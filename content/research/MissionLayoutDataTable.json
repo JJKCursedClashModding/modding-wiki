@@ -3,51 +3,204 @@
   "fields": {
     "Id": {
       "simple": "Mission layout identifier.",
-      "technical": "FName import key/row name for FGameDataTableRow_MissionLayout. It is not chosen directly by gameplay: AGameBattleManager::GetCharacterStartTransform first finds the active Map row, indexes MapRow->Id_MissionLayout with the current MissionWave->MissionLayoutIndex, and then resolves that id against MissionLayoutDataTables (DTM+0x9B0).",
+      "technical": "FName import key/row name for FGameDataTableRow_MissionLayout (the export labels it ID, and the asset declares ImportKeyField 'Id'); an unassigned value is NAME_None. It is not chosen directly by gameplay: AGameBattleManager::GetCharacterStartTransform resolves the current map row by StudioBattleLevelRequest_CA0.BattleLevel, indexes MapRow->Id_MissionLayout with the current MissionWave->MissionLayoutIndex, and then resolves that name against MissionLayoutDataTables (DTM+0x9B0). The first table in that array whose FindRow finds the key wins. No direct read of the row's own Id member was found; its role is lookup identity.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_MissionLayout.h:13",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionLayout.h:12",
         "Source/Abrams/Public/GameDataTableManager.h:196",
+        "Source/Abrams/Private/GameDataTableManager.cpp:285",
+        "Source/Abrams/Private/GameBattleManager.cpp:1486",
         "Source/Abrams/Private/GameBattleManager.cpp:1487",
+        "Source/Abrams/Private/GameBattleManager.cpp:1488",
+        "Source/Abrams/Private/GameBattleManager.cpp:1490",
         "Source/Abrams/Private/GameBattleManager.cpp:1491"
       ],
-      "status": "observed"
+      "status": "verified"
     },
     "Location": {
       "simple": "Spawn positions, indexed by battle character slot.",
-      "technical": "TArray<FVector>, default empty. If Layout->Location.IsValidIndex(Index), GetCharacterStartTransform replaces the translated component of the start transform with Location[Index]. The Z component is subsequently overwritten by GameBattle_TraceGroundHeight over the world, so the authoritative final height is ground-traced rather than the raw data value. No layout row is selected when MapRow->Id_MissionLayout is out of range or None.",
+      "technical": "TArray<FVector>, constructor-default empty; every supplied row nevertheless has exactly six entries. When the layout row is selected for the active map/wave and Layout->Location.IsValidIndex(Index), SetTranslation(Layout->Location[Index]) replaces the translation of the base transform taken from the battle area's pair component (or FTransform::Identity). Pair selects that fallback area array, not a different layout array. Coordinates are world-space Unreal units (centimetres). The result's Z is then always passed through GameBattle_TraceGroundHeight(World, Location, +200, -10000), which returns the nearest qualifying ground hit's ImpactPoint.Z + 1 or the original Z when no hit; X/Y are untouched. Zero-valued exported entries are ordinary data, not a skip sentinel: a valid Index still sets translation to (0,0,0) before the Z trace.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionLayout.h:17",
+        "Source/AbramsDataTable/Private/GameDataTableRow_MissionLayout.cpp:3",
         "Source/Abrams/Private/GameBattleManager.cpp:1493",
-        "Source/Abrams/Private/GameBattleManager.cpp:1502",
-        "Source/Abrams/Private/GameBattleManager.cpp:1508"
+        "Source/Abrams/Private/GameBattleManager.cpp:1495",
+        "Source/Abrams/Private/GameBattleManager.cpp:1504",
+        "Source/Abrams/Private/GameBattleManager.cpp:1505",
+        "Source/Abrams/Private/GameBattleManager.cpp:1506",
+        "Source/Abrams/Private/GameManagerTails.cpp:824"
+      ],
+      "status": "verified"
+    },
+    "Location[].X": {
+      "simple": "World X coordinate of a slot's spawn position, in Unreal units (centimetres).",
+      "technical": "The double-valued FVector X component (exported as a JSON number). It is consumed only as part of the whole Location[Index] value, via SetTranslation, when a layout row is found and IsValidIndex(Index) passes; the subsequent ground trace leaves X unchanged. The native array defaults empty; all 137 exported rows have six entries, and a zero X is data rather than a skip marker.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionLayout.h:17",
+        "Source/Abrams/Private/GameBattleManager.cpp:1495",
+        "Source/Abrams/Private/GameBattleManager.cpp:1504",
+        "Source/Abrams/Private/GameBattleManager.cpp:1506"
+      ],
+      "status": "verified"
+    },
+    "Location[].Y": {
+      "simple": "World Y coordinate of a slot's spawn position, in Unreal units (centimetres).",
+      "technical": "The double-valued FVector Y component (exported as a JSON number). It is consumed only as part of the whole Location[Index] value, via SetTranslation, when a layout row is found and IsValidIndex(Index) passes; the subsequent ground trace leaves Y unchanged. The native array defaults empty; all 137 exported rows have six entries, and a zero Y is data rather than a skip marker.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionLayout.h:17",
+        "Source/Abrams/Private/GameBattleManager.cpp:1495",
+        "Source/Abrams/Private/GameBattleManager.cpp:1504",
+        "Source/Abrams/Private/GameBattleManager.cpp:1506"
+      ],
+      "status": "verified"
+    },
+    "Location[].Z": {
+      "simple": "Initial world Z coordinate of a slot's spawn position, before ground adjustment.",
+      "technical": "The double-valued FVector Z component (exported as a JSON number). It is copied with X/Y by SetTranslation when the layout row and slot are valid, but is then overwritten by GameBattle_TraceGroundHeight(+200/-10000): the final Z is the nearest qualifying ground-hit ImpactPoint.Z + 1, or the original Z if no hit is found. Exported values include negative, zero and elevated heights; zero is not a skip sentinel.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionLayout.h:17",
+        "Source/Abrams/Private/GameBattleManager.cpp:1495",
+        "Source/Abrams/Private/GameBattleManager.cpp:1505",
+        "Source/Abrams/Private/GameManagerTails.cpp:824"
       ],
       "status": "verified"
     },
     "Rotation": {
       "simple": "Spawn rotations, indexed by battle character slot.",
-      "technical": "TArray<FRotator>, default empty. If Layout->Rotation.IsValidIndex(Index), the start transform's rotation is set from FQuat(Rotation[Index]). Unlike Location, the final rotation is not ground-adjusted; when the array does not contain the slot the transform from the battle area (or identity) is kept.",
+      "technical": "TArray<FRotator>, constructor-default empty; every supplied row nevertheless has exactly six entries. If Layout->Rotation.IsValidIndex(Index), Result.SetRotation(FQuat(Layout->Rotation[Index])) replaces the rotation of the area-component transform (or identity); Pair does not choose a separate rotation array. FRotator angles are degrees (exported Pitch/Roll are all 0.0; Yaw ranges -180 to 290). Unlike Location, the ground trace only changes translation Z, so within this function the row's rotation is final; a missing row or out-of-range slot keeps the battle-area or identity rotation. All-zero exported rotations are real identity values, not skip markers.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionLayout.h:20",
-        "Source/Abrams/Private/GameBattleManager.cpp:1496",
-        "Source/Abrams/Private/GameBattleManager.cpp:1504"
+        "Source/AbramsDataTable/Private/GameDataTableRow_MissionLayout.cpp:3",
+        "Source/Abrams/Private/GameBattleManager.cpp:1497",
+        "Source/Abrams/Private/GameBattleManager.cpp:1499",
+        "Source/Abrams/Private/GameBattleManager.cpp:1504",
+        "Source/Abrams/Private/GameBattleManager.cpp:1506"
+      ],
+      "status": "verified"
+    },
+    "Rotation[].Pitch": {
+      "simple": "FRotator pitch in degrees for a slot's spawn rotation.",
+      "technical": "The double-valued FRotator Pitch component (exported as a JSON number). It is converted with FQuat and applied through SetRotation only when the layout row and Rotation.IsValidIndex(Index) pass. All 822 exported rotation entries have Pitch 0.0; that is an identity value, not a sentinel meaning 'no override'.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionLayout.h:20",
+        "Source/Abrams/Private/GameBattleManager.cpp:1499"
+      ],
+      "status": "verified"
+    },
+    "Rotation[].Roll": {
+      "simple": "FRotator roll in degrees for a slot's spawn rotation.",
+      "technical": "The double-valued FRotator Roll component (exported as a JSON number). It is converted with FQuat and applied through SetRotation only when the layout row and Rotation.IsValidIndex(Index) pass. All 822 exported rotation entries have Roll 0.0; that is an identity value, not a sentinel meaning 'no override'.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionLayout.h:20",
+        "Source/Abrams/Private/GameBattleManager.cpp:1499"
+      ],
+      "status": "verified"
+    },
+    "Rotation[].Yaw": {
+      "simple": "FRotator yaw in degrees for a slot's spawn facing.",
+      "technical": "The double-valued FRotator Yaw component (exported as a JSON number). It is converted with FQuat and applied through SetRotation when the layout row and Rotation.IsValidIndex(Index) pass; the ground trace does not alter it. Exported values range -180 to 290 degrees, so -180 and 180 are equivalent facings rather than distinct sentinels.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionLayout.h:20",
+        "Source/Abrams/Private/GameBattleManager.cpp:1499"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset contains 137 rows; its RowStruct is FGameDataTableRow_MissionLayout and the manager loads MissionLayoutDataTable into MissionLayoutDataTables (DTM+0x9B0).",
-    "Rows are reached through a cross-table join: MissionWave.MissionLayoutIndex -> Map.Id_MissionLayout[] -> MissionLayout row. This is the only consumer identified in the reconstructed source.",
-    "The spawn-transform function is reconstructed with retail RVA 0x1015dc0 in comments; the scoreboard should be consulted for its current byte/status state.",
-    "Only available C++ and the export were reviewed; not a claim about every retail or Blueprint use."
+    "The supplied export is one asset/shard named MissionLayoutDataTable: 137 rows, RowStruct Class'GameDataTableRow_MissionLayout' from /Script/AbramsDataTable, ImportKeyField 'Id'. Every exported ID equals its row name and every row has six Location and six Rotation entries.",
+    "StartInitialLoading registers the name 'MissionLayoutDataTable' under FPrimaryAssetType 'DataTable', whose scan directory is /Game/DataTables; after load completion Tick resolves it through the asset manager and appends the UDataTable to MissionLayoutDataTables (DTM+0x9B0). No other direct reference to that cache or asset name appears in the reconstructed Source.",
+    "The only direct source-side consumer chain is MissionWave.MissionLayoutIndex -> Map.Id_MissionLayout[] -> MissionLayout row -> AGameBattleManager::GetCharacterStartTransform. The supplied MapDataTable has 30 rows with 16-element Id_MissionLayout arrays; 134 of the 137 layout row names are referenced at least once, while MAP16_ST112_2, MAP16_ST112_3 and MAP16_ST112_4 are unreferenced. MissionWaveDataTable has 1774 rows: 133 use the -1 no-override sentinel, and all non-negative exported indices (0..4 and 8..13) fall within the 16-element Map arrays.",
+    "Precedence is FTransform::Identity -> battle-area pair component transform -> layout Location/Rotation (only when the wave, map row, wave index and character slot all pass their guards) -> final Z ground trace. Native defaults are NAME_None and empty arrays; exported zero locations and zero rotations are ordinary values, not skip markers.",
+    "AGameBattleArea::GetCharacterStartTransform (retail 0x1015c60) is a separate area-slot helper used by domain-expansion sub-state 6 and does not consult this table. It should not be confused with AGameBattleManager::GetCharacterStartTransform (0x1015dc0), which owns the mission-layout override.",
+    "The C++ path is reconstructed: source comments identify retail RVA 0x1015dc0 and status/verdicts.json currently records a MATCH claim for that RVA from Tools/verify/LANES/w23-deps-1.md. No retail Blueprint graph dump or live retail run was available, so this is not a claim about every possible retail or Blueprint use."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameBattleManager.cpp:1471",
-      "detail": "GetCharacterStartTransform applies Location and Rotation for the active wave's layout row."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:285",
+      "detail": "StartInitialLoading registers 'MissionLayoutDataTable'; after load completion Tick resolves its loader and appends the UDataTable to MissionLayoutDataTables (DTM+0x9B0)."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_BattleArcade.cpp:220",
-      "detail": "Battle entry construction calls GetCharacterStartTransform for each character slot."
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1486",
+      "detail": "GetCharacterStartTransform joins the current mission wave to the active Map row by StudioBattleLevelRequest_CA0.BattleLevel, then indexes Map.Id_MissionLayout[Wave.MissionLayoutIndex] and resolves that name in MissionLayoutDataTables."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1493",
+      "detail": "When the row and character slot Index are valid, Location[Index] overrides translation and Rotation[Index] overrides rotation before the final Z ground trace."
+    },
+    {
+      "source": "Source/Abrams/Public/GameBattleArea.h:83",
+      "detail": "EGameBattlePair selects the fallback per-pair area component array; an invalid pair or slot leaves FTransform::Identity. The mission layout arrays are not pair-specific."
+    },
+    {
+      "source": "Source/Abrams/Private/GameManagerTails.cpp:824",
+      "detail": "GameBattle_TraceGroundHeight provides the final Z from a +200/-10000 cm line trace (ground-hit Z+1, otherwise the original Z); layout X/Y and rotation are unchanged."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:778",
+      "detail": "System360->MissionWave is MissionWaves[RetryCount] for Arcade (and likewise PvE at line 797 and Story at line 820); it supplies MissionLayoutIndex for the join."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleArcade.cpp:222",
+      "detail": "Arcade entry construction stores GetCharacterStartTransform in Setup.StartTransform for each character slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleAgingOnline.cpp:158",
+      "detail": "Online aging case 1 stores GetCharacterStartTransform in Setup.StartTransform for each character slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleAgingOnline.cpp:202",
+      "detail": "Online aging case 0 stores GetCharacterStartTransform in Setup.StartTransform for each network member slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleDemo.cpp:129",
+      "detail": "Demo battle entry construction stores GetCharacterStartTransform in Setup.StartTransform for each character slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleFree.cpp:176",
+      "detail": "Free battle entry construction stores GetCharacterStartTransform in Setup.StartTransform for each character slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:608",
+      "detail": "PvE solo entry construction stores GetCharacterStartTransform in Setup.StartTransform for each character slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvETag.cpp:191",
+      "detail": "PvE tag entry construction stores GetCharacterStartTransform in Setup.StartTransform for each character slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvP.cpp:360",
+      "detail": "PvP entry construction stores GetCharacterStartTransform in Setup.StartTransform for each character slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleReplay.cpp:161",
+      "detail": "Replay entry construction stores GetCharacterStartTransform in Setup.StartTransform for each character slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:163",
+      "detail": "Story entry construction stores GetCharacterStartTransform in Setup.StartTransform for each character slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleTest.cpp:118",
+      "detail": "Test battle entry construction stores GetCharacterStartTransform in Setup.StartTransform for each character slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleVisualLobby.cpp:1483",
+      "detail": "Visual-lobby entry construction stores GetCharacterStartTransform(MemberStartPair, Index) in Setup.StartTransform."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:855",
+      "detail": "Built characters receive ApplyCharacterSetup(Entry.Setup), which consumes Setup.StartTransform for actual placement."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:1015",
+      "detail": "ApplyCharacterSetup sets the character's location/rotation from Setup.StartTransform and caches it as AGameCharacter.StartTransform."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleFreeStates.cpp:464",
+      "detail": "After the intro, Free battle resets the character to the cached StartTransform."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_07.cpp:627",
+      "detail": "Domain-expansion sub-state 6 uses the separate AGameBattleArea::GetCharacterStartTransform helper; it bypasses the mission-layout join."
     }
   ]
 }

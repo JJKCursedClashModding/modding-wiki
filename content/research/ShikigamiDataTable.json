@@ -1,30 +1,35 @@
 {
-  "description": "Core shikigami (summon) definition: Blueprint, action controller, stats, cooldowns, linked animation/material/effect/sound/unique rows and auto-attack ranges.",
+  "description": "Core shikigami (summon) definition: row ID and actor Blueprint, linked action/animation/material/effect/sound/voice/unique rows, action and bone controller selection, HP/down gauges, summon/order cooldowns, instance-death and immortality flags, and auto-attack ranges.",
   "fields": {
     "ID": {
       "simple": "Shikigami ID, e.g. CN_010.",
-      "technical": "FName row key reached through joins CharacterShikigami.Id_Shikigami[] -> ShikigamiDataTables (+0x6C0) in battle preload/spawn/sequencer; capture paths use CharacterCaptureRow.Id_ShikigamiCharacter. The first table containing the ID wins; missing rows abort ResolveRows or are skipped depending on the caller. 20 exported rows (CN_010 ... CN_280 family).",
+      "technical": "FName row key; all 20 exported row keys equal Id. Battle preload/spawn/sequencer join CharacterShikigami.Id_Shikigami[] to ShikigamiDataTables (+0x6C0), while capture uses CharacterCaptureRow.Id_ShikigamiCharacter. The manager's table arrays are searched in registration order and return the first matching row (the current build registers one ShikigamiDataTable), and these callers skip a missing row. The cached AGameShikigami::ShikigamiRow->Id is also used by sequencer binding lookup and character-specific battle UI. Exported rows are CN_010 through CN_280, including the CN_050/051/052 variants.",
       "evidence": [
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:198",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:917",
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:451",
-        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:761"
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:761",
+        "Source/Abrams/Private/GameSequencerManager.cpp:1046",
+        "Source/AbramsSequencer/Private/AbramsSequencerModuleBase.cpp:211",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_030.cpp:61"
       ],
       "status": "verified"
     },
     "FileName_BP": {
       "simple": "Shikigami actor Blueprint asset name.",
-      "technical": "FName primary-asset loader key (export rows are <ID>_BP, e.g. CN_010_00_BP). Battle preload appends it to the shikigami asset list; capture setup resolves it via Slot.ShikigamiLoaders.FindChecked (a missing loader is fatal there). Used with GamePrimaryAssetType_Shikigami.",
+      "technical": "FName primary-asset loader key derived from the row ID: base rows use <ID>_00_BP (e.g. CN_010_00_BP) and the three _10 variants use <ID>_BP (e.g. CN_050_10_BP). Battle preload creates Shikigami primary-asset loaders from it and appends it to the shikigami asset list; battle spawn and level-sequencer spawn use the loaded class from StudioShikigamiLoaders_950. Capture setup calls Slot.ShikigamiLoaders.FindChecked on it, so an unregistered key is fatal there. Used with GamePrimaryAssetType_Shikigami.",
       "evidence": [
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:214",
-        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1139",
-        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:455"
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:922",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:764",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:455",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1195"
       ],
       "status": "verified"
     },
     "Id_ShikigamiMaterial": {
       "simple": "ShikigamiMaterialDataTable row ID for material patterns.",
-      "technical": "FName; resolved on demand by the shikigami material controller when a pattern is applied, via ShikigamiMaterialDataTables (+0x6D0). None/missing rows leave materials unchanged. Export values are None for most rows and e.g. CN_040 where patterns exist.",
+      "technical": "FName; None in 16/20 exports, otherwise CN_040, CN_052 (two rows) or CN_080. Resolved on demand by UGameShikigamiMaterialController when a pattern is applied, via ShikigamiMaterialDataTables (+0x6D0): SetMaterialPattern(0, nullptr) at spawn and later SetMaterialPattern/AddMaterialPattern calls all look up this ID when no row is passed. None or a missing row makes those helpers return before changing material-section visibility or MaterialPattern. All exported non-None IDs resolve.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:1710",
         "Source/Abrams/Private/GameShikigami.cpp:1787",
@@ -34,7 +39,7 @@
     },
     "Id_ShikigamiAnimation": {
       "simple": "List of ShikigamiAnimationDataTable sets to load/use.",
-      "technical": "TArray<FName> of animation-set IDs. Battle preload appends each set's FileName array to the AnimMontage preload list; battle spawn resolves each set and calls AnimInstance.SetAnimationAsset for its Key/FileName pairs. Export CN_010 uses CN_010 (base), CN_010_DAMAGE and per-attack sets with None padding.",
+      "technical": "TArray<FName> of animation-set IDs; all 20 export arrays have 10 slots with None padding and every non-None ID resolves in ShikigamiAnimationDataTable. Battle preload appends each referenced set's FileName array to the AnimMontage preload list; battle spawn resolves each non-None set and calls AnimInstance.SetAnimationAsset(Key[i], Montage) for its paired Key/FileName entries (skipping None pairs). Export CN_010 uses CN_010 (base), CN_010_DAMAGE and per-attack sets.",
       "evidence": [
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:215",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:931",
@@ -44,7 +49,7 @@
     },
     "ActionControllerType": {
       "simple": "Enum selecting the shikigami's action controller class.",
-      "technical": "EGameShikigamiActionControllerType (e.g. CN_010) passed to AGameShikigami::CreateActionController and CreateBoneController at spawn. Failure to create either aborts shikigami initialization. Export rows carry the matching CN_xxx enum value.",
+      "technical": "uint8-backed EGameShikigamiActionControllerType. Exports use the matching CN_xxx enumerators, except CN_051, CN_052 and both _10 variants, which all use CN_050. Passed to AGameShikigami::CreateActionController and CreateBoneController at spawn: the switches choose controller subclasses and also set follow height, summon offset, order/placement flags and (for CN_231) effect rotation. Failure of either creator, or of CreateMaterialController, makes Setup return false. The C++ constructor default is None.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:1161",
         "Source/Abrams/Private/GameShikigami.cpp:1162"
@@ -53,7 +58,7 @@
     },
     "SummonCursedEnergyLevel": {
       "simple": "Minimum caster cursed-energy level to summon.",
-      "technical": "int32 compared with OwnerCharacter.StatusController.GetCursedEnergyLevelClamped(); when the row value is greater, AGameShikigami::IsSummonAvailable returns false before the summon-cooldown check. Export CN_010 uses 1.",
+      "technical": "int32; C++ constructor default 0, but all exports are explicit (1 in 19 rows, 2 in CN_020). AGameShikigami::IsSummonAvailable first compares the row value strictly greater than OwnerCharacter.StatusController.GetCursedEnergyLevelClamped(); when it is greater, summoning is rejected before the summon-cooldown check.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:171",
         "Source/Abrams/Public/GameShikigami.h:320"
@@ -62,55 +67,63 @@
     },
     "HitPoint": {
       "simple": "Shikigami maximum/current hit points.",
-      "technical": "float copied to both HitPointMax and HitPoint by UGameShikigamiStatusController::ApplyHitPointParameters (retail 0x1414952E0); subsequent damage changes the current value. Export CN_010=120.0.",
+      "technical": "float; C++ constructor default 0, explicitly serialized in every row (CN_010=120.0; 1.0/100.0/200.0 elsewhere). UGameShikigamiStatusController::ApplyHitPointParameters copies it to both HitPointMax and HitPoint at setup and on action-driven resets; damage later clamps and changes the current value while HitPointMax remains the row value.",
       "evidence": [
         "Source/Abrams/Private/GameShikigamiStatusController.cpp:5",
-        "Source/Abrams/Private/GameShikigami.cpp:1125"
+        "Source/Abrams/Private/GameShikigami.cpp:1125",
+        "Source/Abrams/Private/GameActorStatusController.cpp:10",
+        "Source/Abrams/Private/GameBattleDamage.cpp:879"
       ],
       "status": "verified"
     },
     "DownValue": {
       "simple": "Shikigami down/daze gauge maximum and initial value.",
-      "technical": "float copied to DownValueMax and DownValue by ApplyDownValueParameters (retail 0x1414952A0); damage reduces DownValue until it reaches zero and the shikigami goes down. Export CN_010=150.0.",
+      "technical": "float down/daze gauge maximum and initial value; C++ constructor default 0, explicitly serialized in every row. CN_010=150.0; 15/20 rows use -1.0. UGameShikigamiStatusController::ApplyDownValueParameters writes the row value directly to both DownValueMax and DownValue (unlike the character status setter, it does not clamp a negative value). GameBattleDamage only decrements DownValue while it is >0, so -1.0 effectively marks a shikigami with no down gauge for that path. Actions also reapply the row value to refill it.",
       "evidence": [
         "Source/Abrams/Private/GameShikigamiStatusController.cpp:13",
-        "Source/Abrams/Private/GameShikigami.cpp:1126"
+        "Source/Abrams/Private/GameShikigami.cpp:1126",
+        "Source/Abrams/Private/GameActorStatusController.cpp:16",
+        "Source/Abrams/Private/GameBattleDamage.cpp:905"
       ],
       "status": "verified"
     },
     "OrderCoolTime": {
       "simple": "Cooldown between player orders to the shikigami.",
-      "technical": "float seconds copied to StatusController.OrderCoolTime at setup and reset by shikigami actions (row +0x40); CP_030/CP_240 order actions copy it into the status timer (Unknown98) to gate further orders. Export CN_010=0.3.",
+      "technical": "float seconds; C++ constructor default 0, explicitly serialized as -1.0 in 10 rows, 0.0 in 8 rows and 0.3 in CN_010/CN_020. Setup copies it to StatusController.OrderCoolTime, and release actions re-copy the row value there. CP_030/CP_160/CP_240 order helpers start the order timer (Unknown98) from it; the timer only ticks while >0 and order checks require <=0, so non-positive values mean no order cooldown.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:1129",
         "Source/Abrams/Private/GameShikigamiAction.cpp:1305",
         "Source/Abrams/Private/CP_030_ActionController.cpp:144",
-        "Source/Abrams/Public/GameShikigamiStatusController.h:30"
+        "Source/Abrams/Private/CP_240_ActionController.cpp:792",
+        "Source/Abrams/Private/GameShikigamiStatusController.cpp:32"
       ],
       "status": "verified"
     },
     "SummonCoolTime": {
       "simple": "Cooldown before the shikigami can be summoned again.",
-      "technical": "float seconds copied to StatusController.SummonCoolTime at setup; actions set SummonCoolTimeLeft from it, and UI widgets display the remaining ratio SummonCoolTimeLeft/SummonCoolTime. Export CN_010=16.0.",
+      "technical": "float seconds; C++ constructor default 0, explicitly serialized as -1.0 in 10 rows, 0.0 in 6 rows and 8.0/15.0/16.0/18.0 in four rows. Setup copies it to StatusController.SummonCoolTime; release/downed-hit paths set SummonCoolTimeLeft from it and the left value ticks down only while >0. IsSummonAvailable treats <=0 as available, and CP_030/CP_160 UI widgets display SummonCoolTimeLeft/SummonCoolTime only when the denominator is >0, so -1.0 is a no-cooldown sentinel rather than a negative duration.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:1127",
+        "Source/Abrams/Private/GameShikigami.cpp:495",
         "Source/Abrams/Private/GameShikigamiAction.cpp:341",
-        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_030.cpp:46"
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_030.cpp:46",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_160.cpp:33"
       ],
       "status": "verified"
     },
     "bIsInstanceDeathEnabled": {
-      "simple": "Whether this summon can die as an instance.",
-      "technical": "bool returned by AGameShikigami::IsInstanceDeathEnabled (retail 0x1488820, row +0x48); the flag is consumed through the actor interface, so the actual death/cleanup decision is in callers outside this table's code. Export rows all false.",
+      "simple": "Whether damage immediately HP-defeats this summoned instance.",
+      "technical": "bool; C++ constructor default false. Exported true only for CN_051, CN_051_10 and CN_110 (3/20), false for the other 17. AGameShikigami::IsInstanceDeathEnabled returns the row flag; GameBattleDamage forces NewHitPoint to 0 whenever it is true, so the next damage application leaves the instance HP-empty regardless of its prior HitPoint.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:151",
-        "Source/Abrams/Public/GameShikigami.h:242"
+        "Source/Abrams/Public/GameShikigami.h:242",
+        "Source/Abrams/Private/GameBattleDamage.cpp:880"
       ],
       "status": "verified"
     },
     "bImmortalityEnabled": {
       "simple": "Whether the shikigami is immune to normal defeat.",
-      "technical": "bool checked at the start of AGameShikigami::IsDefeated (retail 0x1488350): when true, defeat is driven solely by bRequestedActive instead of StatusController hit points. Export rows all false.",
+      "technical": "bool; C++ constructor default false. Exported true for CN_040, CN_070, CN_200, CN_272 and CN_280 (5/20), false for the other 15. At the start of AGameShikigami::IsDefeated, true makes the result solely (!bRequestedActive) without consulting HP; false uses the normal path in which an empty HitPoint or an inactive request also counts as defeated.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:1955"
       ],
@@ -118,25 +131,29 @@
     },
     "AutoAttackDistance_Owner": {
       "simple": "Maximum distance from the summoner for auto-attack.",
-      "technical": "float UE units; GetAutoAttackDistanceOwner returns it (retail 0x14147FF20) and shikigami action AI compares the distance between shikigami and OwnerCharacter against it before auto-attacking. Export CN_010=1800.0.",
+      "technical": "float UE world-distance units; C++ constructor default 0 (all exports are positive). GetAutoAttackDistanceOwner returns the row value. Generic FGameShikigamiAttackActionBase::CanReplace rejects an auto-attack when shikigami-to-owner distance exceeds it (after the UseAutoAttackDistance check); CN_230 order/cancel logic uses the same getter, with one order path rejecting on owner distance alone. Export CN_010=1800.0.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:147",
-        "Source/Abrams/Private/GameShikigamiAction.cpp:1379"
+        "Source/Abrams/Private/GameShikigamiAction.cpp:1379",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:40",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:1236"
       ],
       "status": "verified"
     },
     "AutoAttackDistance_Target": {
       "simple": "Maximum distance to the target for auto-attack.",
-      "technical": "float UE units; GetAutoAttackDistanceTarget returns it (retail 0x14147FF30) and the action AI compares shikigami-to-target distance against it (inverted comparison in the source; NaN counts as in range). Export CN_010=2500.0.",
+      "technical": "float UE world-distance units; C++ constructor default 0 (all exports are positive). GetAutoAttackDistanceTarget returns the row value. Generic FGameShikigamiAttackActionBase::CanReplace requires the shikigami-to-secondary-target distance to be within it when a target exists; the final comparison is !(distance > limit), so NaN counts as in range. CN_230 order/cancel checks use the same getter and refuse only when both owner and target distances are exceeded. Export CN_010=2500.0.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:148",
-        "Source/Abrams/Private/GameShikigamiAction.cpp:1389"
+        "Source/Abrams/Private/GameShikigamiAction.cpp:1389",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:40",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:972"
       ],
       "status": "verified"
     },
     "Id_ActionMove": {
       "simple": "ActionMoveDataTable row for shikigami movement.",
-      "technical": "FName; when non-None, ResolveRows looks it up in ActionMoveDataTables and caches MoveRow; a missing row aborts setup while None keeps the previous row. Shikigami action code reads cached MoveRow thereafter.",
+      "technical": "FName; ActionMoveDataTable row for shikigami movement. All exports are non-None and resolve in ActionMoveDataTable. When non-None, ResolveRows looks it up in ActionMoveDataTables and caches MoveRow; a missing row makes ResolveRows return false without overwriting the previously cached row, while None is skipped. Shikigami movement code then reads cached MoveRow.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:843",
         "Source/Abrams/Private/GameShikigami.cpp:845"
@@ -145,7 +162,7 @@
     },
     "Id_ActionJump": {
       "simple": "ActionJumpDataTable row for shikigami jumping.",
-      "technical": "FName; same lookup/cache pattern as Id_ActionMove over ActionJumpDataTables (cached JumpRow, +0x5D0); missing non-None rows abort setup.",
+      "technical": "FName; ActionJumpDataTable row for shikigami jumping. All exports are non-None and resolve in the ActionJumpDataTable shards; same lookup/cache pattern as Id_ActionMove over ActionJumpDataTables (cached JumpRow, +0x5D0). A missing row fails setup while leaving the old cached pointer; None is skipped. Export CN_010 uses CN_010.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:852",
         "Source/Abrams/Private/GameShikigami.cpp:854"
@@ -154,7 +171,7 @@
     },
     "Id_ActionDash": {
       "simple": "ActionDashDataTable row for shikigami dashing.",
-      "technical": "FName; same lookup/cache pattern over ActionDashDataTables (cached DashRow, +0x5E0); missing non-None rows abort setup. Export CN_010 uses CN_010.",
+      "technical": "FName; ActionDashDataTable row for shikigami dashing. All exports are non-None and resolve in the ActionDashDataTable shards; same lookup/cache pattern over ActionDashDataTables (cached DashRow, +0x5E0). A missing row fails setup while leaving the old cached pointer; None is skipped. Export CN_010 uses CN_010.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:861",
         "Source/Abrams/Private/GameShikigami.cpp:863"
@@ -163,25 +180,27 @@
     },
     "Id_CharacterEffect": {
       "simple": "CharacterEffectDataTable row for shikigami visual effects.",
-      "technical": "FName resolved through Shikigami_FindRow over CharacterEffectDataTables (+0x4D0) and cached as EffectRow during ResolveRows; that row's FileName_BP list feeds preload. None yields no effect row. Most exported shikigami rows use None.",
+      "technical": "FName; None in 18/20 exports, otherwise CN_110 or CN_231. Resolved by Shikigami_FindRow over CharacterEffectDataTables (+0x4D0) during ResolveRows and cached as EffectRow; None leaves it null. The cached row supplies shikigami effect tuning: GetMapGroundEffectScale falls back to (1,1,1) without it and CN_110's aura reads BuffDebuffEffectScale and aura colors. This field does NOT drive battle preload: BattleAssets_CharacterEffects appends FileName_BP from the Character row's own Id_CharacterEffect instead.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:876",
-        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:132"
+        "Source/Abrams/Private/GameShikigami.cpp:569",
+        "Source/Abrams/Private/CN_110_ActionController.cpp:80",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:136"
       ],
       "status": "verified"
     },
     "Id_CharacterSound": {
       "simple": "CharacterSoundDataTable row for shikigami sounds.",
-      "technical": "FName resolved via Shikigami_FindCharacterSoundRow (retail 0x14147E710) over CharacterSoundDataTables (+0x510), with bCheckNone=true, and cached as SoundRow. Export rows are mostly None.",
+      "technical": "FName; None in 17/20 exports, otherwise CN_020, CN_081 or CN_111. Resolved via Shikigami_FindCharacterSoundRow (retail 0x14147E710) over CharacterSoundDataTables (+0x510) with bCheckNone=true and cached as SoundRow. The cached row's FootstepType is returned by AGameShikigami::GetFootstepType, which yields 0 when no row resolved; this field is not the character-variation sound ID used by the battle asset collector.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:877",
-        "Source/Abrams/Private/GameShikigami.cpp:877"
+        "Source/Abrams/Private/GameShikigami.cpp:1861"
       ],
       "status": "verified"
     },
     "Id_ShikigamiVoiceGroup_DefaultAction": {
       "simple": "Voice group for generic shikigami actions.",
-      "technical": "FName (row +0x7C) resolved to a ShikigamiVoiceGroupDataTable row in PlayVoice case 1; the group's Id_VoiceGroup[Value] selects the cue without a bounds check (Value used directly). Any non-None voice group field also enables shikigami battle voice playback via SetBattleVoiceEnabled.",
+      "technical": "FName (row +0x7C); None in 18/20 exports, otherwise CN_040_DEFAULTACTION or CN_080_DEFAULTACTION. PlayVoice case 1 resolves it in ShikigamiVoiceGroupDataTables. Value directly indexes ShikigamiVoiceGroup.Id_VoiceGroup with no bounds check; that FName is then looked up in VoiceGroupDataTables and one of its non-None Id_Voice entries is chosen randomly for playback, gated by bActionVoiceEnabled and bVoiceGroupPlaybackEnabled. Any non-None voice-group field causes SetBattleVoiceEnabled to set the latter flag.",
       "evidence": [
         "Source/Abrams/Private/GameShikigamiActionController.cpp:449",
         "Source/Abrams/Private/GameShikigami.cpp:1824"
@@ -190,7 +209,7 @@
     },
     "Id_ShikigamiVoiceGroup_Attack": {
       "simple": "Voice group for shikigami attacks.",
-      "technical": "FName (row +0x84) resolved in PlayVoice case 3; requires Value>0 and indexes Id_VoiceGroup[Value-1].",
+      "technical": "FName (row +0x84); None in 17/20 exports, otherwise CN_040_ATTACK, CN_070_ATTACK or CN_080_ATTACK. PlayVoice case 3 requires Value>0 and indexes ShikigamiVoiceGroup.Id_VoiceGroup[Value-1] without a bounds check; the selected FName is then resolved in VoiceGroupDataTables for random cue selection.",
       "evidence": [
         "Source/Abrams/Private/GameShikigamiActionController.cpp:461"
       ],
@@ -198,7 +217,7 @@
     },
     "Id_ShikigamiVoiceGroup_Damage": {
       "simple": "Voice group for shikigami damage reactions.",
-      "technical": "FName (row +0x8C) resolved in PlayVoice case 6; requires Value>0 and indexes Id_VoiceGroup[Value-1].",
+      "technical": "FName (row +0x8C); None in 18/20 exports, otherwise CN_040_DAMAGE or CN_080_DAMAGE. PlayVoice case 6 requires Value>0 and indexes Id_VoiceGroup[Value-1] without a bounds check before the VoiceGroupDataTables lookup and random cue selection.",
       "evidence": [
         "Source/Abrams/Private/GameShikigamiActionController.cpp:473"
       ],
@@ -206,7 +225,7 @@
     },
     "Id_ShikigamiVoiceGroup_Down": {
       "simple": "Voice group for shikigami down/damage states.",
-      "technical": "FName (row +0x94) resolved in PlayVoice case 8; indexes Id_VoiceGroup[Value] directly (no bounds check).",
+      "technical": "FName (row +0x94); None in 19/20 exports, otherwise CN_080_DOWN. PlayVoice case 8 indexes Id_VoiceGroup[Value] directly with no bounds check before the VoiceGroupDataTables lookup and random cue selection; exported arrays include None holes, so event values matter.",
       "evidence": [
         "Source/Abrams/Private/GameShikigamiActionController.cpp:481"
       ],
@@ -214,7 +233,7 @@
     },
     "Id_ShikigamiVoiceGroup_Unique": {
       "simple": "Voice group for shikigami unique actions.",
-      "technical": "FName (row +0x9C) resolved in PlayVoice case 10; indexes Id_VoiceGroup[Value] directly (no bounds check).",
+      "technical": "FName (row +0x9C); None in 17/20 exports, otherwise CN_040_UNIQUE, CN_080_UNIQUE or CN_200_UNIQUE. PlayVoice case 10 indexes Id_VoiceGroup[Value] directly with no bounds check before the VoiceGroupDataTables lookup and random cue selection.",
       "evidence": [
         "Source/Abrams/Private/GameShikigamiActionController.cpp:489"
       ],
@@ -222,17 +241,18 @@
     },
     "Id_ShikigamiUnique": {
       "simple": "List of ShikigamiUniqueDataTable tuning rows.",
-      "technical": "TArray<FName>; ResolveRows resolves each ID against ShikigamiUniqueDataTables (+0x700) into UniqueRows. Consumers then use GetCharacterUniqueFloatValue(ValueIndex, RowIndex) with the array position as RowIndex. Export CN_010 has base and per-attack entries with None padding.",
+      "technical": "TArray<FName>; every export array has 8 slots and all non-None IDs resolve in ShikigamiUniqueDataTable. ResolveRows clears the cache, then appends one ShikigamiUniqueDataTables result per slot; None or missing IDs become nullptr entries rather than being skipped. Consumers call GetCharacterUniqueFloatValue(ValueIndex, RowIndex) through the actor interface with the array position as RowIndex, using UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds or null checks. Export CN_010 has base and per-attack entries followed by None padding.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:871",
         "Source/Abrams/Private/GameShikigami.cpp:874",
-        "Source/Abrams/Private/GameShikigami.cpp:1253"
+        "Source/Abrams/Private/GameShikigami.cpp:1253",
+        "Source/Abrams/Public/GameShikigami.h:349"
       ],
       "status": "verified"
     },
     "FootIKLimit": {
       "simple": "Foot IK reach limits for the shikigami's bone controller.",
-      "technical": "TArray<double> (export CN_010 has 4 values, all 0.0 for that row) passed as the FootIKLimit pointer to CreateBoneController(ActionControllerType, FootIKLimit) at spawn; per-character bone controllers read elements (usually [0] and sometimes [1]) into limb IK Limit fields. The array is stored in the row without a BlueprintReadWrite specifier in the reconstructed header.",
+      "technical": "TArray<double>; C++ constructor default empty, but all 20 export arrays have 4 doubles. CreateBoneController copies the array into a local and passes it to InitBoneController(ActionControllerType, &Limits). The shikigami UCN_020_BoneController uses element [0] for all four limb limits (CN_020 exports 100.0 there, 0.0 elsewhere; all other shikigami rows are all zero). The same TArray<double> convention is used by character bone controllers where, for example, CN_140 uses [0] for legs and [1] for arms; that [1] behavior should not be attributed to the shikigami controller. In the reconstructed row header this member is EditAnywhere only, without BlueprintReadWrite.",
       "evidence": [
         "Source/Abrams/Private/GameShikigami.cpp:1162",
         "Source/Abrams/Private/CN_020_BoneController.cpp:11",
@@ -243,35 +263,65 @@
     }
   },
   "notes": [
-    "ShikigamiDataTables is manager slot +0x6C0; the name is registered at GameDataTableManager.cpp:410 and resolved at line 238. CharacterShikigamiDataTable (+0x4F0) is the per-character selection table that points here.",
-    "ResolveRows is mostly fail-fast: missing rows for Id_ActionMove/Jump/Dash leave previously cached rows in place but abort setup, while None IDs are skipped. Id_CharacterEffect/Id_ShikigamiUnique tolerate None with bCheckNone behavior of the shared finders.",
-    "The 20 exported rows share the same schema; no localization variants or numbered shards exist in this table (ShikigamiVoiceGroup and ShikigamiUnique are separate tables).",
-    "Voice-group indexing conventions are per-event and unchecked; consult ShikigamiVoiceGroupDataTable for the Id_VoiceGroup arrays."
+    "ShikigamiDataTables is manager slot +0x6C0; the name is registered at GameDataTableManager.cpp:410 and resolved at line 238. CharacterShikigamiDataTable (+0x4F0) is the per-character selection table that points here. Shared finders scan manager table arrays in registration order and return the first match; the current build registers one ShikigamiDataTable.",
+    "ResolveRows first stores ShikigamiRow, then treats linked rows differently: non-None Id_ActionMove/Jump/Dash must resolve or it returns false without overwriting the cached Move/Jump/Dash row, while None is skipped. Id_ShikigamiUnique appends one cache entry per slot, including nullptr for None/missing. CharacterEffect and CharacterSound use None-rejecting finders and tolerate None by leaving their cached pointer null. Setup/battle-spawn/capture callers generally ignore Setup's false result, so a failed linked lookup can leave a partially initialized actor.",
+    "All 20 exported rows explicitly serialize all 26 fields and share the same schema; there are no localization variants or numbered shards for this table. C++ constructor defaults (empty FNames/TArrays, None enum, zeros and false) are reconstruction fallback values, not omitted shipped cells. Exported non-None IDs resolve in their respective linked-table exports/shards.",
+    "Negative/non-positive cooldown values are meaningful sentinels: OrderCoolTime is -1.0 in 10 rows and 0.0 in 8, while SummonCoolTime is -1.0 in 10 rows and 0.0 in 6. Timers only tick and gates only block while the active timer is >0, and UI ratios guard a positive denominator, so these behave as no cooldown. DownValue=-1.0 (15 rows) similarly means no usable down gauge in the damage path.",
+    "Voice-group indexing conventions are per-event and unchecked: DefaultAction/Down/Unique use Value directly, Attack/Damage require Value>0 and use Value-1. The indexed FName selects a row from ShikigamiVoiceGroupDataTable, whose Id_Voice array is then randomly sampled through VoiceGroupDataTables and VoiceDataTables.",
+    "Exported field names, native types and values are retail-data evidence; runtime mechanics described here come from the current reconstructed C++ (whose comments cite retail RVAs). No Blueprint-only or unobserved retail behavior is asserted."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:198",
-      "detail": "Battle preload joins CharacterShikigami -> Shikigami rows, collecting FileName_BP plus all referenced animation filenames."
+      "detail": "Battle preload joins CharacterShikigami -> Shikigami rows and collects FileName_BP plus montage filenames from each referenced ShikigamiAnimation row."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:917",
+      "detail": "Battle spawn resolves the row through the CharacterShikigami join, obtains its Blueprint loader class, calls SpawnShikigami, and registers Key/FileName montage pairs on the spawned anim instance."
     },
     {
       "source": "Source/Abrams/Private/GameShikigami.cpp:835",
-      "detail": "ResolveRows caches ActionMove/Jump/Dash, unique, effect and sound rows for the spawned shikigami."
+      "detail": "ResolveRows caches ActionMove/Jump/Dash, ShikigamiUnique, CharacterEffect and CharacterSound rows; missing non-None movement rows fail setup while None entries are skipped or become null cache entries as appropriate."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:1125",
+      "detail": "Setup seeds the status controller from HitPoint, DownValue, SummonCoolTime and OrderCoolTime before creating action, bone and material controllers."
     },
     {
       "source": "Source/Abrams/Private/GameShikigami.cpp:1161",
-      "detail": "Spawn creates the action and bone controllers from ActionControllerType and FootIKLimit."
-    },
-    {
-      "source": "Source/Abrams/Private/GameShikigamiStatusController.cpp:5",
-      "detail": "Initializes HP/down gauges and summon/order cooldowns from the row."
+      "detail": "Spawn creates the action and bone controllers from ActionControllerType and FootIKLimit; the enum switch also configures movement/order flags and the CN_231 effect rotation."
     },
     {
       "source": "Source/Abrams/Private/GameShikigamiAction.cpp:1379",
-      "detail": "Auto-attack AI checks owner/target distance limits from the row."
+      "detail": "Generic attack replacement checks shikigami-owner and shikigami-target distances against AutoAttackDistance_Owner/_Target; CN_230 action/order logic reuses both getters with different rejection combinations."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:880",
+      "detail": "Damage application asks IsInstanceDeathEnabled and forces HP to zero for flagged summons; positive DownValue is decremented and can trigger the down action."
     },
     {
       "source": "Source/Abrams/Private/GameShikigamiActionController.cpp:440",
-      "detail": "PlayVoice resolves the five voice group IDs into ShikigamiVoiceGroup rows and indexes their cue arrays."
+      "detail": "PlayVoice resolves the five voice-group IDs into ShikigamiVoiceGroup rows, indexes their Id_VoiceGroup arrays per event, then resolves a VoiceGroup row and randomly selects a voice."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:569",
+      "detail": "Cached EffectRow from Id_CharacterEffect supplies GetMapGroundEffectScale; CN_110's active-set aura also reads that cached row's scale and colors."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:1861",
+      "detail": "Cached SoundRow from Id_CharacterSound supplies GetFootstepType, returning 0 when no row was resolved."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSequencerManager.cpp:1046",
+      "detail": "Sequencer support-character binding finds an owned shikigami by comparing its cached ShikigamiRow->Id with the binding character ID."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerModuleBase.cpp:211",
+      "detail": "Sequencer actor rebinding checks cached Row->Id against the model name and, on mismatch, re-resolves the ShikigamiDataTable row with Setup(bRowsOnly=true)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_030.cpp:46",
+      "detail": "Character-specific battle UI selects icons from cached ShikigamiRow->Id and displays the summon-cooldown ratio copied into the status controller."
     }
   ]
 }

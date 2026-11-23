@@ -1,85 +1,154 @@
 {
-  "description": "Groups individual Arcade missions into selectable roots, with one mission list per difficulty and a root title.",
+  "description": "Defines each selectable Arcade root: an ordered mission-ID list for each difficulty and the localization key for its displayed title. Unlock conditions and run progress are stored elsewhere (CharacterArcadeDataTable and the Arcade run state).",
   "fields": {
     "Id": {
       "simple": "Arcade root/mission-set identifier.",
-      "technical": "FName import key/row name for FGameDataTableRow_ArcadeMissionSet. It comes from CharacterArcade->Id_ArcadeMissionSet on the root-select screen and from Game->ArcadeRun.RootSelection.RootId during an Arcade run, then is looked up over ArcadeMissionSetDataTables (DTM+0x970). No consumer reads the member as a value.",
+      "technical": "FName (default NAME_None) declared as the row's import key/ID. Exported rows key their ID field to the row name (ARCADE_MISSION_A..F). Lookup keys are supplied by FGameDataTableRow_CharacterArcade::Id_ArcadeMissionSet[RootIndex] when building the root list and later by Game->ArcadeRun.RootSelection.RootId; BattleArcade_GetMissionIds and the overview walk ArcadeMissionSetDataTables (DTM+0x970) with UDataTable::FindRow, so the first loaded table containing that key wins (the manager registers only ArcadeMissionSetDataTable). The member is also read as a value: the list-item widget copies MissionSet->Id into DecidedRootId on Decide and FocusedRootId on focus; MenuSequence copies DecidedRootId to RootSelection.RootId and then to the GameManager run.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeMissionSet.h:11",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterArcade.h:18",
+        "JJKCCDatatables/datatables/ArcadeMissionSetDataTable.json",
+        "JJKCCDatatables/datatables/CharacterArcadeDataTable.json",
+        "Source/Abrams/Private/GameDataTableManager.cpp:454",
+        "Source/Abrams/Private/GameDataTableManager.cpp:281",
         "Source/Abrams/Public/GameDataTableManager.h:192",
-        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:192",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:201",
         "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:239",
+        "Source/Abrams/Private/GameArcadeRootSelectListItemWidget.cpp:24",
+        "Source/Abrams/Private/GameArcadeRootSelectListItemWidget.cpp:79",
+        "Source/Abrams/Private/GameMenuSequence.cpp:1265",
+        "Source/Abrams/Private/GameMenuSequence.cpp:1283",
         "Source/Abrams/Private/GameBattleSituationOverviewArcadeWidget.cpp:77"
       ],
-      "status": "observed"
+      "status": "verified"
     },
     "Id_ArcadeMission_Easy": {
       "simple": "Ordered mission ids used for the Easy difficulty and as the fallback list.",
-      "technical": "TArray<FName>, default empty. BattleArcade_GetMissionIds copies this array when Difficulty is neither Normal nor Hard; that includes Easy and any unrecognised difficulty byte. The resulting ordered ids drive mission panels, the run's MissionId, and the situation-overview progression.",
+      "technical": "TArray<FName> (default empty). BattleArcade_GetMissionIds first empties its output and returns this array when Difficulty is not exactly Normal (2) or Hard (3): Easy (1), None (0), Invalid (255) and any other byte all take this branch. A missing mission-set row also returns an empty array. The list is copied in order without filtering None; root-info panels use the array index as the stage index (panel 0 gets stage 0 and its detail number is Index+1), while BattleArcade_IsLastMission treats a missing or None id at Index+1 as the end of the run. All exported Easy/Normal/Hard lists have five IDs and all 90 references resolve to ArcadeMissionDataTable rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeMissionSet.h:15",
-        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:48",
-        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:68",
-        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:78"
+        "JJKCCDatatables/datatables/ArcadeMissionSetDataTable.json",
+        "Source/AbramsDataTable/Public/EGameArcadeDifficulty.h:8",
+        "Source/AbramsDataTable/Public/EGameArcadeDifficulty.h:11",
+        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:52",
+        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:77",
+        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:78",
+        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:110",
+        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:115",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:284",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:289",
+        "Source/Abrams/Private/GameBattleSituationOverviewArcadeWidget.cpp:74",
+        "Source/Abrams/Private/GameBattleSituationOverviewArcadeWidget.cpp:93",
+        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:220",
+        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:222",
+        "JJKCCDatatables/datatables/ArcadeMissionDataTable.json"
       ],
       "status": "verified"
     },
     "Id_ArcadeMission_Normal": {
       "simple": "Ordered mission ids used for the Normal difficulty.",
-      "technical": "TArray<FName>, default empty. BattleArcade_GetMissionIds copies this array only when the difficulty byte equals EGameArcadeDifficulty::Normal; otherwise Easy or Hard is selected. Array order is preserved and the current stage is indexed by the number of already stored battle results.",
+      "technical": "TArray<FName> (default empty). BattleArcade_GetMissionIds copies this array only when the difficulty byte equals EGameArcadeDifficulty::Normal (2); otherwise it selects Hard (3) or the Easy fallback. The UI starts on Normal (OnOpenBegin) and cycles Easy/Normal/Hard before calling UpdateRootInfo. During a run, IntervalArcade chooses the current mission with MissionIds[BattleResults.Num()], so list order and the won-battle count define the stage on that path; that index is not explicitly bounds-checked.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeMissionSet.h:18",
-        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:48",
-        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:70",
+        "JJKCCDatatables/datatables/ArcadeMissionSetDataTable.json",
+        "Source/AbramsDataTable/Public/EGameArcadeDifficulty.h:9",
+        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:71",
         "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:72",
-        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:215"
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:319",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:360",
+        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:220",
+        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:222"
       ],
       "status": "verified"
     },
     "Id_ArcadeMission_Hard": {
       "simple": "Ordered mission ids used for the Hard difficulty.",
-      "technical": "TArray<FName>, default empty. BattleArcade_GetMissionIds copies this array only when the difficulty byte equals EGameArcadeDifficulty::Hard. The returned ids are later resolved against ArcadeMissionDataTable; unused exported slots are None.",
+      "technical": "TArray<FName> (default empty). BattleArcade_GetMissionIds copies this array only when the difficulty byte equals EGameArcadeDifficulty::Hard (3). The helper does not validate the IDs; root-info and overview consumers skip a mission whose ArcadeMissionDataTable lookup fails, while IntervalArcade resolves the current mission without a null/bounds check. Every exported Hard slot is populated and resolves to a mission row; None, when encountered as the next ID, is treated as the end of the run by BattleArcade_IsLastMission.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeMissionSet.h:21",
-        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:48",
-        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:73",
-        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:75"
+        "JJKCCDatatables/datatables/ArcadeMissionSetDataTable.json",
+        "Source/AbramsDataTable/Public/EGameArcadeDifficulty.h:10",
+        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:74",
+        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:75",
+        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:118",
+        "Source/Abrams/Private/GameBattleSituationOverviewArcadeWidget.cpp:80",
+        "JJKCCDatatables/datatables/ArcadeMissionDataTable.json"
       ],
       "status": "verified"
     },
     "Id_Text_Title": {
       "simple": "Localization text id for the root's displayed title.",
-      "technical": "FName, default None. UGameArcadeRootSelectListItemWidget::SetItemData passes it directly to RootNameText->SetTextIdOnly. The exported values are SYS_ARCADE_ROOT_SELECT_ROOT_LABEL_* text ids; the data table supplies only the id, not the localized string. Exported direct consumer is the list-item widget reached through UGameArcadeRootSelectWidget::Setup.",
+      "technical": "FName (default None). UGameArcadeRootSelectListItemWidget::SetItemData passes it directly to RootNameText->SetTextIdOnly. SetTextIdOnly creates an id-only text request: None clears the text, while a SYS_ id is resolved by AGameTextManager through SystemTextDataTable's language columns. The six exported values are SYS_ARCADE_ROOT_SELECT_ROOT_LABEL_0001..0006; those keys exist in SystemTextDataTable (English 'Route A'..'Route F'). This table stores only the key, not the localized string.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeMissionSet.h:24",
+        "JJKCCDatatables/datatables/ArcadeMissionSetDataTable.json",
         "Source/Abrams/Private/GameArcadeRootSelectListItemWidget.cpp:48",
-        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:239"
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:239",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:52",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:60",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:58",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:72",
+        "Source/Abrams/Private/GameTextManager.cpp:456",
+        "Source/Abrams/Private/GameTextManager.cpp:624",
+        "Source/Abrams/Private/GameTextManager.cpp:718",
+        "JJKCCDatatables/datatables/SystemTextDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset has 6 rows; each row supplies parallel Easy/Normal/Hard mission-id lists and a title text id. The manager loads ArcadeMissionSetDataTable into ArcadeMissionSetDataTables (DTM+0x970).",
-    "Difficulty is stored as a byte on the Arcade run and compared against EGameArcadeDifficulty; the default branch means Easy is also the safe fallback in the reconstructed receiver.",
-    "The mission-set finder 0x12fc180 is labelled behavioural in status/functions.json; source comments cite retail RVAs but this file does not claim byte parity.",
-    "No localization-variant or numbered-shard export exists for this table in the supplied set; only the supplied exported asset and reconstructed C++ were examined."
+    "The supplied export has one AssetVariant, one row struct (GameDataTableRow_ArcadeMissionSet, ImportKeyField=Id) and six rows (ARCADE_MISSION_A..F). Each row has three five-entry mission-ID arrays and one title text id. Cross-checked references: all 90 mission IDs resolve to ArcadeMissionDataTable rows and all six title keys resolve to SystemTextDataTable rows.",
+    "GameDataTableManager registers ArcadeMissionSetDataTable by name, resolves its loader after all table loads complete, and adds the loaded UDataTable to ArcadeMissionSetDataTables (DTM+0x970). The configured array contains that one asset; no numbered shards or localization variants of this table exist in the supplied exports. Every finder walks the array and uses the first row hit.",
+    "Root discovery is external: FGameDataTableRow_CharacterArcade::Id_ArcadeMissionSet supplies the candidate SetId at its array Index. The exported CharacterArcadeDataTable has 27 character rows and all 27 per-character shards list ARCADE_MISSION_A..F in the same order. That Index also indexes CharacterArcade::ClearFlagConditions and the user clear bits on the root-select screen; unlock/clear state is not stored in this table.",
+    "EGameArcadeDifficulty is a uint8 enum: None=0, Easy=1, Normal=2, Hard=3, Invalid=255. The root-select UI starts at Normal and cycles Easy/Normal/Hard; MenuSequence copies the widget Difficulty byte into Run.RootSelection.RootByte, and FGameArcadeSettings::Reset writes 255. BattleArcade_GetMissionIds special-cases only 2 and 3, so every other byte uses the Easy list.",
+    "Order is significant. Root info builds up to five mission panels and numbers details from Index+1; the situation overview marks Index < BattleResults.Num() as won and Index == BattleResults.Num() as current; BattleArcade_IsLastMission checks the next slot and treats a missing slot or NAME_None as the end. IntervalArcade indexes MissionIds[BattleResults.Num()] without an explicit bounds check. The export contains no None entries in the three lists.",
+    "Evidence provenance: status/functions.json labels 0x12fc180 (BattleArcade_GetMissionIds), 0x14c16d0 (root-select Setup), 0x14c8730 (root-info UpdateRootInfo) and 0x165afe0 (overview SetupArcade) behavioural/BEHAV-certified, while 0x14d41b0 (list-item SetItemData), 0x14c57a0 (Decide), 0x14b9cc0 (focus), 0x1311060 (IsLastMission) and 0x14ad760 (StepDifficulty) are INV MATCH. Behavioural means reconstructed behaviour, not byte parity.",
+    "No retail Blueprint graph, editor asset, cooked runtime or live game run was inspected for this table. Blueprint/editor-only consumers cannot be exhaustively excluded from the partial supplied Content; the runtime statements above are traced reconstructed C++ (with the recorded status just described) plus the supplied exports."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:48",
-      "detail": "BattleArcade_GetMissionIds selects one of the three difficulty arrays from this row."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:281",
+      "detail": "Loads ArcadeMissionSetDataTable into ArcadeMissionSetDataTables (DTM+0x970) after all table loaders complete."
     },
     {
       "source": "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:239",
-      "detail": "Attaches the resolved mission-set row to each root-select list item."
+      "detail": "Resolves CharacterArcade::Id_ArcadeMissionSet[Index] to a mission-set row and caches the pointer in ListItemDataArray[].MissionSet."
     },
     {
       "source": "Source/Abrams/Private/GameArcadeRootSelectListItemWidget.cpp:48",
-      "detail": "Displays Id_Text_Title through the root-name text widget."
+      "detail": "Displays the cached row's Id_Text_Title through RootNameText->SetTextIdOnly."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleSituationOverviewArcadeWidget.cpp:77",
-      "detail": "Looks up the active root's mission set; the result is discarded by this consumer."
+      "source": "Source/Abrams/Private/GameArcadeRootSelectListItemWidget.cpp:24",
+      "detail": "Copies the cached row's Id into DecidedRootId; OnWidgetFocused copies it into FocusedRootId."
+    },
+    {
+      "source": "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:52",
+      "detail": "BattleArcade_GetMissionIds selects one of the three arrays by difficulty and returns it in order for the mission preview panels."
+    },
+    {
+      "source": "Source/Abrams/Private/GameMenuSequence.cpp:1265",
+      "detail": "Copies DecidedRootId and the widget Difficulty byte into the menu sequence, then into Game->ArcadeRun.RootSelection."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSituationOverviewArcadeWidget.cpp:74",
+      "detail": "Uses Run.RootSelection.RootId/RootByte to obtain mission IDs for overview progression; the separate mission-set lookup is discarded."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:220",
+      "detail": "Uses the difficulty-specific list and BattleResults.Num() to set ArcadeRun.MissionId for the next battle."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleArcade.cpp:284",
+      "detail": "BattleArcade_IsLastMission calls the same helper and treats a missing or None next ID as the end of the run."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:572",
+      "detail": "Uses IsLastMission with the stored RootId/RootByte to decide clear recording and victory-sequence behavior."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetTextBlock.cpp:72",
+      "detail": "Resolves the title text id through GameTextManager, which routes SYS_ ids to SystemTextDataTable language columns."
     }
   ]
 }

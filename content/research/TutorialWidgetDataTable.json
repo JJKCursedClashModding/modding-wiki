@@ -3,21 +3,25 @@
   "fields": {
     "Id": {
       "simple": "Tutorial-page row identifier.",
-      "technical": "FName row key collected from all TutorialWidgetDataTables. ShowTutorialTypes does not filter by this ID; it filters by TutorialWidgetType and appends matching rows in table/row-name order, which becomes the page sequence. The ID is therefore a unique row key rather than a runtime selection key in the reconstructed consumer.",
+      "technical": "FName export key (export field ID, import key Id). The row’s own Id is not read by the reconstructed runtime. FGameDataTableArray::GetRows collects pointers in table order and then UDataTable row-name order; ShowTutorialTypes filters only on TutorialWidgetType and appends each matching row, so row names establish page order within a requested type. The single export shard has 54 unique row keys.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:11",
+        "Source/Abrams/Public/GameDataTableArray.h:21",
         "Source/Abrams/Private/GameTutorialWidget.cpp:35",
-        "Source/Abrams/Private/GameTutorialWidget.cpp:78"
+        "Source/Abrams/Private/GameTutorialWidget.cpp:78",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:86"
       ],
       "status": "verified"
     },
     "TutorialWidgetType": {
       "simple": "Tutorial flow/category this page belongs to.",
-      "technical": "EGameTutorialWidgetType (None, Move=1 through Adapt=45, Invalid=255). ShowTutorial(Type) calls ShowTutorialTypes with one type; the latter scans all rows for each requested type in the supplied type-list order and appends them to the displayed page array. Exported rows use 38 distinct types, with some types contributing several pages.",
+      "technical": "EGameTutorialWidgetType (uint8): None=0, Move=1 through Adapt=38 as contiguous values, and Invalid=255 as a sentinel. The row constructor defaults this field to None. ShowTutorial(Type) forwards a one-element list to ShowTutorialTypes; for each requested type in list order, that function scans the cached rows and appends the matches. All 38 named non-None/non-Invalid values occur in the export, and some types contribute several pages; no None or Invalid row is exported.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameTutorialWidgetType.h:6",
         "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:16",
+        "Source/AbramsDataTable/Private/GameDataTableRow_TutorialWidget.cpp:4",
         "Source/Abrams/Private/GameTutorialWidget.cpp:69",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:75",
         "Source/Abrams/Private/GameTutorialWidget.cpp:81",
         "Source/Abrams/Private/GameTutorialWidget.cpp:86"
       ],
@@ -25,46 +29,55 @@
     },
     "Id_TutorialLabel": {
       "simple": "Localized heading shown at the top of the page.",
-      "technical": "FName passed directly to HeaderText->SetTextIdOnly on every SetPage call.",
+      "technical": "FName heading key passed unchanged to HeaderText->SetTextIdOnly on every SetPage call. The text block builds an FGameTextRequest and resolves it through AGameTextManager; the exported TUT_* keys are not SYS_* IDs and are present in TutorialTextDataTable_<Language>, one of the GameText tables loaded into the text manager’s language cache. No COUNT/MAX parameters are attached to the heading.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:19",
-        "Source/Abrams/Private/GameTutorialWidget.cpp:145",
-        "Source/Abrams/Private/GameTutorialWidget.cpp:146"
+        "Source/Abrams/Private/GameTutorialWidget.cpp:146",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:52",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:72",
+        "Source/Abrams/Private/GameTextManager.cpp:559",
+        "Source/Abrams/Private/GameTextManager.cpp:622"
       ],
       "status": "verified"
     },
     "Id_TutorialMessage": {
       "simple": "Localized body text for the tutorial page.",
-      "technical": "FName passed to ExplanationText_1 or ExplanationText_2 depending on whether the page has images. A hard-coded legacy key TUT_OUTGAME_MESSAGE_1301 is rewritten to TUT_OUTGAME_MESSAGE_1304 at display time; all other keys are passed through unchanged.",
+      "technical": "FName body key passed to ExplanationText_1 when either texture slot is non-None, or to ExplanationText_2 when slots 0 and 1 are both None. The sole exported row using TUT_OUTGAME_MESSAGE_1301 (TUT_WIDGET_OUTGAME_1301) is rewritten to TUT_OUTGAME_MESSAGE_1304 at display time; all other 53 rows pass through unchanged. Both keys are present in all 11 TutorialTextDataTable_<Language> export shards.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:22",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:156",
         "Source/Abrams/Private/GameTutorialWidget.cpp:175",
         "Source/Abrams/Private/GameTutorialWidget.cpp:177",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:181",
         "Source/Abrams/Private/GameTutorialWidget.cpp:182"
       ],
       "status": "verified"
     },
     "TutorialTextureName": {
       "simple": "Ordered list of explanation image names for the page.",
-      "technical": "TArray<FName>. Names are split into WidgetTexture primary-asset loaders or Win64 platform-streamed loads according to the parallel switch array. None entries are skipped while loading. SetPage reads indices 0 and 1 unchecked to decide between the image layout and text-only layout; ApplyPageTextures later maps non-None names in order onto ExplanationImages and shows each loaded texture.",
+      "technical": "TArray<FName> with exactly two slots in every exported row; 24 of those 108 slots are None. The loader skips None, then uses the same-index switch flag to create bare-FName WidgetTexture primary-asset loaders (false) or direct Win64 streamable paths (true). SetPage reads indices 0 and 1 unguarded: both None selects Layout_2/ExplanationText_2, otherwise Layout_1/ExplanationText_1. ApplyPageTextures walks the row’s non-None names in order and the two ExplanationImages, applying only names that have a loaded texture; a missing earlier texture is skipped rather than reserving its image slot.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:25",
         "Source/Abrams/Private/GameTutorialWidget.cpp:100",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:103",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:117",
         "Source/Abrams/Private/GameTutorialWidget.cpp:156",
-        "Source/Abrams/Private/GameTutorialWidget.cpp:246",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:247",
         "Source/Abrams/Private/GameTutorialWidget.cpp:257"
       ],
       "status": "verified"
     },
     "bSwitchPlatformTutorialTexture": {
       "simple": "Parallel flags selecting input-device-specific image variants.",
-      "technical": "TArray<bool> aligned with TutorialTextureName by index; retail indexes it unchecked. True names are loaded as /Game/Widgets/StreamingAssets/Tutorial/Win64/<Name>_Win64_Keyboard and <Name>_Win64_Controller; false names go through GamePrimaryAssetType_WidgetTexture. ApplyPageTextures strips '_Win64' and selects the Keyboard or Controller variant based on the active EGameWidgetInputGuideType before applying it to the page image.",
+      "technical": "TArray<bool> parallel to TutorialTextureName; every exported row has two flags. After a None name is skipped, the loader reads bSwitchPlatformTutorialTexture[Index] without a bounds check. true loads /Game/Widgets/StreamingAssets/Tutorial/Win64/<Name>_Win64_Keyboard.<Name>_Win64_Keyboard and the matching _Controller object through LoadAssetList; false creates a WidgetTexture primary-asset loader keyed by the bare FName and resolved through the asset-manager cache. ApplyPageTextures removes _Win64 from loaded object names; EGameWidgetInputGuideType::Keyboard selects the _Keyboard asset, while every other guide type selects _Controller. Seven exported rows contain at least one true flag (10 true slots).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:28",
         "Source/Abrams/Private/GameTutorialWidget.cpp:107",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:117",
         "Source/Abrams/Private/GameTutorialWidget.cpp:121",
         "Source/Abrams/Private/GameTutorialWidget.cpp:127",
         "Source/Abrams/Private/GameTutorialWidget.cpp:131",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:135",
         "Source/Abrams/Private/GameTutorialWidget.cpp:223",
         "Source/Abrams/Private/GameTutorialWidget.cpp:224"
       ],
@@ -72,27 +85,52 @@
     }
   },
   "notes": [
-    "The export contains 54 rows. Most rows have two image names; the arrays must stay the same length because SetPage/loader code indexes both arrays positionally, and indices 0/1 are read unguarded.",
-    "Only one table consumer is identified: UGameTutorialWidget. Callers supply one or more EGameTutorialWidgetType values; the table itself does not encode prerequisites or ordering beyond table/row order.",
-    "The platform-specific suffix and Win64 directory are hard-coded in the reconstructed retail flow; no other platform path is assumed.",
-    "Only the supplied retail export and partial Content are available; no claim is made about all Blueprint or editor-tool uses."
+    "The single export shard contains 54 DataTable rows and uses ImportKeyField Id; all 54 row keys are unique. Every row has exactly two entries in each parallel array (24 texture-name slots are None; 10 switch slots are true). Keep the arrays aligned and at least two long: SetPage reads indices 0 and 1 unchecked, and the loader indexes the switch array by texture index.",
+    "The only C++ row reader found is UGameTutorialWidget: DataTable primary asset TutorialWidgetDataTable -> DataTableLoaders -> manager cache TutorialWidgetDataTables -> FGameDataTableArray::GetRows (table order, then row-name order) -> per-type filtering. Callers supply the requested type list and gate when to show it (config menus, mode phases, mission tutorial steps); page order is requested-type order followed by export row-name order. The table stores no prerequisite or visibility-gating flags.",
+    "TUT_* label/message fields are localized text keys, not display strings. AGameTextManager searches its language-specific GameText table cache, which includes TutorialTextDataTable_<Language>, for non-SYS_ IDs. The fixed page counter uses SYS_COMMON_LABEL_0101 with COUNT=CurrentPage+1 (1-based) and MAX=Rows.Num(); those values are generated in SetPage and are not table fields.",
+    "The Win64 directory and _Win64_Keyboard / _Win64_Controller suffixes are hard-coded in the reconstructed retail flow. No other platform path, texture-asset existence, or cooked-loader behavior is inferred from this table.",
+    "Only the supplied retail DataTable exports and partial Content are available. No retail Blueprint decompilation or editor inspection was performed, so no claim is made about every Blueprint, editor tool, or uncaptured runtime use."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:484",
+      "detail": "Registers TutorialWidgetDataTable as a DataTable primary asset for the initial loader batch."
+    },
+    {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:311",
-      "detail": "Loads TutorialWidgetDataTable into TutorialWidgetDataTables."
+      "detail": "After all loaders complete, resolves the loaded UDataTable and appends it (if non-null) to the TutorialWidgetDataTables cache."
+    },
+    {
+      "source": "Source/Abrams/Public/GameDataTableArray.h:21",
+      "detail": "Collects typed rows in table order then row-name order; GameTutorialWidget.cpp:78 uses this for TutorialWidgetDataTables."
     },
     {
       "source": "Source/Abrams/Private/GameTutorialWidget.cpp:75",
-      "detail": "Collects all rows, keeps those matching the requested tutorial types in order, and starts the appropriate texture loads."
+      "detail": "ShowTutorialTypes keeps rows whose type is in the caller’s list, appends them in requested-type order, and starts the appropriate texture loads."
     },
     {
       "source": "Source/Abrams/Private/GameTutorialWidget.cpp:142",
-      "detail": "SetPage applies the row's label/message keys, chooses image vs text-only layout, and updates page navigation buttons."
+      "detail": "SetPage applies the row’s label/message keys, chooses the image or text-only layout, and updates 1-based page/count text and navigation buttons."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTutorialWidget.cpp:117",
+      "detail": "Creates WidgetTexture loaders for non-platform texture names and a separate Win64 streamable handle for switched names."
     },
     {
       "source": "Source/Abrams/Private/GameTutorialWidget.cpp:203",
-      "detail": "ApplyPageTextures attaches the current page's loaded normal/platform image textures to the explanation image widgets."
+      "detail": "ApplyPageTextures maps the current page’s loaded keyboard/controller textures onto the two explanation image widgets."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:559",
+      "detail": "Caches TutorialTextDataTable_<Language> with the other GameText tables that resolve the row’s TUT_* keys."
+    },
+    {
+      "source": "Source/Abrams/Private/GameConfigHelpWidget.cpp:39",
+      "detail": "Help/Tutorial menus hard-code tutorial-type values (for example 17-37) as button payloads; these select types, not row IDs."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:699",
+      "detail": "Mission tutorial steps pass an authored EGameTutorialWidgetType list in order; an empty list skips the tutorial popup."
     }
   ]
 }

@@ -3,77 +3,103 @@
   "fields": {
     "ID": {
       "simple": "Outline preset key (BREAK_FALL, INVINCIBLE, SUPER_ARMOR, HYPER_ARMOR, LIMITLESS, COUNTER).",
-      "technical": "FName row key resolved through Shikigami_FindMaterialOutlineRow over MaterialOutlineDataTables (+0x810, retail 0x14126A9E0). AGameCharacter::Tick derives six buff-board bits from its status controller and requests AddOutline/RemoveOutline by these exact names; AGameShikigami uses an invincibility flag to request INVINCIBLE. The shared finder rejects NAME_None and returns the first matching row; missing rows silently do nothing.",
+      "technical": "FName (declared Id, export key ID) used as the DataTable row name; consumers pass a name to FindRow rather than reading Row->Id, although every exported ID value matches its row name. Shikigami_FindMaterialOutlineRow walks MaterialOutlineDataTables (+0x810, retail VA 0x14126A9E0) in array order and returns the first FindRow hit. The outline callers pass bCheckNone=false and bWarn=false but guard NAME_None themselves, so a missing row silently produces no animation. AGameCharacter::Tick gates on bOutlineEnabled and derives six bits from status/action queries (battle-sequence playback forces all zero), assigning AddOutline/RemoveOutline in the order LIMITLESS (0x1), COUNTER (0x2), BREAK_FALL (0x4), SUPER_ARMOR (0x8), HYPER_ARMOR (0x10), INVINCIBLE (0x20). AGameShikigami::Tick also gates on bOutlineEnabled and requests only INVINCIBLE when collision-lock membership changes for lock 4 or 5.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialOutline.h:12",
         "Source/Abrams/Private/GameShikigami.cpp:34",
         "Source/Abrams/Private/GameCharacter.cpp:305",
+        "Source/Abrams/Private/GameCharacter.cpp:323",
         "Source/Abrams/Private/GameCharacter.cpp:338",
+        "Source/Abrams/Private/GameShikigami.cpp:443",
         "Source/Abrams/Private/GameShikigami.cpp:461"
       ],
       "status": "verified"
     },
     "OutlineEmissiveColor": {
       "simple": "Outline emissive color.",
-      "technical": "FVector converted to FLinearColor (X,Y,Z used as RGB, alpha default) and passed to MaterialController->StartOutlineEmissiveColor(Color, Duration); for characters the identical color/scale pair is also applied to WeaponController. Values can exceed 1.0 (e.g. LIMITLESS Z=2.6), i.e. HDR emissive values are not clamped in this code. Export colors: green BREAK_FALL, blue-grey INVINCIBLE, amber SUPER_ARMOR, red HYPER_ARMOR.",
+      "technical": "Declared FVector (UE5 three doubles); the explicit FLinearColor conversion copies X,Y,Z to R,G,B and sets A=1. The float values are handed unchanged to StartOutlineEmissiveColor, so values above 1 are not clamped by this code (LIMITLESS Z=2.6; SUPER_ARMOR/HYPER_ARMOR/COUNTER X=1.1/1.1/1.5). Characters pass the same color to the body MaterialController and through WeaponController to each weapon; shikigami pass it to their MaterialController. Exact exported RGB: BREAK_FALL (0,1,0), INVINCIBLE (0.6,0.6,0.9), SUPER_ARMOR (1.1,0.8,0), HYPER_ARMOR (1.1,0,0), LIMITLESS (1.2,0,2.6), COUNTER (1.5,0.6,0.3); the constructor default is ZeroVector.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialOutline.h:16",
         "Source/Abrams/Private/GameCharacter.cpp:342",
-        "Source/Abrams/Private/GameCharacter.cpp:346",
-        "Source/Abrams/Private/GameShikigami.cpp:465"
+        "Source/Abrams/Private/GameCharacter.cpp:345",
+        "Source/Abrams/Private/GameShikigami.cpp:465",
+        "Source/Abrams/Private/GameCharacterWeaponController.cpp:39",
+        "Source/Abrams/Public/GameMaterialParameterAnimator.h:129"
       ],
       "status": "verified"
     },
     "OutlineScale": {
       "simple": "Outline thickness/scale.",
-      "technical": "Float passed to MaterialController->StartOutlineScale(Scale, Duration) (and WeaponController for characters). Export values 3.0 for BREAK_FALL/INVINCIBLE and 4.0 for the armor/counter/limitless rows; the animator drives the material's OutlineScale parameter over the same fade-in duration as the color.",
+      "technical": "Declared float at layout offset +0x28 (constructor default 0.0). It is passed as the Goal to StartOutlineScale for every cached OutlineScale animator on the character body, each weapon, and (for shikigami) the shikigami material controller; the Duration is the same row FadeInTime. Exported values: 3.0 for BREAK_FALL and INVINCIBLE; 4.0 for SUPER_ARMOR, HYPER_ARMOR, LIMITLESS and COUNTER. The animator writes the interpolated value to the cached OutlineScale scalar parameter of each material instance while its tween is active.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialOutline.h:19",
         "Source/Abrams/Private/GameCharacter.cpp:341",
         "Source/Abrams/Private/GameCharacter.cpp:347",
         "Source/Abrams/Private/GameShikigami.cpp:464",
-        "Source/Abrams/Private/GameCharacterMaterialController.cpp:166"
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:166",
+        "Source/Abrams/Public/GameMaterialParameterAnimator.h:102"
       ],
       "status": "verified"
     },
     "FadeInTime": {
       "simple": "Duration of the outline ramp-in.",
-      "technical": "Float seconds used as the Duration argument of both StartOutlineEmissiveColor and StartOutlineScale. Export values are 0 for BREAK_FALL/INVINCIBLE/COUNTER and 0.05 for the armor/limitless rows. Zero means an immediate change through the animators.",
+      "technical": "Declared float seconds at layout offset +0x2C (constructor default 0.0). Used as Duration for both StartOutlineEmissiveColor and StartOutlineScale on the add path. StartTo begins a linear tween from each parameter's captured material default to the row Goal, advanced by controller DeltaSeconds; Duration <= 0 also applies the Goal immediately. Exported values are 0 for BREAK_FALL, INVINCIBLE and COUNTER and 0.05 s for SUPER_ARMOR, HYPER_ARMOR and LIMITLESS.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialOutline.h:22",
         "Source/Abrams/Private/GameCharacter.cpp:340",
         "Source/Abrams/Private/GameCharacter.cpp:344",
-        "Source/Abrams/Private/GameShikigami.cpp:463"
+        "Source/Abrams/Private/GameShikigami.cpp:463",
+        "Source/Abrams/Public/GameMaterialParameterAnimator.h:57",
+        "Source/Abrams/Public/StudioTween.h:35"
       ],
       "status": "verified"
     },
     "FadeOutTime": {
       "simple": "Duration of the outline reset when the buff turns off.",
-      "technical": "Float seconds passed to the owner's ResetOutline(FadeOutTime) (retail 0x14127DD30/0x14127DE...) on the RemoveOutline branch. Row color and scale are not read on removal; all six exported rows use FadeOutTime=0.",
+      "technical": "Declared float seconds at layout offset +0x30 (constructor default 0.0). Read only when a previously displayed buff bit turns off and no add name was selected; it is passed to AGameCharacter::ResetOutline or AGameShikigami::ResetOutline, which reset both cached Outline* parameter animators to the defaults captured from their material instances over this duration. Row color and scale are not read on removal. Duration <= 0 applies those defaults immediately; all six exported rows set 0.0. SetOutlineEnabled(false) bypasses this row path and resets with 0.0 directly.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacter.cpp:353",
-        "Source/Abrams/Private/GameShikigami.cpp:471"
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialOutline.h:25",
+        "Source/Abrams/Private/GameCharacter.cpp:349",
+        "Source/Abrams/Private/GameCharacter.cpp:423",
+        "Source/Abrams/Private/GameCharacter.cpp:411",
+        "Source/Abrams/Private/GameShikigami.cpp:471",
+        "Source/Abrams/Private/GameShikigami.cpp:1983",
+        "Source/Abrams/Public/GameMaterialParameterAnimator.h:66"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "MaterialOutlineDataTables is manager slot +0x810; the loader name is registered at GameDataTableManager.cpp:432 and resolved at line 259. All six exported rows are reachable from the character's six buff bits; only INVINCIBLE is requested by the available shikigami code.",
-    "The material controllers cache material parameters named OutlineEmissiveColor and OutlineScale and animate them (GameCharacterMaterialController.cpp:159-171; GameShikigamiMaterialController.cpp:26-38). This establishes the destination parameters, but the row-to-parameter binding is made only through the Start*/ResetOutline calls above.",
-    "This is a separate table from MaterialRimDataTable (+0x820), which has no identified row consumer in the available source."
+    "MaterialOutlineDataTables is manager slot +0x810. \"MaterialOutlineDataTable\" is registered as a primary-asset loader name (GameDataTableManager.cpp:432); after all loaders complete, Tick resolves that one asset into the array (line 259). The shared finder iterates the array in order, so with the exported data there is one source table; duplicate keys, if introduced, would resolve to the first match.",
+    "The character assigns one AddOutline/RemoveOutline name while testing the six bits in ascending order LIMITLESS, COUNTER, BREAK_FALL, SUPER_ARMOR, HYPER_ARMOR, INVINCIBLE; later active (or removed) bits overwrite earlier ones. If both an add and a removal are produced in the same tick, the AddOutline branch runs and the removal is ignored. Battle-sequence playback forces the new bit set to zero; the character INVINCIBLE bit uses collision locks 5/6/9, the shikigami uses locks 4/5, and both ticks are gated by bOutlineEnabled.",
+    "The material controllers create MIDs for each mesh material and, when OutlineEmissiveColor/OutlineScale exist, initialize animators with the parameter index and current/default value (GameCharacterMaterialController.cpp:159-172; GameShikigamiMaterialController.cpp:26-38; GameWeaponMaterialController.cpp:102-115). Start*/Reset* enqueue those animators; TickMaterialAnimators advances them and writes SetVectorParameterByIndex/SetScalarParameterByIndex (GameMaterialParameterAnimator.h:57-72, 122-133). This establishes the destination parameters and the reset target; the row-to-parameter binding is made only through the Start*/ResetOutline call sites.",
+    "This is a separate table from MaterialRimDataTable (+0x820), which has no identified row consumer in the available source.",
+    "Evidence boundary: all runtime statements above come from the reconstructed C++ sources (the shared row finder at 0x126a9e0 is behaviour-certified, not a byte-match) plus the single export. No retail Blueprint graph/asset evidence was available; the project guide states retail Blueprints contain no logic, so no Blueprint-level behavior is claimed."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameShikigami.cpp:34",
-      "detail": "Shikigami_FindMaterialOutlineRow walks MaterialOutlineDataTables and returns the first row with the requested name (retail 0x14126A9E0)."
+      "detail": "Shikigami_FindMaterialOutlineRow walks MaterialOutlineDataTables and returns the first row with the requested name; outline callers pass bCheckNone=false and bWarn=false (retail finder 0x126a9e0)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:259",
+      "detail": "After all primary-asset loads complete, GameDataTableManager resolves MaterialOutlineDataTable into MaterialOutlineDataTables (+0x810); this array is the only alias the finder consults."
     },
     {
       "source": "Source/Abrams/Private/GameCharacter.cpp:305",
-      "detail": "Character tick maps six status buff bits to LIMITLESS/COUNTER/BREAK_FALL/SUPER_ARMOR/HYPER_ARMOR/INVINCIBLE row requests."
+      "detail": "Character tick maps six status/action bits to LIMITLESS/COUNTER/BREAK_FALL/SUPER_ARMOR/HYPER_ARMOR/INVINCIBLE row requests in precedence order; add wins over removal."
     },
     {
       "source": "Source/Abrams/Private/GameCharacter.cpp:338",
-      "detail": "Adds the row's color/scale over FadeInTime to both character and weapon material controllers; removal calls ResetOutline with FadeOutTime."
+      "detail": "Adds the row's color/scale over FadeInTime to the body and every weapon material controller; the otherwise exclusive removal branch resets them over FadeOutTime."
     },
     {
-      "source": "Source/Abrams/Private/GameShikigami.cpp:461",
-      "detail": "Shikigami add/remove INVINCIBLE outline using the same four fields on the shikigami material controller."
+      "source": "Source/Abrams/Private/GameShikigami.cpp:443",
+      "detail": "Shikigami tick requests INVINCIBLE on a change in collision locks 4/5 and uses the same four row fields on its material controller."
+    },
+    {
+      "source": "Source/Abrams/Public/GameMaterialParameterAnimator.h:57",
+      "detail": "StartTo/ResetToDefault drive linear tweens from captured material defaults; nonpositive durations apply immediately and Tick writes the cached MID parameter indices."
     }
   ]
 }

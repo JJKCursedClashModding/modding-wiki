@@ -2,125 +2,189 @@
   "description": "Per-character finisher wiring: damage IDs for solo and tag-team super attacks, multi-hit behavior, linked domain expansion and the character-specific super-attack ranking record.",
   "fields": {
     "Id": {
-      "simple": "Character ID used as the row key.",
-      "technical": "Unreal DataTable row name. ResolveDataRows resolves it from CharacterDataTable.Id_CharacterSpecialAttack, with FStudioBattleCharacterOverrides::SpecialAttackIdOverride taking priority when set. The row is required; failure aborts character row resolution. Asset collectors and battle phases independently look up the same row by the character's Id_CharacterSpecialAttack.",
+      "simple": "Special-attack row ID used as the DataTable key; it normally equals a character ID, but mission overrides can select ST_ rows.",
+      "technical": "FName member Id (exported as ID, ImportKeyField Id); runtime FindRow uses the DataTable row-map key rather than reading the member. AGameDataTableManager loads the one DataTable registered as CharacterSpecialAttackDataTable into CharacterSpecialAttackDataTables; every lookup walks that array and the first matching row wins. AGameCharacter::ResolveDataRows uses Overrides.SpecialAttackIdOverride when it is not None, otherwise CharacterDataTable.Id_CharacterSpecialAttack; the override is copied from MissionCharacterDataTable.Id_CharacterSpecialAttack by GameMissionCharacter_CopyOverrideIds. A null result aborts ResolveDataRows. BattleCharacterAssetCollectors and GamePhase_BattleBase independently look up the same table with Character->Id_CharacterSpecialAttack, so they bypass the override and silently skip assets when the row is missing. ST_CP_051 and ST_CP_260 are reachable through mission overrides even though the base CharacterDataTable export does not reference them.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSpecialAttack.h:11",
+        "Source/Abrams/Private/GameDataTableManager.cpp:196",
+        "Source/Abrams/Private/GameCharacter.cpp:475",
         "Source/Abrams/Private/GameCharacter.cpp:506",
+        "Source/Abrams/Private/GameCharacter.cpp:507",
+        "Source/Abrams/Private/GamePvESettings.cpp:232",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:346",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:267"
       ],
       "status": "verified"
     },
     "Id_GlossaryText_Name": {
-      "simple": "Name-text ID field on the special-attack row; no direct use was found.",
-      "technical": "FName serialized on every exported row, with all 42 exported values set to None. No consumer of SpecialAttackRow.Id_GlossaryText_Name exists in the available Source/Plugins. The numerous Id_GlossaryText_Name hits belong to the distinct CharacterDataTable field (row +0x10) and must not be attributed here.",
+      "simple": "Name-text ID slot with no traced consumer. Every exported value is None.",
+      "technical": "FName at GameDataTableRow_CharacterSpecialAttack.h:16. All 42 exported rows serialize None. No expression in the available Source/Plugins reads SpecialAttackRow.Id_GlossaryText_Name. Every Id_GlossaryText_Name consumer found is instead on FGameDataTableRow_Character (for example Setup.CharacterRow->Id_GlossaryText_Name feeding GetGameTextById), a distinct field at row +0x10. Retail Blueprint graphs are unavailable, so this is a source-level negative result rather than proof that retail has no use.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSpecialAttack.h:16",
-        "Source/Abrams/Private/GameCharacter.cpp:900"
+        "Source/AbramsDataTable/Public/GameDataTableRow_Character.h:21",
+        "Source/Abrams/Private/GameCharacter.cpp:900",
+        "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:215"
       ],
       "status": "unresolved"
     },
     "Id_Damage_SpecialTagCombo": {
       "simple": "Damage row used for the tag-team special combo finisher.",
-      "technical": "FName key into DamageDataTables. State 6 reads it from Performers[0] both for lethal-damage prediction (IsLethalSequenceDamage with bIgnoreStock=false) and for the actual ApplySequenceDamage on the target after the sequence. ApplySequenceDamage resolves the Damage row and sends a multi-hit request with flags 0x23.",
+      "technical": "FName key into DamageDataTables (DamageDataTable1..5; first matching row wins). State 6 takes it from Performers[0] at sequence exit: IsLethalSequenceDamage(..., bIgnoreStock=false) requires the projected hit to reduce the target to <=0 HP and the target to be out of stock (no ActionControllerSlot181 preservation and GetStockAfterLoss <= 0). The same ID is then passed to ApplySequenceDamage on State()->Target. ApplySequenceDamage looks up the Damage row across all five shards, queues AddMultiHit at zero delay with Flags78=0x23, and still queues the request with a null DamageRow if the ID does not resolve; a null row makes the lethal prediction false. 30/42 exported rows set this ID (the 12 CN rows are None, ST_CP_051 uses its own ST_ ID), and all non-None IDs resolve in the available Damage shards.",
       "evidence": [
+        "Source/Abrams/Private/GameDataTableManager.cpp:231",
         "Source/Abrams/Private/GameBattleState_06.cpp:368",
+        "Source/Abrams/Private/GameBattleState_06.cpp:370",
         "Source/Abrams/Private/GameBattleState_06.cpp:397",
         "Source/Abrams/Private/GameBattleSequenceState.cpp:292",
-        "Source/Abrams/Private/GameBattleSequenceState.cpp:325"
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:294",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:297",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:325",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:331",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:338"
       ],
       "status": "verified"
     },
     "Id_Damage_SoloSpecialAttack": {
       "simple": "Damage row used for the solo super-attack finisher.",
-      "technical": "FName key into DamageDataTables. State 5 reads the finisher's value to predict lethality (with bIgnoreStock=true) while accumulating team costs, and applies it once per knocked-out character at sequence end. Missing damage rows make the lethal check return false and the damage request carry a null DamageRow.",
+      "technical": "FName key into the same five DamageDataTables shards. State 5 reads the finisher's cached row for IsAnyTeamDefeated with bIgnoreStock=true (HP check only; stock is checked separately through team cost and GetRemainingCharacterStock), then at sequence end calls ApplySequenceDamage once per KnockOut.KnockedOut loser. That victim list is produced by the multi-hit collector, so this field's effect is coupled to bMultiHitSoloSpecialAttack. Missing damage rows make IsLethalSequenceDamage return false and ApplySequenceDamage queue a request with DamageRow=null. 30/42 exported rows set this ID; the 12 CN rows are None, CP_050/CP_130/CP_160 reuse CP_010's damage, and ST_CP_051 has its own ST_ ID; all non-None IDs resolve in the available shards.",
       "evidence": [
+        "Source/Abrams/Private/GameDataTableManager.cpp:231",
         "Source/Abrams/Private/GameBattleState_05.cpp:136",
         "Source/Abrams/Private/GameBattleState_05.cpp:428",
-        "Source/Abrams/Private/GameBattleSequenceState.cpp:295",
-        "Source/Abrams/Private/GameBattleSequenceState.cpp:333"
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2409",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:294",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:297",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:331"
       ],
       "status": "verified"
     },
     "bMultiHitSoloSpecialAttack": {
       "simple": "Whether the solo super hits every listed victim instead of one chosen target.",
-      "technical": "Bool. AGameCharacter::IsMultiHitSoloSpecialAttackEnabled returns this field unchecked via interface slot 168. The battle knockout collector uses it: when true, all alive victims become KnockedOut and the search breaks; when false, it narrows to one victim by secondary/target selection. Constructor default false; exported CP_020 is the sole true row among 42.",
+      "technical": "Bool, constructor default false. AGameCharacter::IsMultiHitSoloSpecialAttackEnabled returns SpecialAttackRow->bMultiHitSoloSpecialAttack without a null check (the base IGameActorInterface implementation returns false); ResolveDataRows guarantees the cache on resolved AGameCharacter instances. FStudioBattleSystem310::UpdateSoloSpecialAttackFinish first removes defeated victims. When true it copies the whole remaining victim list into KnockOut.KnockedOut and stops processing further attackers. When false it selects one victim: a valid, visible secondary target if present, else a valid primary target, falling back to index 0; the selection branch is only used when more than one victim remains. Export has CP_020 as the sole true row; the other 41 rows, including all 12 CN rows and both ST_ rows, are false.",
       "evidence": [
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterSpecialAttack.cpp:4",
+        "Source/Abrams/Public/GameActorInterface.h:482",
         "Source/Abrams/Private/GameCharacter.cpp:2368",
-        "Source/Abrams/Public/GameCharacter.h:348",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2398",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:2409",
-        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterSpecialAttack.cpp:4"
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2411",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2417",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2437"
       ],
       "status": "verified"
     },
     "Id_DomainExpansion": {
       "simple": "Domain-expansion row tied to the character's super.",
-      "technical": "FName key into DomainExpansionDataTables. ResolveDataRows resolves it optionally into DomainExpansionRow; battle assets and GamePhase_BattleBase use it to reach DomainExpansion.Id_Map and preload that map's MiniMapFileName. State 7 uses it to select the domain-transformation area transform, falling back to the tag-combo transform when the row or Id_Map is absent. None is allowed and means no domain link.",
+      "technical": "FName key into DomainExpansionDataTables. ResolveDataRows does an optional lookup and caches the result in DomainExpansionRow; None leaves that cache null and skips asset preload. BattleCharacterAssetCollectors and GamePhase_BattleBase resolve SpecialAttack -> DomainExpansion -> Map and add DomainMap->MiniMapFileName only when Id_Map is non-None; available rows CP_020/CP_030/CP_050 have no map, while CP_130/CP_140/CP_260/ST_CP_260 do. State 7 makes a fresh lookup of this ID for the sequence transform: a resolved row with a non-None Id_Map selects GetDomainExpansionTransform unless IsNotCP130() is false; CP_130 and the absent-row/absent-map cases use GetTagComboTransform(0). IsNotCP130 compares the caster's model name to CP_130. Other state-7 logic uses the cached DomainExpansionRow (HasDomainMap checks its Id_Map): non-CP130 requests the domain stage in substate 2, while CP130 requests it at exit. A character that actually enters state 7 therefore needs a resolvable Id_DomainExpansion even though ResolveDataRows itself permits None. 7/42 rows set this ID and all resolve in the available DomainExpansion export.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSpecialAttack.h:28",
         "Source/Abrams/Private/GameCharacter.cpp:558",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:346",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:351",
-        "Source/Abrams/Private/GameBattleState_07.cpp:511",
-        "Source/Abrams/Private/GamePhase_BattleBase.cpp:269"
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:356",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:269",
+        "Source/Abrams/Private/GameBattleState_07.cpp:215",
+        "Source/Abrams/Private/GameBattleState_07.cpp:276",
+        "Source/Abrams/Private/GameBattleState_07.cpp:372",
+        "Source/Abrams/Private/GameBattleState_07.cpp:509",
+        "Source/Abrams/Private/GameBattleState_07.cpp:512",
+        "Source/Abrams/Private/GameBattleState_07.cpp:514",
+        "Source/Abrams/Private/GameBattleState_07.cpp:528"
       ],
       "status": "verified"
     },
     "RankingRecord": {
       "simple": "Which numbered super-attack ranking record this character can earn.",
-      "technical": "EGameRankingRecord enum. EvaluateRankingRecords compares the player's SpecialAttackRow->RankingRecord against each RankingRecordDataTable row for the numbered SuperCursedEnergyAttack_01..27 records; on a match and a SuperCursedEnergyAttack_Hit battle-log threshold it appends the enum byte to earned records. Constructor default None; 14 exported rows are None.",
+      "technical": "EGameRankingRecord (uint8) stored per character; constructor default None. EvaluateRankingRecords iterates every RankingRecordDataTable row and, for the numbered SuperCursedEnergyAttack_01..27 cases, awards a record only when this field equals that row's RankingRecord and the player's SuperCursedEnergyAttack_Hit log (Myself, Send, counted as int32) is at least that row's PrizeThreshold; the enum byte is appended to OutRecords. In the available RankingRecord export all 27 numbered rows exist with PrizeThreshold 1. None or an unnumbered enum value cannot satisfy this branch; the generic SuperCursedEnergyAttack record is a separate case and is not driven by this field. 28/42 exported rows set a numbered value (CP_051 and ST_CP_051 both map to _17; CP_270 maps to _27) and 14 rows are None.",
       "evidence": [
-        "Source/Abrams/Private/GameBattleManager.cpp:1079",
+        "Source/AbramsDataTable/Public/EGameRankingRecord.h:27",
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankingRecord.h:19",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterSpecialAttack.cpp:5",
+        "Source/Abrams/Private/GameDataTableManager.cpp:185",
+        "Source/Abrams/Private/GameBattleManager.cpp:1052",
+        "Source/Abrams/Private/GameBattleManager.cpp:1072",
         "Source/Abrams/Private/GameBattleManager.cpp:1135",
         "Source/Abrams/Private/GameBattleManager.cpp:1139",
-        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterSpecialAttack.cpp:5"
+        "Source/Abrams/Private/GameCharacter.cpp:2263"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported table has 42 rows; available Content is partial, so this is not a claim about every retail character or Blueprint reference.",
-    "Id_GlossaryText_Name on this row is distinct from CharacterDataTable.Id_GlossaryText_Name; no direct consumer of the special-attack copy was identifiable. All exported values are None.",
-    "Source evidence is reconstructed C++; locations with retail RVAs in comments are provenance hints, not a byte-match verdict."
+    "The base export has 42 rows: 40 character IDs plus ST_CP_051 and ST_CP_260 mission variants. The 42 per-character JSON files are one-row subsets of the same export, not additional shards. Available Content is partial, so this is not a claim about every retail character or Blueprint reference.",
+    "Id_GlossaryText_Name on this row is distinct from CharacterDataTable.Id_GlossaryText_Name; no source consumer of the special-attack copy was identifiable. All exported values are None.",
+    "All non-None Id_Damage_* and Id_DomainExpansion references resolve in the available DamageDataTable1..5, DomainExpansionDataTable and MapDataTable exports. None is the no-damage/no-domain sentinel on all 12 CN rows, and CP_020/CP_030/CP_050 have DomainExpansion rows without an Id_Map.",
+    "Lookup precedence differs by consumer: AGameCharacter applies SpecialAttackIdOverride (from the mission row), while BattleCharacterAssetCollectors and GamePhase_BattleBase use the base Character->Id_CharacterSpecialAttack. Character lookups walk the manager's table array with first-match precedence and cache SpecialAttackRow for state 5/6/7, damage and ranking.",
+    "Evidence is reconstructed C++ plus the read-only DataTable exports. Source comments with retail RVAs are provenance hints, not byte-match verdicts; no retail Blueprint graph, cooked binary or live-game check was performed."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameCharacter.cpp:506",
-      "detail": "Resolves the required SpecialAttack row from CharacterDataTable.Id_CharacterSpecialAttack, honoring the studio override, and caches it in SpecialAttackRow."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:196",
+      "detail": "Registers the CharacterSpecialAttackDataTable asset under the FName used to build CharacterSpecialAttackDataTables."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleState_05.cpp:136",
-      "detail": "Uses Id_Damage_SoloSpecialAttack to decide whether each knocked-out opponent constitutes a team defeat."
+      "source": "Source/Abrams/Private/GameCharacter.cpp:507",
+      "detail": "ResolveDataRows looks up the row with SpecialAttackIdOverride if set, else CharacterDataTable.Id_CharacterSpecialAttack, and caches it in SpecialAttackRow; a miss aborts setup."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleState_05.cpp:428",
-      "detail": "Applies Id_Damage_SoloSpecialAttack to every loser at the end of the solo super sequence."
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:232",
+      "detail": "Copies MissionCharacterDataTable.Id_CharacterSpecialAttack into the override, allowing ST_CP_051/ST_CP_260 rows to replace the character default."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleState_06.cpp:368",
-      "detail": "Uses Id_Damage_SpecialTagCombo for lethal prediction before applying tag-combo damage."
+      "source": "Source/Abrams/Private/GameCharacter.cpp:558",
+      "detail": "Resolves Id_DomainExpansion optionally and caches the DomainExpansion row; None leaves the cache null."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleState_06.cpp:397",
-      "detail": "Applies Id_Damage_SpecialTagCombo from the first performer to the target."
-    },
-    {
-      "source": "Source/Abrams/Private/GameCharacter.cpp:2368",
-      "detail": "Exposes bMultiHitSoloSpecialAttack through IGameActorInterface for the knockout collector."
-    },
-    {
-      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:2409",
-      "detail": "Branches knockout collection to all victims when multi-hit solo special is enabled."
-    },
-    {
-      "source": "Source/Abrams/Private/GameBattleState_07.cpp:511",
-      "detail": "Resolves Id_DomainExpansion to choose the domain-expansion transform versus the tag-combo fallback."
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:346",
+      "detail": "Looks up the special-attack row from the base character ID for asset collection, bypassing the setup override."
     },
     {
       "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:351",
-      "detail": "Joins SpecialAttack -> DomainExpansion -> Map to collect the domain map's minimap texture."
+      "detail": "Joins SpecialAttack -> DomainExpansion -> Map to collect the domain map's MiniMapFileName."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:269",
+      "detail": "Battle-phase preloading independently follows SpecialAttack.Id_DomainExpansion to the domain map's minimap texture."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_05.cpp:136",
+      "detail": "Uses the finisher's Id_Damage_SoloSpecialAttack for team-defeat lethality prediction with bIgnoreStock=true."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_05.cpp:428",
+      "detail": "Applies Id_Damage_SoloSpecialAttack once per knocked-out loser at the end of the solo super sequence."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:2409",
+      "detail": "Uses bMultiHitSoloSpecialAttack to choose all remaining victims or one selected victim for KnockOut.KnockedOut."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_06.cpp:368",
+      "detail": "Uses Performers[0].Id_Damage_SpecialTagCombo for lethal prediction with bIgnoreStock=false."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_06.cpp:397",
+      "detail": "Applies Performers[0].Id_Damage_SpecialTagCombo to the tag-combo target."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSequenceState.cpp:325",
+      "detail": "Shared ApplySequenceDamage helper resolves either damage ID across all Damage shards and queues AddMultiHit with flags 0x23."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_07.cpp:509",
+      "detail": "Freshly resolves Id_DomainExpansion to choose the domain or tag-combo sequence transform, with the CP_130 exception."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_07.cpp:528",
+      "detail": "CP130 domain state requests its stage from the cached DomainExpansionRow->Id_Map at exit."
     },
     {
       "source": "Source/Abrams/Private/GameBattleManager.cpp:1135",
-      "detail": "Matches the character's RankingRecord against earned numbered super-attack ranking records."
+      "detail": "Matches the player's RankingRecord to numbered RankingRecordDataTable rows after the Super hit threshold is reached."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1139",
+      "detail": "Appends the matched RankingRecord enum byte to the earned-result records."
     }
   ]
 }

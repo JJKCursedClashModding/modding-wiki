@@ -1,58 +1,118 @@
 {
-  "description": "Intermediate voice-group list for shikigami: one row per shikigami action category, whose entries resolve to VoiceGroupDataTable rows for actual voice selection.",
+  "description": "Sparse per-shikigami, per-action voice-group indirection: a row ID chosen from ShikigamiDataTable holds positional FName slots that resolve to VoiceGroupDataTable rows for the actual cue lottery.",
   "fields": {
-    "Id": {
+    "ID": {
       "simple": "Row key / shikigami voice-group ID.",
-      "technical": "FName primary key. ShikigamiDataTable fields Id_ShikigamiVoiceGroup_DefaultAction, _Attack, _Damage, _Down and _Unique supply lookup IDs; ShikigamiAction_FindRow walks DTM.ShikigamiVoiceGroupDataTables (+0x6F0) and returns the first typed row with this Id. None IDs are rejected. Export spells it ID.",
+      "technical": "FName UPROPERTY (native member Id; export/catalog column ID; DataTable ImportKeyField Id). All exported row keys equal ID. AGameShikigami caches its ShikigamiDataTable row in ShikigamiRow; the five Id_ShikigamiVoiceGroup_DefaultAction/_Attack/_Damage/_Down/_Unique FNames supply request-specific lookup IDs. ShikigamiAction_FindRow rejects NAME_None when bCheckNone is true (all five calls pass true), then scans DTM.ShikigamiVoiceGroupDataTables (+0x6F0) in registration order and returns the first typed match; a missing row ends the request. The manager registers the primary-asset name ShikigamiVoiceGroupDataTable and appends its resolved UDataTable after all loaders complete; this build registers one such table. PlayVoice is only forwarded when AGameShikigami's bActionVoiceEnabled and bVoiceGroupPlaybackEnabled are both set; SetBattleVoiceEnabled sets the latter only when at least one of the five upstream fields is non-None. The empty C++ constructor leaves Id at NAME_None; exports are explicit.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiVoiceGroup.h:10",
         "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiVoiceGroup.h:11",
+        "Source/AbramsDataTable/Private/GameDataTableRow_ShikigamiVoiceGroup.cpp:3",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Shikigami.h:70",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Shikigami.h:82",
+        "Source/Abrams/Public/GameDataTableManager.h:152",
+        "Source/Abrams/Private/GameDataTableManager.cpp:162",
+        "Source/Abrams/Private/GameDataTableManager.cpp:241",
+        "Source/Abrams/Private/GameDataTableManager.cpp:413",
+        "Source/Abrams/Private/GameShikigami.cpp:841",
+        "Source/Abrams/Private/GameShikigami.cpp:597",
+        "Source/Abrams/Private/GameShikigami.cpp:1822",
+        "Source/Abrams/Private/GameShikigamiActionController.cpp:361",
         "Source/Abrams/Private/GameShikigamiActionController.cpp:449",
         "Source/Abrams/Private/GameShikigamiActionController.cpp:461",
         "Source/Abrams/Private/GameShikigamiActionController.cpp:473",
         "Source/Abrams/Private/GameShikigamiActionController.cpp:481",
-        "Source/Abrams/Private/GameShikigamiActionController.cpp:489",
-        "Source/Abrams/Private/GameDataTableManager.cpp:241"
+        "Source/Abrams/Private/GameShikigamiActionController.cpp:489"
       ],
       "status": "verified"
     },
     "Id_VoiceGroup": {
-      "simple": "VoiceGroupDataTable IDs indexed by shikigami action step/category.",
-      "technical": "TArray<FName>. PlayVoice selects this array by request Id: default/down/unique use index Value, attack/damage require Value>0 and use Value-1. The chosen entry resolves to a VoiceGroup row (+0x750); a random non-None voice from that group is played on the shikigami mesh, with an optional interruption rule on the owner's voice slot. No bounds check is performed on the array.",
+      "simple": "VoiceGroupDataTable IDs indexed by shikigami action/event step.",
+      "technical": "TArray<FName> UPROPERTY; the empty C++ constructor leaves it empty, but all 10 exported rows have 13 slots (47 non-None, 83 None). PlayVoice indexes this array with no upper/negative bounds check: request Id 1 (DefaultAction), 8 (Down) and 10 (Unique) use Value directly; Id 3 (Attack) and 6 (Damage) reject Value<=0 and use Value-1. Attack values come from EGameCharacterAttackVoiceType (Weak=1 through Charge=7) via GameAnimNotify_PlayActionVoice, and Damage values from EGameCharacterDamageVoiceType (Weak=1 through Blow=5); None=0 is filtered by Value<=0, while Invalid=255 has no guard. Observed shikigami callers use DefaultAction 1/2/3, Down 1/4/5 and Unique 0/1/2/3. Exported slot order is START/DASH/JUMP/STEP for DefaultAction; weak..charge for Attack; weak..blow for Damage; BOUNDED/DOWN/None/BREAKFALL/DEAD for Down; and per-shikigami lines for Unique. CN_080_DOWN has a real None hole at index 2, so Value 2 selects None and aborts. The chosen FName is resolved in DTM.VoiceGroupDataTables (+0x750) by the same None-rejecting first-match finder; all 47 referenced group IDs exist in the supplied VoiceGroup export/shards. VoiceGroup.Id_Voice is counted for non-None entries, GameManager random stream 0 draws GetFraction()*Count, and the raw (unfiltered) array is indexed without an explicit clamp: every reachable exported group has its non-None entries contiguous from index 0, so the supplied data picks a non-None entry, but 11 distinct downstream Voice IDs are absent from the VoiceDataTable export and a selected missing row returns without playback. When bFlag is false, an already-playing voice on the owner character's Voice3D slot CharacterIndex+6 can be suppressed/replaced using LastPlayedVoiceId/LastPlayedVoicePriority; bFlag true skips that gate. The cue is played on slot CharacterIndex+6 attached to the shikigami mesh; bSituationCheck is ignored by the shikigami wrapper.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiVoiceGroup.h:14",
         "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiVoiceGroup.h:15",
+        "Source/AbramsDataTable/Private/GameDataTableRow_ShikigamiVoiceGroup.cpp:3",
+        "Source/Abrams/Private/GameShikigamiActionController.cpp:440",
+        "Source/Abrams/Private/GameShikigamiActionController.cpp:446",
         "Source/Abrams/Private/GameShikigamiActionController.cpp:454",
+        "Source/Abrams/Private/GameShikigamiActionController.cpp:457",
         "Source/Abrams/Private/GameShikigamiActionController.cpp:466",
+        "Source/Abrams/Private/GameShikigamiActionController.cpp:469",
         "Source/Abrams/Private/GameShikigamiActionController.cpp:478",
         "Source/Abrams/Private/GameShikigamiActionController.cpp:486",
         "Source/Abrams/Private/GameShikigamiActionController.cpp:494",
         "Source/Abrams/Private/GameShikigamiActionController.cpp:499",
-        "Source/Abrams/Private/GameShikigamiActionController.cpp:505"
+        "Source/Abrams/Private/GameShikigamiActionController.cpp:504",
+        "Source/Abrams/Private/GameShikigamiActionController.cpp:507",
+        "Source/Abrams/Private/GameShikigamiActionController.cpp:516",
+        "Source/Abrams/Private/GameShikigamiActionController.cpp:518",
+        "Source/Abrams/Private/GameShikigamiActionController.cpp:523",
+        "Source/Abrams/Private/GameShikigamiActionController.cpp:525",
+        "Source/Abrams/Private/GameShikigamiActionController.cpp:570",
+        "Source/Abrams/Private/GameShikigami.cpp:597",
+        "Source/Abrams/Private/GameAnimNotify_PlayActionVoice.cpp:18",
+        "Source/AbramsDataTable/Public/EGameCharacterAttackVoiceType.h:6",
+        "Source/Abrams/Private/GameShikigamiAction.cpp:1475",
+        "Source/AbramsDataTable/Public/EGameCharacterDamageVoiceType.h:6",
+        "Source/Abrams/Public/GameDataTableManager.h:158"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Loaded as a DataTable primary asset named ShikigamiVoiceGroupDataTable into DTM.ShikigamiVoiceGroupDataTables (+0x6F0).",
-    "The join chain is ShikigamiDataTable.Id_ShikigamiVoiceGroup_* -> this row -> VoiceGroupDataTable.Id_Voice -> VoiceDataTable cues.",
-    "Only five request kinds were observed for shikigami voices (default action 1, attack 3, damage 6, down 8, unique 10); no generic system/situation/guard fields are read in the available consumer.",
-    "The companion export contains 10 available rows; retail completeness and Blueprint-only references are not asserted. Source is reconstructed retail C++ with retail RVAs recorded inline."
+    "Manager path: ShikigamiVoiceGroupDataTable is one registered DataTable primary asset (GameDataTableManager.cpp:413), resolved after all loaders complete into DTM.ShikigamiVoiceGroupDataTables (+0x6F0) at line 241. VoiceGroupDataTable (+0x750, line 247) and VoiceDataTable (+0x740, line 246) are separate arrays. Every shared lookup here scans arrays in registration order and takes the first typed row match; the current build registers one table per array.",
+    "Full chain: cached ShikigamiDataTable row -> one Id_ShikigamiVoiceGroup_* FName -> this row's ID -> Id_VoiceGroup[step] -> VoiceGroupDataTable.Id_Voice[pick] -> VoiceDataTable.CueSheetName/CueName -> SoundManager.PlayVoice3DCue. Actions reach it through AGameShikigami::GAISlot186 (including the Tick queue and PlayActionVoice notify); other actor kinds use the separate character controller/table path, so character-only Ids 2/5/7/9 do not read this table.",
+    "Only five request Ids are handled by shikigami PlayVoice (1 DefaultAction, 3 Attack, 6 Damage, 8 Down, 10 Unique); its default branch returns for all others. Indexing is positional and unchecked: DefaultAction/Down/Unique use Value, Attack/Damage require Value>0 and use Value-1. Attack and Damage enums supply the one-based Value; DefaultAction START (0) and Down BOUNDED (0) are valid export slots even though the observed shikigami calls start at 1.",
+    "Interruption precedence applies only when bFlag is false and a voice is already playing on the owner character slot. Default (1) is blocked by a previous Unique (10) and, after another Default, requires a different priority (=Value); Attack (3) is blocked by previous Attack or Unique; Damage (6)/Down (8) require strictly higher priority only against a previous Damage/Down; Unique (10) requires a different, strictly higher priority against a previous Unique. Damage priorities are 0 for values 1-4 and 1 for 5; Down priorities are 1 for 0, 2 for 1/2, 11 for 3 and 12 for 4/5/6; Unique is 11; unlisted values keep 0xFF. bFlag true skips this whole gate.",
+    "Export coverage: the master has 10 rows; the four per-character shards (CN_040 3, CN_070 1, CN_080 5, CN_200 1) union to exactly the same rows and values with no duplicates, and every row key equals ID. Eleven ShikigamiDataTable fields across CN_040/070/080/200 point here; ten resolve, but CN_040.Id_ShikigamiVoiceGroup_Damage = CN_040_DAMAGE has no row in the master or any shard. All 47 Id_VoiceGroup entries resolve in VoiceGroupDataTable; their groups contain 164 distinct Voice IDs, eleven of which are absent from VoiceDataTable (five in CN_040_JUMP_01 and three each in CN_040_ATTACK_PROJECTILE_01 and CN_080_ATTACK_PROJECTILE_01). Those are export/data gaps, not proven retail omissions.",
+    "The VoiceGroup random pick counts non-None entries but indexes the unfiltered Id_Voice array, so it relies on None padding being trailing; that holds for every group reachable from this table. A None at this table's own Id_VoiceGroup slot (CN_080_DOWN index 2) or a dangling downstream Voice ID instead makes PlayVoice return silently.",
+    "All mechanics above are verified against the current reconstructed C++ (whose comments record retail RVAs), not against an independently byte-matched retail build. No retail Blueprint graph evidence was available or relied on; supplied JSON exports cannot prove retail completeness or rule out data assets outside them."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:413",
+      "detail": "Registers ShikigamiVoiceGroupDataTable as a DataTable primary-asset loader name."
+    },
+    {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:241",
-      "detail": "Resolves ShikigamiVoiceGroupDataTable into DTM.ShikigamiVoiceGroupDataTables."
+      "detail": "Resolves the loaded table into DTM.ShikigamiVoiceGroupDataTables (+0x6F0)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigamiActionController.cpp:361",
+      "detail": "Shared out-of-line finder rejects None when requested and returns the first typed row across manager table arrays."
     },
     {
       "source": "Source/Abrams/Private/GameShikigamiActionController.cpp:440",
-      "detail": "PlayVoice selects a row by shikigami action kind."
+      "detail": "PlayVoice selects this table and the positional Id_VoiceGroup element by request Id/Value."
     },
     {
       "source": "Source/Abrams/Private/GameShikigamiActionController.cpp:499",
-      "detail": "Resolves the selected Id_VoiceGroup entry to a VoiceGroup row."
+      "detail": "Resolves the selected Id_VoiceGroup entry to a VoiceGroup row in DTM.VoiceGroupDataTables (+0x750)."
     },
     {
-      "source": "Source/Abrams/Private/GameShikigamiActionController.cpp:505",
-      "detail": "Counts non-None voice candidates for the random pick."
+      "source": "Source/Abrams/Private/GameShikigamiActionController.cpp:504",
+      "detail": "Counts non-None VoiceGroup.Id_Voice entries and performs the random pick before the final Voice row lookup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:1822",
+      "detail": "SetBattleVoiceEnabled enables shikigami voice-group playback only if a ShikigamiDataTable voice-group field is non-None."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:597",
+      "detail": "GAISlot186 clears the queued request and forwards Id/Value/bFlag to PlayVoice only when both voice gates are enabled; bSituationCheck is unused."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:841",
+      "detail": "ResolveRows caches the upstream ShikigamiDataTable row that supplies the five voice-group lookup IDs."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimNotify_PlayActionVoice.cpp:18",
+      "detail": "Maps attack animation notifies to request Id 3 and enum-based Value 1-7 for the Attack array."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigamiAction.cpp:1475",
+      "detail": "Maps DamageVoiceType to request Id 6 and Value for the Damage array."
     }
   ]
 }

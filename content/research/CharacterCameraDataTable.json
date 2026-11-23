@@ -1,61 +1,120 @@
 {
-  "description": "Per-character lock-on camera tuning: the vertical offset from a target character's feet/location used as the camera's gaze point when that character is locked on.",
+  "description": "Per-target lock-on camera tuning: the target character's Character.Id_CharacterCamera selects an FName-keyed row whose TargetHeightOffset is added to the target's foot/base Z to seed the lock-on gaze in camera modes 1-3. One 46-row retail export: 44 rows use 135.0 and CN_040/CN_240 use 200.0 Unreal world units (centimetres by engine convention).",
   "fields": {
     "ID": {
-      "simple": "Row key, normally the character/camera ID referenced by Character rows.",
-      "technical": "FName primary key of the row (ImportKeyField=Id in the export). The virtual camera resolves the target character's Character::Id_CharacterCamera (Character row +0xD8) against the tables in CharacterCameraDataTables (DTM +0x460); the row's own ID is the lookup key rather than a value read by the consumer.",
+      "simple": "Row key (exported ID; native FName Id) referenced by the target character's Character.Id_CharacterCamera.",
+      "technical": "FName at row +0x8, declared UPROPERTY(BlueprintReadWrite, EditAnywhere). The export declares ImportKeyField=Id and all 46 exported rows have row name == exported ID, but no traced C++ consumer reads the row's Id member as a value. UGameCharacterVirtualCamera::OnTargetChanged instead takes CameraId from the target's cached Character row Id_CharacterCamera (row +0xD8) and calls FindRow<FGameDataTableRow_CharacterCamera>(CameraId, FString(), false) over DTM->CharacterCameraDataTables (+0x460), so the DataTable row name is the effective lookup key and the first matching table wins. AGameCharacter::ResolveDataRows caches the selected Character row pointer (+0x3A0) during setup; no variation, mission override or camera-specific override rewrites Id_CharacterCamera. Alias Character rows share rows (CN_041->CN_040, CN_071->CN_070, CN_081->CN_080, CN_111->CN_110, CP_081->CP_080); CN_210 stores NAME_None and finds no row.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCamera.h:11",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:600",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Character.h:105",
+        "Source/Abrams/Private/GameCharacter.cpp:487",
+        "Source/Abrams/Private/GameCharacter.cpp:848",
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:308",
-        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:311"
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:311",
+        "Source/Abrams/Private/GameDataTableManager.cpp:200",
+        "Source/Abrams/Public/GameDataTableManager.h:111"
       ],
       "status": "verified"
     },
     "TargetHeightOffset": {
-      "simple": "Height above the locked-on target at which the camera aims (centimetres).",
-      "technical": "double, default 0.0 in the reconstructed row constructor. On target change the virtual camera sets LockOnGazeHeight to this value; if the target is invalid, or no row is found in any table, it falls back to the retail constant 135.0. The value is added to the target's world-location Z when building LockOnGazeLocation, used by the target-camera solver and by camera modes 2 and 3 (and to derive LockOnHeightDifference). Exported retail values are 135.0 for all rows in the available export.",
+      "simple": "Vertical offset above the locked-on target's foot/base location used to seed the lock-on gaze (Unreal world units, normally centimetres).",
+      "technical": "double at row +0x10, declared UPROPERTY(EditAnywhere) without BlueprintReadWrite. The reconstructed row constructor sets 0.0 (0.00f), but every exported row writes a value. OnTargetChanged starts a 0.25 s view blend, sets LockOnTargetIndex to the target's character index, and copies the first matching row's TargetHeightOffset into the cached LockOnGazeHeight (+0x398, member default 135.0); NAME_None or a miss writes the 135.0 .data fallback. Its invalid-target branch also writes 135.0, but the only two callers (camera modes 1 and 2) invoke it only for a valid target. CopyCameraStateFrom copies the cached height on character swap. The value is added without scaling to GAISlot014_LocationLike().Z, which is actor Z minus scaled capsule half-height: mode 1 seeds the gaze before SolveTargetCamera (gaze direction/2D distance, then the solver rewrites LockOnGazeLocation to the pivot), mode 2 sets the target-relative gaze every frame while a target is valid, and entering mode 3 adds it to a valid target's base Z and derives LockOnHeightDifference; subsequent mode-3 updates use Mode3GazeLocation instead. No other C++ read of LockOnHeightDifference was found. Export values are 135.0 in 44 rows and 200.0 in CN_040 and CN_240.",
       "evidence": [
-        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterCamera.cpp:4",
+        "Source/Abrams/Private/GameCharacter.cpp:848",
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:112",
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:124",
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:129",
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:233",
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:298",
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:302",
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:305",
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:313",
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:317",
-        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:124",
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:329",
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:334",
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:350",
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:539",
-        "Source/Abrams/Public/GameCharacterVirtualCamera.h:141"
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:542",
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:727",
+        "Source/Abrams/Public/GameCharacterVirtualCamera.h:141",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterCamera.cpp:4",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCamera.h:14",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCamera.h:15",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:601"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The export contains 46 rows; all observed TargetHeightOffset values are 135.0, matching the built-in fallback.",
-    "There is a single table asset registered as 'CharacterCameraDataTable'; the manager appends it to CharacterCameraDataTables (DTM +0x460) after all DataTable loaders complete.",
-    "OnTargetChanged is only invoked when the target character index differs from LockOnTargetIndex; changing camera rows for an unchanged target will not refresh the height until the target changes.",
-    "Evidence is from reconstructed C++ with cited retail RVAs; no claim is made about byte-identical matching or about Blueprint-only consumers."
+    "The retail export is one DataTable named CharacterCameraDataTable (RowStruct GameDataTableRow_CharacterCamera, ImportKeyField=Id) with 46 rows and no duplicate keys: 44 x TargetHeightOffset=135.0, CN_040=200.0, CN_240=200.0. All 46 datatables_by_character/*/CharacterCameraDataTable.json shards contain exactly the matching single row and agree with the master export.",
+    "The camera row belongs to the lock-on target, not to the camera owner. Cross-referencing all 48 CharacterDataTable rows shows every non-None Id_CharacterCamera resolves to one of the 46 camera rows, no camera row is unreferenced, five alias rows share a target row (CN_041->CN_040, CN_071->CN_070, CN_081->CN_080, CN_111->CN_110, CP_081->CP_080), and CN_210 uses NAME_None so it receives the 135.0 fallback.",
+    "AGameDataTableManager creates one primary-asset loader named CharacterCameraDataTable, waits until every DataTable loader has completed, resolves the UDataTable through the asset manager, and appends it to CharacterCameraDataTables (DTM +0x460). FindRow loops that array in order and returns on the first match; there is no duplicate-key preference logic. The per-character shard files are export views, not separately loaded assets.",
+    "OnTargetChanged is called only from camera modes 1 and 2, only when the target's CharacterIndex differs from the cached LockOnTargetIndex (initial sentinel 0xFF). Mode 3 never calls it. Repointing a live target's camera row or changing its Character row without changing that index does not refresh LockOnGazeHeight until a qualifying target change or camera-state copy.",
+    "The reconstructed default 0.0 row value is not observed in the export. The 135.0 fallback equals the normal exported value, so a missing/None camera reference is data-visible only through the Character.Id_CharacterCamera join, not through a distinct height.",
+    "The similarly named GameDebugManager::CameraTargetHeightOffset is a separate float debug value (default 150.0), written by the debug slider; no C++ read of it or of its changed flag was found, and it is not this table's value or the 135.0 fallback.",
+    "Evidence is reconstructed C++ annotated with retail RVAs (including behaviour-certified OnTargetChanged and mode-2/3 functions in this checkout) plus the community retail DataTable exports. No retail Blueprint graph or live runtime was inspected, so Blueprint-only consumers or editor-side overrides cannot be excluded; no byte-identical source or playtest claim is made."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:200",
-      "detail": "Loads CharacterCameraDataTable into the manager's CharacterCameraDataTables array."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:348",
+      "detail": "Registers CharacterCameraDataTable in the list used to create DataTable primary-asset loaders."
     },
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:348",
-      "detail": "Registers the CharacterCameraDataTable primary asset loader name."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:488",
+      "detail": "Creates the loader map from the registered primary-asset names."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:172",
+      "detail": "Defers table-array population until all DataTable loaders report completion."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:200",
+      "detail": "Resolves the single CharacterCameraDataTable UDataTable and appends it to CharacterCameraDataTables (DTM +0x460)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:487",
+      "detail": "Caches the resolved selected Character row pointer used later to obtain Id_CharacterCamera."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:308",
-      "detail": "Selects the camera row using the locked-on target's Id_CharacterCamera."
+      "detail": "Reads Id_CharacterCamera from the locked-on target's cached Character row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:311",
+      "detail": "Finds the first CharacterCamera row whose row name matches that FName; falls back to 135.0 on a miss."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:313",
-      "detail": "Copies TargetHeightOffset into LockOnGazeHeight."
+      "detail": "Copies TargetHeightOffset into the cached LockOnGazeHeight."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:124",
+      "detail": "Mode 1: initial lock-on gaze = target foot/base location plus LockOnGazeHeight."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:233",
+      "detail": "Mode 1: SolveTargetCamera uses the offset-seeded gaze for direction/pitch and rewrites the gaze location to the solved pivot."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:334",
-      "detail": "Mode 2 lock-on gaze = target location plus LockOnGazeHeight."
+      "detail": "Mode 2: per-frame lock-on gaze = target foot/base location plus LockOnGazeHeight."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:539",
-      "detail": "Mode 3 gaze and lock-on height difference also use the offset."
+      "detail": "Mode 3 entry: adds LockOnGazeHeight to a valid target's foot/base Z to initialize LockOnGazeLocation."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:542",
+      "detail": "Mode 3 entry: derives LockOnHeightDifference from the offset gaze and the owner's eye base."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:350",
+      "detail": "Mode 3 updates use Mode3GazeLocation directly; they do not reread LockOnGazeHeight."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:727",
+      "detail": "Character swap copies the cached LockOnGazeHeight into the new virtual camera."
     }
   ]
 }

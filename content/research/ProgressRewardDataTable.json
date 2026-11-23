@@ -1,27 +1,31 @@
 {
-  "description": "Defines one-time progression rewards: the ItemSet granted when a specific story/PvE/PvP/arcade/collection milestone is reached, together with the condition type and numeric/name parameters used to test and describe that milestone.",
+  "description": "Defines progression rewards: the ItemSet granted when a story, PvE, PvP, arcade, or collection milestone is reached, plus the condition type and numeric/name parameters used to test and describe that milestone. The grant path adds the set once while its first item is out of stock; it has no separate per-row granted flag.",
   "fields": {
     "Id": {
       "simple": "Progress-reward row identifier.",
-      "technical": "FName key. The PvP result path collects the Id of every row whose condition is PvPRankMatchWinningStreakCount and passes them to GameShop_GrantProgressRewardRows; a full grant sweep collects every row's Id. The grant helper scans ProgressRewardDataTables for each ID, skips missing rows, and is the only route that turns a reward row into an item-set grant.",
+      "technical": "FName import key; the retail export writes it as ID and all 493 row keys equal their ID value. UGameResultWidget::OpenPvPResult collects the Id of every row whose condition is PvPRankMatchWinningStreakCount, while GameShop_GrantProgressRewards collects every row Id for a full sweep. GameShop_GrantProgressRewardRows looks each name up in ProgressRewardDataTables in shard order and uses the first matching row; a missing name leaves a null row that is dereferenced rather than safely skipped. Every identified grant path in the reconstructed C++ converges on this helper.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ProgressReward.h:11",
         "Source/Abrams/Private/GameResultWidget.cpp:321",
         "Source/Abrams/Private/GameResultWidget.cpp:325",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1059",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1064",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1067",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1140"
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1137",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1143"
       ],
       "status": "verified"
     },
     "Id_ItemSet": {
       "simple": "ItemSet awarded by this reward row.",
-      "technical": "FName. GameShop_GrantProgressRewardRows resolves this ID in ItemSetDataTables, requires the set's first item to be non-None and not already in stock, checks that the set is unlocked and all reward conditions are reached, then grants the set once with Count=1. UI code finds the reward row by matching Id_ItemSet to an ITM_SET_PROGRESS_REWARD* set to show the reward name and unlock progress.",
+      "technical": "FName. All 493 exported rows have a unique ITM_SET_PROGRESS_REWARD* ItemSet, and every target ItemSet and its first item resolve in the supplied exports. GameShop_GrantProgressRewardRows first finds the set in ItemSetDataTables, requires Id_Item[0] to be non-None and absent from the save's stock, then requires the reward condition to be reached and the set to be unlocked; it finally calls GameShop_AddItemSet with Count=1 and a condition-derived GetType. UI lookup instead scans rows whose Id_ItemSet equals an ITM_SET_PROGRESS_REWARD* set after that prefix is selected from an item or the arcade plate filter.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ProgressReward.h:16",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:949",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1082",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1083",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1087",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1130",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:90",
         "Source/Abrams/Private/GameCharacterSelectArcadeRewardInfoWidget.cpp:38",
         "Source/Abrams/Private/GameCharacterSelectArcadeRewardInfoWidget.cpp:46"
       ],
@@ -29,85 +33,126 @@
     },
     "UnlockConditionsType": {
       "simple": "Kind of player milestone that unlocks the reward.",
-      "technical": "EGameItemUnlockConditionsType (Default=1 through UseKyotoStudentsCount=64 in the reconstructed enum, Invalid=255), default None. GameItem_GetUnlockProgress switches on it to convert save data into one or more (current, required) FIntPoint pairs; every pair must be reached for GameItem_IsProgressRewardReached. It also chooses the unlock-message text and the GetType category used when granting: story=2, PvE risk=6, other PvE=4, anything else=7. PvP win-streak rows are additionally selected by UGameResultWidget::OpenPvPResult.",
+      "technical": "EGameItemUnlockConditionsType stored as one uint8; the header default is None. The reconstructed enum runs None=0, Default=1 through UseKyotoStudentsCount=59, with Invalid=255. GameItem_GetUnlockProgress switches on it to convert save data into zero or more (current, required) FIntPoint pairs; GameItem_IsProgressRewardReached requires every pair to pass. A separate progress-reward text switch maps a subset of types to ITM_UNLOCK_MESSAGE_* requests and returns no text for unhandled types. For grants, story types 2-8 and 57 get GetType=2, StoryReleaseAllCorrelationDiagramCharacter gets 6, PvERiskValueThreshold and the other PvE types get 4, and everything else gets 7. PvP result display additionally selects only PvPRankMatchWinningStreakCount rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameItemUnlockConditionsType.h:6",
+        "Source/AbramsDataTable/Public/EGameItemUnlockConditionsType.h:66",
+        "Source/AbramsDataTable/Public/EGameItemUnlockConditionsType.h:67",
         "Source/AbramsDataTable/Public/GameDataTableRow_ProgressReward.h:19",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ProgressReward.h:27",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:463",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:487",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:906",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1028",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1046",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1516"
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1092",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1516",
+        "Source/Abrams/Private/GameResultWidget.cpp:323"
       ],
       "status": "verified"
     },
     "UnlockConditionsValue": {
       "simple": "Numeric thresholds/counts for the unlock condition.",
-      "technical": "TArray<float>; thresholds are converted with FMath::CeilToInt (the retail SSE ceil idiom). Index 0 is the required count/level/rank for most types; for rank-threshold conditions index 0 selects the rank tier and index 1 is the required count. Some conditions use pairs such as (rank, count), while others use no numeric values at all and rely only on the type/strings. Exported rows normally contain three floats, with trailing zeroes unused.",
+      "technical": "TArray<float>; every exported row has exactly three floats, but only index 0 is nonzero in this export and indices 1-2 are always zero. Most runtime branches use ceil(Values[0]) as the required count, level, or threshold. PvPRankPointMax ignores all values and instead uses ceil(GlobalThreshold.Min) reached through the RankPoint row. PvEModeClearRankCount and PvPBattleWinResultRankThreshold use ceil(Values[0]) as a rank tier (1=S, 2=S+A) and ceil(Values[1]) as the count, but no exported row uses those two types. Arcade clear, StoryMissionClearRank, StoryReleaseAllCorrelationDiagramCharacter, and StoryAllMissionTaskClear use no numeric value; StoryMissionTaskClear instead treats Values[0] as an objective index. UseKyotoStudentsCount uses ceil(Values[0]) per listed character. The text formatter casts floats with static_cast<int32> rather than ceil. An empty interpreter result is replaced by the never-passing pair (-1, 0).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ProgressReward.h:22",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:471",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:620",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:514",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:639",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1392",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1413"
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:662",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:679",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:871",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:882",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:906",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1552"
       ],
       "status": "verified"
     },
     "UnlockConditionsValueStr": {
-      "simple": "Name parameters (character/stage/mission/rank IDs) for the unlock condition.",
-      "technical": "TArray<FName>. Interpreted by type: e.g. StoryMissionClearRank uses index 0 as a demo ID, StoryCharaRelateThreshold uses two character IDs, PvEGrowthCharaLevelThreshold uses a character ID, PvPRankPointMax uses a RankPoint row ID (which points to GlobalThreshold::Min), and arcade-clear types treat every non-None entry as a character ID and emit one (0/1, 1) clear-flag pair each. Index 0 is read unguarded by the arcade reward-info widget. Names are also substituted into ITM_UNLOCK_MESSAGE_* text requests.",
+      "simple": "Name parameters such as character, stage, mission, and rank IDs for the unlock condition.",
+      "technical": "TArray<FName>; every exported row has six entries, with unused slots set to None. Meanings are type-specific: StoryCharaRelateThreshold uses two character IDs; StoryMissionClearRank uses a StoryDemo ID; StoryChapterAllMissionClearRank uses a chapter ID; PvEGrowthCharaLevelThreshold uses one character ID; UseCharacterCount and StageSelectCount use a character or map ID; UseMultiCharacterCount, UsePvPCharacterGroupCount, and UseKyotoStudentsCount use multiple character IDs; PvPRankPointMax uses a RankPoint ID whose Id_GlobalThreshold selects GlobalThreshold::Min. Arcade clear types emit one (0/1, 1) pair for each non-None character ID using the flag selected by the condition type. All RankPoint, GlobalThreshold, StoryDemo, and Character references in the export resolve. Several fixed-index reads and the arcade reward widget's index-0 read are unguarded. Character, mission, chapter, stage, and rank IDs are resolved before insertion into ITM_UNLOCK_MESSAGE_* parameters; raw FNames are not printed directly.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ProgressReward.h:25",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:475",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:498",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:494",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:511",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:537",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:622",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:685",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:682",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:698",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:710",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:871",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:882",
         "Source/Abrams/Private/GameCharacterSelectArcadeRewardInfoWidget.cpp:32",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1383"
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1560"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The export contains 493 rows. UnlockConditionsType, UnlockConditionsValue, and UnlockConditionsValueStr form one loosely typed condition record; their meaning is defined jointly by the type switch in GameItem_GetUnlockProgress, not by the array indices alone.",
-    "Progress pairs use (current, required). A condition is reached when current >= required for every pair. No condition/unknown type becomes the never-passing sentinel (-1, 0), while boolean conditions add (0, 1) until reached and (0, 0) when reached.",
-    "Arcade plate reward display specifically filters for ArcadeModeCharacterClear rows whose UnlockConditionsValueStr[0] equals the selected character and whose item set begins with a Plate item; it then shows the set name and OnUnlock/OnLock animation.",
-    "Multiple ProgressRewardDataTables shards are supported; grant and UI helpers scan them in order. Only the supplied retail export and partial Content are available."
+    "The supplied export is a single ProgressRewardDataTable with 493 rows and 40 distinct condition types. All row keys equal the exported ID, all Id_ItemSet values are unique and resolve to an ItemSet with a non-None first item, and all first items resolve in ItemDataTable.",
+    "UnlockConditionsType, UnlockConditionsValue, and UnlockConditionsValueStr are one loosely typed condition record. Their meaning is defined jointly by the GameItem_GetUnlockProgress type switch, not by array position alone.",
+    "Progress pairs are (current, required), and GameItem_IsProgressRewardReached requires current >= required for every pair. Default is already reached as (0, 0); unreached boolean checks use (0, 1) and reached checks use (0, 0). None, PvEModeClearRiskValue, unrecognized types, and invalid rank tiers produce the never-passing sentinel (-1, 0).",
+    "Grant precedence is: find the ItemSet, reject a None or in-stock first item, evaluate all reward progress, require the set to be unlocked, then add each set item with Count=1 times its Quantity. Only Id_Item[0] is used for the anti-repeat stock check; there is no separate persisted granted-row flag in this path.",
+    "The unlock-message formatter is a separate type switch, is not exhaustive, uses static_cast<int32> for displayed values, and returns no request for Default and unsupported types; do not infer its text from the progress interpreter's ceil semantics.",
+    "Arcade plate display keeps only ArcadeModeCharacterClear rows whose UnlockConditionsValueStr[0] equals the selected character and whose set's first item has ItemType Plate, then shows the set name and loops OnUnlock or OnLock according to GameItem_IsProgressRewardReached.",
+    "FGameDataTableArray and all helpers support multiple shards in table order, with first matching row winning. The reconstruction's loader registers only one asset named ProgressRewardDataTable, and the supplied export is one asset; no packaged ProgressReward shard names are present in this checkout.",
+    "Text above is verified against the reconstructed C++ and retail-derived JSON exports. No retail Blueprint graphs were inspected; the project guide states that retail game logic is in C++. No runtime save state or executed game behavior was used as evidence."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:305",
-      "detail": "Loads ProgressRewardDataTable into ProgressRewardDataTables."
+      "detail": "Resolves the ProgressRewardDataTable primary asset into the ProgressRewardDataTables array after all table loads complete."
     },
     {
       "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:463",
       "detail": "GameItem_GetUnlockProgress is the shared condition interpreter for progress rewards and shop lineups."
     },
     {
-      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1028",
-      "detail": "GameItem_IsProgressRewardReached requires every condition pair to be satisfied."
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:949",
+      "detail": "Item unlock progress reaches this table indirectly: an unlocked ItemSet with an ITM_SET_PROGRESS_REWARD prefix is matched to Reward->Id_ItemSet."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1015",
+      "detail": "GameItem_IsItemProgressReached and GameItem_IsProgressRewardReached apply the all-pairs-pass rule; both use (-1, 0) when no progress pair is produced."
     },
     {
       "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1059",
-      "detail": "Grants each eligible reward's ItemSet once and classifies the grant by condition type."
+      "detail": "GameShop_GrantProgressRewardRows applies stock, progress, and set-unlock gates, then grants each accepted ItemSet with Count=1 and a type-derived GetType."
     },
     {
       "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1137",
-      "detail": "Sweeps all progress reward rows for bulk grant checks."
+      "detail": "GameShop_GrantProgressRewards collects all row IDs for the full reward sweep used by menu and result phases."
     },
     {
-      "source": "Source/Abrams/Private/GameResultWidget.cpp:315",
-      "detail": "On PvP result, selects win-streak reward rows and appends granted item sets to the result display."
+      "source": "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:257",
+      "detail": "One bulk grant sweep is run after the main menu's levels load; granted sets open a reward dialog before new shop lineups."
+    },
+    {
+      "source": "Source/Abrams/Private/GameResultWidget.cpp:321",
+      "detail": "OpenPvPResult selects only PvPRankMatchWinningStreakCount rows and appends granted item sets to the result display."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterSelectArcadeRewardInfoWidget.cpp:20",
-      "detail": "Finds a character's arcade plate reward, shows its item-set name, and plays an unlock/lock animation."
+      "detail": "Finds a character's matching ArcadeModeCharacterClear plate reward, displays its ItemSet name, and plays OnUnlock or OnLock."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCollectionArchiveTileWidget.cpp:254",
+      "detail": "Collection detail UI reaches this table indirectly through an item's ITM_SET_PROGRESS_REWARD ItemSet to show unlock progress and description text."
     },
     {
       "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1516",
-      "detail": "Builds the ITM_UNLOCK_MESSAGE_* text explaining a reward's remaining condition."
+      "detail": "GameItem_GetProgressRewardUnlockText builds the ITM_UNLOCK_MESSAGE_* request for a recognized condition type."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1748",
+      "detail": "Item unlock text and progress use the ItemSet prefix as an alias to find the corresponding progress-reward row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemOwnership.cpp:22",
+      "detail": "GameItem_HasStock supplies the first-item stock test used by the anti-repeat grant gate."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:90",
+      "detail": "GameShop_AddItemSet performs the actual item grants and KPI/collection bookkeeping for the accepted reward set."
     }
   ]
 }

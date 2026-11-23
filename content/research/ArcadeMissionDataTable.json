@@ -3,43 +3,55 @@
   "fields": {
     "Id": {
       "simple": "Arcade mission identifier.",
-      "technical": "FName import key/row name for FGameDataTableRow_ArcadeMission. It is selected from an ArcadeMissionSet difficulty list (or set directly as the run's current MissionId) and passed to the finder over ArcadeMissionDataTables (DTM+0x980). No consumer reads the member as a value.",
+      "technical": "FName import key/row name for FGameDataTableRow_ArcadeMission. BattleArcade_GetMissionIds selects it from an ArcadeMissionSet difficulty list; IntervalArcade writes the stage's entry to Game->ArcadeRun.MissionId, which is the key passed to the finders over ArcadeMissionDataTables (DTM+0x980). No reconstructed consumer reads the row member Id as a value.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeMission.h:11",
         "Source/Abrams/Public/GameDataTableManager.h:193",
-        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:48",
-        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:224"
+        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:52",
+        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:222",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:145"
       ],
       "status": "observed"
     },
     "Id_Map": {
       "simple": "Battle stage/map for the mission.",
-      "technical": "FName, default None. UGamePhase_IntervalArcade copies the current mission's Id_Map into Game->StudioBattleLevelRequest_CA0.BattleLevel before the wave-derived battle pair is chosen. Unlike the story-mission path, this Arcade consumer does not substitute a random map when the name is None.",
+      "technical": "Default-constructed FName (None). UGamePhase_IntervalArcade copies the current mission's Id_Map into Game->StudioBattleLevelRequest_CA0.BattleLevel before the wave-derived battle pair is chosen. The map id is subsequently used as a key into MapDataTables (DTM+0x3A0) for map data and selection icons; unlike the story-mission path, this Arcade consumer does not substitute Story_PickRandomMapId when the name is None. All 90 exported map ids resolve to MapDataTable rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeMission.h:15",
         "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:224",
-        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:226"
+        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:226",
+        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:257",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:480",
+        "JJKCCDatatables/datatables/MapDataTable.json"
       ],
       "status": "verified"
     },
     "Id_MissionWave": {
       "simple": "Ordered list of wave ids that make up the mission.",
-      "technical": "TArray<FName>, default empty. UGamePhase_BattleArcade iterates every entry, resolves each through MissionWaveDataTables (DTM+0x9A0) with bCheckNone=true, and keeps only non-null rows; the resulting wave/task arrays are indexed by RetryCount and passed to AGameBattleManager::SetupArcadeMission. UI and interval code instead take Id_MissionWave[0] without checking array bounds or a null row: the first wave feeds enemy portraits, situation-overview poses, and IntervalArcade_BattlePairFromWave. Exported rows pad unused slots with None.",
+      "technical": "TArray<FName>, default empty. UGamePhase_BattleArcade iterates every entry, resolves each through MissionWaveDataTables (DTM+0x9A0) with bCheckNone=true, and keeps only non-null rows; the resulting wave/task arrays are indexed by RetryCount and passed to AGameBattleManager::SetupArcadeMission. All first-wave consumers index element 0 without a Num() guard. Null handling varies by consumer: RootInfo and the Arcade overview widget null-check the looked-up mission and wave, the interval helper dereferences the mission row without a null check, and FGameSituationOverviewParameter::BuildArcade dereferences the first-wave row without a null check. The first wave determines enemy portraits, situation-overview poses and IntervalArcade_BattlePairFromWave (which maps a null wave to 0xFF). Every exported row has three slots: one valid wave id followed by two None sentinels; None has no MissionWave row and is dropped by the battle loop.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeMission.h:18",
         "Source/Abrams/Private/GamePhase_BattleArcade.cpp:144",
-        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:146",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:147",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:149",
+        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:149",
+        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:227",
+        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:419",
         "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:118",
         "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:123",
         "Source/Abrams/Private/GameBattleSituationOverviewArcadeWidget.cpp:80",
-        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:149",
-        "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:191"
+        "Source/Abrams/Private/GameBattleSituationOverviewArcadeWidget.cpp:85",
+        "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:191",
+        "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:193",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:118",
+        "JJKCCDatatables/datatables/ArcadeMissionDataTable.json",
+        "JJKCCDatatables/datatables/MissionWaveDataTable.json"
       ],
       "status": "verified"
     },
     "ResultEvaluationScoreRate": {
       "simple": "Multiplier applied to the battle's bonus score for rank evaluation.",
-      "technical": "float, constructor default 0.0f. AGameBattleManager::GetResultEvaluationScoreRate starts at 1.0, applies StoryMission->ResultEvaluationScoreRate, then unconditionally overrides it with the Arcade mission value when an Arcade mission is active. The same priority appears in result snapshot construction: bonus points are multiplied by the rate and truncated to int32 before GetResultScoreRank. The PvE result Enter path also uses the accessor when computing MissionWaveRank from completed bonuses. Exported Arcade rows use 1.0 or 1.3.",
+      "technical": "float, constructor default 0.0f, distinct from the accessor's 1.0f fallback when no mission row is cached. AGameBattleManager::GetResultEvaluationScoreRate starts at 1.0, applies StoryMission->ResultEvaluationScoreRate, then unconditionally overrides it with the Arcade mission value when System360->ArcadeMission is non-null. Result-snapshot construction repeats the same precedence inline: summed player bonus points are multiplied by the rate and cast to int32 before GetResultScoreRank. The PvE result Enter path calls the accessor for a bonus rank and takes it when the returned value is numerically greater than the existing MissionWaveRank. Of the 90 exported rows, the 30 Easy-list rows (_01.._05 for roots A-F) use 1.3 and the 60 Normal/Hard-list rows use 1.0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeMission.h:21",
         "Source/AbramsDataTable/Private/GameDataTableRow_ArcadeMission.cpp:4",
@@ -47,25 +59,38 @@
         "Source/Abrams/Private/GameBattleManager.cpp:409",
         "Source/Abrams/Private/GameBattleManager.cpp:1369",
         "Source/Abrams/Private/GameBattleManager.cpp:1377",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:738"
+        "Source/Abrams/Private/GameBattleManager.cpp:1379",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:738",
+        "Source/Abrams/Public/GameBattleSystems_B.h:204",
+        "JJKCCDatatables/datatables/ArcadeMissionDataTable.json",
+        "JJKCCDatatables/datatables/ArcadeMissionSetDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset contains 90 rows and its RowStruct is FGameDataTableRow_ArcadeMission; the manager loads ArcadeMissionDataTable into ArcadeMissionDataTables (DTM+0x980).",
-    "Several first-wave consumers are reconstructed as unguarded, matching recorded retail behaviour; an empty or invalid Id_MissionWave[0] is therefore a real failure mode rather than something this table guarantees against.",
+    "The single supplied export contains 90 rows, uses RowStruct FGameDataTableRow_ArcadeMission with ImportKeyField Id, and every row key matches its serialized ID field. The manager loads ArcadeMissionDataTable into ArcadeMissionDataTables (DTM+0x980). No numbered or localization-variant shards for this table exist in the supplied export set.",
+    "Every exported row has three Id_MissionWave slots: one valid wave id followed by two None sentinels. All 90 wave ids resolve in MissionWaveDataTable and all 90 Id_Map values resolve in MapDataTable; all 90 missions are referenced by exactly one Easy/Normal/Hard list in ArcadeMissionSetDataTable. The 30 Easy-list rows have rate 1.3 and the 60 Normal/Hard rows have rate 1.0.",
+    "All first-wave consumers index element 0 without a Num() guard. Null handling varies: RootInfo and the Arcade overview widget null-check the mission and wave, the interval helper dereferences the mission without a null check, and FGameSituationOverviewParameter::BuildArcade dereferences the first-wave row without a null check. BattlePairFromWave itself maps a null wave to 0xFF. Empty arrays or missing rows are therefore real failure modes rather than something this table guarantees against.",
     "Source comments cite retail RVAs such as 0x13c7fe0 and 0x1018a90; status/functions.json labels the former behavioural and the latter match. That status applies to the consumer code, not to the exported data itself.",
     "Only available C++ and the exported asset were reviewed; Content is partial and Blueprint/editor-only uses cannot be exhaustively excluded."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:282",
+      "detail": "Binds the loaded ArcadeMissionDataTable asset into ArcadeMissionDataTables (DTM+0x980), the array used by every direct row finder."
+    },
+    {
+      "source": "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:239",
+      "detail": "Resolves CharacterArcade->Id_ArcadeMissionSet into ArcadeMissionSet rows; their difficulty lists supply the mission ids later assigned to ArcadeRun.MissionId."
+    },
+    {
       "source": "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:224",
-      "detail": "Reads Id_Map and the first Id_MissionWave entry to set the battle level and battle pair."
+      "detail": "Reads Id_Map and the first Id_MissionWave entry to set the battle level and battle pair; first-wave enemies also drive portraits and overview slots."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattleArcade.cpp:144",
-      "detail": "Resolves every Id_MissionWave entry into wave rows and picks a task per wave for SetupArcadeMission."
+      "detail": "Resolves every Id_MissionWave entry into wave rows and lottery-picked tasks, then passes the arrays with the mission row to SetupArcadeMission."
     },
     {
       "source": "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:118",
@@ -73,7 +98,15 @@
     },
     {
       "source": "Source/Abrams/Private/GameBattleSituationOverviewArcadeWidget.cpp:80",
-      "detail": "Uses the first wave's enemies to set per-mission situation-overview states."
+      "detail": "Uses the first wave's enemies to set per-mission situation-overview states relative to the run's won-mission count."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:191",
+      "detail": "BuildArcade looks up the current mission's first wave and uses its enemies to assign situation-overview pose indices."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:769",
+      "detail": "SetupArcade caches the row pointer and wave/task arrays in System360; GetArcadeMission exposes that cached pointer to result-state code, which currently only null-tests it."
     },
     {
       "source": "Source/Abrams/Private/GameBattleManager.cpp:409",
@@ -81,7 +114,11 @@
     },
     {
       "source": "Source/Abrams/Private/GameBattleManager.cpp:1369",
-      "detail": "Scales the player's bonus score by the active mission's rate before rank evaluation."
+      "detail": "Scales the summed player bonus score by the active mission's rate, casts to int32, and feeds the rank lookup."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:738",
+      "detail": "Uses the cached rate through GetResultEvaluationScoreRate when computing the PvE result bonus rank."
     }
   ]
 }

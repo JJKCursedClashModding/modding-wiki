@@ -1,29 +1,43 @@
 {
-  "description": "Defines the friendly/hostile presentation of each relationship level for a character pair; referenced from StoryCharaGraphPair.",
+  "description": "Defines the five per-level friendly/hostile presentation flags for a directed StoryCharaGraphPair relationship; consumed by relationship UI to choose labels, gauge/target backgrounds, and graph-line styling.",
   "fields": {
     "ID": {
-      "simple": "Relationship-level definition id (usually <character A>_<character B>).",
-      "technical": "FName row key in StoryCharaRelateLevelDataTables (DTM +0x880). StoryCharaGraphPair.Id_StoryCharaRelateLevel[partner index] selects it; the relation gauge, graph, target item and reward list consumers resolve it with DTM_FindStoryCharaRelateLevelRow (retail 0x1649650, first matching table, no None pre-check in callers).",
+      "simple": "Directed relationship-definition row key, normally <character A>_<character B>.",
+      "technical": "FName export/import key and UDataTable row name in StoryCharaRelateLevelDataTables (DTM +0x880); all 88 exported rows have ID equal to their row key. StoryCharaGraphPair.Id_StoryCharaRelateLevel[partner index] supplies the lookup name, so order matters: A_B and B_A are separate rows. The gauge, graph, target-item, level-change and earned-reward consumers use UDataTable::FindRow through DTM_FindStoryCharaRelateLevelRow (retail 0x1649650) or the equivalent FindFirstRow template; both walk tables in order and return the first match. Traced callers pass bCheckNone=false and the unused bUnknown=false, so NAME_None is not rejected up front and lookup results are read unchecked. The native Id member is not itself read by the traced consumers; export Properties.ImportKeyField is Id.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryCharaRelateLevel.h:11",
-        "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:18",
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryCharaGraphPair.h:24",
+        "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:20",
+        "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:28",
+        "Source/Abrams/Private/GameDataTableManager.cpp:266",
+        "Source/Abrams/Public/GameDataTableManager.h:177",
         "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:69",
         "Source/Abrams/Private/GameStoryCharaGraphWidget.cpp:81",
-        "Source/Abrams/Private/GameStoryCharaRelateTargetListItemWidget.cpp:96",
+        "Source/Abrams/Private/GameStoryCharaRelateTargetListItemWidget.cpp:98",
+        "Source/Abrams/Private/GameCharaRelateLevelListItemWidget.cpp:100",
         "Source/Abrams/Private/GameStoryEarnedRewardListItemWidget.cpp:120"
       ],
       "status": "verified"
     },
     "bFriendly": {
       "simple": "Per-level flag: true = friendly relationship, false = hostile.",
-      "technical": "TArray<bool> indexed as [Level - 1]; exported rows have five entries (levels 1..5). Read after the level is derived from GraphPair start level + saved changes, and used to switch text ids (SYS_STORY_CORRELATION_DIAGRAM_LABEL_0004 / 0005), gauge visibility/material, graph line parameters and target item background. Consumers assume a valid non-zero level and a populated array.",
+      "technical": "TArray<bool> of five flags, indexed as [Level - 1] for levels 1..5. Level comes from GameManager::GetCharaRelateLevel or the change preview: StoryCharaGraphPair.StartRelateLevel is converted to a value with GlobalThreshold Min (STORY_CHARA_RELATE_LV_1..5), the saved directed delta is added, and the result is converted back to a level. The flag selects SYS_STORY_CORRELATION_DIAGRAM_LABEL_0004 versus 0005, which gauge image is visible, which graph-line parameter list is used, and which target-item background is visible. GaugeRate is a unitless Change / (EndValue - StartValue) written to both gauge dynamic materials regardless of the flag. StartRelateLevel and EndRelateLevel are level numbers, not indices into this array; EndRelateLevel is used elsewhere for the gauge denominator and reward visibility, not to choose the flag. Every exported array has five booleans and no sentinel/default entry; consumers do not bounds-check Level or array length, so Level 0 or greater than 5 gives an out-of-range index, and a missing row is dereferenced unchecked. The graph widget separately guards its own five-element line-parameter lists but not this row.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryCharaRelateLevel.h:15",
+        "Source/Abrams/Private/GameManagerGraphics.cpp:531",
+        "Source/Abrams/Private/GamePhase_WidgetTest.cpp:289",
+        "Source/Abrams/Private/GamePhase_WidgetTest.cpp:311",
+        "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:72",
         "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:73",
         "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:74",
         "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:78",
+        "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:80",
+        "Source/Abrams/Private/GameStoryCharaGraphWidget.cpp:61",
+        "Source/Abrams/Private/GameStoryCharaGraphWidget.cpp:78",
         "Source/Abrams/Private/GameStoryCharaGraphWidget.cpp:82",
+        "Source/Abrams/Private/GameStoryCharaRelateTargetListItemWidget.cpp:85",
         "Source/Abrams/Private/GameStoryCharaRelateTargetListItemWidget.cpp:99",
+        "Source/Abrams/Private/GameStoryCharaRelateTargetListItemWidget.cpp:101",
         "Source/Abrams/Private/GameCharaRelateLevelListItemWidget.cpp:101",
         "Source/Abrams/Private/GameStoryEarnedRewardListItemWidget.cpp:121"
       ],
@@ -31,35 +45,46 @@
     }
   },
   "notes": [
-    "The row has no numeric bounds or level-count field; five-element arrays in the export and GlobalThreshold STORY_CHARA_RELATE_LV_1..5 define the expected maximum (Source/Abrams/Private/GamePhase_WidgetTest.cpp:292-297).",
-    "Row constructor is empty (Source/AbramsDataTable/Private/GameDataTableRow_StoryCharaRelateLevel.cpp:3). 88 exported rows, no shards or locale variants.",
-    "The friendly/hostile flag is presentation only; the numeric relation value/level is computed from StoryCharaGraphPair.StartRelateLevel plus GameManager save data.",
-    "Evidence is from the reconstructed C++ in Source/ (row shape/counts from the exported table); status/ records byte matches for some owner TUs, but this file does not claim a retail byte comparison for every function or exhaustive Blueprint/runtime coverage."
+    "The row stores no numeric relation value, threshold, level count, or default/sentinel. All 88 exported rows have exactly five booleans. GlobalThreshold STORY_CHARA_RELATE_LV_1..5 have bands 0-24, 25-49, 50-74, 75-99 and 100-100, but the traced conversion functions use only the Min values [0, 25, 50, 75, 100] and cap derived levels at 5 (Source/Abrams/Private/GamePhase_WidgetTest.cpp:288-321). Shipped GraphPair start levels are 1..3 and exported change values are positive, but the C++ itself does not enforce the valid index range.",
+    "Row constructor is empty (Source/AbramsDataTable/Private/GameDataTableRow_StoryCharaRelateLevel.cpp:3). The single export StoryCharaRelateLevelDataTable.json has 88 unique row keys, every row ID equals its key, every bFriendly array has five booleans, and there are no shards, locale variants or None-ID rows in the available exports.",
+    "The friendly/hostile flag is presentation only: the numeric level is derived from StoryCharaGraphPair.StartRelateLevel, GlobalThreshold Min values, and the directed save-data delta in StudioNestedNameInts_770. StoryCharaRelateChange rows feed that delta (Source/Abrams/Private/GameManagerGraphics.cpp:476-489 and :531-549).",
+    "Rows are directed: consumers look up a GraphPair row by the source character and index by the other character, so A_B and B_A are distinct. The export has 44 reciprocal pairs; four have different five-flag arrays (for example CP_020_CP_030 versus CP_030_CP_020), so symmetry must not be assumed.",
+    "StoryCharaGraphPair.Id_Character and Id_StoryCharaRelateLevel contain None padding for absent partners in some rows. Target-list setup filters Partner.IsNone() before creating items (Source/Abrams/Private/GameStoryCharaRelateWidget.cpp:141), while other consumers use Find results and pair arrays unchecked.",
+    "DataTableManager registers the primary asset name StoryCharaRelateLevelDataTable, waits for all loaders, resolves that asset and appends it to the single DTM +0x880 table array; null tables are skipped (Source/Abrams/Private/GameDataTableManager.cpp:266, :439 and :162). With one exported table the first-match precedence is currently trivial.",
+    "Evidence is from the reconstructed C++ in Source/: status/ records a mix of INV byte matches, BEHAV and EQUIV support for the cited functions, but this file does not claim a retail byte comparison for every function or exhaustive Blueprint/runtime coverage. No retail Blueprint graph or live-game result was inspected here; AGENTS.md states that shipped gameplay logic is C++, but widget bindings and material setup are not independently verified."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:67",
-      "detail": "Selects friendly/hostile gauge, text and GaugeRate for the pair detail screen."
+      "source": "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:69",
+      "detail": "Pair row supplies the level-row ID; bFriendly selects the visible friendly/hostile gauge image and the relation label. The GaugeRate ratio is written to both gauge dynamic materials regardless of the flag."
     },
     {
-      "source": "Source/Abrams/Private/GameStoryCharaGraphWidget.cpp:79",
-      "detail": "Picks friendly/hostile relation line parameters for a graph edge."
+      "source": "Source/Abrams/Private/GameStoryCharaGraphWidget.cpp:81",
+      "detail": "Uses GameManager level and bFriendly to select FriendlyRelateLevelLineParameterList[Level - 1] or HostileRelateLevelLineParameterList[Level - 1] for a graph edge."
     },
     {
-      "source": "Source/Abrams/Private/GameStoryCharaRelateTargetListItemWidget.cpp:94",
-      "detail": "Chooses the target item's friendly/hostile background."
+      "source": "Source/Abrams/Private/GameStoryCharaRelateTargetListItemWidget.cpp:98",
+      "detail": "Uses the directed pair row for CharacterId -> TargetCharacterId and bFriendly[ToLevel - 1] to choose Background_Friendry or Background_Hostility; target list items are fed by GameStoryCharaRelateWidget::SetupTargetList."
     },
     {
-      "source": "Source/Abrams/Private/GameCharaRelateLevelListItemWidget.cpp:94",
-      "detail": "Reads the relation label for after-change levels in the level-up list."
+      "source": "Source/Abrams/Private/GameCharaRelateLevelListItemWidget.cpp:100",
+      "detail": "Uses bFriendly[NewLevel - 1] for the friendly/hostile relation label after a change, in both directions (Source/Abrams/Private/GameCharaRelateLevelListItemWidget.cpp:103-104)."
     },
     {
-      "source": "Source/Abrams/Private/GameStoryEarnedRewardListItemWidget.cpp:114",
-      "detail": "Reads the pair's current relation label in the earned-reward list."
+      "source": "Source/Abrams/Private/GameStoryEarnedRewardListItemWidget.cpp:120",
+      "detail": "Uses bFriendly[Game->GetCharaRelateLevel(From, To) - 1] for the earned-reward list relation labels in both directions."
     },
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:266",
-      "detail": "Loads StoryCharaRelateLevelDataTable into StoryCharaRelateLevelDataTables."
+      "detail": "Loads/resolves StoryCharaRelateLevelDataTable through the primary-asset loader map and caches it in StoryCharaRelateLevelDataTables (DTM +0x880); also registered at Source/Abrams/Private/GameDataTableManager.cpp:439."
+    },
+    {
+      "source": "Source/Abrams/Private/GameManagerGraphics.cpp:531",
+      "detail": "Indirect consumer: GetCharaRelateLevel supplies the level used by the graph, target and reward consumers from GraphPair start level plus saved delta and GlobalThreshold conversion; it does not read this table directly."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_WidgetTest.cpp:288",
+      "detail": "Indirect consumer: StoryRelationLevel/StoryRelationValue convert GlobalThreshold Min values into the 1..5 Level used to index bFriendly."
     }
   ]
 }

@@ -5,7 +5,8 @@
       "simple": "Row key for one voice-override rule.",
       "technical": "FName row key. No behavioral read of this member was found in the available consumers; rows are collected wholesale from DTM.StoryVoiceOverrideDataTables (+0x8F0) and filtered by Id_StoryDemo and Id_Character. Export spells it ID.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_StoryVoiceOverride.h:12",
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryVoiceOverride.h:11",
+        "Source/Abrams/Private/GameDataTableManager.cpp:273",
         "Source/Abrams/Private/GamePhase_BattleStory.cpp:610",
         "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:376",
         "JJKCCDatatables/datatables/StoryVoiceOverrideDataTable.json"
@@ -14,68 +15,114 @@
     },
     "Id_StoryDemo": {
       "simple": "Story demo/mission ID that the override applies to.",
-      "technical": "FName. The battle-story preload keeps rows whose value equals GameManager.StudioStoryMissionId_CE0. The unique-pair sequencer evaluator keeps rows whose value equals StudioStoryDemoId_CD8, falling back to StudioStoryDiagramDemoId_CF8 when the former is None, and skips all overrides while a result sequence (sequence type 2) is current.",
+      "technical": "FName (row +0x10). Battle-story cue-sheet collection keeps rows whose value equals GameManager.StudioStoryMissionId_CE0 and does not check Id_Character. The sequencer evaluator instead uses StudioStoryDemoId_CD8, falling back to StudioStoryDiagramDemoId_CF8 only when the former is None; it skips the override block when a current file parameter exists and GameSequence_TypeFromName maps its name to type 2 (SQ_Result_), and it also requires a non-None resolved character ID plus valid section/target. All 18 exported demo values are STMSN_* keys that resolve in both StoryDemoDataTable and StoryMissionDataTable; the DiagramDemo fallback is a STDM_SS_* short-story key in the supplied export, so no override row matches it.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_StoryVoiceOverride.h:16",
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryVoiceOverride.h:15",
         "Source/Abrams/Private/GamePhase_BattleStory.cpp:613",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:375",
         "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:380",
         "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:382",
-        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:375",
-        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:386"
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:386",
+        "Source/Abrams/Private/GameSequenceNameBuilder.cpp:20",
+        "JJKCCDatatables/datatables/StoryVoiceOverrideDataTable.json",
+        "JJKCCDatatables/datatables/StoryDemoDataTable.json",
+        "JJKCCDatatables/datatables/StoryMissionDataTable.json",
+        "JJKCCDatatables/datatables/ShortStoryDataTable.json"
       ],
       "status": "verified"
     },
     "Id_Character": {
       "simple": "Target character whose voice is overridden.",
-      "technical": "FName. The sequencer evaluator requires it to equal the resolved target character ID (and requires that ID to be non-None) before applying the override. Level-sequence asset preparation adds the override voice cue sheet for every row matching a character being prepared; the battle-story preload does not filter by character.",
+      "technical": "FName (row +0x18). The sequencer evaluator requires it to equal the resolved target character ID from GetTargetCharacterId (the cached target actor's model/NPC ID) and requires that ID to be non-None; it takes the first match in GetRows order (table order, then row-name order). Level-sequence preparation resolves CharacterIds to Character rows, requires a non-None input ID and a CharacterVariation row, then adds every matching override's voice cue sheet with Add rather than AddUnique and applies no demo filter. Battle-story preload does not filter by character.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_StoryVoiceOverride.h:19",
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryVoiceOverride.h:18",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:203",
         "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:369",
-        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:373",
         "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:386",
-        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:583"
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:583",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:589",
+        "Source/Abrams/Public/GameDataTableArray.h:21",
+        "JJKCCDatatables/datatables/StoryVoiceOverrideDataTable.json"
       ],
       "status": "verified"
     },
     "Id_Voice": {
       "simple": "Replacement VoiceDataTable row to use.",
-      "technical": "FName. The sequencer evaluator assigns this value as the chosen VoiceId before its normal unique-pair/group fallbacks, so a matching row wins. Preload paths resolve it in VoiceDataTable and add Voice.CueSheetName to the load list; a missing Voice row leaves no override voice/cue sheet.",
+      "technical": "FName (row +0x20), naming a VoiceDataTable row. ResolveVoiceId assigns the first matching override's raw Id_Voice and breaks, so a non-None value outranks the cached unique-pair voice and the VoiceGroup common fallback; a None value falls through to those later picks. Downstream, the sequencer sound module resolves the ID with FindSoundRow(2, SoundId) to Voice.CueSheetName/CueName (queued IDs resolve through PlayNextQueuedVoice), and the same ID derives the subtitle ID and CharacterMouthAnim lookups, with _En appended for English voice. Both preload paths resolve it in VoiceDataTables and add Voice.CueSheetName: battle uses AddUnique, level sequence uses Add. A missing Voice row for a non-None ID contributes no cue sheet and no playback; the evaluator does not retry its fallbacks in that case.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_StoryVoiceOverride.h:22",
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryVoiceOverride.h:21",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Voice.h:15",
         "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:387",
-        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:414",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:405",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:415",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:532",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:33",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:166",
+        "Source/Abrams/Private/GameSequencerManager.cpp:1191",
         "Source/Abrams/Private/GamePhase_BattleStory.cpp:617",
-        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:587"
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:587",
+        "JJKCCDatatables/datatables/StoryVoiceOverrideDataTable.json",
+        "JJKCCDatatables/datatables/VoiceDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Loaded as a DataTable primary asset named StoryVoiceOverrideDataTable into DTM.StoryVoiceOverrideDataTables (+0x8F0).",
-    "The override is scoped by demo ID and (in the sequencer) character ID; it takes precedence over unique-pair voices and the common fallback group, except during result sequences.",
-    "The same table is used for cue-sheet preloading in two phase paths, one keyed only by story mission ID and one keyed only by character ID.",
-    "Sources are reconstructed retail C++; the unique-pair evaluator is byte-marked DIFF in status/verdicts.json:73124, so exact retail equivalence of that consumer is not byte-proven. Content is partial; no retail completeness claim."
+    "Loaded as a DataTable primary asset named StoryVoiceOverrideDataTable (type DataTable) through the manager's loader map and cached into DTM.StoryVoiceOverrideDataTables (+0x8F0) once all primary assets finish loading.",
+    "The sequencer override is scoped by demo ID and character ID; when its selected Id_Voice is non-None it takes precedence over the cached unique-pair voice and the VoiceGroup common fallback. The override block is skipped for type-2 result sequences and is not consulted unless the section, target and resolved character ID are valid/non-None.",
+    "FGameDataTableArray caches only the loaded UDataTable pointers; GetRows rebuilds a temporary row-pointer list in table order then row-name order on each call. The evaluator takes the first matching override row; both preloaders iterate all matching rows.",
+    "The same table is also used for cue-sheet preloading: battle story keys only on StudioStoryMissionId_CE0 and returns early unless its StoryMission row and retry-indexed StoryMissionWave row resolve (unresolved battle-talk sets are skipped), while level-sequence preparation keys only on the input character ID and skips unresolved characters/variations.",
+    "The single supplied export has 37 rows, 18 distinct Id_StoryDemo values and 14 Id_Character values; no field is empty/None and no (demo, character) pair repeats. Every character, voice and demo key resolves in CharacterDataTable (48 rows), VoiceDataTable (34,165 rows), StoryDemoDataTable (115 rows) and StoryMissionDataTable (90 rows). Row IDs skip 0026-0028, 0032-0034 and 0038-0040, so retail completeness is not claimed.",
+    "The loader, both phase preloaders and ResolveVoiceId are reconstructed retail C++ registered as behavioural/certified in status/functions.json (0x13215c0, 0x139b200, 0x13cd260, 0x1789870) rather than byte-matched. No retail Blueprint asset referencing this table was found in the supplied partial Content tree or exports, so Blueprint-only callers are not asserted."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:446",
+      "detail": "Registers StoryVoiceOverrideDataTable as a DataTable primary-asset loader name."
+    },
+    {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:273",
-      "detail": "Resolves StoryVoiceOverrideDataTable into DTM.StoryVoiceOverrideDataTables."
+      "detail": "Resolves the loaded primary asset into DTM.StoryVoiceOverrideDataTables (+0x8F0)."
+    },
+    {
+      "source": "Source/Abrams/Public/GameDataTableArray.h:21",
+      "detail": "GetRows rebuilds the row list from cached tables in table order then row-name order."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:610",
-      "detail": "Collects override rows to preload cue sheets for the current story mission."
+      "detail": "Collects overrides for the current mission; only Id_StoryDemo is filtered."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:617",
+      "detail": "Resolves each override voice and AddUnique-loads its cue sheet."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:581",
-      "detail": "Collects per-character override cue sheets during level-sequence preparation."
+      "detail": "Collects overrides by character ID during studio-character preparation; no demo filter."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:587",
+      "detail": "Resolves each override voice and adds its cue sheet to the sequencer preload list."
     },
     {
       "source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:376",
-      "detail": "Unique-pair voice evaluation applies matching demo/character overrides."
+      "detail": "Fetches override rows in ResolveVoiceId after section/target and result-sequence gates."
     },
     {
-      "source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:414",
-      "detail": "Override wins before unique-pair and common fallback voice selection."
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:387",
+      "detail": "Assigns the first matching override VoiceId before unique-pair and common fallbacks."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSequencerManager.cpp:2033",
+      "detail": "Unique-pair voice choice is cached; the override is consulted before that cache."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:532",
+      "detail": "Passes the selected ID to sound-module playback or the sequencer voice queue."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:166",
+      "detail": "Resolves the selected ID to Voice.CueSheetName/CueName for playback."
     }
   ]
 }

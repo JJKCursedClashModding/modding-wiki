@@ -1,147 +1,198 @@
 {
-  "description": "Holds the ordered lines of the end-credit sequence, including literal text, block type and typography, plus flags that assign each line to the full, short, first-DLC, or second-DLC credit variants.",
+  "description": "Retail end-credit data table whose rows pair literal credit text (or blank spacers) with a content category, alignment and typography values, plus four booleans named for the main, short, first-DLC and second-DLC credit variants. The reconstructed C++ does not identify a reader of this table, so variant and styling effects remain data/name evidence rather than proven runtime behavior.",
   "fields": {
     "Id": {
-      "simple": "Credit line row identifier.",
-      "technical": "FName row key serialized in FGameDataTableRow_Credit; exported keys follow CREDIT_<sequence>_<variant>. No C++ lookup by this name was identified, so its runtime selection behavior is unverified.",
+      "simple": "Credit-line row identifier (exported as ID; native member Id).",
+      "technical": "FName at retail offset 0x8; the reconstructed constructor does not list it, so its implicit default is the empty FName. The export's Properties.ImportKeyField is Id, and every one of the 2549 row keys equals its serialized ID. Keys use three retail naming families: CREDIT_<n>_10, CREDIT_SHORT_<n>_10 and CREDIT_SHOET_DLC1/2_<n>_10 (the SHOET spelling is present in the data). No C++ lookup by this name or CreditDataTable row read was identified.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:12"
+        "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:13",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:49",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:815",
+        "Tools/m1-verify/usmap-rowstructs.json:7957",
+        "datatables/CreditDataTable.json (Properties.ImportKeyField and Rows)"
       ],
       "status": "observed"
     },
     "LineNumber": {
-      "simple": "Line or ordering number within a credit block.",
-      "technical": "int32 serialized at retail offset 0x10 with constructor default 0. The export uses 1 for nearly every row and only a few 0/3 values, so it is not a unique global ordering index; exact consumption is not visible in the available source.",
+      "simple": "Nominal line or order value within a credit block.",
+      "technical": "int32 at retail offset 0x10, constructor default 0. Export values are 1 on 2547 rows, 3 only on CREDIT_0003_10 and 0 only on CREDIT_0508_10; it is not a unique global order, and no consumer establishes how or whether it orders rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:17",
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:49",
-        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:816"
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:816",
+        "datatables/CreditDataTable.json (Rows.LineNumber)"
       ],
       "status": "observed"
     },
     "ContentType": {
-      "simple": "Kind of credit line (title, section, company, job, name, image, or blank space).",
-      "technical": "EGameCreditContentType (None=0, Title, Company, Section, Job, Name, Image, Space, Invalid=255) serialized at offset 0x14 with default None. The export uses Title, Section, Company, Job, Name, and Space; Space rows carry empty text. The enum is the only evidence for the category semantics because no consumer was found.",
+      "simple": "Kind of credit line (title, section, company, job, name, image, spacer, etc.).",
+      "technical": "EGameCreditContentType : uint8 at retail offset 0x14 (None=0, Title=1, Company=2, Section=3, Job=4, Name=5, Image=6, Space=7, Invalid=255), constructor default None. The export uses Company (19), Job (616), Name (1225), Section (52), Space (617) and Title (20); None, Image and Invalid do not occur. All Space rows have empty Text, but 46 Name rows are empty too, so empty Text does not identify a spacer. No table consumer proves the behavioral meaning of the categories.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameCreditContentType.h:6",
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:20",
-        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:817"
+        "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:49",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:817",
+        "Tools/m1-verify/usmap-rowstructs.json:23769",
+        "datatables/CreditDataTable.json (Rows.ContentType)"
       ],
       "status": "observed"
     },
     "Justify": {
-      "simple": "Text alignment for the credit line.",
-      "technical": "TEnumAsByte<ETextJustify::Type> serialized at offset 0x15; constructor default is Left. Exported rows use Center for titles/sections/spaces, Right for job labels, and Left for voice names. No widget code in the available source reads this field.",
+      "simple": "Text alignment stored for the credit line.",
+      "technical": "TEnumAsByte<ETextJustify::Type> at retail offset 0x15, constructor default Left. Export counts are Center (2101), Left (365) and Right (83). The 83 Right rows are exactly the 83 Job rows with FontSize -1, LineHeightPercentage 1.01 and LetterSpacing -100; alignment is not a one-to-one content-type rule (Jobs also use Center/Left, Names use Center/Left, and some Titles and Spaces use Left). Generic UMG uses this enum, but no code links the exported field to a text widget.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:23",
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:49",
-        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:818"
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:818",
+        "datatables/CreditDataTable.json (Rows.Justify, ContentType, FontSize, LineHeightPercentage, LetterSpacing)"
       ],
       "status": "observed"
     },
     "FontSize": {
-      "simple": "Point size override for the line.",
-      "technical": "int32 at offset 0x18, default 0 in the reconstructed constructor. Exported data uses -1 for 2539 of 2549 rows and 40 for the two opening title rows, consistent with -1 being an inherit/default sentinel; this interpretation is inferred from data, not from a consumer.",
+      "simple": "Font-size value stored for the line when overridden.",
+      "technical": "int32 at retail offset 0x18, constructor default 0. Exported values are -1 on 2539 rows, 40 on the two main Title rows CREDIT_0001_10 and CREDIT_0003_10, and 30 on eight Title rows across the main, short and DLC key families. -1 is consistent with an inherit/default sentinel, but no consumer proves that convention or the unit; the reconstructed row only stores the int32.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:26",
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:49",
-        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:819"
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:819",
+        "datatables/CreditDataTable.json (Rows.FontSize)"
       ],
       "status": "observed"
     },
     "LineHeightPercentage": {
-      "simple": "Line-height multiplier applied to the credit text.",
-      "technical": "float at offset 0x1C with constructor default 0.0f. Exported values include 0.0, 1.0, 1.01, and a large 100.0 used by Space rows; no source consumer confirms the exact unit or whether 0.0 means automatic spacing.",
+      "simple": "Line-height value stored for the credit text.",
+      "technical": "float at retail offset 0x1C, constructor default 0.0f. Export counts are 1.0 (2172 rows), 0.0 (292), 1.01 (83, the same Right-justified Job rows with LetterSpacing -100) and 100.0 only on CREDIT_0002_10 and CREDIT_0004_10, both Space rows. No consumer confirms the unit, whether 0.0 means automatic/inherit, or why 100.0 appears; generic UMG text code uses a same-named float, but that code was not tied to this table.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:29",
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:49",
-        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:820"
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:820",
+        "datatables/CreditDataTable.json (Rows.LineHeightPercentage)"
       ],
       "status": "observed"
     },
     "LetterSpacing": {
-      "simple": "Extra spacing between characters in the line.",
-      "technical": "int32 at offset 0x20, default 0. Exported values include 0, negative -100 on right-justified job lines, and positive 856/1320 values on name lines; the unit is not established by any identified consumer.",
+      "simple": "Extra character spacing stored for the credit line.",
+      "technical": "int32 at retail offset 0x20, constructor default 0. Export counts are 0 (2123), -100 (83, exactly the Right-justified Job rows), 42 (2 Titles), 450 (49 Jobs), 856 (108 Names), 885 (44 Names), 1250 (2 Titles), 1290 (36 Names), 1318 (2 Titles) and 1320 (100 Names). Positive values are therefore not exclusive to Name rows. The unit and any widget mapping are unproven because no table reader was identified.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:32",
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:49",
-        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:821"
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:821",
+        "datatables/CreditDataTable.json (Rows.LetterSpacing)"
       ],
       "status": "observed"
     },
     "Text": {
-      "simple": "Literal credit text to display.",
-      "technical": "FString at offset 0x28, default empty. Unlike most game tables this field holds final strings (including names, company names, and a title with an embedded newline) rather than a localization ID; exported Space rows have empty Text. No runtime formatter was identified.",
+      "simple": "Literal credit text, or an empty spacer.",
+      "technical": "FString at retail offset 0x28, constructor default empty. Non-empty export values are final display strings (names, companies, jobs and a Title containing a newline), not localization IDs; 663 rows are empty: all 617 Space rows plus 46 Name rows. The export contains no alternate localization of this table, and no runtime formatter or ID resolver for this field was found.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:35",
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:49",
-        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:822"
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:822",
+        "datatables/CreditDataTable.json (Rows.Text)"
       ],
       "status": "observed"
     },
     "IsMain": {
-      "simple": "Include this line in the standard (full) credits.",
-      "technical": "Boolean flag at runtime offset 0x38; layout verification ties it to a retail bit-set instruction. Default false in the reconstructed constructor. No data-table reader is present in the available source.",
+      "simple": "Marks a row for the main/full credit variant.",
+      "technical": "bool at retail offset 0x38; the reconstructed constructor defaults it to false, and the retail BoolProperty SetBit thunk pins that byte offset. Export: 2216 true, 333 false. Most true rows are the unprefixed CREDIT_<n>_10 family; CREDIT_0001_10 and CREDIT_0004_10 are also flagged for all four variants. No C++ consumer of the flag was identified.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:38",
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:49",
-        "Tools/verify/layout-checks/LayoutCheckRuntimePad.cpp:991"
+        "Tools/verify/layout-checks/LayoutCheckRuntimePad.cpp:991",
+        "datatables/CreditDataTable.json (Rows.IsMain)"
       ],
       "status": "observed"
     },
     "IsShort": {
-      "simple": "Include this line in the short credits variant.",
-      "technical": "Boolean flag at runtime offset 0x39 with a retail bit-set proof; default false. Exported rows flagged here include the opening title and spacing rows. No C++ consumer of the flag was identified.",
+      "simple": "Marks a row for the short credit variant.",
+      "technical": "bool at retail offset 0x39, constructor default false; retail SetBit offset pin. Export: 150 true (146 exclusively short plus CREDIT_0001_10, CREDIT_0002_10, CREDIT_0003_10 and CREDIT_0004_10) and 2399 false. The reconstructed widget has a short panel selected by credit type 1, but no code reads this flag or links it to that panel.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:41",
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:49",
-        "Tools/verify/layout-checks/LayoutCheckRuntimePad.cpp:992"
+        "Tools/verify/layout-checks/LayoutCheckRuntimePad.cpp:992",
+        "datatables/CreditDataTable.json (Rows.IsShort)"
       ],
       "status": "observed"
     },
     "IsDlc1": {
-      "simple": "Include this line in the first DLC credits variant.",
-      "technical": "Boolean flag at runtime offset 0x3A with a retail bit-set proof; default false. No C++ consumer of the flag was identified.",
+      "simple": "Marks a row for the first DLC credit variant.",
+      "technical": "bool at retail offset 0x3A, constructor default false; retail SetBit offset pin. Export: 60 true (58 exclusively DLC1 plus CREDIT_0001_10 and CREDIT_0004_10) and 2489 false. Credit type 2 selects a prebuilt DLC1 panel in the widget, but no code reads this flag or links it to that panel.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:44",
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:49",
-        "Tools/verify/layout-checks/LayoutCheckRuntimePad.cpp:993"
+        "Tools/verify/layout-checks/LayoutCheckRuntimePad.cpp:993",
+        "datatables/CreditDataTable.json (Rows.IsDlc1)"
       ],
       "status": "observed"
     },
     "IsDlc2": {
-      "simple": "Include this line in the second DLC credits variant.",
-      "technical": "Boolean flag at runtime offset 0x3B with a retail bit-set proof; default false. No C++ consumer of the flag was identified.",
+      "simple": "Marks a row for the second DLC credit variant.",
+      "technical": "bool at retail offset 0x3B, constructor default false; retail SetBit offset pin. Export: 130 true (128 exclusively DLC2 plus CREDIT_0001_10 and CREDIT_0004_10) and 2419 false. Credit type 3 selects a prebuilt DLC2 panel, but no code reads this flag or links it to that panel.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:47",
         "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:49",
-        "Tools/verify/layout-checks/LayoutCheckRuntimePad.cpp:994"
+        "Tools/verify/layout-checks/LayoutCheckRuntimePad.cpp:994",
+        "datatables/CreditDataTable.json (Rows.IsDlc2)"
       ],
       "status": "observed"
     }
   },
   "notes": [
-    "No identifiable C++ consumer of CreditDataTable or FGameDataTableRow_Credit exists in the available Source, and the table is not among the names registered in GameDataTableManager::LoadDataTable. UGameCreditWidget reconstructs four prebuilt UMG panels (default, short, DLC1, DLC2) and scrolls them, but does not fetch this table. Therefore the variant-flag effects above are inferred from names/exported data rather than proven runtime behavior.",
-    "The exported table has 2549 rows; the reconstruction's layout checks confirm the retail field offsets, and status records show the struct constructor as matched while its generated Copy body remains DIFF. This is a structural/layout caveat, not evidence of a gameplay consumer.",
-    "Only the exported retail table and partial Content are available; a script, editor tool, or unreconstructed consumer could still read the table. No Blueprint behavior is assumed.",
-    "Do not treat the export's field values as constraints on other localizations: only this single CreditDataTable snapshot is present, and its Text values are already resolved strings."
+    "No identifiable C++ reader of FGameDataTableRow_Credit or CreditDataTable was found: Source has no FindRow/lookup using this struct, no CreditDataTables cache, and CreditDataTable is absent from the explicit table-name list in AGameDataTableManager::StartInitialLoading and from the DTM table arrays. The generic /Game/DataTables 'DataTable' PrimaryAssetType scan (Config/DefaultGame.ini:24) and the M4 registry entry /Game/DataTables/CreditDataTable explain that the asset exists/is cooked, not that a row reader exists.",
+    "The reconstructed credit runtime selects among four BindWidget panels in UGameCreditWidget::SetCreditType (0 default, 1 short, 2 DLC1, 3 DLC2), scrolls the active panel, and reads BgmDataTable Duration values (BGM_DEMO_07 minus 3.5 s, and BGM_DEMO_01) for timing. That is verified reconstructed widget behavior, but it does not consume CreditDataTable. The available Content/export has no WBP_Credit Blueprint internals or table reference, so no Blueprint-side binding is asserted.",
+    "The sole export contains one DataTable asset named CreditDataTable, 2549 unique row keys and no shards or localized siblings; every ID equals its row key. Row names follow main/short/SHOET_DLC1/SHOET_DLC2 families, and the flags are almost always mutually exclusive. Exceptions are CREDIT_0001_10 and CREDIT_0004_10 (all four), CREDIT_0002_10 and CREDIT_0003_10 (main+short only), and CREDIT_2210_10 (no flag). These are data observations, not precedence rules.",
+    "Retail layout checks pin fields to offsets 0x8..0x28 and the booleans to 0x38..0x3B; status records mark TCppStructOps<FGameDataTableRow_Credit>::Construct at 0x16c5a70 as MATCH. The generated Copy at 0x16c8d40 had a byte-DIFF verdict but is behavior-certified in current BEHAV status (engine TArray copy inlining). Those records support struct layout/copy fidelity, not a consumer or field semantics.",
+    "Do not treat exported values as constraints on other locales or builds: only this single CreditDataTable snapshot is present, and its non-empty Text values are already resolved strings.",
+    "The generated wiki page for this table lists only export field names with AI placeholder descriptions; it was not used as semantic evidence."
   ],
   "usages": [
     {
       "source": "Source/AbramsDataTable/Public/GameDataTableRow_Credit.h:9",
-      "detail": "Declares the serialized row schema; this is the only direct source-level evidence for every field."
+      "detail": "Declares FGameDataTableRow_Credit; lines 12-47 declare the 12 reflected fields and line 49 gives reconstructed defaults."
+    },
+    {
+      "source": "Source/AbramsDataTable/Public/EGameCreditContentType.h:6",
+      "detail": "Declares the uint8 content enum and numeric values used by ContentType."
+    },
+    {
+      "source": "Tools/m1-verify/usmap-rowstructs.json:7953",
+      "detail": "Retail reflection dump confirms the 12 properties in order and the uppercase serialized ID name."
     },
     {
       "source": "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:815",
-      "detail": "Static assertions pin the reconstructed fields to retail offsets 0x8..0x28."
+      "detail": "Static assertions pin Id through Text to retail offsets 0x8..0x28."
     },
     {
       "source": "Tools/verify/layout-checks/LayoutCheckRuntimePad.cpp:991",
-      "detail": "Static assertions pin the four variant booleans to retail offsets 0x38..0x3B with runtime bit-set evidence."
+      "detail": "Static assertions pin IsMain, IsShort, IsDlc1 and IsDlc2 to retail offsets 0x38..0x3B using SetBit-thunk evidence."
     },
     {
       "source": "Source/Abrams/Private/GameCreditWidget.cpp:27",
-      "detail": "Shows the reconstructed credit widget's variant selection among four prebuilt panels, but no table lookup; included to document the consumer limit, not as proof that this table drives it."
+      "detail": "Reconstructed SetCreditType maps 0/1/2/3 to four prebuilt panels; the function reads no CreditDataTable row and is included only as a consumer limit."
+    },
+    {
+      "source": "Source/Abrams/Public/EDebugPlayCreditType.h:6",
+      "detail": "Enum names Default/Short/Dlc1/Dlc2 corroborate the widget's four credit-type indices, not table flag consumption."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCreditWidget.cpp:21",
+      "detail": "The only data-table read in the credit widget is BgmDataTable Duration for scroll timing, not a CreditDataTable lookup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:324",
+      "detail": "StartInitialLoading's explicit DataTable primary-asset names contain no CreditDataTable; no dedicated manager array or finder exists."
+    },
+    {
+      "source": "Config/DefaultGame.ini:24",
+      "detail": "Generic DataTable primary-asset scan over /Game/DataTables covers the asset path without identifying a consumer."
+    },
+    {
+      "source": "Tools/verify/M4-mount/registry-summary.json:415",
+      "detail": "Retail mount registry lists /Game/DataTables/CreditDataTable, confirming the asset's presence only."
+    },
+    {
+      "source": "status/verdicts.json:50810",
+      "detail": "Records the retail Construct verdict for FGameDataTableRow_Credit; Tools/verify/BEHAV/records/D08.json:1220 certifies Copy behavior despite the older byte DIFF."
     }
   ]
 }

@@ -3,59 +3,154 @@
   "fields": {
     "Id": {
       "simple": "Row key / battle-talk ID.",
-      "technical": "FName primary key; the playback system passes this value to the widget's OpenTalk and later uses the owning set's Id when notifying the character manager that talk ended. The row struct declares it as Id while the exported assets spell it ID (case-insensitive match).",
-      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:11", "Source/Abrams/Private/GameBattleSystems_A.cpp:1909", "Source/Abrams/Private/GameBattleSystems_A.cpp:1976"],
+      "technical": "FName row property (declared Id, exported as ID). QueueBattleTalkSet passes each set-array ID to FindRow, and the playback state machine passes CurrentTalk->Id to OpenTalk, which resolves the row again across DTM.BattleTalkDataTables in order. The finished queue does not report this ID: it passes the owning BattleTalkSetDataTable Id to NotifyBattleTalkEnd, which fans the set ID out to every character action controller's OnBattleTalkEnd. Export keys and exported ID values match for all rows.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:11",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1922",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1989",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2018",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:73",
+        "Source/Abrams/Private/GameCharacterManager.cpp:403"
+      ],
       "status": "verified"
     },
     "WaitTime": {
       "simple": "Delay before the line is shown.",
-      "technical": "Seconds; constructor default 0.0f. On entering state 2 the system copies it to a countdown Timer, decrements by DeltaTime, and advances when Timer <= 0.0f. A zero value therefore displays on the next tick.",
-      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:15", "Source/AbramsDataTable/Private/GameDataTableRow_BattleTalk.cpp:4", "Source/Abrams/Private/GameBattleSystems_A.cpp:1909", "Source/Abrams/Private/GameBattleSystems_A.cpp:1915"],
+      "technical": "float seconds; constructor default 0.0f. State 1 copies it verbatim into Timer, state 2 subtracts DeltaTime, and the line opens on the first tick with Timer <= 0.0f. There is no clamp: zero (and any negative value) therefore opens on the tick after state 1, not during queueing. Exported values range 0.0-5.0 s; 225 of 288 rows are 0.0, 50 are 1.5, and single rows use 0.5, 0.8, 1.0, 2.5 and 5.0.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:15",
+        "Source/AbramsDataTable/Private/GameDataTableRow_BattleTalk.cpp:4",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1909",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1913"
+      ],
       "status": "verified"
     },
     "Id_Character": {
       "simple": "Character row whose story name is used as the speaker label.",
-      "technical": "FName into CharacterDataTable; None leaves the lookup unset and the widget collapses the speaker name. The same value selects the voice slot: the first live character whose CharacterRow.Id matches gets its character index, otherwise slot 0 is used. The widget reads Character.Id_GlossaryText_StoryName, not a name stored on this row.",
-      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:18", "Source/Abrams/Private/GameBattleTalkWidget.cpp:92", "Source/Abrams/Private/GameBattleTalkWidget.cpp:98", "Source/Abrams/Private/GameBattleSystems_A.cpp:1923", "Source/Abrams/Private/GameBattleSystems_A.cpp:1936"],
+      "technical": "FName into CharacterDataTable; non-None in all 288 exported rows, with 31 distinct IDs that all resolve. Widget lookup skips None and collapses the speaker text when no row is found; otherwise it passes Character.Id_GlossaryText_StoryName to SetTextIdOnly, which resolves localized text through AGameTextManager. Separately, playback scans non-hidden managed characters (GetCharacters(false)) and uses the first whose CharacterRow.Id matches this field for the voice player slot; no match falls back to slot 0. The story-name lookup and voice-slot choice are independent.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:18",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:96",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:100",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1925",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1930",
+        "Source/Abrams/Private/GameCharacterManager.cpp:138"
+      ],
       "status": "verified"
     },
     "Id_CharacterVariation": {
       "simple": "Variation used to find a fallback battle-talk portrait.",
-      "technical": "FName into CharacterVariationDataTable. Consulted only when BattleTalkImageFileName is None; the variation's Id_CharacterImage then selects a CharacterImage row whose BattleTalkImageFileName supplies the texture. None/missing rows leave the image collapsed; the story phase's texture preload follows the same join.",
-      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:21", "Source/Abrams/Private/GameBattleTalkWidget.cpp:107", "Source/Abrams/Private/GameBattleTalkWidget.cpp:110", "Source/Abrams/Private/GameBattleTalkWidget.cpp:112", "Source/Abrams/Private/GamePhase_BattleStory.cpp:670"],
+      "technical": "FName into CharacterVariationDataTable; non-None in all exported rows, and all 33 distinct values resolve. It is consulted only when BattleTalkImageFileName is None: the widget follows Variation.Id_CharacterImage -> CharacterImage.BattleTalkImageFileName -> FindDynamicLoadTexture. In the export every variation in this path has a resolvable CharacterImage row with a non-None portrait name. None or any missing link leaves ImageName None and the portrait collapsed; the story phase's texture preload follows the same join with its own finders and simply adds no name on a miss.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:21",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:116",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:117",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:118",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:668",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:678"
+      ],
       "status": "verified"
     },
     "BattleTalkImageFileName": {
       "simple": "Direct portrait texture name, overriding the variation-derived portrait.",
-      "technical": "FName passed to FindDynamicLoadTexture. If non-None it is used verbatim and skips the CharacterVariation/CharacterImage join; if None the fallback above applies; if the fallback also yields no name the portrait is collapsed. The same name is collected by the story phase for preloading.",
-      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:24", "Source/Abrams/Private/GameBattleTalkWidget.cpp:100", "Source/Abrams/Private/GameBattleTalkWidget.cpp:114", "Source/Abrams/Private/GameBattleTalkWidget.cpp:120", "Source/Abrams/Private/GamePhase_BattleStory.cpp:663"],
+      "technical": "FName texture-cache key, not a CharacterDataTable row ID. Non-None wins verbatim and bypasses the variation/CharacterImage join; one exported row uses T_UI_Character_BattleTalk_Image_CN_122_00. UGameWidgetManager::FindDynamicLoadTexture is only a DynamicLoadTextureMap lookup, so an unpreloaded key yields a null brush even though the widget is made visible. None selects the fallback; if the fallback also yields None the portrait is collapsed. The story phase AddUnique-collects the resolved non-None key for the current wave so it can be loaded into that cache.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:24",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:110",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:126",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:128",
+        "Source/Framework/Public/WidgetManager.h:96",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:663",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:665"
+      ],
       "status": "verified"
     },
     "TextId": {
-      "simple": "Localized subtitle text ID displayed for the line.",
-      "technical": "FName passed to SerifText->SetTextIdOnly; the widget does not resolve the string itself. Typing visibility is driven separately by TalkVisibleCharacters/IsTalkFinished rather than by this field.",
-      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:27", "Source/Abrams/Private/GameBattleTalkWidget.cpp:124", "Source/Abrams/Private/GameBattleTalkWidget.cpp:125"],
+      "simple": "Localized game-text ID for the spoken line.",
+      "technical": "FName passed to SerifText->SetTextIdOnly; no subtitle string is stored on this row. That setter builds a text request and AGameTextManager resolves the first matching row in its ordered current-language GameText tables (Glossary, Battle, Item, CommandList, Chat, Stamp, Story, StoryDemo, ShortStoryDemo, Tutorial, BattleSubTitle, Sound, Dlc1, Dlc2), returning empty text on a miss. All 288 exported IDs are unique and present in each of the 11 locale shards: 191 in StoryDemoTextDataTable, 68 in DlcStoryDemoTextDataTable2, 16 in TutorialTextDataTable and 13 in DlcStoryDemoTextDataTable1, with no overlap; none are in BattleSubTitleTextDataTable or BattleTextDataTable. Typing/advance is separate: the widget resets TalkVisibleCharacters, IsTalkFinished checks SerifText->IsTyping, and the queue also requires the 0.5 s hold and voice completion unless Decision is used for a bWaitForInput set.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:27",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:130",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:131",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:52",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:72",
+        "Source/Abrams/Private/GameTextManager.cpp:548",
+        "Source/Abrams/Private/GameTextManager.cpp:589",
+        "Source/Abrams/Private/GameTextManager.cpp:679",
+        "Source/Abrams/Public/GameBattleTalkWidgetInline.h:9"
+      ],
       "status": "verified"
     },
     "Id_Voice": {
       "simple": "Voice row ID played with the line.",
-      "technical": "FName passed to AGameSoundManager::PlayVoiceById together with the speaker's character index (0 when no match). The returned VoiceHandle is polled with IsVoicePlaying and stopped after the line; it is also stopped when the talk system is reset/closed.",
-      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:30", "Source/Abrams/Private/GameBattleSystems_A.cpp:1936", "Source/Abrams/Private/GameBattleSystems_A.cpp:1966", "Source/Abrams/Private/GameBattleSystems_A.cpp:1973", "Source/Abrams/Private/GameBattleSystems_A.cpp:2056"],
+      "technical": "FName into VoiceDataTable; all 288 exported IDs resolve to non-None cue-sheet/cue rows, and the alternate voice shards are not consulted by this path. PlayVoiceById rejects None, resolves the row, then PlayVoice requires a loaded cue sheet and a usable player (the requested slot if present, otherwise the first non-playing player) and returns -1 if neither is available. It uses the slot computed from Id_Character (0 when no character matches), appends _En to the cue name when bAppendEnVoiceSuffix is set and applies a VoiceVolume row override before playing. State 4 waits for typing, the 0.5 s hold and IsVoicePlaying(handle) to finish unless Decision skips those checks for bWaitForInput; it then stops the voice with a 0.0 s fade. OnEvent05 stops it only when still in state 4, OnEvent13 stops it unconditionally, and OnPrepareBattle only clears the stored handle to -1.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:30",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1936",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1960",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1966",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2038",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2058",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2072",
+        "Source/Abrams/Private/GameSoundManager.cpp:919",
+        "Source/Abrams/Private/GameSoundManager.cpp:960",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:595"
+      ],
       "status": "verified"
     }
   },
   "notes": [
-    "Loaded as a 'DataTable' primary asset named BattleTalkDataTable into AGameDataTableManager::BattleTalkDataTables (+0xB40) after all primary assets finish loading; row lookup walks tables in order and takes the first hit, with None IDs rejected.",
-    "Queueing is driven by BattleTalkSetDataTable.Id_BattleTalk; the set condition arrays decide when a set is queued, while this row controls only that individual line's presentation.",
-    "The sequential state machine adds a fixed 0.5 s minimum after opening and a fixed 1.5 s gap after the last line; these are code constants, not fields.",
-    "All C++ here is a reconstruction of the retail game (retail addresses are recorded in source comments). Content is partial, so no claim is made about every retail row or every Blueprint use."
+    "Loaded as the single 'DataTable' primary asset BattleTalkDataTable into AGameDataTableManager.BattleTalkDataTables (+0xB40) after DTM's own DataTable loaders all report complete. Row finders walk the table array in order and take the first hit; the queue skips None TalkIds, the widget guards per-field None lookups, and PlayVoiceById rejects None.",
+    "BattleTalkSetDataTable.Id_BattleTalk supplies the talk-row IDs and their playback order. On entering a story fight, sets whose ValueType entries are all None are queued once; conditional sets are checked each tick while bBattleTalkEnabled and queued once every non-None condition passes. Tutorial state 13 queues its TalkSetIds individually with bWaitForInput=true, so Decision can end a line early.",
+    "The sequential state machine adds a fixed 0.5 s minimum after opening and a fixed 1.5 s gap after the last line; both are code constants, not fields. A line also waits for SerifText typing and voice playback to finish unless Decision is accepted.",
+    "Export cross-check: one BattleTalkDataTable asset with 288 rows, no numbered shards, and key == ID for every row. All character, variation and voice IDs resolve; all 79 set rows reference 289 talk slots, with one dangling reference (STMSN_06084M_01 -> STMSN_06084M_01_03) that the queue silently drops. One row overrides the portrait directly.",
+    "Portrait and voice assets are indirect: story-wave preload collects set cue sheets and resolved portrait texture names, FindDynamicLoadTexture reads a cache rather than loading on demand, and PlayVoice needs the cue sheet already loaded. Missing preload/data yields a null portrait brush or a -1 voice handle, not a field-level error at this table.",
+    "All mechanics here are verified in the reconstructed C++ plus the supplied exports; retail addresses are recorded in source comments. No retail Blueprint graph/asset evidence was available in the read-only inputs, and the Content export is partial, so this makes no claim about retail Blueprint overrides or about every retail row."
   ],
   "usages": [
-    {"source": "Source/Abrams/Private/GameDataTableManager.cpp:310", "detail": "Resolves the loaded BattleTalkDataTable into the manager's BattleTalkDataTables array."},
-    {"source": "Source/Abrams/Private/GameDataTableManager.cpp:483", "detail": "Requests the BattleTalkDataTable primary asset during initial loading."},
-    {"source": "Source/Abrams/Private/GameBattleSystems_A.cpp:2018", "detail": "Finds each talk row referenced by a queued set and appends it to the playback queue."},
-    {"source": "Source/Abrams/Private/GameBattleSystems_A.cpp:1909", "detail": "Playback state machine reads WaitTime, Id, Id_Character and Id_Voice."},
-    {"source": "Source/Abrams/Private/GameBattleTalkWidget.cpp:73", "detail": "Widget resolves the row to render the speaker, portrait and subtitle."},
-    {"source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:658", "detail": "Story phase walks set-referenced talk rows to preload portraits."}
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:310",
+      "detail": "Resolves the loaded BattleTalkDataTable into DTM.BattleTalkDataTables (+0xB40)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:483",
+      "detail": "Requests the BattleTalkDataTable primary asset during initial loading."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:180",
+      "detail": "Story-fight enter and tick choose unconditional/conditional sets from StoryMissionWave.Id_BattleTalkSet and call QueueBattleTalkSet."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:2018",
+      "detail": "Resolves each non-None BattleTalkSet.Id_BattleTalk ID into the ordered playback queue."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:1910",
+      "detail": "Playback tick reads WaitTime, then Id/Id_Character/Id_Voice and polls typing, voice and timers."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleTalkWidget.cpp:73",
+      "detail": "OpenTalk re-resolves the row and renders speaker, portrait and subtitle."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetTextBlock.cpp:52",
+      "detail": "SetTextIdOnly builds the request that AGameTextManager resolves across the 14 current-language text tables."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSoundManager.cpp:960",
+      "detail": "PlayVoiceById resolves Id_Voice through VoiceDataTable and the loaded cue-sheet/player caches."
+    },
+    {
+      "source": "Source/Framework/Public/WidgetManager.h:96",
+      "detail": "FindDynamicLoadTexture reads the portrait texture cache by FName."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:658",
+      "detail": "Story phase walks set-referenced talk rows to preload portrait texture names."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterManager.cpp:403",
+      "detail": "NotifyBattleTalkEnd forwards the owning set ID to all action controllers when the queue finishes."
+    }
   ]
 }

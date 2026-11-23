@@ -1,40 +1,45 @@
 {
-  "description": "Single global tuning row for the virtual/target camera: gaze/rotation/distance attenuation, mode distances and blend times, and horizontal/vertical look limits.",
+  "description": "Single global tuning row for the virtual/target camera: per-channel smoothing rates, mode distances and request blends, horizontal/vertical look limits, pivot height and view offset.",
   "fields": {
     "ID": {
       "simple": "Row name (Only one exported row: Default).",
-      "technical": "FName serialized on the row, but the accessor does NOT look up by this value: UGameVirtualCamera::FirstCameraRow (retail 0x104a480) takes the first row name of the first CameraDataTables table (+0x310) whose row struct is FGameDataTableRow_Camera and returns that row. No source consumer reads the row's Id member itself; changing the row name alone would not change the selected row as long as it stays first.",
+      "technical": "FName serialized on the row (export ID = \"Default\"), but the accessor does NOT look up by this value: UGameVirtualCamera::FirstCameraRow (retail 0x104a480) walks DTM->CameraDataTables (+0x310), skips tables with no rows, and returns FindRow<FGameDataTableRow_Camera> on the first row name of the first usable table. No source consumer reads the row's Id member itself; changing the row name alone would not change the selected row as long as it stays first.",
       "evidence": [
         "Source/Abrams/Private/GameVirtualCamera.cpp:20",
         "Source/Abrams/Private/GameVirtualCamera.cpp:29",
-        "Source/Abrams/Public/GameVirtualCameraRow.h:9"
+        "Source/Abrams/Public/GameVirtualCameraRow.h:9",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Camera.h:11"
       ],
       "status": "observed"
     },
     "GazeLocation_AttenuateRate": {
       "simple": "Gaze-location smoothing rate.",
-      "technical": "Float multiplied by 60 at InitVirtualCamera (0.5 in the export -> 30) and stored in GazeLocationAttenuateRateBase/current. UpdateViewTransform uses DeltaTime * rate as the FMath::Lerp alpha (clamped 0..1) between current and target gaze location. An interpolated override can be driven by the camera's Interp128.",
+      "technical": "Float multiplied by 60 at InitVirtualCamera (0.5 in the export -> 30) and stored in GazeLocationAttenuateRateBase/current. UpdateViewTransform uses clamped DeltaTime * rate as the FMath::Lerp alpha between current and target gaze location. UGameAnimNS_CameraGazeSettings can temporarily overwrite only the current rate with its own LocationAttenuateRate * 60 when the notify value is >= 0; on notify end ResetGazeLocationAttenuateRate eases (or snaps) it back to this row-derived base through Interp128.",
       "evidence": [
         "Source/Abrams/Private/GameVirtualCamera.cpp:42",
-        "Source/Abrams/Private/GameVirtualCamera.cpp:64"
+        "Source/Abrams/Private/GameVirtualCamera.cpp:64",
+        "Source/Abrams/Private/GameAnimNS_CameraGazeSettings.cpp:19",
+        "Source/Abrams/Private/GameAnimNS_CameraGazeSettings.cpp:32"
       ],
       "status": "verified"
     },
     "RotationPitch_AttenuateRate": {
       "simple": "Pitch smoothing rate.",
-      "technical": "Float * 60 at init (export 0.5 -> 30). Used as DeltaTime * rate in GameVirtualCamera_LerpRotator for current->target pitch; roll uses a hard-coded 30 instead of a row field.",
+      "technical": "Float * 60 at init (export 0.5 -> 30). The clamped DeltaTime * rate is the alpha in GameVirtualCamera_LerpRotator for current->target pitch; roll uses a hard-coded 30 instead of a row field.",
       "evidence": [
         "Source/Abrams/Private/GameVirtualCamera.cpp:44",
-        "Source/Abrams/Private/GameVirtualCamera.cpp:65"
+        "Source/Abrams/Private/GameVirtualCamera.cpp:65",
+        "Source/Abrams/Public/GameRotationMath.h:23"
       ],
       "status": "verified"
     },
     "RotationYaw_AttenuateRate": {
       "simple": "Yaw smoothing rate.",
-      "technical": "Float * 60 at init (export 0.5 -> 30), used as DeltaTime * rate in the yaw rotator lerp inside UpdateViewTransform.",
+      "technical": "Float * 60 at init (export 0.5 -> 30), used as clamped DeltaTime * rate in the yaw rotator lerp inside UpdateViewTransform.",
       "evidence": [
         "Source/Abrams/Private/GameVirtualCamera.cpp:45",
-        "Source/Abrams/Private/GameVirtualCamera.cpp:66"
+        "Source/Abrams/Private/GameVirtualCamera.cpp:66",
+        "Source/Abrams/Public/GameRotationMath.h:23"
       ],
       "status": "verified"
     },
@@ -49,11 +54,12 @@
     },
     "TargetCamera_Distance": {
       "simple": "Normal third-person camera boom length.",
-      "technical": "Float (export 200 cm). Copied to CurrentDistance and TargetCameraDistance in InitCharacterCamera and used as the base distance request (key 0) when no movement/down request exists. Gameplay actions request a larger distance and then release it back to this value.",
+      "technical": "Float (export 200 cm). Copied to the base-camera CurrentDistance and to the character-camera TargetCameraDistance in InitCharacterCamera; TargetCameraDistance is restored as distance-request key 0 when movement/downed requests expire. Gameplay actions request a larger distance and then release it back to this value. In target-camera mode the solved boom is OwnerRadius * the eased distance + min(2D gaze distance, 1000), then shortened by the collision trace, so this is not the literal final camera offset.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:449",
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:451",
-        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:465"
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:465",
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:264"
       ],
       "status": "verified"
     },
@@ -68,16 +74,16 @@
     },
     "ShootCamera_Distance": {
       "simple": "Shoot/aim camera boom length.",
-      "technical": "Float (export 200 cm) copied to the character virtual camera's ShootCameraDistance member at init and propagated by the camera copy path (GameCharacterVirtualCamera.cpp:718). No further read of that member appears in the available source (the similarly named debug-menu value is a separate GameDebugManager field), so the exact aiming behavior remains unresolved here.",
+      "technical": "Float (export 200 cm) copied to the character virtual camera's ShootCameraDistance member at init and propagated by the camera copy path (GameCharacterVirtualCamera.cpp:718). No read of that member appears in the available C++/sequencer code (the similarly named debug-menu camera-distance values are separate GameDebugManager fields), so any aiming behavior remains unresolved here.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:452",
-        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:716"
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:718"
       ],
       "status": "observed"
     },
     "TargetCamera_ActionDistance": {
       "simple": "Camera distance while running/dashing/jumping/stepping.",
-      "technical": "Float (export 320 cm). Movement actions call SetDistanceRequest(1, TargetCamera_ActionDistance, <mode-specific time>) so the longest active request wins. Used by normal run, dash, jump, step and CP_180 jump-like actions.",
+      "technical": "Float (export 320 cm). Movement actions call SetDistanceRequest(1, TargetCamera_ActionDistance, <mode-specific time>) so the longest active request wins. Used by normal run, dash, jump, step, CP_180_Jump and CP_180_RunJump.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction.cpp:746",
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:45",
@@ -105,10 +111,11 @@
     },
     "TargetCamera_ActionDistanceChangeTime_Jump": {
       "simple": "Blend time for the jump camera-distance change.",
-      "technical": "Float seconds (export 0.2) used by the normal jump action and CP_180's jump/dash-like actions when requesting TargetCamera_ActionDistance.",
+      "technical": "Float seconds (export 0.2) used by FGameCharacterAction_JumpBase and by CP_180_Jump / CP_180_RunJump when requesting TargetCamera_ActionDistance.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Jump.cpp:157",
-        "Source/Abrams/Private/CP_180_ActionController.cpp:320"
+        "Source/Abrams/Private/CP_180_ActionController.cpp:320",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:343"
       ],
       "status": "verified"
     },
@@ -122,29 +129,34 @@
     },
     "TargetCamera_DownDistance": {
       "simple": "Camera distance while knocked down/downed.",
-      "technical": "Float (export 475 cm). Blow/down action states call SetDistanceRequest(2, DownDistance, DownDistanceChangeTime); this request competes with the movement request by maximum distance.",
+      "technical": "Float (export 475 cm). Five blow/down Start states (Blow, BlowSpin, BlowGroundRestraint, GroundRestraint, CentipedeRestraintFall) call SetDistanceRequest(2, DownDistance, DownDistanceChangeTime); this request competes with the movement key 1 by maximum distance.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:612",
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1103",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1186",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1273",
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1489"
       ],
       "status": "verified"
     },
     "TargetCamera_DownDistanceChangeTime": {
       "simple": "Blend time into the downed camera distance.",
-      "technical": "Float seconds (export 0.2) passed together with TargetCamera_DownDistance to SetDistanceRequest(2, ...) from all six down/blow consumer sites.",
+      "technical": "Float seconds (export 0.2) passed together with TargetCamera_DownDistance to SetDistanceRequest(2, ...) from five blow/down Start sites: Blow, BlowSpin, BlowGroundRestraint, GroundRestraint and CentipedeRestraintFall.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:612",
-        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1186"
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1103",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1186",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1273",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1489"
       ],
       "status": "verified"
     },
     "TargetCamera_NormalDistanceChangeWaitTime": {
       "simple": "Delay before the camera returns to normal distance.",
-      "technical": "Float seconds (export 3.0). UpdateDistanceRequest(negative blend time) keeps postponing a return while this countdown is active; when requests run out, the first such call sets DistanceRequestWait to this row value and returns without restoring key 0. Blow recovery calls RemoveDistanceRequest(2, NormalDistanceChangeTime).",
+      "technical": "Float seconds (export 3.0). When no distance requests remain and UpdateDistanceRequest is called with a negative blend time (the action End handlers pass -1.0f), it sets DistanceRequestWait to this row value once if it is not already counting down and returns without restoring key 0. SolveTargetCamera decrements the wait each tick and, when it reaches zero, calls SetDistanceRequest(0, TargetCameraDistance, NormalDistanceChangeTime). Repeated negative-blend removals do not reset an active wait.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:513",
-        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:404"
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:239",
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:513"
       ],
       "status": "verified"
     },
@@ -233,36 +245,48 @@
     },
     "CameraModeChange_InterpolationTime": {
       "simple": "Blend duration when switching camera modes.",
-      "technical": "Float seconds (export 0.25). Stored by InitCharacterCamera and passed to StartViewBlend when the camera mode changes.",
+      "technical": "Float seconds (export 0.25). Stored by InitCharacterCamera and passed to StartViewBlend when ChangeCameraMode changes the camera mode with bBlendView; target changes use a separate hard-coded 0.25 s blend in OnTargetChanged, not this field.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:459",
-        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:571"
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:571",
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:298"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Only one row (Default) is exported. The accessor returns the FIRST row of the first table containing a FGameDataTableRow_Camera, so table sharding/localization variants would not be combined; adding rows would not make them selectable by ID without changing retail code.",
+    "Only one row (Default) is exported. FirstCameraRow returns the first row name of the first CameraDataTables table that has rows and a valid FGameDataTableRow_Camera; it skips empty tables, and returns nullptr if none is usable (InitVirtualCamera dereferences the result unchecked). Sharding/localization variants would not be combined, and adding rows would not make them selectable by ID without changing the accessor.",
     "Manager loading: 'CameraDataTable' -> CameraDataTables (+0x310) at GameDataTableManager.cpp:179/327. CharacterCameraDataTable (+0x460) is a separate per-character table and is not the row documented here.",
-    "Attenuation rates are multiplied by 60 at initialization (frame-rate-normalized from the exported per-frame values). Distances are in Unreal centimetres; blending uses EEasingFunc::EaseInOut with exponent 2.",
-    "No further consumer for ShootCamera_Distance was found in the available C++/sequencer code; the similarly named debug menu fields belong to GameDebugManager, not to this row."
+    "Attenuation rates are multiplied by 60 at initialization, converting the exported per-frame-style values into per-second rates for DeltaTime-scaled lerp alphas. Distances are in Unreal centimetres; distance-request blending uses EEasingFunc::EaseInOut with exponent 2 (view and gaze-reset blends use EaseOut).",
+    "Schema/defaults: FName Id plus 25 floats. The reconstructed row constructor leaves Id at the FName default (None) and initializes every float to 0.0f. The available export explicitly serializes all 26 values in the single Default row, so those zeros are constructor fallbacks rather than the shipped values; no special sentinel value is read from this row by the traced code.",
+    "Distance requests are TMap keys 0 (base), 1 (movement) and 2 (downed), resolved by largest value. The -1.0f blend passed to RemoveDistanceRequest by run/dash/jump/step/CP_180 End handlers is a caller-side signal to arm the wait timer, not a serialized table value.",
+    "No further consumer for ShootCamera_Distance was found in the available C++/sequencer code; the similarly named debug menu fields belong to GameDebugManager, not to this row.",
+    "Evidence scope: runtime descriptions come from the reconstructed C++ in Source/ (comments cite retail RVAs) and the read-only DataTable export; no retail binary, Blueprint or editor-only behavior was inspected for this review."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameVirtualCamera.cpp:20",
-      "detail": "FirstCameraRow selects the first row of the first CameraDataTable asset; InitVirtualCamera consumes all four attenuation rates (retail 0x1051e30)."
+      "detail": "FirstCameraRow selects the first row of the first usable CameraDataTables asset; InitVirtualCamera consumes all four attenuation rates (retail 0x1051e30)."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:435",
+      "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:447",
       "detail": "InitCharacterCamera copies all distance/limit/height/offset/mode fields from the row into the live camera (retail 0x1291f80)."
     },
     {
+      "source": "Source/Abrams/Private/GameAnimNS_CameraGazeSettings.cpp:19",
+      "detail": "Animation notify state temporarily overrides the live gaze-location smoothing rate (when >= 0) and resets it to the row-derived base on end, via ResetGazeLocationAttenuateRate."
+    },
+    {
       "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:157",
-      "detail": "Camera heading/pitch solver interpolates the horizontal limit by gaze distance and clamps pitch by vertical limits."
+      "detail": "Target-camera solver interpolates the horizontal limit by gaze distance, clamps pitch by vertical limits, then builds the pivot/boom (with OwnerRadius and collision shortening) and applies the wait-driven return to base distance."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:474",
       "detail": "SetDistanceRequest/UpdateDistanceRequest arbitrates normal, movement and downed distance requests and applies blend/wait times."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:244",
+      "detail": "Wait expiry re-adds distance request 0 using the row's NormalDistanceChangeTime; UpdateDistanceRequest arms the wait from NormalDistanceChangeWaitTime when the request map empties."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterAction.cpp:746",
@@ -270,7 +294,7 @@
     },
     {
       "source": "Source/Abrams/Private/GameCharacterAction_Blow.cpp:612",
-      "detail": "Blow/down actions request and later release the downed camera distance using the down distance, change time and normal return time."
+      "detail": "Blow/down states request the downed camera distance with this distance/change time; recovery removes the request using NormalDistanceChangeTime."
     }
   ]
 }

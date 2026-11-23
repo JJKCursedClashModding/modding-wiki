@@ -1,45 +1,98 @@
 {
-  "description": "Per-character lists of decal actor Blueprint asset names, used when preloading battle assets for characters that project decals.",
+  "description": "Per-character lists of decal Blueprint asset names used to assemble battle-prepare and battle-preload requests. The export is one 11-row DataTable (ImportKeyField=Id), with five FileName_BP slots per row and no decal placement, size, lifetime or gameplay parameters.",
   "fields": {
     "ID": {
-      "simple": "Row key, normally the character ID referenced by Character::Id_CharacterDecal.",
-      "technical": "FName primary key (ImportKeyField=Id in the export). BattleAssets_CharacterDecals_12BC3C0 resolves Character::Id_CharacterDecal against CharacterDecalDataTables (DTM +0x500); a None value skips the lookup entirely. Only 11 of the exported characters have a non-None reference.",
+      "simple": "Row key, normally the Character row ID referenced by Character::Id_CharacterDecal.",
+      "technical": "FName key (UPROPERTY BlueprintReadWrite/EditAnywhere; export Properties.ImportKeyField is Id and every master row writes a matching ID). BattleAssets_CharacterDecals_12BC3C0 reads Character::Id_CharacterDecal (FGameDataTableRow_Character +0x70 in the retail layout), returns immediately when it is None, and finds the first matching row across AGameDataTableManager::CharacterDecalDataTables (DTM +0x500) with FindRow(..., false), which suppresses a missing-row warning. No reconstructed consumer reads the embedded Id value; lookup uses the UDataTable row name. The 11 master rows are exactly the 11 non-None Character.Id_CharacterDecal values: ten same-ID links plus CN_071 -> CN_070 (there is no exported Character row named CN_070).",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterDecal.h:11",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:238",
-        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:242"
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:242",
+        "Source/Abrams/Public/GameDataTableManager.h:121",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:551",
+        "JJKCCDatatables/datatables/CharacterDecalDataTable.json",
+        "JJKCCDatatables/datatables/CharacterDataTable.json"
       ],
       "status": "verified"
     },
     "FileName_BP": {
-      "simple": "Array of decal Blueprint asset names to preload.",
-      "technical": "TArray<FName>, row +0x10, values such as DCL_00300_BP. BattleAssets_CharacterDecals_12BC3C0 appends the whole array (including any None entries) to the battle-preload asset-name output; the collector is shared by battle prepare (GamePhase_BattleBase state 1) and battle preload. Missing rows contribute nothing. No direct spawn-time reader of this field was found in the reconstructed source: the observed use is asset collection/preload only.",
+      "simple": "Ordered list of decal Blueprint asset names (DCL_*_BP) to load for the character.",
+      "technical": "TArray<FName> (UPROPERTY BlueprintReadWrite/EditAnywhere; reconstructed retail row +0x10). All 11 exported rows have five slots: 25 non-None names and 30 None slots. BattleAssets_CharacterDecals_12BC3C0 appends every element in array order, including None, to the caller's TArray; it assigns no per-slot meaning. The names become GamePrimaryAssetType_Decal primary-asset names (Config scans /Game/Decals for GameDecalActor_BP_C): GamePrimaryAssetLoader_CreateLoaders skips None names and deduplicates by FName in a TMap, so trailing None slots and duplicates across characters do not create loaders. The shared collector serves GamePhase_BattleBase prepare state 1 (after a variation-row check, including transformation entries) and UGamePhase::PreloadCharacterDecals (CharacterId/Character row only, with transformation slots appended). Other decal systems can resolve the same primary-asset cache by name (GameRenderManager::SpawnDecal builds FPrimaryAssetId(\"Decal\", FileName) and casts the loaded object to an AActor subclass), but no reconstructed caller ties this table's names to a particular spawn. All 25 non-None values also appear as DecalDataTable Filename values; that separate table (DTM +0x800) feeds animation-notify/boot-resident decal selection and is not read by this collector.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterDecal.h:15",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterDecal.cpp:3",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:242",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:244",
-        "Source/Abrams/Public/BattleCharacterAssetCollectors.h:24"
+        "Source/Abrams/Private/GameDataTableManager.cpp:25",
+        "Source/Abrams/Private/GameDataTableManager.cpp:111",
+        "Config/DefaultGame.ini:22",
+        "Source/Abrams/Private/GameRenderManager.cpp:447",
+        "JJKCCDatatables/datatables/CharacterDecalDataTable.json",
+        "JJKCCDatatables/datatables/DecalDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Export contains 11 rows, each with five FileName_BP slots; unused slots are None.",
-    "The only identifiable field consumer in the reconstructed source is the shared battle asset collector; the limit is documented rather than extended to unproven gameplay uses.",
-    "Single table asset 'CharacterDecalDataTable' loaded into DTM +0x500; no numbered shards or localized variants in the export.",
-    "Reconstructed C++ with retail RVA comments; no claim about Blueprint-only consumers or byte-identical matching."
+    "Export coverage: the single master CharacterDecalDataTable.json has 11 rows; the 11 datatables_by_character/*/CharacterDecalDataTable.json files are one-row projections of exactly those rows (including CN_070 for CN_071), not additional shards. No numbered or locale-specific CharacterDecal export was found. Every row key equals its exported ID, and the set of keys equals the set of non-None Character.Id_CharacterDecal references.",
+    "Array convention: every row has exactly five FileName_BP slots; no code indexes them or gives positions 0-4 distinct roles. None is an empty sentinel that the collector still appends, then GamePrimaryAssetLoader_CreateLoadersForIds rejects it. In the export, 25 of 55 slots are real DCL_*_BP names (22 unique) and 30 are None; all 25 also occur as non-resident Filename rows in DecalDataTable.",
+    "Lookup precedence and failure: BattleAssets_FindRow walks CharacterDecalDataTables in order and returns the first matching row; with the shipped single table there is no shard fallback. A null Character or None Id_CharacterDecal skips the lookup, and an unresolved row contributes nothing silently. DTM fills CharacterDecalDataTables in Tick only after every DataTable loader completes.",
+    "Both callers feed GamePrimaryAssetType_Decal: battle prepare uses StudioCharacterDecalLoaders_9A0 and waits on it before RegisterLoadedBattleAssets, while battle preload uses StudioCharacterDecalLoaders_450; both maps are later retained in StudioRetainedLoaders_90 or released. Prepare skips an entry whose variation row is missing before calling this collector; preload only requires a resolvable Character row. No caller reads CharacterDecalNames from StudioCharacterDecalLoaders_9A0 or _450 after loading.",
+    "Evidence strength: the direct collector at retail 0x12BC3C0 is reconstructed C++ that is behaviour-certified (status state behavioural, not byte-matched); its preload caller at 0x13D5EA0 is an INV MATCH, and the DTM +0x500 member is statically pinned. The row struct has no dedicated retail offset static_assert because layout-checks marks it an ambiguous twin family, so the +0x10 array offset is reconstructed rather than separately pinned. No retail Blueprint bytecode was inspected and no Blueprint-only behavior is claimed.",
+    "Defaults: FGameDataTableRow_CharacterDecal's constructor body is empty, so an uninstantiated/default row has Id=None and an empty FileName_BP array; the export supplies explicit values in every row. There are no numeric units, negative sentinels, or index-dependent parameters in this row struct."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:210",
-      "detail": "Loads CharacterDecalDataTable into AGameDataTableManager::CharacterDecalDataTables."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:358",
+      "detail": "Registers the single primary-asset name CharacterDecalDataTable among the DataTable loaders."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:488",
+      "detail": "Creates the DataTable primary-asset loaders; when all complete, Tick resolves this one asset into CharacterDecalDataTables (DTM +0x500)."
     },
     {
       "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:238",
-      "detail": "Skips characters with no CharacterDecal ID."
+      "detail": "Skips a null Character row or Character.Id_CharacterDecal = None before any table lookup."
     },
     {
       "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:242",
-      "detail": "Resolves the row and appends FileName_BP to the battle preload list."
+      "detail": "Finds the first FGameDataTableRow_CharacterDecal row whose key matches Id_CharacterDecal across CharacterDecalDataTables."
+    },
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:244",
+      "detail": "Appends the whole FileName_BP array in order, including None entries, to the asset-name output."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:260",
+      "detail": "Battle prepare state 1 calls the collector for each walk entry (including transformation rows) after a variation-row check."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:300",
+      "detail": "Feeds CharacterDecalNames into GamePrimaryAssetType_Decal loaders in StudioCharacterDecalLoaders_9A0; state 2 waits on them."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:389",
+      "detail": "PreloadCharacterDecals calls the same collector for battle slots plus transformation slots."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:391",
+      "detail": "Creates the Decal loaders in StudioCharacterDecalLoaders_450; IsBattleAssetPreload checks their completion."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:82",
+      "detail": "Shared loader creation drops None primary-asset names and duplicate names before calling AssetManager::LoadPrimaryAsset."
+    },
+    {
+      "source": "Config/DefaultGame.ini:22",
+      "detail": "Declares the Decal primary asset type: Blueprint classes under /Game/Decals based on GameDecalActor_BP_C."
+    },
+    {
+      "source": "Source/Abrams/Private/GameRenderManager.cpp:447",
+      "detail": "Indirect consumer of the shared Decal cache: SpawnDecal resolves a Decal primary asset by FName and casts it to an AActor subclass; this is not a direct reader of CharacterDecal rows."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase.cpp:250",
+      "detail": "After preload completes, the character-decal loader map is retained in StudioRetainedLoaders_90 until the phase releases it."
     }
   ]
 }

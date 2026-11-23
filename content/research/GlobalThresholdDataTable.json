@@ -1,80 +1,146 @@
 {
-  "description": "Generic numeric bands (inclusive Min/Max) reused by rank, PvE, story, battle-score and shop systems to classify a value into a named threshold row.",
+  "description": "Shared, unsharded lookup vocabulary of named numeric intervals. Each row's inclusive float [Min, Max] band is resolved by Id; reconstructed C++ consumers use it to classify battle result scores, rank points, PvE risk/point values and character relationship values, and to supply rank-tier bounds to UI and shop-unlock checks. The table has no behavior of its own.",
   "fields": {
     "Id": {
-      "simple": "Threshold band key referenced by other tables.",
-      "technical": "FName row key; export label ID. Consumers resolve it through WidgetTest_FindGlobalThreshold / local inline finders over GlobalThresholdDataTables. Key sources include RankPoint.Id_GlobalThreshold, PvE ally/growth/lottery rows, MissionCharacter/StoryCharaRelateLevel rows, shop rank rows and hard-coded story level names. None is not universally guarded: several callers pass the key straight to FindRow and rely on the engine's None test.",
+      "simple": "Threshold band key referenced by other data tables and hard-coded C++ lookups.",
+      "technical": "FName UPROPERTY (BlueprintReadWrite, EditAnywhere; AllowPrivateAccess=true), exported as ID; ImportKeyField is Id and the constructor leaves it NAME_None because only Min/Max are set. All 104 exported rows carry an ID equal to their row name, with no duplicates. WidgetTest_FindGlobalThreshold (retail 0x12face0) and local inline equivalents scan GlobalThresholdDataTables (DTM+0x300) in table order and return the first FindRow hit with missing-row warnings suppressed; every observed shared-helper call passes bCheckNone=false/bUnused=false and the inline finders have no game-level None check. Actual foreign keys exist only in RankPointDataTable.Id_GlobalThreshold (27 rows), PvEAllyParameterDataTable.Id_GlobalThreshold (5), PvEMissionLotteryDataTable.Id_GlobalThreshold (223 rows / 15 distinct keys) and PvEExtraMissionLotteryDataTable.Id_GlobalThreshold (14); all exported foreign keys resolve. Other keys are hard-coded names in C++. MissionCharacter, PvEGrowth, StoryCharaRelateLevel and StoryCharaRelateChange rows do not store a threshold key.",
       "evidence": [
-        "Source/Abrams/Private/GameBattleManager.cpp:764",
-        "Source/Abrams/Private/GamePlayerRankWidget.cpp:87",
-        "Source/Abrams/Private/GamePvESettings.cpp:64",
-        "Source/Abrams/Private/GameRankSystemGradeInfoWidget.cpp:45",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:689",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1302",
-        "Source/AbramsDataTable/Public/GameDataTableRow_GlobalThreshold.h:10"
+        "Source/AbramsDataTable/Public/GameDataTableRow_GlobalThreshold.h:7",
+        "Source/AbramsDataTable/Public/GameDataTableRow_GlobalThreshold.h:10",
+        "Source/AbramsDataTable/Private/GameDataTableRow_GlobalThreshold.cpp:3",
+        "Source/Abrams/Private/GameDataTableManager.cpp:178",
+        "Source/Abrams/Private/GamePhase_WidgetTest.cpp:272",
+        "Source/Abrams/Private/GamePlayerRankWidget.cpp:63",
+        "Source/Abrams/Private/GamePvESettings.cpp:21",
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankPoint.h:23",
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEAllyParameter.h:15",
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionLottery.h:15",
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEExtraMissionLottery.h:15",
+        "JJKCCDatatables/datatables/GlobalThresholdDataTable.json"
       ],
       "status": "verified"
     },
     "Min": {
       "simple": "Inclusive lower bound of the numeric band.",
-      "technical": "float. Most callers use UKismetMathLibrary::InRange_FloatFloat(Value, Min, Max, true, true), so both endpoints are inclusive. Rank UI also treats Min as the tier's start for progress bars, remaining-points calculations and sorting (lower Min sorts earlier); PlayerCardParameter rounds Min to an int for the displayed required rank point. Exported examples are contiguous bands such as 0..24, 25..49 for story relation levels and 0..99, 100..199 for rank points.",
+      "technical": "float UPROPERTY (BlueprintReadWrite, EditAnywhere; AllowPrivateAccess=true) with constructor default 0.0f; all 104 exported rows set it. Classification callers cast the int32 input to float and use UKismetMathLibrary::InRange_FloatFloat(Value, Min, Max, true, true): battle result rank, rank-tier lookup, PvE AI level, ally parameter, risk mission class, mission lottery, extra-mission point level and extra-mission lottery. Min is also the tier floor for story relation level/value conversion, rank sorting by ascending Min, grade/result progress bars and remaining points, leaderboard-card RankPoint (FMath::RoundToInt) and the shop PvPRankPointMax unlock (FMath::CeilToInt(Min)). Exported story relation floors are 0/25/50/75/100; extra-mission point levels 1..11 use 0/10/.../100; rank points span 0..99999, matching the save clamp in AddRankPoint.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_GlobalThreshold.h:14",
+        "Source/AbramsDataTable/Private/GameDataTableRow_GlobalThreshold.cpp:4",
         "Source/Abrams/Private/GameBattleManager.cpp:770",
         "Source/Abrams/Private/GamePlayerRankWidget.cpp:88",
+        "Source/Abrams/Private/GamePvESettings.cpp:61",
         "Source/Abrams/Private/GamePvESettings.cpp:66",
+        "Source/Abrams/Private/GamePvESettings.cpp:274",
+        "Source/Abrams/Private/GamePvESettings.cpp:298",
+        "Source/Abrams/Private/GamePvESettings.cpp:484",
+        "Source/Abrams/Private/GamePhase_WidgetTest.cpp:292",
+        "Source/Abrams/Private/GamePhase_WidgetTest.cpp:305",
         "Source/Abrams/Private/GameRankSystemGradeInfoWidget.cpp:28",
-        "Source/Abrams/Private/GameRankSystemGradeInfoWidget.cpp:69",
         "Source/Abrams/Private/GameResultChangeRankPointWidget.cpp:173",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:614",
-        "Source/AbramsDataTable/Public/GameDataTableRow_GlobalThreshold.h:14"
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:695",
+        "Source/Abrams/Private/GameManagerTails.cpp:401",
+        "JJKCCDatatables/datatables/GlobalThresholdDataTable.json"
       ],
       "status": "verified"
     },
     "Max": {
       "simple": "Inclusive upper bound of the numeric band.",
-      "technical": "float. Used together with Min in the inclusive InRange_FloatFloat test (bIncludeMinimum=true, bIncludeMaximum=true) in battle-score class selection, PvE risk/mission classification, rank point class lookup and story unlock checks. Rank UI also formats Max as the tier's displayed upper point value. No consumer was found that treats Max as exclusive.",
+      "technical": "float UPROPERTY (BlueprintReadWrite, EditAnywhere; AllowPrivateAccess=true) with constructor default 0.0f; all 104 exported rows set it. Every range-classification caller uses bIncludeMaximum=true; no exclusive-max consumer was found. SetupGradeInfo formats Max as the displayed rank upper point value. Story relation conversion and the shop unlock never read Max. Exported maxima include 24/49/74/99/100 for relation levels, 99999 for rank-point/ally/AI bands, 50000 for the top PvE mission bands, 9999999 for result-score catch-alls, exact singletons at 100/200, and -1..-1 sentinel bands for PVE_AI_LEVEL_01/02/10; those sentinels cannot contain ordinary nonnegative risk values and have no special-case branch in the consumer.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_GlobalThreshold.h:17",
+        "Source/AbramsDataTable/Private/GameDataTableRow_GlobalThreshold.cpp:5",
         "Source/Abrams/Private/GameBattleManager.cpp:770",
         "Source/Abrams/Private/GamePvESettings.cpp:66",
         "Source/Abrams/Private/GamePvESettings.cpp:274",
-        "Source/Abrams/Private/GamePlayerRankWidget.cpp:88",
-        "Source/Abrams/Private/GameRankSystemGradeInfoWidget.cpp:58",
+        "Source/Abrams/Private/GamePvESettings.cpp:298",
+        "Source/Abrams/Private/GamePvESettings.cpp:484",
+        "Source/Abrams/Private/GamePvESettings.cpp:525",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:1312",
-        "Source/AbramsDataTable/Public/GameDataTableRow_GlobalThreshold.h:17"
+        "Source/Abrams/Private/GameRankSystemGradeInfoWidget.cpp:58",
+        "JJKCCDatatables/datatables/GlobalThresholdDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "AGameDataTableManager::Tick resolves only GlobalThresholdDataTable into GlobalThresholdDataTables (Source/Abrams/Private/GameDataTableManager.cpp:178, Source/Abrams/Public/GameDataTableManager.h:89).",
-    "This is a shared vocabulary table, not one gameplay system: the same Min/Max pair classifies battle score, rank points, PvE risk/ally levels, story character relation levels and shop unlocks.",
-    "inclusive-range comparisons are direct C++ evidence; overlapping or non-contiguous bands are not validated globally by the consumer, so exported contiguity is a data convention rather than an enforced constraint.",
-    "One unlocalized export file with no numbered shards. Partial Content prevents ruling out Blueprint-only consumers."
+    "Load/cache path: StartInitialLoading creates a DataTable-type primary asset loader named GlobalThresholdDataTable; Tick waits for all loaders, resolves that loader through GetPrimaryAssetObject<UDataTable> and appends the non-null object to the single GlobalThresholdDataTables array at DTM+0x300. StoryDataTables() and GetTables() are local aliases for the same GameInstance manager. All threshold finders scan tables in order and return the first row hit; no global duplicate/overlap validation exists.",
+    "Export coverage: one unsharded, unlocalized table named GlobalThresholdDataTable, RowStruct Class'GameDataTableRow_GlobalThreshold' in /Script/AbramsDataTable. It has 104 unique row keys and every row has exactly ID, Min and Max; this matches the catalog's 104-row count.",
+    "Row families: 5 story relation floors, 27 contiguous rank-point bands, 16 mode-specific result-score bands (4 modes x C/B/A/S), 16 PvE mission bands, 11 extra-mission point bands, 14 extra-mission lottery bands, 10 PvE AI-level bands and 5 PvE ally-parameter bands. Inputs are integer point/risk/score values cast to float; only some consumers convert the result to a 1-based level/index.",
+    "Data relationships: only RankPointDataTable (27 unique keys), PvEAllyParameterDataTable (5), PvEMissionLotteryDataTable (223 rows to 15 keys) and PvEExtraMissionLotteryDataTable (14) carry Id_GlobalThreshold, and every exported key resolves. PvEGrowth uses its own ExperienceThreshold; MissionCharacter has AILevel but no threshold foreign key. Story relationship values come from StoryCharaRelateChange deltas plus StoryCharaGraphPair start levels and are converted using hard-coded STORY_CHARA_RELATE_LV_1..5 Min floors.",
+    "Precedence: rank lookup keeps the first RankPoint row as a fallback and returns the first inclusive band match; battle-score lookup tests fixed C/B/A/S name arrays and maps them to ranks 1..4 with default 1; extra-mission point and AI-level lookups iterate ordered hard-coded name arrays and return Index+1, with extra missions forcing AI level >=6. PVE_MISSION_X_0_99999 overlaps every A..E mission band inside a TMap whose iteration order is not fixed by source order, so which mapping wins cannot be established from these exports alone.",
+    "Sentinels and caps: PVE_AI_LEVEL_01/02/10 are -1..-1 and never match normal nonnegative risk in code that has no sentinel branch. Exact singleton rows end the 100-point extra-mission and relation scales and the 200-point TAG lottery scale. Rank points clamp to 0..99999 and PvE risk to 0..50000, matching the top exported bands; result-score catch-alls use 9999999.",
+    "Consumer-specific interpretation: story relation level/value use only Min floors (clamping level 1..5 for value lookup); the shop compares the saved PvPRankPointMax record with ceil(Min), not Max; grade UI displays Min/Max and computes progress from previous/current/next Min with 'next' limited to the same RankPointClass; result-change UI uses current/next Min without a zero-difference guard; leaderboard cards use RoundToInt(Min) or 0 past the row list.",
+    "Evidence boundary: all behavioral statements here come from reconstructed C++ plus the JSON export. The reconstruction's AGENTS.md/FACTS.md states that retail Blueprints contain no logic; no retail Blueprint bytecode was inspected in this review, so no Blueprint-only consumer is claimed."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameBattleManager.cpp:761",
-      "detail": "Resolves a threshold row by name and selects the battle rank/score class whose inclusive range contains the score."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:326",
+      "detail": "StartInitialLoading registers the GlobalThresholdDataTable primary asset loader; Tick at line 178 resolves and caches it in GlobalThresholdDataTables (DTM+0x300)."
     },
     {
-      "source": "Source/Abrams/Private/GamePlayerRankWidget.cpp:63",
-      "detail": "Rank widgets resolve Id_GlobalThreshold and classify rank points inclusively."
+      "source": "Source/Abrams/Private/GamePhase_WidgetTest.cpp:272",
+      "detail": "WidgetTest_FindGlobalThreshold (0x12face0) scans the loaded tables for the first row hit; all observed calls pass bCheckNone=false and bUnused=false."
     },
     {
-      "source": "Source/Abrams/Private/GamePvESettings.cpp:21",
-      "detail": "PvE uses threshold rows for mission/risk level lookup, ally level selection and lottery weighting."
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:725",
+      "detail": "GetResultScoreRank tests the score against mode-specific RESULT_SCORE[_STORY|_PVE|_ARCADE]_C/B/A/S inclusive bands in fixed order, mapping to result ranks 1..4, default 1."
     },
     {
-      "source": "Source/Abrams/Private/GameRankSystemGradeInfoWidget.cpp:45",
-      "detail": "Grade UI displays Min/Max and computes progress between consecutive threshold tiers."
+      "source": "Source/Abrams/Private/GamePlayerRankWidget.cpp:76",
+      "detail": "GameRankPoint_FindRow uses RankPoint.Id_GlobalThreshold and inclusive Min/Max, keeping the first RankPoint row as fallback; lobby, online, replay and other UI callers go through this helper."
     },
     {
-      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:1302",
-      "detail": "Story character-relation level checks use an inclusive Min/Max range."
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:49",
+      "detail": "Extra-mission point level loops PVE_EXTRA_MISSION_POINT_01..11 inclusively and returns Index+1 (0 on no match); the suggestion widget forces 100 for extra missions."
     },
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:178",
-      "detail": "Load/registry path for GlobalThresholdDataTable."
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:264",
+      "detail": "AI level loops PVE_AI_LEVEL_01..10 inclusively and returns Index+1; MissionId containing PVE_EXTRA_MISSION forces at least 6."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:289",
+      "detail": "Ally parameter selection resolves PvEAllyParameter.Id_GlobalThreshold and tests risk in the inclusive band; no match yields no ally multiplier row."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:470",
+      "detail": "Risk mission class maps hard-coded PVE_MISSION_* keys to uint8 classes via a TMap and inclusive ranges; the overlapping X catch-all's precedence is not source-order fixed."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:509",
+      "detail": "Mission lottery filters PvEMissionLottery rows backwards by threshold FK and inclusive risk band, then weighted-picks the surviving rows."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_WidgetTest.cpp:289",
+      "detail": "Story relation level and value helpers use only the Min floors of the five STORY_CHARA_RELATE_LV_* rows; indirect callers include GetCharaRelateLevel and the relation detail gauge."
+    },
+    {
+      "source": "Source/Abrams/Private/GameRankSystemGradeInfoWidget.cpp:41",
+      "detail": "Grade UI sorts rank rows by threshold Min, formats Min/Max and computes progress from previous/current/next Mins, with next restricted to the same RankPointClass."
+    },
+    {
+      "source": "Source/Abrams/Private/GameResultChangeRankPointWidget.cpp:42",
+      "detail": "Result rank-change UI sorts by Min for the next row and uses current/next Min at lines 170-175 for progress and remaining points; no next row gives a full bar."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:606",
+      "detail": "Leaderboard-card unpacking reads RankIndex from the packed card, returns RoundToInt(Min) for that RankPoint row, or 0 past the end."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:680",
+      "detail": "PvPRankPointMax unlock resolves ShopLineup ValueStrs[0] to a RankPoint row, then its threshold, and compares the saved record with ceil(Min)."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:1276",
+      "detail": "PvE extra-mission lottery selects SOLO/TAG rows by point count and tests the summed points against the inclusive band before a probability roll; this is a PvE consumer despite the file name."
+    },
+    {
+      "source": "Source/Abrams/Private/GameRankSystemManualWidget.cpp:47",
+      "detail": "Indirect consumer: the rank manual builds grade widgets through SetupGradeInfo, which resolves threshold rows for the selected RankPointClass."
+    },
+    {
+      "source": "Source/Abrams/Private/GameVsEnemyIntervalExtraMissionSuggestionWidget.cpp:10",
+      "detail": "Indirect consumer: sets the extra-mission suggestion animation level from GamePvE_GetExtraMissionPointLevel."
     }
   ]
 }

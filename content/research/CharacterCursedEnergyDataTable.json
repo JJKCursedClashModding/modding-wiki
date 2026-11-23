@@ -1,82 +1,100 @@
 {
-  "description": "Per-character cursed-energy level thresholds and recovery tuning for the level gauge and the consumable cursed-energy pool.",
+  "description": "Per-character cursed-energy level thresholds (gauge levels and the spendable-pool cap) and recovery timing/rates for that pool.",
   "fields": {
     "Id": {
-      "simple": "Character ID used as the row key.",
-      "technical": "Unreal DataTable row name. ResolveDataRows selects CharacterCursedEnergyDataTable by CharacterDataTable.Id_CharacterCursedEnergy or its studio override and requires the row to exist; status initialization then reads the row through AGameCharacter.CursedEnergyRow. The export has 36 rows.",
+      "simple": "Character/row ID used to find this cursed-energy row.",
+      "technical": "Exported as FName ID; the native UPROPERTY is Id and the table's ImportKeyField is Id. AGameCharacter::ResolveDataRows searches DTM.CharacterCursedEnergyDataTables with FStudioBattleCharacterOverrides.CursedEnergyIdOverride when it is non-None, otherwise CharacterDataTable.Id_CharacterCursedEnergy; a miss fails character setup. MissionCharacterDataTable supplies those overrides (for example STMSN_09104M_ALLY_01 uses CP_020_ST instead of CP_020). Battle HUD widgets GameCommandListWidget and GameVsEnemyIntervalCharacterWidget instead look rows up directly by Character->Id_CharacterCursedEnergy and do not apply the mission override. All 36 exported row names match their ID values.",
       "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:461",
         "Source/Abrams/Private/GameCharacter.cpp:500",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:98"
+        "Source/Abrams/Private/GameCharacter.cpp:918",
+        "Source/Abrams/Private/GamePvESettings.cpp:231",
+        "Source/Abrams/Private/GameCommandListWidget.cpp:425",
+        "Source/Abrams/Private/GameVsEnemyIntervalCharacterWidget.cpp:122",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCursedEnergy.h:9"
       ],
       "status": "verified"
     },
     "LevelThreshold": {
-      "simple": "Ordered gauge amounts that define cursed-energy levels 1, 2, 3 and 4.",
-      "technical": "TArray<float>, typically four entries (CP_010 exports 100/200/300/400). Level is the count of thresholds <= the gauge, minimum 1; index 0 is the initial floor and the last usable index is CursedEnergyLevelMax from status setup. SetCursedEnergyGauge clamps the gauge between Threshold[0] and Threshold[CursedEnergyLevelMax]. Initialization copies the array and converts it to per-level deltas for UI markers; helpers return Threshold[Level - 1] or 0 for an invalid index. Some code reads fixed indices 0 and 3 (GetLastLevelThreshold), so a shorter array is unsafe in those paths.",
+      "simple": "Increasing gauge amounts that define cursed-energy levels 1-4 and the spendable-energy cap for the reached level.",
+      "technical": "TArray<float>. All 36 exported rows have exactly four positive, strictly increasing values (CP_010: 100/200/300/400; CP_020_ST reuses CP_020's thresholds). GetCursedEnergyLevel counts entries <= CursedEnergyGauge and floors the result at 1. InitializeStatus uses [0] as the gauge floor and copies the array into LevelThresholdDeltas (walked backwards, a[i] -= a[i-1]) for HUD markers. SetCursedEnergyGauge clamps the gauge to [LevelThreshold[0], LevelThreshold[CursedEnergyLevelMax]]; CursedEnergyLevelMax is Setup.Int40 (default 3, battle rules can set 0..3) and is an index, not necessarily the array's last element. On a level change it sets CursedEnergyMax = LevelThreshold[NewLevel - 1], adds the threshold delta to energy, and applies level effects. The out-of-line helper treats Level as 1-based and returns 0 for a null row or out-of-range index; CP_220 and CN_240 carry the same helper body. Other readers assume the four-entry shape: GetLastLevelThreshold uses fixed [3] (also used for CP_110/CP_130/CP_250 energy and exp), passive exp uses .Last(), resets use [0], and link-combo/CP_220 interpolate adjacent levels. A shorter exported array would be unsafe in those paths.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:98",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:141",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:203",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:217",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:428",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:515",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:514",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:520",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3131",
-        "Source/Abrams/Public/GameCharacterStatusController.h:740",
-        "Source/Abrams/Private/GameEffect.cpp:2004",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:429"
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3430",
+        "Source/Abrams/Public/GameCharacterStatusController.h:163",
+        "Source/Abrams/Private/GameEffect.cpp:2001",
+        "Source/Abrams/Private/GameBattleCharacterDataWidget.cpp:321",
+        "Source/Abrams/Private/GameCommandListWidget.cpp:429",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:1520",
+        "Source/Abrams/Private/GameBattleState_06.cpp:389"
       ],
       "status": "verified"
     },
     "Recover_Wait": {
-      "simple": "Pause before the cursed-energy pool starts regenerating after it drops.",
-      "technical": "Seconds. SetCursedEnergy (when the new value is lower) and level-up handling set CursedEnergyRecoverWait to Recover_Wait multiplied by the solo rate when applicable, and additionally by GetStatusRate154 in SetCursedEnergy. Tick decrements the wait by GetActionValue112()*DeltaTime and only recovers energy when the wait is no longer > 0. Constructor default 0.0f; CP_010 exports 1.5.",
+      "simple": "Delay before the cursed-energy pool starts regenerating after a drop or level-up.",
+      "technical": "Seconds of scaled wait time. SetCursedEnergy sets CursedEnergyRecoverWait = GetStatusRate154() * (SoloSide == 1 ? Recover_Wait_Rate_Solo : 1.0f) * Recover_Wait when the incoming value is below current energy; level-up uses only the solo multiplier times Recover_Wait. Tick subtracts GetActionValue112() * DeltaTime, floored at zero, and adds no recovery while the wait is still > 0. GetActionValue112 is an action-layer product that can be 0 (for example CP_121 with shikigami 1 out, or attacks with bRecoverCursedEnergyDisabled), so the real-time delay can be longer or indefinite. Constructor default 0.0f; CP_010 exports 1.5, and the 36 rows span 0.5-2.0.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:514",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:559",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:3439",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:3446",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3443",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3445",
+        "Source/Abrams/Private/GameCharacter.cpp:3032",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:2192",
+        "Source/Abrams/Private/CP_121_ActionController.cpp:525",
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCursedEnergy.h:32"
       ],
       "status": "verified"
     },
     "Recover_Speed": {
-      "simple": "Cursed-energy restored per second after the recover wait.",
-      "technical": "Energy units/second. Tick computes GetCursedEnergyRecoverRate() * solo multiplier * Recover_Speed * DeltaTime, then adds it through SetCursedEnergy, which clamps to CursedEnergyMax. Constructor default 0.0f; CP_010 exports 75.0.",
+      "simple": "Cursed energy restored per second after the recovery wait expires.",
+      "technical": "Base energy units/second. Tick passes CursedEnergy + GetCursedEnergyRecoverRate() * (SoloSide == 1 ? Recover_Speed_Rate_Solo : 1.0f) * Recover_Speed * DeltaTime to SetCursedEnergy, which clamps to [0, CursedEnergyMax]. GetCursedEnergyRecoverRate itself aggregates chase/escape and buff rates with action-controller/action-layer multipliers, so this field is only the row-level base rate. Constructor default 0.0f; CP_010 exports 75.0, and the 36 rows span 50-200.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3451",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3453",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3454",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:540",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:561",
+        "Source/Abrams/Private/GameCharacter.cpp:3037",
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCursedEnergy.h:32"
       ],
       "status": "verified"
     },
     "Recover_Wait_Rate_Solo": {
-      "simple": "Multiplier for Recover_Wait in solo play.",
-      "technical": "Float multiplier. Used only when FGameCharacterStatusSetup.SoloSide == 1: level-up recalculation applies it directly, while SetCursedEnergy applies StatusRate154 * Recover_Wait_Rate_Solo * Recover_Wait. CP_010 exports 1.0 (no change); constructor default 0.0f, which would shorten the wait to zero if a row omitted it.",
+      "simple": "Solo-only multiplier on the recovery wait.",
+      "technical": "Float read only when FGameCharacterStatusSetup.SoloSide == 1. Level-up sets the wait to this * Recover_Wait; SetCursedEnergy sets it to GetStatusRate154() * this * Recover_Wait. Non-solo paths use 1.0. All 36 rows export 1.0 (no change); the row-struct constructor default is 0.0f, so an omitted serialized property would zero the wait.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:514",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:557",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:559",
-        "Source/Abrams/Public/GameCharacterStatusController.h:822"
+        "Source/Abrams/Public/GameCharacterStatusController.h:171",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCursedEnergy.h:32"
       ],
       "status": "verified"
     },
     "Recover_Speed_Rate_Solo": {
-      "simple": "Multiplier for Recover_Speed in solo play.",
-      "technical": "Float multiplier applied when SoloSide == 1 in the tick recovery formula; non-solo uses 1.0. CP_010 exports 1.0; constructor default 0.0f, which would disable regeneration if a row omitted it.",
+      "simple": "Solo-only multiplier on the cursed-energy recovery rate.",
+      "technical": "Float used in place of 1.0 in the tick recovery product when Setup.SoloSide == 1; non-solo uses 1.0. The wait logic and SetCursedEnergy's clamp do not read it. All 36 rows export 1.0; the row-struct constructor default is 0.0f, so an omitted serialized property would disable regeneration for solo sides.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:3449",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3448",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3451",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3454",
+        "Source/Abrams/Public/GameCharacterStatusController.h:171",
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCursedEnergy.h:32"
       ],
       "status": "verified"
     },
     "Add_Rate_Solo": {
-      "simple": "Solo multiplier for cursed-energy gain; no consumer was identifiable.",
-      "technical": "Float at row offset 0x30, exported as 1.0 on all 36 rows with constructor default 0.0f. No direct or copied read of Add_Rate_Solo exists in the available Source/Plugins; AddCursedEnergyExp instead takes an externally computed Exp value. The retail field offset is corroborated by Tools/verify layout checks, but current source behavior cannot establish its exact formula.",
+      "simple": "Serialized solo add-rate field with no identified consumer in this reconstruction.",
+      "technical": "Native float at retail row offset 0x30, corroborated by the layout check and retail reflection dump. All 36 rows export 1.0 (neutral if it is used as a multiplier), and the row-struct constructor default is 0.0f. AddCursedEnergyExp only forwards its Exp argument to SetCursedEnergyGauge and plays level-down FX; it never reads this row field. No direct or copied read of Add_Rate_Solo exists in Source/Plugins, so its exact formula and purpose cannot be established from available evidence and must not be inferred from the name.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCursedEnergy.h:30",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCursedEnergy.h:32",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2585",
         "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:626"
       ],
@@ -84,55 +102,105 @@
     }
   },
   "notes": [
-    "Two distinct pools share these settings: CursedEnergyGauge (level thresholds) and CursedEnergy (spendable pool clamped to CursedEnergyMax). LevelThreshold controls both the level count and the pool cap.",
-    "No localized variants of the table were exported; 36 rows were available, so variant-specific values cannot be asserted beyond the export.",
-    "Add_Rate_Solo is a serialized/validated field with no identified consumer in this source snapshot; its purpose is not inferred from its name alone.",
-    "Behavior is described from reconstructed C++; status comments with retail RVAs are not byte-match claims."
+    "CursedEnergyGauge (the level/exp gauge) and CursedEnergy (the spendable pool) are separate status fields. LevelThreshold determines both the level count and CursedEnergyMax (Threshold[NewLevel - 1]); Recover_Wait and Recover_Speed with their solo multipliers affect only the spendable pool. Initialization sets the gauge to Threshold[0] and then sets CursedEnergy to CursedEnergyMax.",
+    "Data relationships verified in the exports: CharacterDataTable.Id_CharacterCursedEnergy selects the default row, while MissionCharacterDataTable can override it (STMSN_09104M_ALLY_01 and STMSN_09106M_ALLY_01 -> CP_020_ST; STMSN_09112M_ENEMY_01 -> CN_122_ST). The _ST rows keep the base thresholds but use shorter waits and faster recovery (0.5 s / 150 or 200 versus 1.0 s / 90 or 110). The 34 per-character export folders are views into the same 36-row table, not additional rows.",
+    "No language-localized table asset was exported; the catalog and export contain one CharacterCursedEnergyDataTable variant with 36 rows, including the two _ST rows named above.",
+    "GetCursedEnergyLevelThreshold takes a 1-based Level and returns 0 for an invalid index, while GetCursedEnergyLevel returns at least 1; fixed reads of [0]/[3] and .Last() assume the shipped four-entry arrays. CursedEnergyLevelMax is a configurable threshold index (usually 3; battle rules can lower it) and the HUD's clamped level is min(CursedEnergyLevel, 3).",
+    "Add_Rate_Solo is serialized, retail-layout-verified, and constant 1.0 in the exported data, but no consumer is present in this source snapshot; its purpose remains unresolved.",
+    "Behavior is described from reconstructed C++ with retail RVA/offset annotations, plus retail reflection/layout dumps and row exports. No retail Blueprint graph or Blueprint logic evidence was available or used, so no Blueprint-derived claims are made."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:195",
+      "detail": "Resolves the table by the exact name CharacterCursedEnergyDataTable into the manager's CharacterCursedEnergyDataTables array."
+    },
+    {
       "source": "Source/Abrams/Private/GameCharacter.cpp:500",
-      "detail": "Resolves the required row from CharacterDataTable.Id_CharacterCursedEnergy (or studio override) and caches it as AGameCharacter.CursedEnergyRow."
+      "detail": "Override-aware lookup caches the row in AGameCharacter.CursedEnergyRow; a miss fails character setup."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:98",
-      "detail": "Initializes gauge and energy from Threshold[0]; later reads CursedEnergyRow throughout status handling."
+      "detail": "Initialization starts the gauge at Threshold[0], then initializes CursedEnergy from CursedEnergyMax."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:141",
-      "detail": "Copies LevelThreshold into LevelThresholdDeltas and converts it to differences for display."
+      "detail": "Copies LevelThreshold into LevelThresholdDeltas and converts it to per-level deltas for HUD markers."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:203",
+      "detail": "Counts thresholds at or below the gauge to compute the cursed-energy level, floored at 1."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:217",
+      "detail": "Tests Threshold[CursedEnergyLevelMax] against the gauge for the at-threshold condition."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:428",
-      "detail": "Clamps the level gauge to the first threshold and the CursedEnergyLevelMax threshold."
+      "detail": "Clamps the level gauge to Threshold[0] and Threshold[CursedEnergyLevelMax]."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:514",
-      "detail": "Recalculates the recovery wait on level-up, applying the solo multiplier in solo mode."
+      "detail": "On level-up, applies the solo wait multiplier to Recover_Wait and uses the new threshold as CursedEnergyMax."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:559",
-      "detail": "Recalculates the recovery wait when energy drops, including status-rate and solo multipliers."
+      "detail": "On an energy drop, sets the wait using GetStatusRate154, the solo wait rate, and Recover_Wait."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:2192",
+      "detail": "Indirect wait consumer: the action-layer product can make GetActionValue112 zero, pausing wait decay."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:3430",
+      "detail": "Uses the last threshold to scale cursed-energy exp gained passively with time."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:3454",
       "detail": "Applies Recover_Speed and Recover_Speed_Rate_Solo each tick once the wait expires."
     },
     {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:3131",
+      "detail": "GetLastLevelThreshold reads fixed Threshold[3], also used by CP_110/CP_130/CP_250."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:4084",
+      "detail": "Round/knock-out resets return the gauge to Threshold[0] before refilling the pool to its max."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:4274",
+      "detail": "Link-combo gain interpolates between adjacent values from the same threshold array."
+    },
+    {
       "source": "Source/Abrams/Private/GameBattleState_06.cpp:389",
-      "detail": "Uses GetCursedEnergyLevelThreshold to refill tag-combo performers to their clamped level's threshold."
+      "detail": "Tag-combo exit refills each performer to the clamped next level's threshold."
     },
     {
-      "source": "Source/Abrams/Private/GameEffect.cpp:2004",
-      "detail": "Safe LevelThreshold[Level - 1] accessor used by effect-level logic; returns 0 for a null row or bad index."
+      "source": "Source/Abrams/Private/GameEffect.cpp:2001",
+      "detail": "Shared 1-based LevelThreshold[Level - 1] accessor returns 0 for a null row or bad index."
     },
     {
-      "source": "Source/Abrams/Private/GameCommandListWidget.cpp:429",
-      "detail": "Turns LevelThreshold entries into integer deltas for command-list gauge markers."
+      "source": "Source/Abrams/Private/CP_220_ActionController.cpp:1520",
+      "detail": "Charge interpolation uses thresholds for base, next-stage and maximum gauge values."
     },
     {
-      "source": "Source/Abrams/Private/GameVsEnemyIntervalCharacterWidget.cpp:123",
-      "detail": "Copies LevelThreshold into the versus-enemy interval character gauge widget."
+      "source": "Source/Abrams/Private/CN_240_ActionController.cpp:1133",
+      "detail": "Adaptation completion refills CN_240 to the clamped next level's threshold."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleCharacterDataWidget.cpp:321",
+      "detail": "Passes status-derived threshold deltas and reachable level into the battle HUD gauge."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleCursedEnergyGaugeWidget.cpp:342",
+      "detail": "Places HUD threshold markers at running 0.01-scaled positions derived from the deltas."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCommandListWidget.cpp:425",
+      "detail": "Direct, override-free lookup converts LevelThreshold entries to integer deltas for command-list markers."
+    },
+    {
+      "source": "Source/Abrams/Private/GameVsEnemyIntervalCharacterWidget.cpp:122",
+      "detail": "Direct, override-free lookup copies LevelThreshold into the versus-enemy interval gauge."
     }
   ]
 }

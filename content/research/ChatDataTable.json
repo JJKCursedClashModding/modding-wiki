@@ -1,127 +1,185 @@
 {
-  "description": "Catalogs the fixed quick-chat messages available in battle, lobby, VS, results, and interval menus, mapping each chat ID to a category, a label slot, and the contexts where it may be chosen.",
+  "description": "Documents the fixed quick-chat rows used by battle situation-overview, lobby, battle-interval, result, and character-customization UI: each FName chat ID maps to a category, a label slot, and five per-context visibility/eligibility gates.",
   "fields": {
     "Id": {
       "simple": "Quick-chat row identifier.",
-      "technical": "FName row key used to find a chat row across ChatDataTables and to identify the selected chat in list items/command widgets. GetChatIconSprite, the controller, multiplayer message display, and customization widgets all perform first-match FindRow lookups by this name; the tile list copies it into UGameCustomizeChatTileItem::ChatId.",
+      "technical": "FName import key / row key (export property `ID`, `ImportKeyField=Id`; 58 keys CHAT_001..CHAT_058). FindRow helpers over `AGameDataTableManager::ChatDataTables` (DTM +0x830) return the first table containing the requested name, and this name is carried in `FGameOnlineSendMessage::ID` by the fixed chat lists. It is also cached/aliased as the four battle direction IDs in `GChatLabelMap`, save-data `UserCustomize.ChatShortcuts`, online `BattleChatArray`, `UGameCharacterChatController::ChatIds`, and battle `FStudioBattleVoiceRequest::VoiceId`, then re-resolved against ChatDataTables; tile items copy it to `UGameCustomizeChatTileItem::ChatId`. A None/missing ID fails the lookup (the current FindChatRow helper calls all pass bCheckNone=false).",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Chat.h:13",
+        "Source/Abrams/Private/GameDataTableManager.cpp:261",
         "Source/Abrams/Private/GameChatMessageWidget.cpp:325",
-        "Source/Abrams/Private/GameCustomizeChatCommandWidget.cpp:42",
         "Source/Abrams/Private/GameWidgetManager.cpp:1456",
+        "Source/Abrams/Private/GameWidgetManager.cpp:1930",
+        "Source/Abrams/Private/GameChatListWidget.cpp:135",
+        "Source/Abrams/Private/GameCommonChatListWidget.cpp:152",
+        "Source/Abrams/Public/GameCharacterActionTables.h:707",
+        "Source/Abrams/Private/GameCustomizeChatSelectWidget.cpp:232",
+        "Source/Abrams/Private/GameUserCustomizeInfo.cpp:172",
+        "Source/Abrams/Private/GameCharacterChatController.cpp:156",
+        "Source/Abrams/Private/GameBattleManager.cpp:2536",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1813",
         "Source/Abrams/Private/GameCustomizeChatTileViewWidget.cpp:49"
       ],
       "status": "verified"
     },
     "ChatCategory": {
       "simple": "Broad chat tab/category for the message.",
-      "technical": "EGameChatCategory (None, Conversation, Tactics, Unique, Invalid=255). CommonChatList uses it as the key of ChatListItemDataMap and as the category key sent to the chat window, so rows are grouped by category. ChatMessageWidget and result chat copy its byte into the message request; WidgetManager maps it to EGameCommonChatIconCategory for the chat icon, with provocation/respect labels overriding that icon later.",
+      "technical": "uint8 EGameChatCategory (None=0, Conversation=1, Tactics=2, Unique=3, Invalid=255); the export uses only 1..3 (Conversation 17 rows, Tactics 27, Unique 14). `UGameCommonChatListWidget::InitializeWidget` groups every row into `ChatListItemDataMap` keyed by this enum, and `SetupChatList` carries that key to `UGameCommonChatListWindowWidget::SetListItems`, which only installs Conversation/Tactics/Unique lists (None/Invalid rows would not appear there). `GetChatIconSprite` maps None->Stamp, 1->Conversation, 2->Tactics, 3->Unique and any other value (including Invalid)->None icon category; Provocation_1/2 and Respect_1/2 labels then overwrite that icon category (Respect last). Chat message, result, and battle requests put the byte in `FGameChatMessageRequest::Byte21`, for which no reader was found; `OnChatSent`/`StartCooldown` receive it but cooldowns do not branch on it.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameChatCategory.h:6",
         "Source/Abrams/Private/GameCommonChatListWidget.cpp:39",
-        "Source/Abrams/Private/GameChatMessageWidget.cpp:348",
+        "Source/Abrams/Private/GameCommonChatListWidget.cpp:186",
+        "Source/Abrams/Private/GameCommonChatListWindowWidget.cpp:181",
         "Source/Abrams/Private/GameWidgetManager.cpp:1462",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:1847"
+        "Source/Abrams/Private/GameChatMessageWidget.cpp:348",
+        "Source/Abrams/Private/GameBattleWidget.cpp:404",
+        "Source/Abrams/Private/GameResultWidget.cpp:259",
+        "Source/Abrams/Private/GameCharacterChatController.cpp:198",
+        "Source/Abrams/Private/GameCharacter.cpp:4198"
       ],
       "status": "verified"
     },
     "ChatLabel": {
       "simple": "Specific quick-chat line/label used by the message.",
-      "technical": "EGameChatLabel, a 1-based enum whose numeric value is converted by GameAnimNotify_TypeIndex(value) = value - 1 to index FGameDataTableRow_CharacterChat::Id_ChatText/Id_Voice for the speaking character. Provocation_1/2 and Respect_1/2 are recognized for icon choice and shared cooldowns. LevelReport_Low/Medium/High have special text/cooldown handling and, with Medium/High, are excluded from the customizable battle tile list. Exported labels are unique per row; None/Invalid would produce an out-of-range index.",
+      "technical": "uint8 EGameChatLabel with None=0, 58 contiguous values Greeting_1=1..FightCarefully=58, and Invalid=255; the export has one row per usable label and no None/Invalid. Consumers compute `GameAnimNotify_TypeIndex(label) = static_cast<int32>(label)-1` and use that zero-based slot in the speaking character's `FGameDataTableRow_CharacterChat` arrays (`Id_ChatText`, parallel `Id_Voice`), reached through `Character::Id_CharacterChat` / cached `AGameCharacter::ChatRow`; all 27 exported CharacterChat rows have 58 slots in each array and all 11 ChatText locale shards contain the referenced IDs. None gives -1 and Invalid 254: message, result, battle, and situation-overview display paths bounds-check or skip, while several customization paths index unguarded. Special labels: LevelReport_Low/Medium/High (33..35) are remapped in battle from clamped cursed-energy level (1/2/else) before display/voice/cooldown, and in customization all three use a generic label text (`SYS_CUSTOMIZE_CHAT_LABEL_0002` for Physical, `0001` otherwise) instead of a per-chat text ID; Medium/High are excluded from battle tiles and numbered commands; Provocation_1/2 and Respect_1/2 drive icon override, shared four-direction cooldown, and battle logs; AimAtTheTarget=20 makes `UGameChatMessageContentWidget::ShowMessage` substitute `BTL_HUD_LABEL_0508` with the speaker's target. The label byte is carried as `FGameChatMessageRequest::Category` and passed to `OnChatSent`.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameChatLabel.h:6",
         "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:5",
         "Source/Abrams/Private/GameChatMessageWidget.cpp:341",
-        "Source/Abrams/Private/GameCharacterChatController.cpp:207",
+        "Source/Abrams/Private/GameChatMessageWidget.cpp:349",
+        "Source/Abrams/Private/GameResultWidget.cpp:250",
+        "Source/Abrams/Private/GameCharacter.cpp:522",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1835",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1847",
+        "Source/Abrams/Private/GameCharacterChatController.cpp:202",
         "Source/Abrams/Private/GameWidgetManager.cpp:1470",
+        "Source/Abrams/Private/GameCustomizeChatCommandWidget.cpp:61",
         "Source/Abrams/Private/GameCustomizeChatCommandWidget.cpp:76",
-        "Source/Abrams/Private/GameCustomizeChatTileViewWidget.cpp:41"
+        "Source/Abrams/Private/GameCustomizeChatTileViewWidget.cpp:41",
+        "Source/Abrams/Private/GameCustomizeChatTileViewWidget.cpp:50",
+        "Source/Abrams/Private/GameChatMessageContentWidget.cpp:32",
+        "Source/Abrams/Private/GameChatListItemData.cpp:16"
       ],
       "status": "verified"
     },
     "bUseBattleEnabled": {
-      "simple": "Whether the chat can be assigned/used in battle customization.",
-      "technical": "Boolean gate. The customize chat tile view skips rows where this is false (also skipping LevelReport_Medium/High), and IsListed in the command widget requires it before a row receives a numbered command index. It is distinct from the in-match bUseVsEnabled/bUseBattleResultEnabled gates.",
+      "simple": "Whether the chat is eligible for the customizable battle shortcut tile list.",
+      "technical": "bool gate used only by customization UI: `UGameCustomizeChatTileViewWidget::SetupTiles` skips false rows and `GameCustomizeChatCommandWidgetPrivate::IsListed` requires true before assigning a 1-based numbered command index. It does not gate battle voice playback or chat cooldown, which are driven by direction IDs and ChatLabel.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Chat.h:23",
         "Source/Abrams/Private/GameCustomizeChatTileViewWidget.cpp:41",
-        "Source/Abrams/Private/GameCustomizeChatCommandWidget.cpp:61"
+        "Source/Abrams/Private/GameCustomizeChatCommandWidget.cpp:61",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1813"
       ],
       "status": "verified"
     },
     "bUseLobbyEnabled": {
-      "simple": "Whether the chat appears in the lobby chat list.",
-      "technical": "Boolean gate checked by UGameCommonChatListWidget::SetupChatList when ListType is 0 (visual lobby); rows with false are omitted from the category-grouped chat window list.",
+      "simple": "Whether the chat appears in the visual-lobby chat list.",
+      "technical": "bool gate checked only by `UGameCommonChatListWidget::SetupChatList` when ListType==0 (the proven caller is `FVisualLobbyState_Main` in GamePhase_BattleVisualLobby.cpp); false rows are omitted from the category-grouped lobby list. It is not read by message display or the battle voice system.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Chat.h:25",
         "Source/Abrams/Private/GameCommonChatListWidget.cpp:196",
-        "Source/Abrams/Public/GameCommonChatListWidget.h:53"
+        "Source/Abrams/Private/GamePhase_BattleVisualLobby.cpp:255"
       ],
       "status": "verified"
     },
     "bUseVsEnabled": {
-      "simple": "Whether the chat appears in the VS chat list.",
-      "technical": "Boolean gate in UGameChatListWidget::SetChatContext: context 0 (VS) keeps only rows where this is true when replacing list items.",
+      "simple": "Whether the chat appears in the context-0 battle chat list (named bUseVsEnabled).",
+      "technical": "bool gate in `UGameChatListWidget::SetChatContext`: context 0 keeps only rows where this is true when replacing `ItemDataList` items. The proven caller is the battle situation-overview widget; the source does not define a separate \"VS\" mode for this context, so the field name is preserved but no stronger context claim is made.",
       "evidence": [
-        "Source/Abrams/Private/GameChatListWidget.cpp:37",
-        "Source/Abrams/Private/GameChatListWidget.cpp:40"
+        "Source/AbramsDataTable/Public/GameDataTableRow_Chat.h:28",
+        "Source/Abrams/Private/GameChatListWidget.cpp:40",
+        "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:893"
       ],
       "status": "verified"
     },
     "bUseBattleResultEnabled": {
       "simple": "Whether the chat appears in the battle-result chat list.",
-      "technical": "Boolean gate in UGameChatListWidget::SetChatContext: context 1 (battle result) keeps only rows where this is true when replacing list items.",
+      "technical": "bool gate in `UGameChatListWidget::SetChatContext`: context 1 (opened by `UGameResultWidget::SetupSymbolChatMessages`) keeps only rows where this is true when replacing the fixed chat list items.",
       "evidence": [
-        "Source/Abrams/Private/GameChatListWidget.cpp:42",
-        "Source/Abrams/Private/GameChatListWidget.cpp:43"
+        "Source/AbramsDataTable/Public/GameDataTableRow_Chat.h:31",
+        "Source/Abrams/Private/GameChatListWidget.cpp:43",
+        "Source/Abrams/Private/GameResultWidget.cpp:280"
       ],
       "status": "verified"
     },
     "bUseBattleIntervalEnabled": {
       "simple": "Whether the chat appears in the battle-interval chat list.",
-      "technical": "Boolean gate checked by UGameCommonChatListWidget::SetupChatList when ListType is 1 (battle interval); rows with false are omitted from the category-grouped chat window list.",
+      "technical": "bool gate checked only by `UGameCommonChatListWidget::SetupChatList` when ListType==1 (the proven caller is `UGamePhase_IntervalPvE`); false rows are omitted from the category-grouped interval list.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Chat.h:34",
         "Source/Abrams/Private/GameCommonChatListWidget.cpp:202",
-        "Source/Abrams/Public/GameCommonChatListWidget.h:53"
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:1357"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "ChatDataTable is loaded into ChatDataTables (DTM +0x830). Multiple tables are supported: consumers loop over them and use the first row that matches the requested ID.",
-    "The row itself contains no text or voice asset: displayed text comes from FGameDataTableRow_CharacterChat::Id_ChatText[ChatLabel-1] for the selected character, and battle voice uses the parallel Id_Voice slot.",
-    "Customization's numbered command index is derived from the ordered list of battle-enabled rows excluding LevelReport_Medium/High; it is not stored in the table.",
-    "The exported snapshot contains 58 rows with categories Conversation, Tactics, and Unique; the reconstruction states Blueprints contain no game logic, so no Blueprint behavior is assumed here."
+    "Loading/table shape: GameDataTableManager adds exactly one table from primary-asset name `ChatDataTable` into `ChatDataTables` (DTM +0x830) and registers that name in its loader list. `FGameDataTableArray` supports multiple tables: FindRow consumers stop at the first table containing an ID, while GetRows collectors enumerate all tables in table order then row-name order.",
+    "Export shape: one ChatDataTable export (no numbered shards) with 58 unique row keys CHAT_001..CHAT_058 and all 8 header fields; categories are 17 Conversation / 27 Tactics / 14 Unique and all 58 labels are unique. True-flag counts are battle 39, lobby 49, context-0 15, result 8, interval 47.",
+    "Defaults and sentinels: FName Id defaults to None/empty, ChatCategory and ChatLabel to None (0), and all five booleans to false in the inline row constructor; both enums are uint8 with Invalid=255. No exported row uses None/Invalid or omits a field.",
+    "The row has no text/voice asset: the selected character is resolved via Character::Id_CharacterChat into CharacterChatDataTables / cached AGameCharacter::ChatRow, then Id_ChatText[Label-1] (and Id_Voice[Label-1] where valid) supplies content; bounds checks differ by consumer and LevelReport labels can remap the slot in battle.",
+    "Customization's displayed command number is 1..N over GetRows (table/row-name order) after filtering out false bUseBattleEnabled and LevelReport_Medium/High; an unlisted row leaves the SetText value at -1 (or the index is hidden in profile mode). The number is not stored in the table.",
+    "Chat IDs are persisted/aliased through `GChatLabelMap` defaults (Up CHAT_001, Down CHAT_033, Left CHAT_003, Right CHAT_038), `UserCustomize.ChatShortcuts`, online `BattleChatArray`, controller `ChatIds`, and battle request `VoiceId`, then resolved again through ChatDataTables.",
+    "The row has no numeric fields or units; chat cooldown/display timers are floats in GlobalDataTables, not in ChatDataTable.",
+    "Evidence boundary: the behavior above is reconstructed C++ (with cited retail RVAs) plus the export snapshot; no retail Blueprint assets were available or inspected, and reconstruction by itself does not prove byte-identical retail code. No Blueprint-only behavior is asserted."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:261",
-      "detail": "Loads ChatDataTable into the ChatDataTables array used by every listed consumer."
+      "detail": "Loads the sole ChatDataTable asset into ChatDataTables (DTM +0x830) from the primary-asset name `ChatDataTable`."
     },
     {
       "source": "Source/Abrams/Private/GameChatListWidget.cpp:30",
-      "detail": "Filters rows by VS or battle-result context using bUseVsEnabled / bUseBattleResultEnabled."
+      "detail": "Creates one UGameChatListItemData per row via GetRows; SetChatContext filters by bUseVsEnabled (context 0, battle situation overview) or bUseBattleResultEnabled (context 1, results), and selection sends Chat->Id as Message.ID."
     },
     {
       "source": "Source/Abrams/Private/GameCommonChatListWidget.cpp:28",
-      "detail": "Builds the category-grouped chat item map, then filters rows by lobby or battle-interval flags."
+      "detail": "Groups all rows by ChatCategory, then SetupChatList filters ListType 0 by bUseLobbyEnabled and ListType 1 by bUseBattleIntervalEnabled before passing the maps to the chat window."
     },
     {
       "source": "Source/Abrams/Private/GameChatMessageWidget.cpp:323",
-      "detail": "Resolves an incoming chat row, converts its label to a character-text slot, plays the matching voice, and emits a message request with category/label bytes."
+      "detail": "Online chat display resolves Message.ID first-match, maps ChatLabel-1 into the sender's CharacterChat text/voice arrays, and copies category/label bytes into FGameChatMessageRequest; label 20 switches to the target message."
+    },
+    {
+      "source": "Source/Abrams/Private/GameResultWidget.cpp:245",
+      "detail": "Winner result chat resolves received Message.ID, uses the speaker's cached CharacterChat row for text/voice, and copies category/label bytes into its message request."
     },
     {
       "source": "Source/Abrams/Private/GameWidgetManager.cpp:1451",
-      "detail": "Selects the chat icon sprite from category and provocation/respect label."
+      "detail": "GetChatIconSprite resolves ChatId, maps category to an icon category, and lets provocation/respect labels override it; the character/key overload gets the ID from controller ChatIds."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterChatController.cpp:198",
-      "detail": "Uses labels of assigned chat rows to apply the shared provocation/respect cooldown."
+      "detail": "OnChatSent/StartCooldown uses the (possibly remapped) label to apply the normal or shared provocation/respect cooldown from GlobalDataTables; the Category argument is unused."
     },
     {
       "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:1813",
-      "detail": "Battle voice requests resolve a chat row and use its label/category for team visibility and message display."
+      "detail": "Battle voice requests use the direction-stored Chat ID to find the row, remap LevelReport labels by cursed-energy level, decide teammate visibility/mute, play Id_Voice[slot], show Id_ChatText[slot], and call OnChatSent."
     },
     {
-      "source": "Source/Abrams/Private/GameCustomizeChatTileViewWidget.cpp:29",
-      "detail": "Builds the customizable battle chat tile list from battle-enabled rows with the per-character text IDs."
+      "source": "Source/Abrams/Private/GameBattleSituationOverviewChatMessageContentWidget.cpp:29",
+      "detail": "Situation-overview chat bubbles resolve a ChatId and use its label slot for the character's text and voice."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCustomizeChatTileViewWidget.cpp:27",
+      "detail": "Builds battle shortcut tiles from bUseBattleEnabled rows except LevelReport_Medium/High, storing ChatId and the label-indexed ChatTextId."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCustomizeChatCommandWidget.cpp:88",
+      "detail": "Resolves the assigned ID, assigns the 1-based listed-row index, and requests generic energy-type text for all LevelReport labels."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCustomizeChatSelectWidget.cpp:278",
+      "detail": "Restores saved/default shortcut IDs from UserCustomize.ChatShortcuts and resolves them plus the character's chat list for each of the four command slots."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCustomizeChatWidget.cpp:271",
+      "detail": "Applies a chosen tile ID to the current command and re-resolves its label-indexed text; GameCustomizeProfileChatWidget.cpp:99 displays saved shortcuts the same way."
+    },
+    {
+      "source": "Source/Abrams/Private/GameChatListItemData.cpp:10",
+      "detail": "Fixed chat list items expose the character's text ID for the row's label via the stored Chat/CharacterChat row pair."
     }
   ]
 }

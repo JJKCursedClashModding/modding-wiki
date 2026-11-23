@@ -1,93 +1,153 @@
 {
-  "description": "Defines the selectable top and bottom player-card nickname lines, linking each display variant to its inventory item and localized label key.",
+  "description": "Defines the selectable top and bottom lines of a player card: each row pairs a nickname ID and slot type with the inventory nickname item required to select it and the text key used for its displayed label.",
   "fields": {
     "Id": {
-      "simple": "Nickname row identifier.",
-      "technical": "FName key saved as FGamePlayerCardParameter::TopNicknameId / BottomNicknameId and packed into leaderboard cards as numeric strings. Validate() requires the row to exist with the correct NicknameType, otherwise it substitutes '3830' for Top and '23830' for Bottom; ResetUnownedIds applies the same defaults when ownership fails. Tile selection IDs come directly from this field.",
+      "simple": "Nickname row identifier (export key `ID`; native property `Id`).",
+      "technical": "FName row key; all 2940 export row names equal this property, and the asset's ImportKeyField is `Id`. FGamePlayerCardParameter stores the chosen row in TopNicknameId/BottomNicknameId. Validate() requires a row whose NicknameType matches the slot, otherwise substitutes '3830'/'23830'; the ownership sanitiser uses the same defaults. For leaderboards, the numeric FName is converted with FCString::Atoi into uint16 TopNicknameNumber/BottomNicknameNumber and rebuilt with FString::FromInt, with a row-existence fallback. Selection tiles carry this ID into UGameCustomizeCardTileItem::Id, which the editor writes back to the card; substitution can make the tile carry the currently selected row's ID instead of the displayed variant's.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardNickname.h:11",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:108",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:124",
-        "Source/Abrams/Private/GamePlayerCardParameter.cpp:128",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:126",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:131",
-        "Source/Abrams/Private/GamePlayerCardParameter.cpp:133",
-        "Source/Abrams/Private/GamePlayerCardParameter.cpp:637",
-        "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:110"
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:326",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:330",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:636",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:640",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:673",
+        "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:110",
+        "Source/Abrams/Private/GameCustomizePlayerCardEditWidget.cpp:301"
       ],
       "status": "verified"
     },
     "NicknameType": {
       "simple": "Whether this row is a top or bottom nickname line.",
-      "technical": "EGameNicknameType (None, Top, Bottom, Invalid=255), default None. Validate compares the saved ID's row type to the expected slot. The customize tile view removes rows whose type differs from its TargetNicknameType, so the same ID cannot be assigned to the wrong line.",
+      "technical": "EGameNicknameType (None=0, Top=1, Bottom=2, Invalid=255) is a uint8 property whose row constructor defaults to None. Validate() compares the saved ID's row type to the expected slot and replaces a mismatch with that slot's default ID. Tile building removes rows whose NicknameType differs from the widget's Blueprint-editable TargetNicknameType (the C++ constructor defaults to Top), so wrong-slot rows are not offered in that reconstructed C++ path; retail widget Blueprints are unavailable to confirm the instance values. The export itself has only Top and Bottom rows (1470 each), no None or Invalid.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameNicknameType.h:6",
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardNickname.h:16",
+        "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardNickname.h:24",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:126",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:131",
+        "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:23",
         "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:33",
         "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:63"
       ],
       "status": "verified"
     },
     "Id_Item": {
-      "simple": "Inventory item that owns/unlocks this nickname variant.",
-      "technical": "FName. PlayerCard_GetOwnedNicknameRows drops rows with a non-None Id_Item unless that item ID is owned and unlocked; None is treated as always available. The field also maps a row to its Item row for new-item flags, and text helpers use it to find a 'twin' row sharing the same item when the row's own label has no text.",
+      "simple": "Inventory nickname item whose ownership permits this variant.",
+      "technical": "FName matched against Item row IDs. PlayerCard_GetOwnedNicknameRows collects owned (stock count > 0) Item rows of EGameItemType::Nickname, keeps unlocked ones (UserProgressFlag < 0 or its progress bit set), then removes any nickname row with a non-None Id_Item whose ID is absent from that set; NAME_None is treated as always available. With bSort it stable-sorts by the linked Item row's SortingOrder. PlayerCard_FindNicknameItem resolves the selected row through this field to its Item row. Tile new badges read GameItem_IsNew(Row->Id_Item), while clearing the stock-new flag resolves TileItem->Id back to an Item row, so the two can differ under tile substitution. MakeNicknameRowTextRequest also uses this field to find the first other row sharing the item when a label has no text.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardNickname.h:19",
-        "Source/Abrams/Private/GamePlayerCardParameter.cpp:243",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:232",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:236",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:242",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:245",
-        "Source/Abrams/Private/GamePlayerCardParameter.cpp:406",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:249",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:408",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:558",
-        "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:75",
-        "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:115"
+        "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:115",
+        "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:249",
+        "Source/Abrams/Private/GameItemOwnership.cpp:162",
+        "Source/Abrams/Private/GameItemOwnership.cpp:177",
+        "Source/Abrams/Private/GameItemOwnership.cpp:206"
       ],
       "status": "verified"
     },
     "Id_ItemText": {
-      "simple": "Localized label key for this nickname line.",
-      "technical": "FName passed to GameItem_GetNameTextCore with EGameItemType::Nickname, which swaps _TOP/_BOTTOM for languages 2, 3, 5, 9, and 10. Rows with None or no resolved text are filtered from nickname tiles. Tile labels use the resolved text ID or SYS_CUSTOMIZE_PLAYERCARD_LABEL_0011 as fallback; if text is missing and bUseTwin is set, the first other row with the same Id_Item supplies the label.",
+      "simple": "Text-table key used to resolve this nickname's displayed label.",
+      "technical": "FName passed as GameItem_GetNameTextCore(Id_ItemText, EGameItemType::Nickname, nullptr, 0, true). That helper calls PlayerCard_MakeNicknameTextId, which case-insensitively swaps a trailing _TOP/_BOTTOM for languages 2/3/5/9/10 (Fr/Es/It/Pt/Es_LA) and otherwise returns the key unchanged; AGameTextManager then resolves it through the loaded ItemTextDataTable_<language>. Tile building keeps NAME_None text keys and gives them SYS_CUSTOMIZE_PLAYERCARD_LABEL_0011, but removes rows with a real key that has no text after the swap, then deduplicates by resolved label string per Id_Item. Separately, PlayerCard_MakeNicknameTextRequest(Id) uses the first other row with the same Id_Item as a fallback label when the row's own text is missing, Id_Item is not None, and bUseTwin is true.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardNickname.h:22",
-        "Source/Abrams/Private/GamePlayerCardParameter.cpp:491",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:493",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:548",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:549",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:554",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:558",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:566",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:165",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:198",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:199",
         "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:55",
         "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:66",
-        "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:111"
+        "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:74",
+        "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:111",
+        "Source/Abrams/Private/GameTextManager.cpp:552",
+        "Source/Abrams/Private/GameTextManager.cpp:675",
+        "Source/Framework/Public/EApplicationLanguage.h:6"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The export contains 2940 rows: 1470 Top and 1470 Bottom. Many rows share an Id_Item (982 distinct item IDs), representing alternate text variants of the same owned nickname; tile building deduplicates by resolved label text per Id_Item.",
-    "PlayerCard_GetOwnedNicknameRows starts from all nickname rows, removes those whose Id_Item is not owned, and optionally stable-sorts by the SortingOrder of the linked Item row.",
-    "The nickname label language swap is a runtime text-key rewrite, not separate localization rows in this table.",
-    "Only the supplied retail export and partial Content are available; no claim is made about all Blueprint or editor-tool uses."
+    "Export check (one PlayerCardNicknameDataTable asset, no numbered shards): 2940 unique row keys and ID values, 1470 Top and 1470 Bottom, 982 distinct Id_Item values and 2940 distinct Id_ItemText values. All IDs are numeric strings (1010..31422); defaults 3830 (Top) and 23830 (Bottom) exist. The site row-key index matches all 2940 export keys.",
+    "Item relationship check: 2938 rows reference ItemDataTable rows of EGameItemType::Nickname; rows 11382 and 31382 reference ITM_NICKNAME_11380_TOP/BOTTOM, which are absent from the Item export, so the owned-row filter drops them. No row uses a None Id_Item or Id_ItemText sentinel. Id_Item groups comprise 978 sets of three text variants, two sets of two and two sets of one; each Id_Item is used by only one slot type. All 2940 Id_ItemText keys occur in the 11 ItemTextDataTable_<language> exports.",
+    "Validation precedence: Validate() checks row existence plus NicknameType but not ownership; the sanitizer's PlayerCard_ResetUnownedIds checks ownership via PlayerCard_GetOwnedNicknameRows but does not re-check NicknameType. Both fall back to '3830'/'23830'. Ownership requires a Nickname-type Item row with stock count > 0 and an unlocked UserProgressFlag; NAME_None is the always-available sentinel in the owned-row filter.",
+    "Tile precedence: BuildNicknameTiles filters by TargetNicknameType, then by resolved text (only a NAME_None key bypasses the text check), deduplicates by resolved label per Id_Item, and may substitute the selected current row's ID for a variant sharing its Id_Item when the current row lacks text. New badges come from the displayed row's Id_Item; clearing them resolves the substituted tile ID back through this field. Lookups use the first matching table/row and the twin search uses the first matching row in GetRows order.",
+    "Localization is a runtime text-key rewrite in GameItem_GetNameTextCore, not additional nickname table rows; the nickname table has no language columns. The fallback key SYS_CUSTOMIZE_PLAYERCARD_LABEL_0011 exists in SystemTextDataTable but is empty in most exported languages.",
+    "Evidence scope: the reconstructed C++ paths are traced to their retail RVAs, but the checkout has no retail widget Blueprints or editor tools. The bottom tile's TargetNicknameType instance value and any additional Blueprint/editor consumers therefore remain unverified."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:300",
-      "detail": "Loads PlayerCardNicknameDataTable into PlayerCardNicknameDataTables."
+      "detail": "Registers the loaded primary asset named PlayerCardNicknameDataTable in PlayerCardNicknameDataTables after all DataTable loaders finish; the loader alias is created at :473 and resolved through the asset-manager object cache at :143/:162."
+    },
+    {
+      "source": "Source/Abrams/Public/GameDataTableArray.h:19",
+      "detail": "GetRows<T> walks every table in manager order and row-name order; this collector supplies Validate, the owned-row helpers and the twin-label search."
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:115",
-      "detail": "Validates saved top/bottom nickname IDs against row type and ownership defaults."
+      "detail": "Validate replaces saved Top/Bottom IDs that lack a row of the matching NicknameType with '3830'/'23830'."
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:228",
-      "detail": "Builds the owned nickname row list and sorts it by linked Item SortingOrder."
+      "detail": "Builds the owned nickname rows from Nickname-type Item stock/unlock state, keeps None Id_Item rows, and optionally stable-sorts by the linked Item's SortingOrder."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:308",
+      "detail": "PlayerCard_IsNicknameOwned tests a selected ID against that owned-row list; PlayerCard_ResetUnownedIds (:319) uses it to sanitise the saved card."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:159",
+      "detail": "PlayerCard_FindNicknameRow resolves an ID across the manager's table list for row lookups, nickname item resolution (:408) and text requests (:573)."
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:573",
-      "detail": "Builds the displayed nickname text request with twin-row fallback."
+      "detail": "Builds the displayed card nickname request, including the first-same-Item twin fallback when the row's own text has no content."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:198",
+      "detail": "The EGameItemType::Nickname branch of the shared name-text builder rewrites the key's _TOP/_BOTTOM suffix for the listed languages."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardWidget.cpp:116",
+      "detail": "Requests top and bottom nickname text for the player card and combines them with a language-dependent separator."
     },
     {
       "source": "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:59",
-      "detail": "Builds top/bottom nickname selection tiles, filters duplicate labels, and maps rows to inventory items."
+      "detail": "Builds selection tiles: filters by type and resolved text, deduplicates labels per Id_Item, substitutes the selected row where applicable, and reads Item new flags."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:228",
+      "detail": "Selecting a tile stores its row ID; clearing the new badge (:249) resolves that ID back to its nickname Item row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCustomizePlayerCardEditWidget.cpp:300",
+      "detail": "Writes the top and bottom tile IDs back into the edited player card for saving."
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:622",
-      "detail": "Rebuilds leaderboard card nickname IDs from packed numeric values."
+      "detail": "Rebuilds leaderboard card nickname IDs from packed uint16 numbers, falling back to '3830'/'23830' when no row exists."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:654",
+      "detail": "Packs the numeric nickname ID strings into the 14-byte leaderboard card via FCString::Atoi."
+    },
+    {
+      "source": "Source/Abrams/Private/GameUserCustomizeInfo.cpp:219",
+      "detail": "Sanitises the saved customization block by resetting unowned player-card IDs."
     }
   ]
 }

@@ -3,64 +3,111 @@
   "fields": {
     "ID": {
       "simple": "Short-story message id (row key), e.g. STDM_0000101_0010.",
-      "technical": "FName ID of FGameDataTableRow_GameText. GameScript_GetStoryTextId detects 'STDM_SS_' in the script name, replaces that prefix with 'STDM_00' and appends '01' to form the search key; FindTextIdsContaining returns all GameText rows whose ID contains it and the message ids are sorted into FGameScriptContext::MessageIdList. Short-story scripts are identified by GameScript_IsSubStoryScript (same substring test), which selects ShortStoryVoiceDataTable for the voice join. The text table is loaded as ShortStoryDemoTextDataTable_<Language> in slot 9 of the 14-table array.",
+      "technical": "FName ID column of FGameDataTableRow_GameText; the exports also use it as the DataTable row name, which is what exact FindRow resolution uses. GameScript_GetStoryTextId detects 'STDM_SS_' in a script name, replaces that prefix with 'STDM_00' and appends '01' (STDM_SS_001 -> STDM_0000101), and AGameTextManager::FindTextIdsContaining collects every GameText row whose ID contains that key (case-insensitive, across all loaded tables); UGameScriptPlayer::UpdateLoad sorts the returned ids into FGameScriptContext::MessageIdList. GameScript_IsSubStoryScript uses the same substring test for script preload, where sub-stories hard-code the 'Part' cue sheet; FGameScriptCommand_ShowMessageBase::ParseVoice repeats the substring check directly and selects Tables->ShortStoryVoiceDataTables (from ShortStoryVoiceDataTable) for the message-id -> Voice join. ShortStoryDemoTextDataTable_<Language> is the ninth of the 14 configured GameText base names (zero-based index 8 in the initializer); null tables are skipped when the live TextDataTables array is rebuilt.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:11",
         "Source/Abrams/Private/GameTextManager.cpp:59",
         "Source/Abrams/Private/GameTextManager.cpp:558",
+        "Source/Abrams/Private/GameTextManager.cpp:589",
+        "Source/Abrams/Private/GameTextManager.cpp:597",
         "Source/Abrams/Private/GameTextManager.cpp:645",
         "Source/Abrams/Private/GameTextManager.cpp:651",
+        "Source/Abrams/Private/GameTextManager.cpp:652",
+        "Source/Abrams/Private/GameTextManager.cpp:654",
         "Source/Abrams/Private/GameScriptRuntime.cpp:29",
         "Source/Abrams/Private/GameScriptRuntime.cpp:42",
         "Source/Abrams/Private/GameScriptRuntime.cpp:43",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:205",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:240",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:256",
         "Source/Abrams/Private/GameScriptCommands.cpp:896",
         "Source/Abrams/Private/GameScriptCommands.cpp:898",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1029",
         "Source/Abrams/Private/GameScriptCommands.cpp:1040",
-        "Source/Abrams/Private/GameScriptPlayer.cpp:256"
+        "Source/Abrams/Private/GameDataTableManager.cpp:250",
+        "Source/Abrams/Public/GameScriptRuntime.h:67"
       ],
       "status": "verified"
     },
     "Text": {
       "simple": "One localized short-story dialogue line.",
-      "technical": "FString row text (+0x10), resolved by GetGameTextById and passed through FormatText before UGameWidgetMarkupParseProcessor::Parse in UGameStoryDemoMultiRichTextBlockWidget::DisplayMessage. Missing rows render as empty text. The En export has 627 nonempty lines with no GLO/DYN markup; the shared formatter would still handle such tags if present. Message ids also drive timed voice playback via the ShortStoryVoice -> Voice table join.",
+      "technical": "FString Text column (+0x10 in FGameDataTableRow_GameText; empty on the default row). UGameStoryDemoMultiRichTextBlockWidget::DisplayMessage calls GetGameTextById(MessageId), which builds an FGameTextRequest in the current language with empty parameters; GetGameText reads the first matching row's Text and runs AGameTextManager::FormatText (GLO from the glossary cache, DYN from request parameters, with optional modifiers) before UGameWidgetMarkupParseProcessor::Parse builds the displayed lines. A missing row or an empty Text yields an empty string. All 11 exports have 627 rows with identical ids, no empty Text and no <TYPE=KEY> markup, including no GLO/DYN tags; recognized tags would still be substituted if authored. The same message ids are used by ParseVoice, but only when TimeId is not the TEXT_TIME_NONE sentinel: ShortStoryVoice.Id -> Voice.Id_Voice supplies CueSheetName/CueName queued with the message delay and slot.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:15",
+        "Source/Abrams/Private/GameDataTableRow_GameText.cpp:3",
+        "Source/Abrams/Private/GameTextManager.cpp:661",
         "Source/Abrams/Private/GameTextManager.cpp:667",
-        "Source/Abrams/Private/GameTextManager.cpp:687",
+        "Source/Abrams/Private/GameTextManager.cpp:679",
         "Source/Abrams/Private/GameTextManager.cpp:681",
+        "Source/Abrams/Private/GameTextManager.cpp:683",
+        "Source/Abrams/Private/GameTextManager.cpp:687",
+        "Source/Abrams/Private/GameTextManager.cpp:724",
+        "Source/Abrams/Private/GameStoryDemoWidget.cpp:431",
         "Source/Abrams/Private/GameStoryDemoMultiRichTextBlockWidget.cpp:115",
+        "Source/Abrams/Private/GameWidgetMarkupParseProcessor.cpp:129",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1011",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1013",
         "Source/Abrams/Private/GameScriptCommands.cpp:1041",
-        "Source/Abrams/Private/GameWidgetRichTextBlock.cpp:59"
+        "Source/Abrams/Private/GameScriptCommands.cpp:1173"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "FGameDataTableRow_GameText with 11 exported language variants (627 identical row ids each, no empty strings in the companion export). Slot 9 in GameTextManager::Tick; Config/DefaultGame.ini:35-45 cooks one variant per language chunk.",
-    "ShortStory rows (ShortStoryDataTable) carry Id_Script = STDM_SS_*, Id_ShortStoryCharacter and Id_StoryText_Title. The title id (e.g. STR_STDM_SS_001 in the companion export) is a StoryTextDataTable entry, not a row in this dialogue table; the list widget sets that id directly on its button text (GameStoryCharaRelateShortStoryListItemWidget.cpp:100).",
-    "As with the other story text groups, message discovery uses substring matching over all 14 GameText tables, not a table-specific query. The STDM_00 namespace is a naming convention produced by the script-id rewrite; a colliding id in an earlier table would win.",
-    "Reconstruction caveat: FindTextIdsContaining and Tick are behaviour-certified (status/functions.json 0x14b0100, 0x14c96f0; BEHAV BG03); GetGameTextById/GetGameText are byte-matched. Content is partial; no exhaustive retail/Blueprint-only usage claim."
+    "FGameDataTableRow_GameText with 11 exported language variants (627 rows each; all variants share the same row ids and ID values, and none has an empty Text or <TYPE=KEY> markup). Covers the ninth of the 14 configured GameText base names in AGameTextManager::StartLanguageLoading/Tick (zero-based index 8); only successfully loaded non-null tables are appended. Config/DefaultGame.ini:35-45 assigns each language suffix its own cook chunk.",
+    "ShortStoryDataTable (45 rows) carries Id_Script = STDM_SS_*, Id_ShortStoryCharacter and Id_StoryText_Title; all 45 script values rewrite to the 45 seven-digit prefixes present in this table (STDM_SS_001 -> STDM_0000101). The title id (e.g. STR_STDM_SS_001) is a StoryTextDataTable entry in all 11 language exports, not a row here; the list widget sets that id directly on its button text (GameStoryCharaRelateShortStoryListItemWidget.cpp:100).",
+    "FindTextIdsContaining scans Row->ID with case-insensitive FString::Contains across every row of every non-null table in TextDataTables, not a table-specific query; UpdateLoad sorts the returned ids. Exact lookup uses DataTable row names and FindTextRow returns the first table containing the key (TextDataTables order: Glossary, Battle, Item, CommandList, Chat, Stamp, StoryText, StoryDemo, ShortStoryDemo, Tutorial, BattleSubTitle, Sound, Dlc1, Dlc2). A duplicate id in an earlier table would therefore supply Text while discovery could also return the id more than once; no exported En row key in the other GameText groups overlaps these 627 ids.",
+    "Voice is joined outside this table: ParseVoice skips TimeId=TEXT_TIME_NONE, matches the displayed MessageId against ShortStoryVoiceDataTable rows and then VoiceDataTable by Id_Voice; 580 of the 627 exported ids have a ShortStoryVoice row, and all 244 referenced Voice ids exist in VoiceDataTable. UGameScriptPlayer::UpdateLoad instead hard-codes cue sheet 'Part' for sub-story preload and does not read that join.",
+    "Reconstruction caveat: status/functions.json marks FindTextIdsContaining (0x14b0100) byte-matched (`match`; lane verdict HOLD over an unresolved call identity), FindTextRow (0x14af290) and Tick (0x14c96f0) BEHAV-certified (NA15/BG03), and GetGameTextById (0x14af690), GetGameText (0x14af510) and FormatText (0x14c4870) byte-matched. GameScript_GetStoryTextId (0x1436630) and UpdateLoad (0x1440570) are BEHAV-certified. Content is partial; no exhaustive retail or Blueprint-only usage claim."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameScriptRuntime.cpp:42",
-      "detail": "Rewrites STDM_SS_<n> script ids to the STDM_00... prefix used to find short-story dialogue rows."
-    },
-    {
-      "source": "Source/Abrams/Private/GameScriptPlayer.cpp:205",
-      "detail": "Discovers message ids with FindTextIdsContaining using the rewritten prefix and stores them for the script."
-    },
-    {
-      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1029",
-      "detail": "Treats STDM_SS_* scripts as sub-stories and joins message ids to ShortStoryVoiceDataTable rows."
-    },
-    {
-      "source": "Source/Abrams/Private/GameStoryDemoMultiRichTextBlockWidget.cpp:115",
-      "detail": "Resolves each displayed message id to its localized Text through GetGameTextById."
+      "source": "Source/Abrams/Private/GameTextManager.cpp:59",
+      "detail": "Creates the primary-asset loader for ShortStoryDemoTextDataTable_<Language>."
     },
     {
       "source": "Source/Abrams/Private/GameTextManager.cpp:558",
-      "detail": "Loads ShortStoryDemoTextDataTable_<Language> into the shared GameText search array."
+      "detail": "Appends the resolved ShortStoryDemoTextDataTable_<Language> to the combined TextDataTables cache in Tick."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptRuntime.cpp:42",
+      "detail": "GameScript_GetStoryTextId rewrites STDM_SS_<n> script ids to the STDM_00...01 search prefix (the STDM_SS_ test is at line 29)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptPlayer.cpp:205",
+      "detail": "Calls FindTextIdsContaining with the rewritten prefix; UpdateLoad sorts the returned ids into MessageIdList at line 240."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:645",
+      "detail": "FindTextIdsContaining scans the ID field of every GameText row in the combined tables (matching test at line 652)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:681",
+      "detail": "GetGameText resolves the message id to row Text and formats it at line 683 for display."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1029",
+      "detail": "ParseVoice detects STDM_SS_ sub-stories and selects Tables->ShortStoryVoiceDataTables at line 1040 for the message-id join."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1165",
+      "detail": "Show-message updates pass Message.MessageId to UGameStoryDemoWidget::ShowMessage."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryDemoWidget.cpp:431",
+      "detail": "Routes the message id to UGameStoryDemoMultiRichTextBlockWidget::DisplayMessage."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryDemoMultiRichTextBlockWidget.cpp:115",
+      "detail": "Resolves each displayed message id to localized Text through GetGameTextById and parses it into rich-text lines."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:250",
+      "detail": "Caches ShortStoryVoiceDataTable in DTM.ShortStoryVoiceDataTables for the indirect voice join."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptPlayer.cpp:256",
+      "detail": "Sub-story preload takes the hard-coded 'Part' cue sheet branch instead of using the voice-table join."
     }
   ]
 }

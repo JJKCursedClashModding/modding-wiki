@@ -1,63 +1,105 @@
 {
-  "description": "Maps each equippable cursed-tool/object/extras item's VariableId to its equipment grade and the ordered list of equipment-effect rows that define its gameplay bonuses.",
+  "description": "Maps each cursed-tool, cursed-object, or Extras item variant to an equipment grade and an ordered pair of EquipmentItemEffect row IDs used by battle/stat calculations and item-card description text.",
   "fields": {
     "Id": {
       "simple": "Equipment/item-variant row identifier.",
-      "technical": "FName row key. Equipment lookups do not use the owning Item row's Id: they resolve FGameDataTableRow_Item::VariableId across all EquipmentItemDataTables and find this row by that name. Exported IDs include a base ID plus _10/_20 suffixed upgraded variants. The first matching table wins; a missing row yields no effects.",
+      "technical": "FName row key (export property ID; ImportKeyField is Id). Runtime equipment lookups do not use the owning Item row's Id: GameEquipment_GetEffectRows takes an Item row key, resolves FGameDataTableRow_Item::VariableId through the first matching ItemDataTables row (None is rejected), and finds this row by that name in EquipmentItemDataTables. The item-description widget starts from the Item row and uses the same VariableId join; SetHitPoint walks each equipped Item ID and repeats both lookups. All 211 exported keys are unique, equal to their exported ID, and are used as VariableId by a same-key Item row of type CursedTools, CursedObjects, or Extras. Exported keys comprise 81 unsuffixed base rows plus 65 _10 and 65 _20 variants; each consuming finder stops after the first EquipmentItemDataTables row match, and a missing row yields no effects.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItem.h:11",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Item.h:22",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:118",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2254",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2259",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2261",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4387",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4394",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:76",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:4394"
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:277",
+        "JJKCCDatatables/datatables/EquipmentItemDataTable.json",
+        "JJKCCDatatables/datatables/ItemDataTable.json"
       ],
       "status": "verified"
     },
     "Grade": {
-      "simple": "Upgrade/equipment grade of this variant.",
-      "technical": "int32 with constructor default 0; exported rows use 0, 1, and 2, matching base and two upgraded ID suffixes. No identified C++ consumer reads this field in the available Source, so the precise gameplay or sorting effect of each grade is not established.",
+      "simple": "Serialized grade/variant tag for this equipment row.",
+      "technical": "int32 with constructor default 0. The export uses only 0, 1, and 2: for CursedTools and CursedObjects these correspond exactly to the unsuffixed, _10, and _20 row IDs (20/20/20 tool variants and 45/45/45 object variants); all 16 Extras rows are grade 0 and have no suffixed variants. No identified C++ consumer reads Grade: the resolvers select rows by VariableId and then read only Id_EquipmentItemEffect, so this table provides no evidence for a grade-specific bonus, cost, filter, or sort order.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItem.h:15",
-        "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItem.h:20"
+        "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItem.h:20",
+        "JJKCCDatatables/datatables/EquipmentItemDataTable.json"
       ],
       "status": "observed"
     },
     "Id_EquipmentItemEffect": {
       "simple": "Ordered list of effect rows applied by this equipment variant.",
-      "technical": "TArray<FName>. Battle setup walks the array, skips None entries, resolves each effect ID in EquipmentItemEffectDataTables (first matching table), and adds the effect rows to the status-controller effect list. Item description uses the same array at index 0 and 1 to populate two description lines, returning an empty request for an invalid index or None entry. The status controller also keeps an effect-index counter used for one-use item consumption.",
+      "technical": "TArray<FName>. The battle resolver walks every entry, skips NAME_None, resolves each remaining ID in EquipmentItemEffectDataTables (first matching effect row, no deduplication), and appends it before stopping at the first EquipmentItemDataTables row match; type-filtered sum/rate/chance/threshold helpers then consume those effect rows. All 211 exported rows have exactly two slots: slot 0 is always non-None and 115 rows have None in slot 1. The 307 non-None references (218 unique) all resolve in the supplied effect-table export, and no row duplicates an effect ID internally. The description path uses slots 0 and 1 for ItemDescriptionText_1/2 for CursedTools, CursedObjects and Extras (invalid index or None produces an empty text request); the Extras-specific line uses slot 0. SetHitPoint checks one-shot effect types at Ratio <= EffectValue[0], gates them by GetItemUseCount(characterIndex, EffectIndex), and, for Extras, clears the equipped slot, calls ConsumeItem and records the use. EffectIndex is a local counter incremented once per array element, including None, across all equipped items; in the supplied two-slot data it advances by two per item. No numeric magnitude is stored here: the rate/chance/threshold units come from the resolved EquipmentItemEffect rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItem.h:18",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2266",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2268",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2274",
-        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:73",
-        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:81",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2287",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2295",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:4399",
-        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:407"
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4420",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4423",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4475",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4486",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:73",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:77",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:81",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:82",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:224",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:235",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:250",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:407",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:408",
+        "JJKCCDatatables/datatables/EquipmentItemDataTable.json",
+        "JJKCCDatatables/datatables/EquipmentItemEffectDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The export contains 211 rows. Multiple table shards are supported and consumers stop at the first matching row per table array, so duplicate IDs across shards can shadow later rows.",
-    "This table is a thin join: ItemDataTable::VariableId points here, and this table's effect-name array points into EquipmentItemEffectDataTable. Item text and battle stat calculations both rely on that chain.",
-    "No source consumer for Grade was found; only its serialized type/default and the exported 0/1/2 pattern are evidence. Do not infer an exact grade bonus from the number alone.",
-    "Only the supplied retail export and partial Content are available; no claim is made about all Blueprint or editor-tool uses."
+    "Only one EquipmentItemDataTable asset/variant is supplied (211 unique row keys). AGameDataTableManager::Tick resolves one loader of that name into EquipmentItemDataTables after all loaders report complete, and AddLoadedDataTables skips null tables. The finders loop the array and stop at the first EquipmentItem match, so duplicate IDs in a modded or otherwise multi-table array would shadow later copies, including in the one-shot path; no such duplicates or additional shards are present in the supplied export.",
+    "Cross-table join: an Item row's Id is passed into the status lookup, its VariableId selects this row, and Id_EquipmentItemEffect selects EquipmentItemEffect rows. In the supplied exports all 211 equipment keys have same-name Item rows with the same VariableId, and all non-None effect names exist; the item types are 60 CursedTools, 135 CursedObjects and 16 Extras. Descriptions restrict those three types, while the status helpers do not type-filter the Item row.",
+    "Every exported row has exactly two effect slots. Slot 0 is always populated; None appears only in slot 1 (115 rows) and is a skip sentinel for battle and description lookups. The description UI reads those two slots as fixed line 1 and line 2, while the one-shot use counter is keyed by the running slot index rather than by effect ID.",
+    "Grade remains observed-only: no C++ consumer was identified, so an exact bonus, cost, filter, or sort rule must not be inferred from 0/1/2.",
+    "FStudioBattleSystem380 caches per-character Item ID lists and flattens them into a unique EquipmentItemIds array used by team-wide battle-system effect helpers. GameEquipment_GetEffectRowsOfType filters the joined effect rows without deduplication, so the same effect contribution can be counted more than once when multiple equipped items reference it (Source/Abrams/Private/GameBattleSystems_B.cpp:1050, Source/Abrams/Private/GameCharacterStatusController.cpp:2287).",
+    "Reconstructed static C++ and the supplied exports are the available evidence. Retail Blueprint/editor-tool consumers and uncooked asset references were not available, so reads outside the reconstructed Source cannot be excluded."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:182",
-      "detail": "Loads EquipmentItemDataTable into EquipmentItemDataTables."
+      "detail": "StartInitialLoading registers the single EquipmentItemDataTable loader (line 330); Tick resolves it into EquipmentItemDataTables after all loaders report complete and skips null tables."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2250",
-      "detail": "GameEquipment_GetEffectRows resolves an Item's VariableId to this row, then resolves every named effect row for battle stat setup."
+      "detail": "GameEquipment_GetEffectRows resolves an Item row key through Item.VariableId to this row, then every non-None effect ID to EquipmentItemEffect rows for status queries."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2287",
+      "detail": "GameEquipment_GetEffectRowsOfType filters the joined effect rows by type; sum/rate/chance/threshold wrappers feed HP, cursed energy, dash gauge, damage, guard and other battle calculations."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:1050",
+      "detail": "FStudioBattleSystem380 caches per-character Item ID lists and flattens them into unique EquipmentItemIds for team-wide battle-system effect helpers."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:349",
+      "detail": "The PvE hit-point calculation resolves HitPointMax, HitPointMaxAlly and HitPointMaxEnemy through the same equipment-effect chain (lines 349, 356 and 421)."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:4379",
-      "detail": "Revives once-only equipment effects from the player's equipped Item IDs, keyed by effect array index."
+      "detail": "SetHitPoint applies one-shot effect types from each equipped item's array when the HP ratio crosses the effect threshold and the use count is zero; for Extras it clears the ID and records consumption at the running array-slot index."
     },
     {
       "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:73",
-      "detail": "Finds the effect at a requested description index for cursed tools, cursed objects, and extras."
+      "detail": "GameItemText_FindEffect reads slots 0 and 1 for the two item description lines; invalid indices or None produce an empty text request, and Extras additionally uses slot 0 for its extra description line."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:570",
+      "detail": "PvE loadout Item IDs are copied into character status setup and then pass through the same VariableId-to-equipment-to-effect chain."
     }
   ]
 }

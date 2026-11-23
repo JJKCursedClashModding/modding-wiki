@@ -2,9 +2,11 @@
   "description": "Per-variation weapon loadout rows: parallel arrays of weapon IDs, attachment socket names and initial visibility flags used by battles, level sequences and UI captures.",
   "fields": {
     "ID": {
-      "simple": "Row key referenced by CharacterVariation::Id_CharacterWeapon (typically a variation ID).",
-      "technical": "FName primary key (ImportKeyField=Id in the export), e.g. CP_040_00. Battle preload, BattleBase, LevelSequencer and capture resolve the current variation's Id_CharacterWeapon against CharacterWeaponDataTables (DTM +0x4E0); None skips weapon spawning.",
+      "simple": "Row key referenced by CharacterVariation::Id_CharacterWeapon (typically a base variation ID shared by several costume/colour variations).",
+      "technical": "FName primary key (native UPROPERTY Id, export key/ImportKeyField=Id, serialized as ID in the JSON export), e.g. CP_040_00. Battle preload, BattleBase, LevelSequencer and capture resolve the current variation's Id_CharacterWeapon against CharacterWeaponDataTables (DTM +0x4E0) with UDataTable::FindRow on the row name; None skips the lookup. All 15 exported keys are referenced by CharacterVariation rows.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterWeapon.h:11",
+        "Source/Abrams/Private/GameDataTableManager.cpp:208",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:166",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:876",
         "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:734",
@@ -14,67 +16,85 @@
     },
     "Id_Weapon": {
       "simple": "Array of WeaponDataTable IDs to spawn for this loadout.",
-      "technical": "TArray<FName>, four slots in the export. Each non-None ID is resolved to a Weapon row (DTM +0x6B0); its FileName_BP is turned into a Weapon-primary loader/preload entry and the loaded class is spawned via AGameCharacter::SpawnWeapon. Battle preload collects all weapon Blueprints; BattleBase/LevelSequencer/capture spawn the actors. None entries are skipped.",
+      "technical": "TArray<FName> (variable-length natively; four slots in the available export). Each non-None ID is resolved to a Weapon row (DTM +0x6B0); its FileName_BP becomes a Weapon-primary loader/preload key and the loaded class is spawned via AGameCharacter::SpawnWeapon. The shared collector is called by battle preload, BattleBase, LevelSequencer preload and capture LoadCharacter; BattleBase/LevelSequencer/capture then spawn the actors. None entries are skipped, and every non-None exported ID resolves to a Weapon row.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterWeapon.h:15",
-        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:170",
-        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:179",
-        "Source/Abrams/Private/GamePhase_BattleBase.cpp:881",
-        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:660"
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:171",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:177",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:343",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:885",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:740",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1146"
       ],
       "status": "verified"
     },
     "SocketName": {
       "simple": "Socket/bone name on the character mesh where each weapon attaches.",
-      "technical": "TArray<FName> parallel to Id_Weapon, e.g. R_Weapon or L_Weapon. BattleBase and LevelSequencer pass SocketName[WeaponIndex] directly to SpawnWeapon. The capture actor uses the same value but falls back to FName('root') when the parallel slot is missing and, for non-SituationOverview captures with weapon idle montages configured, overrides the socket to 'root'. BattleBase reads the array by index without a validity check.",
+      "technical": "TArray<FName> parallel to Id_Weapon, e.g. R_Weapon or L_Weapon. BattleBase and LevelSequencer pass SocketName[WeaponIndex] directly to SpawnWeapon without an IsValidIndex check; SpawnWeapon attaches the actor to the character mesh at that socket and calls InitializeWeapon(Socket). The capture actor uses the same value but falls back to FName('root') when the parallel slot is missing and, for non-SituationOverview captures with weapon idle montages configured, overrides the socket to 'root'.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterWeapon.h:18",
-        "Source/Abrams/Private/GamePhase_BattleBase.cpp:895",
-        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:748",
-        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:662",
-        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:708"
+        "Source/Abrams/Private/GameCharacter.cpp:1822",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:891",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:745",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:646",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:714"
       ],
       "status": "verified"
     },
     "bDefaultHidden": {
-      "simple": "Whether each weapon starts inactive/hidden after spawning.",
-      "technical": "TArray<bool> parallel to Id_Weapon. BattleBase calls Weapon->SetActive(bDefaultHidden[Index] == false) after spawning, so true means hidden/inactive and false means active. The capture actor uses the same flag with a false fallback when the parallel slot is missing, then may hide weapons not present in a SituationOverview pose or show pose-only weapons. All exported slots are false in the available rows.",
+      "simple": "Whether each weapon starts inactive/hidden after spawning where the consumer applies it.",
+      "technical": "TArray<bool> parallel to Id_Weapon. BattleBase calls Weapon->SetActive(bDefaultHidden[Index] == false) after spawning; AGameActor::SetActive(false) hides the actor and disables ticking, so true means hidden/inactive and false means active. The capture actor copies the flag with a false fallback when the parallel slot is missing, then may hide weapons not present in a SituationOverview pose or show pose-only weapons. LevelSequencer spawns weapons but does not read this array. In the export CP_070_00 and CP_070_20 have true in their first slot; the other exported slots are false.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterWeapon.h:21",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:895",
-        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:663",
-        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:731"
+        "Source/Abrams/Private/GameActor.cpp:134",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:647",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:671",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:675"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Export contains 15 rows, each with four parallel Id_Weapon / SocketName / bDefaultHidden slots; typically only the first slot is populated.",
-    "The three arrays are index-aligned; most consumers iterate Id_Weapon.Num() and index the other arrays directly (capture has IsValidIndex fallbacks for socket/hidden). None in Id_Weapon means the slot is unused.",
-    "CharacterWeaponDataTable is distinct from WeaponDataTable: this table selects and places weapons for a variation, while WeaponDataTable supplies each weapon's FileName_BP asset name.",
-    "Single table asset 'CharacterWeaponDataTable' loaded into DTM +0x4E0; no numbered shards or localization variants in the export.",
-    "Reconstructed source with cited retail RVAs; no claim about Blueprint-only consumers or byte-identical matching."
+    "Export contains 15 rows, each with four parallel Id_Weapon / SocketName / bDefaultHidden slots; typically only the first slot is populated. CP_070_00 and CP_070_20 set bDefaultHidden[0] to true; the other exported slots are false.",
+    "The three arrays are index-aligned; BattleBase and LevelSequencer iterate Id_Weapon.Num() and index the other arrays directly, while capture has IsValidIndex fallbacks for socket/hidden (root/false). None in Id_Weapon means the slot is unused.",
+    "CharacterWeaponDataTable is distinct from WeaponDataTable: this table selects and places weapons for a variation, while WeaponDataTable supplies each weapon's FileName_BP asset name. All 15 row keys and all 15 non-None weapon IDs resolve in the corresponding exports.",
+    "Single table asset 'CharacterWeaponDataTable' loaded into DTM +0x4E0; the catalog lists one variant. The datatables_by_character folders are per-character subsets of the same rows, not additional numbered or localized table shards.",
+    "Indirect key consumer: UCP_040_ActionController::GetDamageSoundEffectId remaps two CP_040 hit sound IDs only when the owner's current CharacterVariation has Id_CharacterWeapon == CP_040_50; it compares the key and does not read this row's arrays.",
+    "Behavior is traced in reconstructed C++ with retail RVA annotations; no retail Blueprint-only consumer evidence, live retail observation, or byte-identical matching is claimed."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:208",
-      "detail": "Loads CharacterWeaponDataTable into AGameDataTableManager::CharacterWeaponDataTables."
+      "detail": "Resolves CharacterWeaponDataTable from a DataTable primary asset loader and adds it to AGameDataTableManager::CharacterWeaponDataTables (DTM +0x4E0)."
     },
     {
       "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:166",
-      "detail": "Collects weapon Blueprints for this variation into battle preload lists."
+      "detail": "Shared Variation -> CharacterWeapon -> Weapon FileName_BP collector used by battle preload, BattleBase, LevelSequencer preload and capture LoadCharacter."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:343",
+      "detail": "Preload builds Weapon loader names for each battle slot's variation from Id_Weapon / WeaponDataTable."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:876",
-      "detail": "Spawns weapons at the specified sockets and applies the default-hidden active state."
+      "detail": "Spawns weapons at SocketName entries and applies SetActive(!bDefaultHidden[Index])."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:734",
-      "detail": "Sequence setup spawns weapons with the same loadout and sockets."
+      "detail": "Sequence setup spawns weapons with the same loadout and sockets; it does not apply bDefaultHidden."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:634",
-      "detail": "Capture loading merges character weapon slots with SituationOverview pose weapons."
+      "detail": "Capture spawn merges character weapon slots with SituationOverview pose weapons, with socket/hidden fallbacks and pose overrides."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1146",
+      "detail": "Capture LoadCharacter calls the shared weapon collector to preload Weapon assets for its slots."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_040_ActionController.cpp:152",
+      "detail": "Indirect key-only consumer: CP_040 hit sound remap is enabled when the variation's Id_CharacterWeapon is CP_040_50."
     }
   ]
 }

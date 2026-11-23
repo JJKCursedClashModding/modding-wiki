@@ -1,51 +1,93 @@
 {
-  "description": "Maps DLC story-demo message IDs to their spoken voice lines; two numbered table shards share one row schema.",
+  "description": "Maps DLC story-demo message/text IDs to the VoiceDataTable row whose cue is spoken with the displayed message; two numbered table shards share FGameDataTableRow_DlcStoryDemoVoice.",
   "fields": {
     "Id": {
       "simple": "Message/text ID that keys the voice mapping.",
-      "technical": "FName primary key. Show-message commands match this value against the displayed message ID; script preload walks all rows and matches it against the script message IDs in order. Export spells it ID.",
+      "technical": "FName row/import key (export field ID; Properties.ImportKeyField = Id; the empty constructor leaves the FName default NAME_None). Show-message commands take the current message ID from the script's sorted text-ID list and ParseVoice compares it with Row->Id across DTM.DlcStoryDemoVoiceDataTables; level-sequence sections pass their TextId directly. Script preload instead loops the discovered, unsorted message IDs and takes the first matching row in table order (shard 1 before shard 2). Those IDs come from AGameTextManager::FindTextIdsContaining on the story-text prefix derived by GameScript_GetStoryTextId (A -> 01 and B -> 03 for non-short stories), so the key is a localized text ID, not necessarily the raw script asset name. Both exports have non-empty, unique keys with no duplicates within or across shards.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_DlcStoryDemoVoice.h:11",
+        "JJKCCDatatables/datatables/DlcStoryDemoVoiceDataTable1.json",
+        "JJKCCDatatables/datatables/DlcStoryDemoVoiceDataTable2.json",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1338",
         "Source/Abrams/Private/GameScriptCommands.cpp:1022",
-        "Source/Abrams/Private/GameScriptPlayer.cpp:262",
-        "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoShowMessageEvaluate.cpp:76"
+        "Source/Abrams/Private/GameScriptPlayer.cpp:184",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:205",
+        "Source/Abrams/Private/GameScriptRuntime.cpp:27",
+        "Source/Abrams/Private/GameTextManager.cpp:645",
+        "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoShowMessageEvaluate.cpp:76",
+        "Source/Abrams/Public/GameDataTableArray.h:19"
       ],
       "status": "verified"
     },
     "Id_Voice": {
       "simple": "VoiceDataTable row to play for that message.",
-      "technical": "FName joined to VoiceDataTable. The command parser resolves it to a Voice row and queues that row's CueSheetName/CueName with the message delay and voice slot; script preload resolves it to add the voice cue sheet to the load set. A missing Voice row leaves no queued voice or cue sheet.",
+      "technical": "FName at row offset +0x10 (header Id_Voice; export field Id_Voice; default NAME_None). ParseVoice resolves it with GameScript_FindVoiceRow(VoiceDataTables, Id_Voice, false, false), so the first Voice table holding that row wins; on success it queues VoiceRow->CueSheetName/CueName with Delay = GetMessageTime(TimeId) and the line's Slot (0-3). TimeId TEXT_TIME_NONE skips parsing entirely, numeric time names are Atof seconds, and unmapped names resolve to 0.0f; a missing Voice row queues no voice. Script preload performs the same join but only takes CueSheetName and moves to the next message ID when no Voice row resolves. The level-sequence evaluator does not pre-resolve the row: it copies Id_Voice into VoiceId (a DLC row overwrites the standard row), skips None or already-requested playback, and UAbramsSequencerSoundModule::PlayVoice then resolves the ID through FindSoundRow(2, VoiceId) to VoiceDataTables before playing CueSheetName/CueName at volume 1.0. All 1,063 exported Id_Voice values are non-empty, unique Vo<ID> strings, and every one resolves in VoiceDataTable with non-empty cue fields; CueName equals the Voice ID in every case.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_DlcStoryDemoVoice.h:15",
+        "JJKCCDatatables/datatables/DlcStoryDemoVoiceDataTable1.json",
+        "JJKCCDatatables/datatables/DlcStoryDemoVoiceDataTable2.json",
+        "JJKCCDatatables/datatables/VoiceDataTable.json",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1013",
         "Source/Abrams/Private/GameScriptCommands.cpp:1024",
-        "Source/Abrams/Private/GameScriptPlayer.cpp:262",
+        "Source/Abrams/Private/GameScriptCommands.cpp:848",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1051",
+        "Source/Abrams/Private/GameScriptRuntime.cpp:50",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:191",
         "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoShowMessageEvaluate.cpp:78",
-        "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoShowMessageEvaluate.cpp:81"
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:168",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:244",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Voice.h:11"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Loaded as two DataTable primary assets, DlcStoryDemoVoiceDataTable1 and DlcStoryDemoVoiceDataTable2, appended to DTM.DlcStoryDemoVoiceDataTables (+0x790). Both shards use FGameDataTableRow_DlcStoryDemoVoice and are searched as one array, first hit wins.",
-    "DLC script contexts use this table instead of StoryDemoVoiceDataTable for both message parsing and cue-sheet preload. The level-sequence evaluator checks it after the standard table and overwrites the standard voice with the DLC row when both match.",
-    "Companion exports contain 200 rows in shard 1 and 863 in shard 2; this is available content, not a retail completeness claim. Sources are reconstructed retail C++."
+    "Loading and precedence: GameDataTableManager registers the primary assets DlcStoryDemoVoiceDataTable1 and DlcStoryDemoVoiceDataTable2 (lines 423-424), waits for all table loaders, then appends the resolved non-null UDataTable pointers in that order to DTM.DlcStoryDemoVoiceDataTables (+0x790). FGameDataTableArray::GetRows walks table order then row-name order, and every consumer uses the combined array, so a duplicate ID would resolve from shard 1 first. The companion exports are disjoint: 200 keys in shard 1 and 863 in shard 2 (1,063 total), both with RowStruct GameDataTableRow_DlcStoryDemoVoice.",
+    "Selection differs by consumer. ParseVoice checks GameScript_IsDlcScript first (a Script row plus the matching StoryDemo row's chapter flag, not an ID prefix) and only then its STDM_SS_ short-story branch. Cue-sheet preload checks GALLERY_ first, then GameScript_IsSubStoryScript (fixed 'Part' cue sheet), then GameScript_IsDlcScript, then the standard table; a script name that qualifies as both substory and DLC therefore uses different mappings in those two consumers. The level-sequence path ignores script classification: it checks the standard table first, then the DLC table, and the DLC Id_Voice overwrites the standard one, including overwriting it with NAME_None.",
+    "There are no numeric or array fields in this row. Voice delay and slot come from the ShowMessage command's TimeId and line index; TEXT_TIME_NONE suppresses ParseVoice, numeric TimeIds are seconds, and an unmapped name gives 0.0f. The sequencer path uses volume 1.0f and is blocked when SoundModule->IsPlayRequested() is already true. No sentinel values are stored in the exported rows; both fields are non-empty and the constructor supplies only the FName default NAME_None.",
+    "Data relationships: message IDs are discovered from localized DLC GameText rows containing the rewritten story-text prefix; every exported DLC voice key also occurs in the DlcStoryDemoText shard exports, and every Id_Voice resolves in VoiceDataTable to the cue sheet and cue used by both script and sequencer playback. No DLC-row alias map or per-row cache was found: consumers re-walk the cached DTM table array, while the script player keeps only the resulting cue sheet name in CueSheetNames.",
+    "Evidence strength: reconstructed retail C++ with RVA provenance. status/functions.json records ParseVoice 0x14452a0, GameScript_IsDlcScript 0x1441710, sequencer PlayMessageVoice 0x179eff0, GetMessageTime 0x1436870 and SoundModule PlayVoice 0x17b2bb0 as byte-matched, while UpdateLoad 0x1440570, GameScript_FindVoiceRow 0x143b100, DTM Tick 0x13215c0 and SoundModule FindSoundRow 0x17aa520 are behaviour-certified. No retail Blueprint bytecode or live retail trace was inspected; no Blueprint-only behavior is claimed. Companion exports are available content, not a retail completeness claim."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:251",
-      "detail": "Resolves both DLC shards into DTM.DlcStoryDemoVoiceDataTables."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:423",
+      "detail": "Registers the first DLC voice primary-asset loader; line 424 registers the second."
     },
     {
-      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1021",
-      "detail": "Collects DLC story voice rows for message parsing."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:251",
+      "detail": "Appends both resolved shards, in order, to DTM.DlcStoryDemoVoiceDataTables (+0x790)."
+    },
+    {
+      "source": "Source/Abrams/Public/GameDataTableArray.h:19",
+      "detail": "Combined row collection preserves table order then row-name order, establishing shard 1 duplicate-key precedence."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1019",
+      "detail": "ParseVoice selects this table for DLC scripts before checking the short-story branch."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1022",
+      "detail": "Finds the first row in the combined shards whose Id equals the current message ID."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1024",
+      "detail": "Resolves Id_Voice in VoiceDataTable and queues the cue sheet, cue, script time delay and voice slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:645",
+      "detail": "Supplies the script's message IDs by scanning localized DLC GameText rows for the story-text prefix."
     },
     {
       "source": "Source/Abrams/Private/GameScriptPlayer.cpp:262",
-      "detail": "Preloads the cue sheet of the first matching DLC row."
+      "detail": "DLC cue-sheet preload walks discovered message IDs and uses the first DLC row whose Id_Voice resolves."
     },
     {
       "source": "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoShowMessageEvaluate.cpp:76",
-      "detail": "Level-sequence DLC message voice lookup."
+      "detail": "Looks up the section TextId after the standard table; a DLC hit overwrites VoiceId with Id_Voice."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:168",
+      "detail": "Resolves the sequencer's VoiceId through VoiceDataTables (FindSoundRow kind 2) before playing the cue."
     }
   ]
 }

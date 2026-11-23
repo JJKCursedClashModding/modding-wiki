@@ -3,73 +3,106 @@
   "fields": {
     "ID": {
       "simple": "Relationship reward row id (usually <character A>_<character B>).",
-      "technical": "FName row key in StoryCharaRelateRewardDataTables (DTM +0x8A0). Used as the key in GameManager.UserInfo.Story.StudioNameInts_7C0 storing the last granted reward level; when that level is below the current pair level, MainMenuStory grants the missing item sets and stores the new level. Also used to create the reward-level-change records for the correlation diagram.",
+      "technical": "FName member `Id` (the export writes the key as `ID` and declares ImportKeyField `Id`; all 44 exported keys equal it). MainMenuStory looks up GameManager.UserInfo.Story.StudioNameInts_7C0 by Reward->Id for the last granted level (default 1), writes ToLevel there with FindOrAdd only when a grant occurs, and puts the same Id into FGameStoryCorrelationDiagramRewardLevel records consumed by the earned-reward notify and list widgets. No studio-release flag gates this scan.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryCharaRelateReward.h:11",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1110",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1112",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1156",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1164",
-        "Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:67"
+        "Source/Abrams/Public/GameUserStoryInfo.h:24",
+        "Source/Abrams/Private/GameStoryEarnedRewardListWidget.cpp:86",
+        "Source/Abrams/Private/GameStoryEarnedRewardNotifyWidget.cpp:122"
       ],
       "status": "verified"
     },
     "Id_Character_1": {
       "simple": "First character of the rewarded pair.",
-      "technical": "FName. Reward rows are selected by unordered character-pair match: the view widget accepts (1,2) or (2,1), and MainMenuStory uses both ids to look up the corresponding StoryCharaGraphPair rows and their directed start/current levels.",
+      "technical": "FName. The view widget accepts (1,2) or (2,1) before showing a row. MainMenuStory finds the StoryCharaGraphPair row keyed by this id, finds Id_Character_2 in Pair1->Id_Character, and uses that index for Pair1->StartRelateLevel[Index] and GetCharaRelateLevel(this, Id_Character_2); if the row or directed entry is absent that side stays at level 0. The earned-reward list item also resolves this id to a Character row/face icon and a directed relation label.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryCharaRelateReward.h:15",
         "Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:57",
         "Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:59",
+        "Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:71",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1119",
-        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1126"
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1126",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1130",
+        "Source/Abrams/Private/GameStoryEarnedRewardListItemWidget.cpp:75",
+        "Source/Abrams/Private/GameStoryEarnedRewardListItemWidget.cpp:123"
       ],
       "status": "verified"
     },
     "Id_Character_2": {
       "simple": "Second character of the rewarded pair.",
-      "technical": "FName; same unordered-pair selection as Id_Character_1. It is used for the reverse GraphPair lookup, whose start level and current level are combined with the first direction when deciding which reward tiers to grant.",
+      "technical": "FName; same unordered-pair selection as Id_Character_1. MainMenuStory repeats the GraphPair lookup from this id, finds Id_Character_1 in Pair2->Id_Character, and combines Pair2->StartRelateLevel[Index] and GetCharaRelateLevel(this, Id_Character_1) with the first direction (minimum current level, maximum start level). It also supplies the second character icon/relation label in the earned-reward item and both character-name parameters of the item-set unlock message.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryCharaRelateReward.h:18",
         "Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:59",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1138",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1145",
-        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1149"
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1149",
+        "Source/Abrams/Private/GameStoryEarnedRewardListItemWidget.cpp:89",
+        "Source/Abrams/Private/GameStoryEarnedRewardListItemWidget.cpp:124",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1788"
       ],
       "status": "verified"
     },
     "Id_ItemSet": {
       "simple": "ItemSet awarded at each relationship level.",
-      "technical": "TArray<FName> indexed as [Level - 1]; exported rows have five slots with None placeholders for early levels. MainMenuStory grants GameShop_AddItemSetOnce(Id_ItemSet[Level - 1], 6) for each newly crossed level between max(saved grant level, both GraphPair start levels) and min(both directed current levels). The reward view shows Id_ItemSet[ItemLevel - 1] for milestones between the pair's GraphPair StartRelateLevel and EndRelateLevel; the earned-reward list does the same for levels crossed in one increase.",
+      "technical": "TArray<FName>; every exported row has five slots. Slot 0 is `None` in all 44 rows and is not a level-1 reward: MainMenuStory calls GameShop_AddItemSetOnce(Id_ItemSet[Level - 1], 6) for Level = FromLevel+1..ToLevel, where FromLevel = max(saved grant level (default 1), both raw GraphPair start levels) and ToLevel = min(both directed current levels from GetCharaRelateLevel). No bounds check is done, so the five-slot shape and GraphPair end levels (3 or 5) bound the data. The reward view and earned level details read [ItemLevel - 1] for visible levels 2..5; the notify widget reads [Level] over the half-open [FromLevel, ToLevel) range (the same tiers, zero-based). `None` is the no-reward sentinel. Unlock text recovers the tier as the first Id_ItemSet.IndexOfByKey(Set->Id) + 1. All 130 non-None ids resolve in ItemSetDataTable; this row stores only their ids, not item contents or quantities.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryCharaRelateReward.h:21",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1152",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1158",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1162",
+        "Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:80",
         "Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:86",
-        "Source/Abrams/Private/GameStoryEarnedRewardListItemWidget.cpp:131"
+        "Source/Abrams/Private/GameStoryEarnedRewardListItemWidget.cpp:131",
+        "Source/Abrams/Private/GameStoryEarnedRewardNotifyWidget.cpp:133",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1784",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1790",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:133"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Reward level gating uses the minimum of the two directed current levels and the maximum of the saved grant level and both directed start levels; the saved level defaults to 1 in MainMenuStory and 0 in the reward view widget (Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1112-1114, 1152-1157; Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:67-68).",
-    "Only pairs that are released (studio mission/pair-release flags) are considered before the grant scan; see GamePhase_MainMenuStory.cpp around 1090-1108.",
-    "44 exported rows; no numbered shards or locale variants. ItemSet contents themselves are in ItemSetDataTable and are not described here.",
-    "Evidence is from the reconstructed C++ in Source/ (row shape/counts from the exported table); status/ records byte matches for some owner TUs, but this file does not claim a retail byte comparison for every function or exhaustive Blueprint/runtime coverage."
+    "Granting is not gated by studio release or pair-release flags. UpdateCorrelationDiagram builds Released/New character and pair lists from StudioMissionInts_6D0/StudioNameInts_720 (state 1 becomes 2) for the diagram, then scans every StoryCharaRelateReward row; only the per-pair GraphPair start/current levels and the saved grant level decide grants (Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1066-1108, 1110-1164).",
+    "Reward levels are 1..5 and there is no level-1 item: slot 0 is `None` everywhere. The grant path defaults a missing saved level to 1 (StudioNameInts_7C0 has 0x80 slots) and only writes the new level when FromLevel < ToLevel; the reward view defaults the same saved level to 0 for its acquired check. A missing GraphPair row/directed entry leaves that side at level 0 in the grant scan and hides all milestones in the view (GamePhase_MainMenuStory.cpp:1112-1114, 1152-1157; GameStoryCharaRelateRewardViewWidget.cpp:67-68, 71-77; GameUserStoryInfo.h:24).",
+    "GetCharaRelateLevel converts saved point changes through GlobalThreshold STORY_CHARA_RELATE_LV_1..5 (Min 0/25/50/75/100), so the `Level` values in grant/notify loops are display levels, not raw points (Source/Abrams/Private/GameManagerGraphics.cpp:531-550; Source/Abrams/Private/GamePhase_WidgetTest.cpp:289-324).",
+    "Index precedence: MainMenuStory uses [Level - 1], the view/earned level details use [ItemLevel - 1]/[DetailLevel - 1], and the notify widget uses [Level] for Level = FromLevel..ToLevel-1 (the zero-based equivalent of the newly crossed levels). Unlock text considers only unlocked ItemSet rows and uses the first matching reward row, with VALUE = array index + 1 (GameStoryEarnedRewardNotifyWidget.cpp:133-139; GameShopSaleItemListItemDataBase.cpp:1748-1793).",
+    "Loading and lookup: DTM +0x8A0 is filled from the single StoryCharaRelateRewardDataTable primary asset via GameDataTableManager_ResolveLoadedTable/AddLoadedDataTables after all loaders complete; FGameDataTableArray::GetRows walks table order then row-name order, and FindRow-based consumers take the first match. The out-of-line row finder used by the earned-reward list is instantiated in StoryLaunchHelpers.cpp:784 (retail 0x166ec40) (GameDataTableManager.cpp:162-176, 268; GameDataTableArray.h:19-35).",
+    "Exports: one full table with 44 rows and four fields (`ID`, `Id_Character_1`, `Id_Character_2`, `Id_ItemSet`); every row key equals `ID`, there are 44 unique unordered pairs, and all 130 non-None ItemSet ids resolve in ItemSetDataTable. Thirteen by-character derivative copies are subsets whose union adds no rows. All 16 character ids and both directed pair entries resolve in StoryCharaGraphPairDataTable, and every non-None tier matches the levels above the directed start and at or below the directed end.",
+    "Evidence is from reconstructed C++ in Source/ plus static exports. Retail RVAs in comments and status/ states show many consumers as `behavioural` (e.g. 0x167e9e0, 0x1688b20, 0x167fef0) with only some byte `match` rows (e.g. 0x1676f20); no retail Blueprint graph or live runtime was inspected. Widget-tree wiring (ItemWidget2..5, LevelDetail2..5) and the precise item-get notify semantics therefore remain reconstruction-based rather than retail-Blueprint-verified."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1110",
-      "detail": "Grants newly earned relationship reward item sets and records the last granted level per row id."
+      "detail": "Flow-4 correlation-diagram update scans every reward row; for each it computes FromLevel = max(saved level, both GraphPair start levels) and ToLevel = min(both directed current levels), grants each crossed tier once with GetType 6, saves ToLevel and emits a RewardLevelChange."
     },
     {
       "source": "Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:50",
-      "detail": "Shows the reward milestones for the selected pair, marking already-reached levels."
+      "detail": "Called by the relationship detail view; finds the row by unordered character pair, reads the saved grant level (default 0), and shows only GraphPair-defined milestone items (levels 2..5) with an acquired flag."
     },
     {
       "source": "Source/Abrams/Private/GameStoryEarnedRewardListItemWidget.cpp:65",
-      "detail": "Displays the item set for levels crossed by a relationship level-up."
+      "detail": "Looks the row up by RewardId through the out-of-line finder; uses both character ids for icons/relation labels and shows Id_ItemSet[DetailLevel - 1] for levels crossed in the one increase."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryEarnedRewardListWidget.cpp:42",
+      "detail": "Creates one list-item data object per reward row as capacity, then fills only the RewardLevelChange entries supplied by the correlation diagram before refreshing the list."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryEarnedRewardNotifyWidget.cpp:114",
+      "detail": "Resolves each RewardLevelChange to the reward row and collects item categories from Id_ItemSet[Level] for Level = FromLevel..ToLevel-1 to select the notification messages and icons."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1748",
+      "detail": "Reverse lookup for item unlock text: for unlocked ITM_SET_CHARA_RELATE_* sets it finds the first reward row containing the set, supplies both character names and the tier number (array index + 1), and returns ITM_UNLOCK_MESSAGE_0010."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryCorrelationDiagramWidget.cpp:136",
+      "detail": "Indirect consumer: opens the earned-reward notify and then the earned-reward list from the RewardLevelChanges produced by MainMenuStory."
     },
     {
       "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:784",
@@ -77,7 +110,7 @@
     },
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:268",
-      "detail": "Loads StoryCharaRelateRewardDataTable into StoryCharaRelateRewardDataTables."
+      "detail": "Loads StoryCharaRelateRewardDataTable into the cached StoryCharaRelateRewardDataTables array at DTM +0x8A0."
     }
   ]
 }

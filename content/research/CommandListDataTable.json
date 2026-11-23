@@ -1,40 +1,47 @@
 {
-  "description": "Supplies the localized text shown on each character's in-game command-list page: character overview, passive skills, and the name/description of each standard, cursed-energy, super, and character-specific extra attack. Text keys double as visibility switches when set to None.",
+  "description": "One row configures the text shown on a character's command-list page: the overview paragraph, up to four passive slots, and the name/description of the available normal, cursed-energy, super and character-specific extra attack widgets. Rows are selected indirectly from Character::Id_CommandList; name keys (and both parallel passive keys) also act as visibility switches when they are None. Text IDs are resolved through the localized CommandListTextDataTable shards.",
   "fields": {
     "Id": {
       "simple": "Command-list row identifier, normally a character ID.",
-      "technical": "FName key fetched from CommandListDataTables using Character::Id_CommandList; the widget returns without populating anything when the character has no command-list ID or no matching row.",
+      "technical": "FName import key; the export writes it as `ID`, while the native member is `Id` in FGameDataTableRow_CommandList. AGameDataTableManager appends the loaded CommandListDataTable to CommandListDataTables, and BuildContents takes the first table whose FindRow<FGameDataTableRow_CommandList> matches Character::Id_CommandList. BuildContents stores CurrentCharacterId first, but returns before populating the listed text/action widgets when Id_CommandList is None or no matching row exists.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:12",
         "Source/Abrams/Private/GameCommandListWidget.cpp:388",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:392"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:392",
+        "Source/Abrams/Private/GameDataTableManager.cpp:257",
+        "Source/Abrams/Public/GameDataTableManager.h:168",
+        "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:46",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Character.h:72"
       ],
       "status": "verified"
     },
     "Id_CommandListText_CharacterDescription": {
       "simple": "Localized key for the character overview paragraph.",
-      "technical": "FName passed directly to CharacterExplanation->SetTextIdOnly.",
+      "technical": "FName passed directly to CharacterExplanation->SetTextIdOnly; the text request resolves it in the current language through GameTextManager. This path has no explicit None check (a None key would simply resolve to empty text), and all exported rows supply a key of the form CMD_CHARACTER_DESCRIPTION_CP_*.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:16",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:399"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:399",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:52",
+        "Source/Abrams/Private/GameTextManager.cpp:622"
       ],
       "status": "verified"
     },
     "Id_CommandListText_PassiveName": {
       "simple": "Localized names of the character passive skills, one per slot.",
-      "technical": "TArray<FName> indexed by the zero-based passive widget slot. A slot is skipped when the index is invalid or either its name or description is None. The name is inserted as the SKILL_NAME parameter of SYS_COMMANDLIST_LABEL_0002.",
+      "technical": "TArray<FName>, read by zero-based index in the order of the four passive widget slots constructed in InitializeWidget (Passive_1..4). When both parallel arrays contain the index and neither value is None, the name is added as the SKILL_NAME text parameter of SYS_COMMANDLIST_LABEL_0002 for PassiveName; otherwise the slot stays hidden. Every exported row supplies four entries, with None used for unused slots.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:19",
         "Source/Abrams/Private/GameCommandListWidget.cpp:471",
         "Source/Abrams/Private/GameCommandListWidget.cpp:476",
         "Source/Abrams/Private/GameCommandListWidget.cpp:480",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:489"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:489",
+        "Source/Abrams/Private/GameCommandListWidget.cpp:192"
       ],
       "status": "verified"
     },
     "Id_CommandListText_PassiveDescription": {
       "simple": "Localized descriptions of the passive skills.",
-      "technical": "TArray<FName> parallel to Id_CommandListText_PassiveName; the selected slot is shown with SetTextIdOnly. Both arrays must contain a non-None value at the same index for the passive widget to appear.",
+      "technical": "TArray<FName> parallel to Id_CommandListText_PassiveName, read by the same zero-based widget-slot index and passed directly to PassiveExplanation->SetTextIdOnly. A slot is shown only when both arrays contain that index and neither the name nor the description is None. Every exported row supplies four entries; None marks unused slots.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:22",
         "Source/Abrams/Private/GameCommandListWidget.cpp:476",
@@ -45,26 +52,29 @@
     },
     "Id_CommandListText_NormalAttack_1_Name": {
       "simple": "Localized name for normal attack 1.",
-      "technical": "FName copied into the attack widget parameter as NameTextId. A None name hides the corresponding widget; the exported CP_050/CP_170 extra-attack rows are the only rows with non-None keys for those two slots.",
+      "technical": "FName copied into FGameCommandListActionParameter::NameTextId and set on the attack widget's AttackName with SetTextIdOnly. UGameCommandListWidget::BuildContents calls SetShow(!IsNone()) on this widget, so a None name hides it. All 27 exported rows have a non-None key in this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:25",
         "Source/Abrams/Private/GameCommandListWidget.cpp:519",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:524"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:524",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:192"
       ],
       "status": "verified"
     },
     "Id_CommandListText_NormalAttack_1_Description": {
       "simple": "Localized description for normal attack 1.",
-      "technical": "FName copied into the attack widget parameter as DescriptionTextId. It is paired with the same-slot Name key; the name alone controls widget visibility.",
+      "technical": "FName copied into FGameCommandListActionParameter::DescriptionTextId. UGameCommandListActionWidget resolves it with GameTextManager and parses `<SplitCommand>` sections, bracketed labels and level markers into the explanation rows. Visibility is controlled by the paired Name key, not by this description.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:28",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:520"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:520",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:194",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:197"
       ],
       "status": "verified"
     },
     "CommandListAttackPropertyType_NormalAttack_1": {
       "simple": "Serialized attack-property tags for normal attack 1.",
-      "technical": "TArray<EGameCommandListAttackPropertyType> declared on the row; the enum values are None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion, Invalid=255. No source consumer was identified; the command widget instead clears PropertyIconResources, so these tags do not drive visible property icons in the reconstructed retail flow.",
+      "technical": "TArray<EGameCommandListAttackPropertyType> (uint8 UENUM with None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion and Invalid=255). Every exported row serializes three EGameCommandListAttackPropertyType::None entries. No C++ reader for this member was found in the available Source. BuildContents never populates PropertyIconResources (it explicitly assigns an empty array for cursed-energy attack 1 and extra attack 1; the other parameters keep the default empty array), so UGameCommandListActionWidget collapses all three property icons in this path. The three serialized slots do not prove an icon mapping.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:31",
         "Source/AbramsDataTable/Public/EGameCommandListAttackPropertyType.h:6",
@@ -74,27 +84,30 @@
       "status": "observed"
     },
     "Id_CommandListText_NormalAttack_1_1_Name": {
-      "simple": "Localized name for normal attack 1 follow-up/variant.",
-      "technical": "FName copied into the attack widget parameter as NameTextId. A None name hides the corresponding widget; the exported CP_050/CP_170 extra-attack rows are the only rows with non-None keys for those two slots.",
+      "simple": "Localized name for the NormalAttack_1_1 widget slot.",
+      "technical": "FName copied into FGameCommandListActionParameter::NameTextId and set on the attack widget's AttackName with SetTextIdOnly. UGameCommandListWidget::BuildContents calls SetShow(!IsNone()) on this widget, so a None name hides it. All 27 exported rows have a non-None key in this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:34",
         "Source/Abrams/Private/GameCommandListWidget.cpp:529",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:534"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:534",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:192"
       ],
       "status": "verified"
     },
     "Id_CommandListText_NormalAttack_1_1_Description": {
-      "simple": "Localized description for normal attack 1 follow-up/variant.",
-      "technical": "FName copied into the attack widget parameter as DescriptionTextId. It is paired with the same-slot Name key; the name alone controls widget visibility.",
+      "simple": "Localized description for the NormalAttack_1_1 widget slot.",
+      "technical": "FName copied into FGameCommandListActionParameter::DescriptionTextId. UGameCommandListActionWidget resolves it with GameTextManager and parses `<SplitCommand>` sections, bracketed labels and level markers into the explanation rows. Visibility is controlled by the paired Name key, not by this description.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:37",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:530"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:530",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:194",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:197"
       ],
       "status": "verified"
     },
     "CommandListAttackPropertyType_NormalAttack_1_1": {
       "simple": "Serialized attack-property tags for normal attack 1 follow-up/variant.",
-      "technical": "TArray<EGameCommandListAttackPropertyType> declared on the row; the enum values are None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion, Invalid=255. No source consumer was identified; the command widget instead clears PropertyIconResources, so these tags do not drive visible property icons in the reconstructed retail flow.",
+      "technical": "TArray<EGameCommandListAttackPropertyType> (uint8 UENUM with None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion and Invalid=255). Every exported row serializes three EGameCommandListAttackPropertyType::None entries. No C++ reader for this member was found in the available Source. BuildContents never populates PropertyIconResources (it explicitly assigns an empty array for cursed-energy attack 1 and extra attack 1; the other parameters keep the default empty array), so UGameCommandListActionWidget collapses all three property icons in this path. The three serialized slots do not prove an icon mapping.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:40",
         "Source/AbramsDataTable/Public/EGameCommandListAttackPropertyType.h:6",
@@ -105,26 +118,29 @@
     },
     "Id_CommandListText_NormalAttack_2_Name": {
       "simple": "Localized name for normal attack 2.",
-      "technical": "FName copied into the attack widget parameter as NameTextId. A None name hides the corresponding widget; the exported CP_050/CP_170 extra-attack rows are the only rows with non-None keys for those two slots.",
+      "technical": "FName copied into FGameCommandListActionParameter::NameTextId and set on the attack widget's AttackName with SetTextIdOnly. UGameCommandListWidget::BuildContents calls SetShow(!IsNone()) on this widget, so a None name hides it. All 27 exported rows have a non-None key in this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:43",
         "Source/Abrams/Private/GameCommandListWidget.cpp:539",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:544"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:544",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:192"
       ],
       "status": "verified"
     },
     "Id_CommandListText_NormalAttack_2_Description": {
       "simple": "Localized description for normal attack 2.",
-      "technical": "FName copied into the attack widget parameter as DescriptionTextId. It is paired with the same-slot Name key; the name alone controls widget visibility.",
+      "technical": "FName copied into FGameCommandListActionParameter::DescriptionTextId. UGameCommandListActionWidget resolves it with GameTextManager and parses `<SplitCommand>` sections, bracketed labels and level markers into the explanation rows. Visibility is controlled by the paired Name key, not by this description.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:46",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:540"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:540",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:194",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:197"
       ],
       "status": "verified"
     },
     "CommandListAttackPropertyType_NormalAttack_2": {
       "simple": "Serialized attack-property tags for normal attack 2.",
-      "technical": "TArray<EGameCommandListAttackPropertyType> declared on the row; the enum values are None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion, Invalid=255. No source consumer was identified; the command widget instead clears PropertyIconResources, so these tags do not drive visible property icons in the reconstructed retail flow.",
+      "technical": "TArray<EGameCommandListAttackPropertyType> (uint8 UENUM with None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion and Invalid=255). Every exported row serializes three EGameCommandListAttackPropertyType::None entries. No C++ reader for this member was found in the available Source. BuildContents never populates PropertyIconResources (it explicitly assigns an empty array for cursed-energy attack 1 and extra attack 1; the other parameters keep the default empty array), so UGameCommandListActionWidget collapses all three property icons in this path. The three serialized slots do not prove an icon mapping.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:49",
         "Source/AbramsDataTable/Public/EGameCommandListAttackPropertyType.h:6",
@@ -134,27 +150,30 @@
       "status": "observed"
     },
     "Id_CommandListText_NormalAttack_2_1_Name": {
-      "simple": "Localized name for normal attack 2 follow-up/variant.",
-      "technical": "FName copied into the attack widget parameter as NameTextId. A None name hides the corresponding widget; the exported CP_050/CP_170 extra-attack rows are the only rows with non-None keys for those two slots.",
+      "simple": "Localized name for the NormalAttack_2_1 widget slot.",
+      "technical": "FName copied into FGameCommandListActionParameter::NameTextId and set on the attack widget's AttackName with SetTextIdOnly. UGameCommandListWidget::BuildContents calls SetShow(!IsNone()) on this widget, so a None name hides it. All 27 exported rows have a non-None key in this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:52",
         "Source/Abrams/Private/GameCommandListWidget.cpp:549",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:554"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:554",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:192"
       ],
       "status": "verified"
     },
     "Id_CommandListText_NormalAttack_2_1_Description": {
-      "simple": "Localized description for normal attack 2 follow-up/variant.",
-      "technical": "FName copied into the attack widget parameter as DescriptionTextId. It is paired with the same-slot Name key; the name alone controls widget visibility.",
+      "simple": "Localized description for the NormalAttack_2_1 widget slot.",
+      "technical": "FName copied into FGameCommandListActionParameter::DescriptionTextId. UGameCommandListActionWidget resolves it with GameTextManager and parses `<SplitCommand>` sections, bracketed labels and level markers into the explanation rows. Visibility is controlled by the paired Name key, not by this description.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:55",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:550"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:550",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:194",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:197"
       ],
       "status": "verified"
     },
     "CommandListAttackPropertyType_NormalAttack_2_1": {
       "simple": "Serialized attack-property tags for normal attack 2 follow-up/variant.",
-      "technical": "TArray<EGameCommandListAttackPropertyType> declared on the row; the enum values are None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion, Invalid=255. No source consumer was identified; the command widget instead clears PropertyIconResources, so these tags do not drive visible property icons in the reconstructed retail flow.",
+      "technical": "TArray<EGameCommandListAttackPropertyType> (uint8 UENUM with None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion and Invalid=255). Every exported row serializes three EGameCommandListAttackPropertyType::None entries. No C++ reader for this member was found in the available Source. BuildContents never populates PropertyIconResources (it explicitly assigns an empty array for cursed-energy attack 1 and extra attack 1; the other parameters keep the default empty array), so UGameCommandListActionWidget collapses all three property icons in this path. The three serialized slots do not prove an icon mapping.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:58",
         "Source/AbramsDataTable/Public/EGameCommandListAttackPropertyType.h:6",
@@ -165,26 +184,29 @@
     },
     "Id_CommandListText_NormalAttack_3_Name": {
       "simple": "Localized name for normal attack 3.",
-      "technical": "FName copied into the attack widget parameter as NameTextId. A None name hides the corresponding widget; the exported CP_050/CP_170 extra-attack rows are the only rows with non-None keys for those two slots.",
+      "technical": "FName copied into FGameCommandListActionParameter::NameTextId and set on the attack widget's AttackName with SetTextIdOnly. UGameCommandListWidget::BuildContents calls SetShow(!IsNone()) on this widget, so a None name hides it. All 27 exported rows have a non-None key in this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:61",
         "Source/Abrams/Private/GameCommandListWidget.cpp:559",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:564"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:564",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:192"
       ],
       "status": "verified"
     },
     "Id_CommandListText_NormalAttack_3_Description": {
       "simple": "Localized description for normal attack 3.",
-      "technical": "FName copied into the attack widget parameter as DescriptionTextId. It is paired with the same-slot Name key; the name alone controls widget visibility.",
+      "technical": "FName copied into FGameCommandListActionParameter::DescriptionTextId. UGameCommandListActionWidget resolves it with GameTextManager and parses `<SplitCommand>` sections, bracketed labels and level markers into the explanation rows. Visibility is controlled by the paired Name key, not by this description.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:64",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:560"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:560",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:194",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:197"
       ],
       "status": "verified"
     },
     "CommandListAttackPropertyType_NormalAttack_3": {
       "simple": "Serialized attack-property tags for normal attack 3.",
-      "technical": "TArray<EGameCommandListAttackPropertyType> declared on the row; the enum values are None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion, Invalid=255. No source consumer was identified; the command widget instead clears PropertyIconResources, so these tags do not drive visible property icons in the reconstructed retail flow.",
+      "technical": "TArray<EGameCommandListAttackPropertyType> (uint8 UENUM with None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion and Invalid=255). Every exported row serializes three EGameCommandListAttackPropertyType::None entries. No C++ reader for this member was found in the available Source. BuildContents never populates PropertyIconResources (it explicitly assigns an empty array for cursed-energy attack 1 and extra attack 1; the other parameters keep the default empty array), so UGameCommandListActionWidget collapses all three property icons in this path. The three serialized slots do not prove an icon mapping.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:67",
         "Source/AbramsDataTable/Public/EGameCommandListAttackPropertyType.h:6",
@@ -194,27 +216,30 @@
       "status": "observed"
     },
     "Id_CommandListText_NormalAttack_3_1_Name": {
-      "simple": "Localized name for normal attack 3 follow-up/variant.",
-      "technical": "FName copied into the attack widget parameter as NameTextId. A None name hides the corresponding widget; the exported CP_050/CP_170 extra-attack rows are the only rows with non-None keys for those two slots.",
+      "simple": "Localized name for the NormalAttack_3_1 widget slot.",
+      "technical": "FName copied into FGameCommandListActionParameter::NameTextId and set on the attack widget's AttackName with SetTextIdOnly. UGameCommandListWidget::BuildContents calls SetShow(!IsNone()) on this widget, so a None name hides it. All 27 exported rows have a non-None key in this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:70",
         "Source/Abrams/Private/GameCommandListWidget.cpp:569",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:578"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:578",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:192"
       ],
       "status": "verified"
     },
     "Id_CommandListText_NormalAttack_3_1_Description": {
-      "simple": "Localized description for normal attack 3 follow-up/variant.",
-      "technical": "FName copied into the attack widget parameter as DescriptionTextId. It is paired with the same-slot Name key; the name alone controls widget visibility.",
+      "simple": "Localized description for the NormalAttack_3_1 widget slot.",
+      "technical": "FName copied into FGameCommandListActionParameter::DescriptionTextId. UGameCommandListActionWidget resolves it with GameTextManager and parses `<SplitCommand>` sections, bracketed labels and level markers into the explanation rows. Visibility is controlled by the paired Name key, not by this description.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:73",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:570"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:570",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:194",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:197"
       ],
       "status": "verified"
     },
     "CommandListAttackPropertyType_NormalAttack_3_1": {
       "simple": "Serialized attack-property tags for normal attack 3 follow-up/variant.",
-      "technical": "TArray<EGameCommandListAttackPropertyType> declared on the row; the enum values are None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion, Invalid=255. No source consumer was identified; the command widget instead clears PropertyIconResources, so these tags do not drive visible property icons in the reconstructed retail flow.",
+      "technical": "TArray<EGameCommandListAttackPropertyType> (uint8 UENUM with None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion and Invalid=255). Every exported row serializes three EGameCommandListAttackPropertyType::None entries. No C++ reader for this member was found in the available Source. BuildContents never populates PropertyIconResources (it explicitly assigns an empty array for cursed-energy attack 1 and extra attack 1; the other parameters keep the default empty array), so UGameCommandListActionWidget collapses all three property icons in this path. The three serialized slots do not prove an icon mapping.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:76",
         "Source/AbramsDataTable/Public/EGameCommandListAttackPropertyType.h:6",
@@ -225,26 +250,29 @@
     },
     "Id_CommandListText_CursedEnergyAttack_1_Name": {
       "simple": "Localized name for first cursed-energy attack.",
-      "technical": "FName copied into the attack widget parameter as NameTextId. A None name hides the corresponding widget; the exported CP_050/CP_170 extra-attack rows are the only rows with non-None keys for those two slots.",
+      "technical": "FName copied into FGameCommandListActionParameter::NameTextId and set on the attack widget's AttackName with SetTextIdOnly. UGameCommandListWidget::BuildContents calls SetShow(!IsNone()) on this widget, so a None name hides it. All 27 exported rows have a non-None key in this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:79",
         "Source/Abrams/Private/GameCommandListWidget.cpp:583",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:612"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:612",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:192"
       ],
       "status": "verified"
     },
     "Id_CommandListText_CursedEnergyAttack_1_Description": {
       "simple": "Localized description for first cursed-energy attack.",
-      "technical": "FName copied into the attack widget parameter as DescriptionTextId. It is paired with the same-slot Name key; the name alone controls widget visibility.",
+      "technical": "FName copied into FGameCommandListActionParameter::DescriptionTextId. UGameCommandListActionWidget resolves it with GameTextManager and parses `<SplitCommand>` sections, bracketed labels and level markers into the explanation rows. Visibility is controlled by the paired Name key, not by this description.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:82",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:584"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:584",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:194",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:197"
       ],
       "status": "verified"
     },
     "CommandListAttackPropertyType_CursedEnergyAttack_1": {
       "simple": "Serialized attack-property tags for first cursed-energy attack.",
-      "technical": "TArray<EGameCommandListAttackPropertyType> declared on the row; the enum values are None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion, Invalid=255. No source consumer was identified; the command widget instead clears PropertyIconResources, so these tags do not drive visible property icons in the reconstructed retail flow.",
+      "technical": "TArray<EGameCommandListAttackPropertyType> (uint8 UENUM with None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion and Invalid=255). Every exported row serializes three EGameCommandListAttackPropertyType::None entries. No C++ reader for this member was found in the available Source. BuildContents never populates PropertyIconResources (it explicitly assigns an empty array for cursed-energy attack 1 and extra attack 1; the other parameters keep the default empty array), so UGameCommandListActionWidget collapses all three property icons in this path. The three serialized slots do not prove an icon mapping.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:85",
         "Source/AbramsDataTable/Public/EGameCommandListAttackPropertyType.h:6",
@@ -255,26 +283,29 @@
     },
     "Id_CommandListText_CursedEnergyAttack_2_Name": {
       "simple": "Localized name for second cursed-energy attack.",
-      "technical": "FName copied into the attack widget parameter as NameTextId. A None name hides the corresponding widget; the exported CP_050/CP_170 extra-attack rows are the only rows with non-None keys for those two slots.",
+      "technical": "FName copied into FGameCommandListActionParameter::NameTextId and set on the attack widget's AttackName with SetTextIdOnly. UGameCommandListWidget::BuildContents calls SetShow(!IsNone()) on this widget, so a None name hides it. All 27 exported rows have a non-None key in this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:88",
         "Source/Abrams/Private/GameCommandListWidget.cpp:617",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:658"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:658",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:192"
       ],
       "status": "verified"
     },
     "Id_CommandListText_CursedEnergyAttack_2_Description": {
       "simple": "Localized description for second cursed-energy attack.",
-      "technical": "FName copied into the attack widget parameter as DescriptionTextId. It is paired with the same-slot Name key; the name alone controls widget visibility.",
+      "technical": "FName copied into FGameCommandListActionParameter::DescriptionTextId. UGameCommandListActionWidget resolves it with GameTextManager and parses `<SplitCommand>` sections, bracketed labels and level markers into the explanation rows. Visibility is controlled by the paired Name key, not by this description.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:91",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:618"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:618",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:194",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:197"
       ],
       "status": "verified"
     },
     "CommandListAttackPropertyType_CursedEnergyAttack_2": {
       "simple": "Serialized attack-property tags for second cursed-energy attack.",
-      "technical": "TArray<EGameCommandListAttackPropertyType> declared on the row; the enum values are None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion, Invalid=255. No source consumer was identified; the command widget instead clears PropertyIconResources, so these tags do not drive visible property icons in the reconstructed retail flow.",
+      "technical": "TArray<EGameCommandListAttackPropertyType> (uint8 UENUM with None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion and Invalid=255). Every exported row serializes three EGameCommandListAttackPropertyType::None entries. No C++ reader for this member was found in the available Source. BuildContents never populates PropertyIconResources (it explicitly assigns an empty array for cursed-energy attack 1 and extra attack 1; the other parameters keep the default empty array), so UGameCommandListActionWidget collapses all three property icons in this path. The three serialized slots do not prove an icon mapping.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:94",
         "Source/AbramsDataTable/Public/EGameCommandListAttackPropertyType.h:6",
@@ -285,26 +316,29 @@
     },
     "Id_CommandListText_SuperCursedEnergyAttack_Name": {
       "simple": "Localized name for super cursed-energy attack.",
-      "technical": "FName copied into the attack widget parameter as NameTextId. A None name hides the corresponding widget; the exported CP_050/CP_170 extra-attack rows are the only rows with non-None keys for those two slots.",
+      "technical": "FName copied into FGameCommandListActionParameter::NameTextId and set on the attack widget's AttackName with SetTextIdOnly. UGameCommandListWidget::BuildContents calls SetShow(!IsNone()) on this widget, so a None name hides it. All 27 exported rows have a non-None key in this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:100",
         "Source/Abrams/Private/GameCommandListWidget.cpp:663",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:670"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:670",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:192"
       ],
       "status": "verified"
     },
     "Id_CommandListText_SuperCursedEnergyAttack_Description": {
       "simple": "Localized description for super cursed-energy attack.",
-      "technical": "FName copied into the attack widget parameter as DescriptionTextId. It is paired with the same-slot Name key; the name alone controls widget visibility.",
+      "technical": "FName copied into FGameCommandListActionParameter::DescriptionTextId. UGameCommandListActionWidget resolves it with GameTextManager and parses `<SplitCommand>` sections, bracketed labels and level markers into the explanation rows. Visibility is controlled by the paired Name key, not by this description.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:103",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:664"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:664",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:194",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:197"
       ],
       "status": "verified"
     },
     "CommandListAttackPropertyType_SuperCursedEnergyAttack": {
       "simple": "Serialized attack-property tags for super cursed-energy attack.",
-      "technical": "TArray<EGameCommandListAttackPropertyType> declared on the row; the enum values are None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion, Invalid=255. No source consumer was identified; the command widget instead clears PropertyIconResources, so these tags do not drive visible property icons in the reconstructed retail flow.",
+      "technical": "TArray<EGameCommandListAttackPropertyType> (uint8 UENUM with None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion and Invalid=255). Every exported row serializes three EGameCommandListAttackPropertyType::None entries. No C++ reader for this member was found in the available Source. BuildContents never populates PropertyIconResources (it explicitly assigns an empty array for cursed-energy attack 1 and extra attack 1; the other parameters keep the default empty array), so UGameCommandListActionWidget collapses all three property icons in this path. The three serialized slots do not prove an icon mapping.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:106",
         "Source/AbramsDataTable/Public/EGameCommandListAttackPropertyType.h:6",
@@ -315,26 +349,29 @@
     },
     "Id_CommandListText_ExtraAttack_1_Name": {
       "simple": "Localized name for character-specific extra attack 1 (CP_050).",
-      "technical": "FName copied into the attack widget parameter as NameTextId. A None name hides the corresponding widget; the exported CP_050/CP_170 extra-attack rows are the only rows with non-None keys for those two slots.",
+      "technical": "FName copied into FGameCommandListActionParameter::NameTextId for the CP_050 extra-attack widget and used by SetShow(!IsNone()). In the export, CP_050 is the only row with a non-None key in this field; the other 26 rows serialize None and hide the widget.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:109",
         "Source/Abrams/Private/GameCommandListWidget.cpp:677",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:686"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:686",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:192"
       ],
       "status": "verified"
     },
     "Id_CommandListText_ExtraAttack_1_Description": {
       "simple": "Localized description for character-specific extra attack 1 (CP_050).",
-      "technical": "FName copied into the attack widget parameter as DescriptionTextId. It is paired with the same-slot Name key; the name alone controls widget visibility.",
+      "technical": "FName copied into FGameCommandListActionParameter::DescriptionTextId. UGameCommandListActionWidget resolves it with GameTextManager and parses `<SplitCommand>` sections, bracketed labels and level markers into the explanation rows. Visibility is controlled by the paired Name key, not by this description.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:112",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:678"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:678",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:194",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:197"
       ],
       "status": "verified"
     },
     "CommandListAttackPropertyType_ExtraAttack_1": {
       "simple": "Serialized attack-property tags for character-specific extra attack 1 (CP_050).",
-      "technical": "TArray<EGameCommandListAttackPropertyType> declared on the row; the enum values are None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion, Invalid=255. No source consumer was identified; the command widget instead clears PropertyIconResources, so these tags do not drive visible property icons in the reconstructed retail flow.",
+      "technical": "TArray<EGameCommandListAttackPropertyType> (uint8 UENUM with None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion and Invalid=255). Every exported row serializes three EGameCommandListAttackPropertyType::None entries. No C++ reader for this member was found in the available Source. BuildContents never populates PropertyIconResources (it explicitly assigns an empty array for cursed-energy attack 1 and extra attack 1; the other parameters keep the default empty array), so UGameCommandListActionWidget collapses all three property icons in this path. The three serialized slots do not prove an icon mapping.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:115",
         "Source/AbramsDataTable/Public/EGameCommandListAttackPropertyType.h:6",
@@ -345,26 +382,29 @@
     },
     "Id_CommandListText_ExtraAttack_2_Name": {
       "simple": "Localized name for character-specific extra attack 2 (CP_170).",
-      "technical": "FName copied into the attack widget parameter as NameTextId. A None name hides the corresponding widget; the exported CP_050/CP_170 extra-attack rows are the only rows with non-None keys for those two slots.",
+      "technical": "FName copied into FGameCommandListActionParameter::NameTextId for the CP_170 extra-attack widget and used by SetShow(!IsNone()). In the export, CP_170 is the only row with a non-None key in this field; the other 26 rows serialize None and hide the widget.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:118",
         "Source/Abrams/Private/GameCommandListWidget.cpp:692",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:700"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:700",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:192"
       ],
       "status": "verified"
     },
     "Id_CommandListText_ExtraAttack_2_Description": {
       "simple": "Localized description for character-specific extra attack 2 (CP_170).",
-      "technical": "FName copied into the attack widget parameter as DescriptionTextId. It is paired with the same-slot Name key; the name alone controls widget visibility.",
+      "technical": "FName copied into FGameCommandListActionParameter::DescriptionTextId. UGameCommandListActionWidget resolves it with GameTextManager and parses `<SplitCommand>` sections, bracketed labels and level markers into the explanation rows. Visibility is controlled by the paired Name key, not by this description.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:121",
-        "Source/Abrams/Private/GameCommandListWidget.cpp:693"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:693",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:194",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:197"
       ],
       "status": "verified"
     },
     "CommandListAttackPropertyType_ExtraAttack_2": {
       "simple": "Serialized attack-property tags for character-specific extra attack 2 (CP_170).",
-      "technical": "TArray<EGameCommandListAttackPropertyType> declared on the row; the enum values are None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion, Invalid=255. No source consumer was identified; the command widget instead clears PropertyIconResources, so these tags do not drive visible property icons in the reconstructed retail flow.",
+      "technical": "TArray<EGameCommandListAttackPropertyType> (uint8 UENUM with None, DirectAttack, Shooting, Buff, Debuff, Heal, Trap, Special, DomainExpansion and Invalid=255). Every exported row serializes three EGameCommandListAttackPropertyType::None entries. No C++ reader for this member was found in the available Source. BuildContents never populates PropertyIconResources (it explicitly assigns an empty array for cursed-energy attack 1 and extra attack 1; the other parameters keep the default empty array), so UGameCommandListActionWidget collapses all three property icons in this path. The three serialized slots do not prove an icon mapping.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:124",
         "Source/AbramsDataTable/Public/EGameCommandListAttackPropertyType.h:6",
@@ -374,8 +414,8 @@
       "status": "observed"
     },
     "Id_CommandListText_TagComboAttack_Name": {
-      "simple": "Localized name for the tag-team combo attack.",
-      "technical": "FName serialized in the row and present in every exported row, but no identified C++ reader in the available Source; no visibility or text behavior can be asserted from a consumer.",
+      "simple": "Serialized tag-team combo attack name (no traced C++ use).",
+      "technical": "FName serialized in every exported row (keys of the form CMD_COMMAND_NAME_CP_*_7000) and present in all exported locale shards, but no C++ reader for this member was found in the available Source. UGameCommandListWidget::BuildContents never references it, so no visibility, text-slot or other runtime behavior can be asserted from traced code.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:97"
       ],
@@ -383,19 +423,20 @@
     }
   },
   "notes": [
-    "This export has 27 rows and one identified C++ consumer, UGameCommandListWidget. The row is selected indirectly: Character::Id_CommandList, not the UI widget, determines which row is fetched from CommandListDataTables.",
-    "For every attack entry the corresponding widget is populated with the row's NameTextId and DescriptionTextId and hidden when the name is None; command-button labels, category colors, attack-set IDs and energy type come from widget-local maps and other tables (Action/UI/Character), not from this table.",
-    "The 11 CommandListAttackPropertyType_* arrays and Id_CommandListText_TagComboAttack_Name have no identified C++ consumer in the available Source. They are included because they are serialized in the reconstructed row struct and exported retail data, but their runtime behavior and constraints are not documented; no Blueprint logic is assumed.",
-    "Only the exported retail table and partial Content are available; additional shards or editor-only uses cannot be ruled out."
+    "The export contains 27 unique rows and one field-level runtime consumer path: UGameCommandListWidget::BuildContents, which forwards text IDs to UGameCommandListActionWidget and UGameCommandListPassiveWidget. AGameDataTableManager only loads/caches the UDataTable into CommandListDataTables; BuildContents scans that array and uses the first row matching Character::Id_CommandList. In the export, every command row is referenced, while 17 of 48 Character rows have Id_CommandList=None and get no content from this path.",
+    "Attack name keys control widget visibility via SetShow(!IsNone()); passive slots require both parallel arrays to have valid, non-None entries. Every attack name/description except ExtraAttack_1/2 is non-None in all 27 rows; ExtraAttack_1 is non-None only for CP_050 and ExtraAttack_2 only for CP_170. The character-description and TagCombo keys are non-None in every row, but only the former is read in the traced C++ path.",
+    "Serialized values are not native defaults: the reconstructed row struct has no member initializers and an empty constructor, which would leave FName values as None and TArray values empty. The export instead writes four passive entries per row and three property-enum entries per attack (all EGameCommandListAttackPropertyType::None). The 11 property arrays and the TagCombo key have no found C++ consumer; property icons are collapsed because BuildContents never supplies PropertyIconResources.",
+    "Description IDs are resolved through GameTextManager using locale-specific CommandListTextDataTable_<language> tables; all 628 non-None keys used by this table exist in all 11 exported locale shards. Command-button labels, category colors, character name/image/gauges, attack-set IDs and energy type come from static widget maps and Character/CharacterUI/CharacterImage/CharacterBaseParameter/CharacterCursedEnergy/Action rows, not from this table; the widget also has hard-coded CP_-specific overrides.",
+    "Row values come from a shipped-table data export. Runtime behavior is traced through reconstructed C++ annotated with retail RVAs, not observed in a retail runtime; no Blueprint behavior is assumed, and additional editor-only or unexported shards cannot be ruled out."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:257",
-      "detail": "Loads CommandListDataTable into CommandListDataTables."
+      "detail": "After all primary-asset DataTable loads complete, resolves CommandListDataTable and appends the non-null UDataTable to the CommandListDataTables member array cached on the manager."
     },
     {
       "source": "Source/Abrams/Private/GameCommandListWidget.cpp:392",
-      "detail": "Sets up the command list by finding the row named by the selected character's Id_CommandList."
+      "detail": "Searches the manager's CommandListDataTables array in order and uses the first row named by the selected character's Id_CommandList; a None ID or missing row returns before the content below is built."
     },
     {
       "source": "Source/Abrams/Private/GameCommandListWidget.cpp:399",
@@ -407,7 +448,7 @@
     },
     {
       "source": "Source/Abrams/Private/GameCommandListWidget.cpp:516",
-      "detail": "Builds each normal-attack action widget from the paired name/description keys and hides its widget when the name is None."
+      "detail": "Builds each normal-attack action widget from the paired name/description keys, sets its category color and command label from widget-local data, and hides it when the name is None."
     },
     {
       "source": "Source/Abrams/Private/GameCommandListWidget.cpp:580",
@@ -420,6 +461,18 @@
     {
       "source": "Source/Abrams/Private/GameCommandListWidget.cpp:672",
       "detail": "Shows the CP_050 and CP_170 extra-attack widgets only when their respective name keys are not None."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCommandListWidget.cpp:163",
+      "detail": "OpenForCharacter and the previous/next-character handlers call BuildContents, so each opening or character change repeats the CommandListDataTable row lookup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCommandListActionWidget.cpp:192",
+      "detail": "Indirect text consumer: SetupContent sets AttackName from NameTextId, then resolves DescriptionTextId through GameTextManager and splits `<SplitCommand>` sections into the explanation/level rows."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:47",
+      "detail": "Loads CommandListTextDataTable_<language> with the other localized text tables, which is how the FName keys stored in this table become localized strings."
     }
   ]
 }

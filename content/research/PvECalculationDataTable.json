@@ -1,68 +1,117 @@
 {
-  "description": "Named scalar constants/rates for PvE result calculations: risk, money, experience, extra-mission points and heal-point payouts.",
+  "description": "Named scalar constants and multipliers used by the reconstructed PvE result path for risk, money, experience, extra-mission points, heal points and whole-run mode-clear bonuses.",
   "fields": {
     "Id": {
-      "simple": "Name of the calculation constant.",
-      "technical": "FName import key/row name for FGameDataTableRow_PvECalculation. Consumers construct names (RISK_VALUE_*, MONEY_*, EXPERIENCE_*, HEAL_POINT_* and mode-clear labels) or take them from PvEMission's Id_PvECalculation_* fields, then look the row up over PvECalculationDataTables (DTM+0x950). The member itself is not read as data.",
+      "simple": "Row name that selects the named calculation constant.",
+      "technical": "Native FName declared with UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(AllowPrivateAccess=true)) at header line 11; no constructor assignment, so an unset value is the default FName/NAME_None. The export's ImportKeyField is Id but serializes each key as uppercase \"ID\". No C++ consumer reads the member as data: DataTable lookups use the row key. Consumers construct literal names (RISK_VALUE_*, MONEY_*, EXPERIENCE_*, HEAL_POINT_*, EXTRA_MISSION_POINT_* and mode-clear bonus names) or copy Id_PvECalculation_RiskValue/Money/Experience from a PvEMission row. The five RISK_VALUE_MISSION_DIFFICULTY_* names are reached only through those PvEMission references, not as literals in consumer code. Every lookup goes through StoryFindRowOutOfLine<FGameDataTableRow_PvECalculation>(PvECalculationDataTables, Id, false, false) at 0x1625810: it walks the cached non-null tables in order and returns the first matching row, and bCheckNone=false means NAME_None is not rejected up front.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvECalculation.h:11",
         "Source/Abrams/Public/GameDataTableManager.h:190",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:102",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:116"
+        "Source/Abrams/Private/GameDataTableManager.cpp:146",
+        "Source/Abrams/Private/GameDataTableManager.cpp:279",
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:21",
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:24",
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:27",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:118",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:781",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:50",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:116",
+        "Source/Abrams/Public/GameResultLabelTables.h:213",
+        "Source/Abrams/Public/GameResultLabelTables.h:225",
+        "JJKCCDatatables/datatables/PvECalculationDataTable.json",
+        "JJKCCDatatables/datatables/PvEMissionDataTable.json"
       ],
       "status": "observed"
     },
     "Value": {
-      "simple": "Numeric value of the named calculation constant.",
-      "technical": "float, constructor default 0.0f. Used throughout PvE result computation: risk starts from RISK_VALUE_MISSION_CLEAR_VALUE and is multiplied by task-clear, previous-mission-count, evaluation and mission difficulty rows before FloorToInt; money uses the mission's money row, task/vow-count/help multipliers and win/loss vow rates before FloorToInt; experience follows the same shape from an evaluation row and the mission's experience row. Other rows supply extra-mission points, heal-point clear/task/vow increments and whole-run mode-clear bonuses (including a HealPoint x per-point bonus term). Some lookups are guarded and leave 0 when absent; others are dereferenced without a null check.",
+      "simple": "Numeric value of the selected calculation constant; multipliers, point amounts, rates or fixed payouts depending on the row name.",
+      "technical": "Native float declared with UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(AllowPrivateAccess=true)) at header line 15; constructor default 0.0f, read from row +0x10. Risk (0x162aac0) starts at RISK_VALUE_MISSION_CLEAR_VALUE (100), multiplies by TASK_CLEAR_RATE (1.5) when completed tasks >= MissionTaskIds.Num(), by CLEAR_RATE_01..03 (1.0/1.1/1.2) for PvEMissionIds.Num() 1..3, by EVALUATION_RATE_C/B/A/S (1.0/1.1/1.2/1.3) for result Rank 1..4 and by the PvEMission risk difficulty row (A..E = 1.0/1.2/1.3/1.4/1.5), then FloorToInt; extra missions and (MaxRisk > CurrentRisk || loss) force 0, and only MissionKind 1 calls it. Money (0x1628780) for an extra mission is MONEY_EXTRA_MISSION_VALUE (10000) plus on a win MONEY_EXTRA_MISSION_CLEAR_BONUS (50000), with each lookup guarded; otherwise it is max(bonus-score sum, 0) times the PvEMission money difficulty row (A..E = 1.1/1.3/1.8/3.0/4.5), TASK_CLEAR_RATE (1.3) if all tasks, BINDINGVOWS_00..03 (1.0/1.1/1.2/1.3) by count of non-None vows (0..3), and HELP (1.25) only when HelpState is 0 (another online user requested SOS). The final win/loss rate is from BindingVowsEffectDataTable effect sums, not from this table: a win adds effects to 1.0 and floors the result at 1.0; a loss adds effects to 1.0 and clamps to [0,1]; final payout is FloorToInt(Rate * Money). Experience (0x1627cb0) has the extra-mission pair 5000 + win 20000; for normal missions it starts from EVALUATION_VALUE_C/B/A/S (10/30/60/100) for Rank 1..4 (0 if unmapped), multiplies by the PvEMission experience difficulty row (A..E = 1.0/1.3/1.8/2.5/3.5), TASK_CLEAR_RATE (2.0), BINDINGVOWS_00..03 (1.0/1.1/1.15/1.3) and HELP (1.5) under the same conditions, applies the experience-specific BindingVowsEffect rate with the same win floor/loss clamp, then FloorToInt. Extra-mission point rows (0x1628170/0x1628080) are C/B/A/S = 0/5/8/12, guarded and floored; Rank 0, 0xFF (the snapshot reset/BonusRank sentinel) and any other value leave 0. Heal points (0x1628260) add CLEAR_VALUE (1) when bClear is true, TASK_CLEAR_00..03 (0/0/1/2) by completed-task count, and BINDINGVOWS_00..03 (0/1/1/2) by non-None vow count; only map lookups are guarded and the total is floored. Mode-clear helpers (0x1628e70/0x1628ac0) sum A..E as 1..5 from the PvEMission money/experience IDs over PlayedMissionIds plus the current mission; a sum of 3..15 selects BONUS_SUM_03..15 (money 1000..50000, experience 100..2000) and HEAL_POINT_BONUS_SUM_03..15 (money 50..10000, experience 50..200 per heal point), add Max(HealPoint * per-point Value, 0), and FloorToInt; sums outside 3..15 select no row and yield 0. Normal money/experience/risk helpers use the PvEMission row and BindingVowIds[Slot] without bounds checks, while extra-mission branches short-circuit before those fields are used.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvECalculation.h:15",
         "Source/AbramsDataTable/Private/GameDataTableRow_PvECalculation.cpp:4",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:40",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:50",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:72",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:82",
         "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:95",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:102",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:105",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:116",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:154",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:156",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:221",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:317",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:369",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:405",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:781"
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:131",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:153",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:191",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:196",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:218",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:262",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:267",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:285",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:306",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:342",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:378",
+        "Source/Abrams/Public/GameResultLabelTables.h:27",
+        "Source/Abrams/Public/GameResultLabelTables.h:47",
+        "Source/Abrams/Public/GameResultLabelTables.h:67",
+        "Source/Abrams/Public/GameResultLabelTables.h:87",
+        "Source/Abrams/Public/GameResultLabelTables.h:109",
+        "Source/Abrams/Public/GameResultLabelTables.h:120",
+        "Source/Abrams/Private/GamePhase_MainMenuPvE.cpp:496",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:810",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:819",
+        "JJKCCDatatables/datatables/PvECalculationDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset has 109 rows with FGameDataTableRow_PvECalculation; the manager loads PvECalculationDataTable into PvECalculationDataTables (DTM+0x950).",
-    "Many consumers are named GamePvE_Calc* helpers in GamePhase_BattlePvESolo.cpp with retail RVAs in comments. They read constants by constructed FName or by ids copied from PvEMission rows; see PvEMission documentation for those cross-table joins.",
-    "Some result helpers return 0 for extra missions or when a row is missing, while others dereference the finder result unguarded. That asymmetry is part of the reconstructed behaviour.",
-    "Finder 0x1625810 is labelled behavioural in status/functions.json. Content is partial and Blueprint uses were not exhaustively inspected."
+    "Export inventory: one PvECalculationDataTable object/one catalog variant, RowStruct GameDataTableRow_PvECalculation, ImportKeyField Id, 109 unique row keys and no alternate or numbered shard. All rows are accounted for by consumer families: risk base/task 2, played-rate 3, evaluation 4, difficulty 5; money task/help 2, difficulty 5, vow-count 4, mode bonus 13, mode heal bonus 13, extra 2; experience evaluation 4, difficulty 5, task/help 2, vow-count 4, mode bonus 13, mode heal bonus 13, extra 2; heal clear 1, task 4, vow-count 4; extra-mission-point evaluation 4. All exported Value entries are JSON numbers; no sentinel or negative values occur in this table.",
+    "Load/lookup chain: StartInitialLoading registers PvECalculationDataTable as a primary-asset loader name; after all loads complete, DTM::Tick resolves it through UAbramsAssetManager and AddLoadedDataTables adds only non-null UDataTable pointers to PvECalculationDataTables (DTM+0x950). StoryFindRowOutOfLine at 0x1625810 has one explicit FGameDataTableRow_PvECalculation instantiation and returns the first matching row across that cached array. No alias or second cache for this table was found in Source, Config or Plugins; the export directory and catalog also contain only this one variant.",
+    "Cross-table keys: the PvEMission export has 1,073 rows. Its 1,072 normal missions each populate all three Id_PvECalculation_* fields with matching A/B/C/D/E names (risk 78/180/270/391/153; money and experience the same distribution). PVE_EXTRA_MISSION_01 has NAME_None in all three fields, which is safe only because IsExtraMission (substring match, 0x1311f60) makes the risk, money and experience helpers return or use their extra-mission branches before reading those fields. The A..E rows are also reinterpreted as ordinal difficulties 1..5 by GMoneyMissionDifficultyMap and GExperienceMissionDifficultyMap for the whole-run bonus.",
+    "Consumer conditions and indices: result rank 1=C, 2=B, 3=A, 4=S; 0 and the 0xFF snapshot/BonusRank sentinel have no row. Risk played-rate uses the count after Enter appends the current mission, so only 1..3 are mapped. Full-task multipliers require PreviousBattleResult.Value438 >= MissionTaskIds.Num(). Vow-count rows use non-None entries of BindingVowIds[Slot] with Slot = PreviousBattleResult.Key3D8; maps cover 0..3 only. Extra-mission-point accumulation in Enter uses the result rank for the player slot and BonusRank for every other character, then clamps each point total to [0,100]; OnResultRecorded only adds the result-rank points on a win in MissionKind 1. Heal points are calculated only on a win, with bClear=true; in PvESolo all per-index results go to the player slot, otherwise to the same index. Mode-clear bonuses require MissionKind 1 and bRunEnd, use PlayedMissionIds plus the current mission, and use the player's bounded HealPointNumbers[Slot].",
+    "Outputs: risk is passed to AddPvEMaxRiskValue and the per-battle risk tally (clamped to 0..50000 downstream); money and mode-clear money go to AddUserMoney (clamped to 0..999999999) and separate tallies; experience and mode-clear experience go to AddStudioInt_828 (same clamp); result extra points go to AddExtraMissionPoint (clamped to 0 and 100); heal points are added to HealPointNumbers and the player tally. Missing rows therefore propagate as 0 through guarded branches, but unguarded row dereferences would fail rather than fall back to the constructor's 0.0f.",
+    "Evidence status: status/functions.json labels the row finder 0x1625810 and helpers 0x1628780 (money), 0x1627cb0 (experience) and 0x1628e70/0x1628ac0 (mode clear) as state behavioural, i.e. BEHAV-certified reconstructions with unmatched retail bytes. Risk 0x162aac0 and the extra-mission-point/heal-point helpers 0x1628080/0x1628170/0x1628260 are state match. Retail RVA comments and the byte-certified static label tables in GameResultLabelTables.h support the row names and conditions; no live-runtime assertion was made.",
+    "Limitations: retail Blueprint graphs, editor-only callers and a live game run were not inspected. The project guide states Blueprints contain no game logic, but exhaustive exclusion of retail asset references is not possible from the static C++ sources and exports available here; behavioural status is not byte-identical parity."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:279",
+      "detail": "Resolves PvECalculationDataTable through the asset-manager loader and caches non-null tables in PvECalculationDataTables (DTM+0x950); null pointers are filtered at lines 146-154."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:118",
+      "detail": "StoryFindRowOutOfLine walks the cached tables with bCheckNone=false; line 781 explicitly instantiates it for FGameDataTableRow_PvECalculation at retail 0x1625810."
+    },
+    {
       "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:95",
-      "detail": "GamePvE_CalcResultRiskValue combines multiple risk constants and the mission's risk id."
+      "detail": "GamePvE_CalcResultRiskValue applies base, task, played-mission, evaluation and PvEMission risk rows, then forces zero for extra missions, below-max-risk condition or a loss before flooring."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:126",
-      "detail": "GamePvE_CalcResultMoney computes mission payout from calculation rows and binding-vow state."
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:131",
+      "detail": "GamePvE_CalcResultMoney uses guarded extra-mission payouts or the normal bonus-score/mission/task/vow/help multipliers, then the separate BindingVowsEffect win/loss rate, and floors the result."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:194",
-      "detail": "GamePvE_CalcResultExperience computes experience payout from evaluation and mission rows."
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:196",
+      "detail": "GamePvE_CalcResultExperience uses the four evaluation amounts, PvEMission experience difficulty, task/vow/help multipliers and the experience-specific BindingVowsEffect rate."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:264",
-      "detail": "Extra-mission point helpers read evaluation-ranked constants."
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:267",
+      "detail": "GamePvE_CalcExtraMissionPoint supplies the C/B/A/S points used during result Enter to roll an extra mission, with the player rank and the 0xFF BonusRank sentinel selecting different characters' ranks."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:307",
-      "detail": "Heal-point helper reads clear/task/vow-count increments."
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:285",
+      "detail": "GamePvE_CalcResultExtraMissionPoint repeats the evaluation lookup with the finished battle's rank for the win/MissionKind-1 saved-point payout."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:354",
-      "detail": "Mode-clear money and experience helpers read whole-run bonus and heal-point bonus rows."
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:306",
+      "detail": "GamePvE_CalcResultHealPoint adds the clear value, completed-task count row and non-None vow-count row, with a 0 short-circuit for extra missions."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:342",
+      "detail": "GamePvE_CalcModeClearMoney and, at line 378, GamePvE_CalcModeClearExperience map the run's PvEMission IDs to A..E ordinals 1..5, select 3..15 bonus rows and add a floored HealPoint-per-point term."
+    },
+    {
+      "source": "Source/Abrams/Public/GameResultLabelTables.h:27",
+      "detail": "Byte-certified static label maps supply every constructed row name: evaluation/task/vow/mode-clear indices, A..E difficulty names and their ordinal values."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:797",
+      "detail": "OnResultRecorded calls the helpers at lines 813, 820, 823, 828, 836, 850 and 853 and deposits the int32 results into risk, money, experience, extra-point, heal-point and mode-clear state/tallies."
     }
   ]
 }

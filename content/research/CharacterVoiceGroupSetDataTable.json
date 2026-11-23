@@ -3,10 +3,13 @@
   "fields": {
     "Id": {
       "simple": "Row key / selected character voice set ID.",
-      "technical": "FName primary key. CharacterSoundDataTable.Id_CharacterVoiceGroupSet holds candidate IDs; AGameCharacter::FindCharacterVoiceGroupSetRow picks an index from saved normal/cursed-energy voice indices (or index 3 on low HP) and resolves the first row with this Id. Export spells it ID.",
+      "technical": "FName primary key. CharacterSoundDataTable.Id_CharacterVoiceGroupSet holds candidate IDs; AGameCharacter::FindCharacterVoiceGroupSetRow uses element 0 for mode 0, the saved NormalAttackVoiceIndex for mode 1, the saved CursedEnergyAttackVoiceIndex for mode 2, and element 3 for low-HP mode 3, then resolves the first row with this Id. Invalid indices or None yield no row. Export spells it ID.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:11",
+        "Source/Abrams/Private/GameCharacter.cpp:3456",
+        "Source/Abrams/Private/GameCharacter.cpp:3459",
         "Source/Abrams/Private/GameCharacter.cpp:3462",
+        "Source/Abrams/Private/GameCharacter.cpp:3463",
         "Source/Abrams/Private/GameCharacter.cpp:3466",
         "Source/Abrams/Private/GameCharacterActionController.cpp:2903",
         "Source/Abrams/Private/GameDataTableManager.cpp:212"
@@ -15,22 +18,25 @@
     },
     "Id_CharacterVoiceGroup_DefaultAction": {
       "simple": "CharacterVoiceGroup row for generic default/action lines.",
-      "technical": "FName. Resolved by Action_FindCharacterVoiceGroupRow over DTM.CharacterVoiceGroupDataTables (+0x530) into a CharacterVoiceGroup row; None is rejected by the finder.. Generic voice Kind 1 uses the request Index into that row's Id_VoiceGroup array.",
+      "technical": "FName. Resolved by Action_FindCharacterVoiceGroupRow over DTM.CharacterVoiceGroupDataTables (+0x530) into a CharacterVoiceGroup row; None is rejected by the finder. Generic voice Kind 1 disables the low-HP set override and uses the request Index into that row's Id_VoiceGroup array.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:15",
         "Source/Abrams/Private/GameCharacterActionController.cpp:3182",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3186"
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3187"
       ],
       "status": "verified"
     },
     "Id_CharacterVoiceGroup_NormalAttack1": {
       "simple": "CharacterVoiceGroup row for the first normal-attack hit.",
-      "technical": "FName. Resolved by Action_FindCharacterVoiceGroupRow over DTM.CharacterVoiceGroupDataTables (+0x530) into a CharacterVoiceGroup row; The selected row supplies Id_VoiceGroup entries for the attack step.. NormalAttack_1, its Auto variant and the air first-hit classes resolve this field; some character overrides use it too.",
+      "technical": "FName. Resolved by Action_FindCharacterVoiceGroupRow over DTM.CharacterVoiceGroupDataTables (+0x530) into a CharacterVoiceGroup row; the selected row supplies Id_VoiceGroup entries for the attack step. For Kind 2 the active action's virtual GetVoiceGroupRow selects this field (Index 0 is replaced by the action's attack voice index). NormalAttack_1, its Auto variant and the air first-hit classes resolve this field; some character overrides use it too.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:18",
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:62",
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:69",
-        "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:244"
+        "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:244",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3197",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3202",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3207"
       ],
       "status": "verified"
     },
@@ -95,7 +101,7 @@
     },
     "Id_CharacterVoiceGroup_CursedEnergyAttack1_1": {
       "simple": "CharacterVoiceGroup row for level-1 cursed-energy attack 1.",
-      "technical": "FName. FGameCharacterAction_CursedEnergyAttack1Base starts with the _1 field and switches to _2 or _3 when GetCursedEnergyLevel() is 2 or 3; the chosen ID is resolved with bCheckNone=true.",
+      "technical": "FName. FGameCharacterAction_CursedEnergyAttack1Base starts with the _1 field for level 1 and other unmatched levels, switches to _2 or _3 when GetCursedEnergyLevel() is 2 or 3; the chosen ID is resolved with bCheckNone=true.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:36",
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:155"
@@ -153,14 +159,14 @@
       "technical": "FName. FGameCharacterAction_SuperCursedEnergyAttackBase::GetVoiceGroupRow resolves this single field without level switching, then the regular VoiceGroup index selection follows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:54",
-        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:297",
+        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:298",
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:301"
       ],
       "status": "verified"
     },
     "Id_CharacterVoiceGroup_ExtraAttack1": {
       "simple": "CharacterVoiceGroup row for a character-specific extra attack 1.",
-      "technical": "FName. Used by CP_020, CP_050, CP_070 and CN_230 ExtraAttack_1 overrides (CN_230 via a direct table walk). CP_230 ExtraAttack_1 instead reads CursedEnergyAttack2_1, so this field is not universal. Many exported rows set it to None.",
+      "technical": "FName. Used by CP_020, CP_050, CP_070 and CN_230 ExtraAttack_1 overrides (CN_230 via a direct table walk). CP_230 ExtraAttack_1 instead reads CursedEnergyAttack2_1, so this field is not universal. 132/151 exported rows set it to None; eight non-None IDs in CP_250/CP_260/CN_122/CN_250 rows have no group row in the supplied export and no reconstructed C++ reader was found for those characters.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:57",
         "Source/Abrams/Private/CP_020_ActionController.cpp:539",
@@ -185,30 +191,32 @@
       "technical": "FName. Generic voice Kind 3 requires Index>0, resolves this field and selects Id_VoiceGroup[Index-1].",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:63",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3214",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3216"
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3212",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3216",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3221"
       ],
       "status": "verified"
     },
     "Id_CharacterVoiceGroup_SituationAttack": {
       "simple": "CharacterVoiceGroup row for situational/nearby-opponent attacks.",
-      "technical": "FName. Generic voice Kind 4 resolves this field and uses Id_VoiceGroup[Index]; Kind 4 requires a qualified secondary target and distance/time conditions.",
+      "technical": "FName. Generic voice Kind 4 resolves this field and uses Id_VoiceGroup[Index]; Kind 2/3 requests can be rewritten to Kind 4 when a qualified secondary target, bSituationCheck and wait-time/distance conditions pass. Kind 4 is low-HP-checked only at Index==2.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:66",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3093",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3223",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3225"
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3100",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3225",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3230"
       ],
       "status": "verified"
     },
     "Id_CharacterVoiceGroup_System": {
       "simple": "CharacterVoiceGroup row for generic system lines.",
-      "technical": "FName. Generic voice Kind 5 resolves this field and indexes Id_VoiceGroup by Index; the set row is selected in mode 2 for this kind.",
+      "technical": "FName. Generic voice Kind 5 resolves this field and indexes Id_VoiceGroup by Index; its nominal set mode is 2, but the low-HP override can replace it with mode 3 at Index 2 or 5/6. The candidate array is read after mode selection.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:69",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3162",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3232",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3234"
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3151",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3163",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3234",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3239"
       ],
       "status": "verified"
     },
@@ -217,8 +225,9 @@
       "technical": "FName. Generic voice Kind 6 requires Index>0, resolves this field and uses Id_VoiceGroup[Index-1].",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:72",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3244",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3247"
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3243",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3247",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3252"
       ],
       "status": "verified"
     },
@@ -227,8 +236,8 @@
       "technical": "FName. Generic voice Kind 8 resolves this field and uses Id_VoiceGroup[Index].",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:75",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3266",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3269"
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3269",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3274"
       ],
       "status": "verified"
     },
@@ -237,8 +246,8 @@
       "technical": "FName. Generic voice Kind 9 resolves this field and uses Id_VoiceGroup[Index].",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:78",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3275",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3278"
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3278",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3283"
       ],
       "status": "verified"
     },
@@ -247,8 +256,8 @@
       "technical": "FName. Generic voice Kind 7 requires Index>0, resolves this field and uses Id_VoiceGroup[Index-1]; it is distinct from Damage1.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:81",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3257",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3260"
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3260",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3265"
       ],
       "status": "verified"
     },
@@ -257,17 +266,21 @@
       "technical": "FName. Generic voice Kind 10 resolves this field and uses Id_VoiceGroup[Index]. Many exported rows leave it None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroupSet.h:84",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3284",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3287"
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3287",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3292"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Loaded as a DataTable primary asset named CharacterVoiceGroupSetDataTable into DTM.CharacterVoiceGroupSetDataTables (+0x520). AGameCharacter::FindCharacterVoiceGroupSetRow chooses an index from saved customization values (mode 1 = normal attack variant, mode 2 = cursed-energy variant); low HP forces mode 3, commonly the PINCH variant in exported rows.",
-    "Every FName field is a join key to CharacterVoiceGroupDataTable, not to VoiceGroupDataTable directly. The selected CharacterVoiceGroup row supplies the Id_VoiceGroup entry indexed by the action step; that entry joins to VoiceGroupDataTable, whose Id_Voice entries join to VoiceDataTable.",
-    "None is common in exported rows (for example ExtraAttack1/ExtraAttack2/Unique for characters without those actions) and Action_FindCharacterVoiceGroupRow rejects None when called with bCheckNone=true.",
-    "The 151 exported rows cover available content only. Character-specific controllers and base action classes are reconstructed C++ with retail RVAs recorded inline; Blueprint-only references cannot be excluded from the partial Content tree."
+    "The DataTable is loaded through DataTableLoaders into DTM.CharacterVoiceGroupSetDataTables (+0x520). AGameCharacter::FindCharacterVoiceGroupSetRow(Mode) reads ActionController slot 90's candidate FNames (normally CharacterSoundDataTable.Id_CharacterVoiceGroupSet): mode 0 uses element 0, mode 1 the saved NormalAttackVoiceIndex, mode 2 the saved CursedEnergyAttackVoiceIndex, and mode 3 element 3 (usually a *_PINCH row in the export). Out-of-range indices and NAME_None return no row; the first matching table in the array wins. CP_051's action controller overrides slot 90 while CP_051_Passive is active, substituting CP_051_2/TYPEA_2/TYPEB_2/PINCH_2.",
+    "PlayVoice Kind 2 (attack actions) selects a field through the active action's virtual GetVoiceGroupRow(VoiceSet), not through a fixed Kind-to-member mapping: normal attacks select NormalAttack*, cursed-energy/super attacks select level-specific fields, CP_020/CP_050/CN_230 extra attacks select their own fields, and CP_230 inlines its own finder. Its set mode comes from the action (normal attacks 1; cursed-energy/super and CP_020/CP_050 extra attacks 2; CP_070 extra attack 1). When request Index is 0 the action's GetAttackVoiceIndex() value is used; the resulting Id_VoiceGroup index has no bounds check and the group finder is called with bCheckNone=false.",
+    "For PlayVoice Kinds 1-10 the set row can be forced to mode 3 when HP/maxHP <= 0.3 (or maxHP <= 0), except Kind 1 explicitly disables that check; Kind 4 applies it only at Index==2 and Kind 5 only at Index 2/5/6. Mode 3 selects candidate element 3, not a field of the set row.",
+    "All 25 row members are reflected FName with no C++ initializer; the inline empty constructor (header line 86) leaves NAME_None. The export serializes all 25 columns on every row and uses 'None' for unused voice slots (no missing columns or non-None declared defaults).",
+    "Every non-None FName is a join to CharacterVoiceGroupDataTable (DTM +0x530), not directly to VoiceGroupDataTable. Action_FindCharacterVoiceGroupRow returns the first matching row and rejects NAME_None when bCheckNone=true; the observed C++ reads of these columns pass true or (in CP_230) check IsNone() explicitly. The selected CharacterVoiceGroup.Id_VoiceGroup[step] then joins to VoiceGroupDataTable, whose Id_Voice entries join to VoiceDataTable.",
+    "Indexing differs by generic Kind: Kinds 1/4/5/8/9/10 use Id_VoiceGroup[Index] directly; Kinds 3/6/7 require Index>0 and use Id_VoiceGroup[Index-1]; Kind 2 uses the attack voice index when Index==0. These are array indices, not IDs or counts, and no bounds check is performed at the read site.",
+    "The export has 151 unique rows (every row key equals its ID and there are no repeated keys). 147 are referenced by the 56 four-element CharacterSoundDataTable candidate arrays (12 slots are None); the remaining four are the CP_051 passive-only rows above. Many slots are None (for example 132/151 ExtraAttack1, 146/151 ExtraAttack2 and 97/151 Unique).",
+    "In the supplied export, eight non-None ExtraAttack1 IDs (CP_250, CP_260, CN_122, CN_250 base and PINCH rows) have no CharacterVoiceGroupDataTable row, and ten CharacterVoiceGroup.Id_VoiceGroup references in downstream rows have no VoiceGroupDataTable row; no reconstructed C++ reader for ExtraAttack1 in those four characters was found, so the reason is unresolved. C++ consumer evidence here comes from current Reconstruction sources with inline retail RVA annotations; retail Blueprint graphs were not reviewed, so Blueprint-only consumers cannot be excluded."
   ],
   "usages": [
     {
@@ -283,20 +296,32 @@
       "detail": "Normal-attack classes pick normal-attack fields from the set."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:151",
+      "source": "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:152",
       "detail": "Cursed-energy classes pick level-specific fields from the set."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:3128",
-      "detail": "Generic PlayVoice maps request Kind to a field and indexes the resulting group."
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:3141",
+      "detail": "Kind 2 takes the set mode from the active attack action and is still subject to the low-HP mode override."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:653",
+      "detail": "Shared group finder rejects None and returns the first matching CharacterVoiceGroup row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:3179",
+      "detail": "Generic PlayVoice maps Kind to a set field, applies the Index convention, and indexes the resulting CharacterVoiceGroup row."
     },
     {
       "source": "Source/Abrams/Private/CP_020_ActionController.cpp:536",
       "detail": "Character-specific extra-attack overrides pick their own fields."
     },
     {
-      "source": "Source/Abrams/Private/CP_230_ActionController.cpp:1123",
+      "source": "Source/Abrams/Private/CP_230_ActionController.cpp:1124",
       "detail": "CP_230 extra attack uses the CursedEnergyAttack2_1 field."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_051_ActionController.cpp:853",
+      "detail": "CP_051 passive buff replaces slot-90 candidate IDs with the four CP_051_*_2 set rows."
     }
   ]
 }

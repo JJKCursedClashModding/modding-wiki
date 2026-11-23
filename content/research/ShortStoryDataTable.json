@@ -1,93 +1,145 @@
 {
-  "description": "Catalogue of short side stories: title text, script to play, prerequisite/sequel link and the cast row to use.",
+  "description": "Catalogue of the 45 short side stories shown in the character-relation list. A row pairs a short-story id with a localized title text id, a ScriptDataTable script id, an optional prerequisite short story, and a ShortStoryCharacterDataTable cast row; the id also drives persisted read state.",
   "fields": {
     "ID": {
-      "simple": "Short-story id (STDM_SS_xxx).",
-      "technical": "FName key in ShortStoryDataTables (DTM +0xA30). Used as the StudioStoryDemoSeen_630 state key, as the item VariableId for ownership checks, as the list item's row name, and as the argument of Story_GetShortStoryScriptId.",
+      "simple": "Short-story id (STDM_SS_001 to STDM_SS_045; exported field `ID`, native `Id`).",
+      "technical": "FName (native `Id`; the catalog's import key). All 45 exported row keys equal this field. MainMenuStory uses it as the `StudioStoryDemoSeen_630` key, resolves the Item row whose `VariableId` equals it and tests stock >0, and copies it into the list item's `ShortStoryRowName`. That selected row name is also the key passed to `Story_GetShortStoryScriptId` and stored in `StudioStoryDiagramDemoId_CF8` when the demo phase starts. A missing save-map entry defaults to seen state 0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShortStory.h:11",
+        "Source/Abrams/Private/GameDataTableManager.cpp:293",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:489",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:492",
         "Source/Abrams/Private/GameStoryCharaRelateDetailWidget.cpp:360",
+        "Source/Abrams/Private/GameStoryCharaRelateShortStoryListItemWidget.cpp:62",
+        "Source/Abrams/Private/GameStoryCharaRelateShortStoryListItemWidget.cpp:67",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:788",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1161"
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1222"
       ],
       "status": "verified"
     },
     "Id_StoryText_Title": {
-      "simple": "Localized-text id shown as the short-story button title.",
-      "technical": "FName (row +0x10) passed to SetButtonTextId(..., EApplicationLanguage::Invalid) by the relation short-story list item. No string formatting is done by the table consumer.",
+      "simple": "Localized-text id for the short-story button title.",
+      "technical": "FName (row +0x10). An unlocked list item passes it unchanged to `SetButtonTextId(..., EApplicationLanguage::Invalid)`, which calls `SetTextIdOnly`; no parameters or string formatting are applied on this path. Locked items instead use the fixed system text `SYS_STORY_CORRELATION_DIAGRAM_LABEL_1003`. Every exported `STR_STDM_SS_*` id is present in all 11 localized `StoryTextDataTable_*` exports; the separate `ShortStoryDemoTextDataTable_*` family does not contain these title ids.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShortStory.h:15",
-        "Source/Abrams/Private/GameStoryCharaRelateShortStoryListItemWidget.cpp:100"
+        "Source/Abrams/Private/GameStoryCharaRelateShortStoryListItemWidget.cpp:100",
+        "Source/Abrams/Private/GameStoryCharaRelateShortStoryListItemWidget.cpp:86",
+        "Source/Abrams/Private/GameWidgetButton.cpp:114",
+        "Source/Abrams/Private/GameWidgetButton.cpp:122",
+        "Source/Abrams/Private/GameTextManager.cpp:556"
       ],
       "status": "verified"
     },
     "Id_Script": {
-      "simple": "Script row to play for this short story.",
-      "technical": "FName (row +0x18). Story_GetShortStoryScriptId returns it without a null-row check; UGamePhase_StoryDemoShortStory::GetScriptId supplies StudioStoryDiagramDemoId_CF8 as the short-story id and passes the returned script id to the normal script phase.",
+      "simple": "ScriptDataTable row id for the script played by the short story.",
+      "technical": "FName (row +0x18). `Story_GetShortStoryScriptId` finds the ShortStory row by id across the loaded tables in order and returns `Id_Script` without a row-null check. The short-story demo phase calls it with `StudioStoryDiagramDemoId_CF8`; `UGamePhase_StoryDemoBase::PreparePhase` then resolves the returned id in ScriptDataTables, reads `ScriptFileName` into the script player and uses `Id_Bgm` to play (or stop, when None) BGM. All 45 exported script ids resolve in ScriptDataTable with matching `ScriptFileName`.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShortStory.h:18",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:136",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:788",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:789",
         "Source/Abrams/Private/GamePhase_StoryDemoShortStory.cpp:26",
-        "Source/Abrams/Private/GamePhase_StoryDemoShortStory.cpp:28"
+        "Source/Abrams/Private/GamePhase_StoryDemoShortStory.cpp:28",
+        "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:91",
+        "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:95",
+        "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:103",
+        "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:112"
       ],
       "status": "verified"
     },
     "Id_ShortStory": {
-      "simple": "Optional linked short story that unlocks the read state.",
-      "technical": "FName (row +0x20). During MainMenuStory update, a short story with Seen == 1 becomes Seen == 2 when this field is None, or when the linked story's StudioStoryDemoSeen_630 value is >= 3; otherwise it stays unread.",
+      "simple": "Optional prerequisite short-story id that must be read before this one can be selected.",
+      "technical": "FName (row +0x20; `None` when unrestricted). During MainMenuStory update, a row at seen state 1 advances to 2 only when this field is None or the linked story's `StudioStoryDemoSeen_630` value is >=3; if the linked key is absent the value stays 1. State 2 is not `Story_IsShortStoryNew` (state <=1), so the list permits selection; state >=3 is shown as already seen. The six exported links are 007->006, 009->008, 016->015, 024->023, 026->025 and 028->027; the other 39 rows are None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShortStory.h:21",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:501",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:505",
-        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:507"
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:507",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1161",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1198",
+        "Source/Abrams/Private/GameStoryCharaRelateShortStoryListViewWidget.cpp:80"
       ],
       "status": "verified"
     },
     "Id_ShortStoryCharacter": {
-      "simple": "Cast row for this short story.",
-      "technical": "FName row id used to find a ShortStoryCharacter row in DTM +0xA40 before filtering the relation detail list and before rendering the list item; a missing cast row drops the story from those consumers.",
+      "simple": "ShortStoryCharacterDataTable row id containing the story's cast.",
+      "technical": "FName (row +0x28), resolved across ShortStoryCharacterDataTables (DTM +0xA40) in table order. The relation detail list and the pair 'new content' detector require a found cast row whose `Id_Character` contains both selected character ids; otherwise the story is skipped. The list item renders at most four non-None cast ids as face icons and returns early when the cast row is missing. All 45 exported ids resolve to 45 cast rows, each with four FName slots.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShortStory.h:24",
+        "Source/Abrams/Private/GameDataTableManager.cpp:294",
         "Source/Abrams/Private/GameStoryCharaRelateDetailWidget.cpp:350",
+        "Source/Abrams/Private/GameStoryCharaRelateDetailWidget.cpp:355",
         "Source/Abrams/Private/GameStoryCharaRelateShortStoryListItemWidget.cpp:76",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1355"
+        "Source/Abrams/Private/GameStoryCharaRelateShortStoryListItemWidget.cpp:81",
+        "Source/Abrams/Private/GameStoryCharaRelateShortStoryListItemWidget.cpp:104",
+        "Source/Abrams/Private/GameStoryCharaRelateShortStoryListItemWidget.cpp:111",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1355",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1360"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Only six exported rows set Id_ShortStory; the rest are None and are treated as immediately readable once owned.",
-    "The script field is used directly for the short-story demo phase; the table itself has no separate map or BGM fields (those live in ScriptDataTable).",
-    "No localization variants of this table were exported; text localization is expected to live in the text-table ids rather than per-locale rows.",
-    "Evidence is from the reconstructed C++ in Source/ (row shape/counts from the exported table); status/ records byte matches for some owner TUs, but this file does not claim a retail byte comparison for every function or exhaustive Blueprint/runtime coverage."
+    "Export scope: one ShortStoryDataTable variant with 45 rows (STDM_SS_001..045). Row keys equal Id, Id_Script equals Id, Id_StoryText_Title equals STR_<Id>, and Id_ShortStoryCharacter equals Id in every row. Every script and cast target exists and no row keys repeat.",
+    "Seen state is in the shared save map StudioStoryDemoSeen_630, not in this table: a missing key is 0, 1 means the story item is in stock but the story is not selectable yet, 2 means unlocked/unread, and 3 means read/completed. MainMenuStory only performs 0->1 through item ownership and 1->2 through the prerequisite check; finishing or skipping the short-story phase writes 3 for the current id. The UI treats <=1 as locked and >=3 as seen, the pair-new notification uses exactly 2, and the 0x100-slot save maps persist the value.",
+    "Ownership detail: Story_FindItemIdByVariableId_13022D0 scans ItemDataTables in table order for VariableId == Id, and GameItem_HasStock requires the resulting item's StudioItemStocks_590 count to be >0; InitialPossession is not consulted. All 45 exports have exactly one matching ITM_SHORT_STORY_xxx0 item with PossessionMax 1 and InitialPossession 0.",
+    "The ShortStory row has no map or BGM fields. Its script id resolves to a ScriptDataTable row that supplies Id_Bgm and Id_Map; all 45 short-story scripts set Id_Map to None, with BGM_DEMO_09 on 41 rows and BGM_DEMO_04 on 4 rows.",
+    "No ShortStoryDataTable locale variants were exported. The 45 STR_STDM_SS_* title ids do resolve in all 11 localized StoryTextDataTable_* exports, so localization is by text id rather than per-locale ShortStory rows.",
+    "Achievement caveat: UnlockStoryDemoAchievements counts every StudioStoryDemoSeen_630 entry >=3 for ACH_SHORT_STORY_01/02/ALL (thresholds 1/15/45) without filtering to ShortStory ids; the same map also holds main story demo ids.",
+    "Evidence boundary: the traced behavior comes from reconstructed C++ (with retail RVA comments) and exported data. status/ certifies some relevant retail bodies as byte matches, behavioural matches or unity-equivalent, but this page does not claim a retail byte comparison for every consuming function. Retail Blueprint assets and a live game run were not independently verified; project guidance says game logic is C++, which is not itself a Blueprint audit."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:293",
+      "detail": "Loads ShortStoryDataTable through the named primary-asset loader and appends the resolved table to ShortStoryDataTables (DTM +0xA30); null tables are filtered."
+    },
+    {
       "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:487",
-      "detail": "Advances per-short-story seen state from owned (1) to readable (2), honouring the Id_ShortStory prerequisite."
+      "detail": "Enumerates all rows once per story-menu update: creates seen state 0 at missing keys, promotes 0->1 when the VariableId item is in stock, then promotes 1->2 when Id_ShortStory is None or its linked state is >=3."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:968",
+      "detail": "Resolves Id to the first Item row whose VariableId matches, else None, for the ownership test above."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemOwnership.cpp:22",
+      "detail": "Defines ownership as a positive saved stock count for that item id; a missing stock entry or zero count leaves seen state at 0."
     },
     {
       "source": "Source/Abrams/Private/GameStoryCharaRelateDetailWidget.cpp:343",
-      "detail": "Builds the relation detail short-story list for the selected character pair."
+      "detail": "Builds the relation detail short-story list; a row survives only when its cast row exists and contains both selected character ids, and its Id is stored as ShortStoryRowName."
     },
     {
       "source": "Source/Abrams/Private/GameStoryCharaRelateShortStoryListItemWidget.cpp:56",
-      "detail": "Displays title, cast faces, new marker and lock state for one short-story row."
+      "detail": "Finds the row by the list item's row name, looks up the cast row, locks the entry for seen state <=1, shows the title only when unlocked, hides the new marker at state >=3, and draws up to four cast face icons."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryCharaRelateShortStoryListViewWidget.cpp:78",
+      "detail": "Accepts a selected row name only when the entry is not locked, so state 0/1 cannot start the short-story phase."
     },
     {
       "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:786",
-      "detail": "Resolves the ShortStory row to its playable Script id."
+      "detail": "Looks up the ShortStory row and returns Id_Script; the inline finder walks loaded tables in order and the result is dereferenced without a null check."
     },
     {
-      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:1323",
-      "detail": "Uses short-story cast and seen state for pair 'new content' notification."
+      "source": "Source/Abrams/Private/GamePhase_StoryDemoShortStory.cpp:26",
+      "detail": "Supplies StudioStoryDiagramDemoId_CF8 to the script-id helper; the base phase resolves that script row for ScriptFileName and BGM."
     },
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:293",
-      "detail": "Loads ShortStoryDataTable into ShortStoryDataTables."
+      "source": "Source/Abrams/Private/GamePhase_StoryDemoShortStory.cpp:32",
+      "detail": "On demo finish or skip, writes seen state 3 for the current short-story id."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:1350",
+      "detail": "Reuses Id_ShortStoryCharacter and seen state >1 && <3 to report new short-story content for a character pair."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSaveDataManager.cpp:277",
+      "detail": "Serializes StudioStoryDemoSeen_630 into 0x100 save slots; the matching read is at line 423."
+    },
+    {
+      "source": "Source/Abrams/Private/GameManager.cpp:925",
+      "detail": "Gates short-story achievements on a non-None short-story id and counts all map entries with seen state >=3 toward thresholds 1, 15 and 45."
     }
   ]
 }

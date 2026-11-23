@@ -1,234 +1,326 @@
 {
-  "description": "Per-character step/dodge tuning: duration, cooldown, speed curve, inertia, homing-invalidation distance and step-end animation rate for grounded and airborne steps.",
+  "description": "Ground and air step/dodge tuning: duration, cooldown, speed interpolation, stopping inertia, homing-invalidation distance and step-end animation rate. The exported row struct is FGameDataTableRow_ActionStep (14 rows).",
   "fields": {
     "Id": {
-      "simple": "Character ID used as the row key.",
-      "technical": "Unreal DataTable row name (exported as ID). ResolveDataRows resolves it via ActionDataTable.Id_ActionStep (or its studio/PvE override) and stores it on the character. Character-specific controllers also look up named rows such as CP_200_AttackH_Behind and CP_200_AttackH_Forward. The export has 14 rows.",
+      "simple": "FName row key (exported as ID) for the character's step row.",
+      "technical": "Unreal DataTable row name; runtime lookup uses the key passed to FindRow, not the embedded Id value. ResolveDataRows takes a non-None ActionStepIdOverride from studio/PvE setup else ActionDataTable.Id_ActionStep, finds the first match in ActionStepDataTables and caches it on the character (GetActionStepRow); a miss fails character setup. Character-specific actions also look up named rows directly: CP_200_AttackE_Neutral/Forward/Diagonal and AttackH_Forward/Behind (+ _Auto), CP_210_AttackE_1/2, and CP_270_AttackG_Dash/Jump. In the available export only CP_010, CP_040 and CN_070 are the default ActionDataTable targets; the other 11 rows are those direct named rows. FName; constructor leaves it None.",
       "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:461",
+        "Source/Abrams/Private/GameCharacter.cpp:475",
         "Source/Abrams/Private/GameCharacter.cpp:546",
-        "Source/Abrams/Private/CP_200_ActionController.cpp:231",
-        "Source/Abrams/Private/CP_270_ActionController.cpp:1179"
+        "Source/Abrams/Private/GameDataTableManager.cpp:225",
+        "Source/Abrams/Private/CP_210_ActionController.cpp:483",
+        "Source/Abrams/Private/CP_200_ActionController.cpp:718",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1179",
+        "Source/Abrams/Public/CP_270_Actions.h:351"
       ],
       "status": "verified"
     },
     "CoolTime": {
-      "simple": "End/refractory time of the step action.",
-      "technical": "Seconds. StartStepCoolTime copies it into StatusController.StepCoolTime; CP_200/CP_270 step actions also end when ActionElapsedTime >= CoolTime (when > 0). CP_010 exports 0.7.",
+      "simple": "Step cooldown / scripted-step cutoff time in seconds.",
+      "technical": "float seconds; reconstructed constructor default 0.0f. After the step-end montage finishes, FGameCharacterAction_Step::Tick calls StartStepCoolTime, which copies this value into StatusController.StepCoolTime (counted down each tick; IsStepCoolTimeOver gates the next step). CP_200 and CP_270 scripted step ticks also end when CoolTime > 0 and ActionElapsedTime >= CoolTime. Exported values are 0.1, 0.12, 0.15 and 0.7; CP_010 exports 0.7.",
       "evidence": [
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:4",
+        "Source/Abrams/Private/GameCharacterAction_Step.cpp:169",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:4041",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:744",
         "Source/Abrams/Private/CP_200_ActionController.cpp:127",
         "Source/Abrams/Private/CP_270_ActionController.cpp:1286"
       ],
       "status": "verified"
     },
     "Step_Time": {
-      "simple": "Ground step movement duration.",
-      "technical": "Seconds. StartStepMove returns without starting when Step_Time <= 0; the movement tick moves along the step direction while MovePhaseElapsed < Step_Time, then applies inertia and stops the float interpolator. Homing-step mode uses the same threshold. CP_010 exports 0.2.",
+      "simple": "Ground step movement duration in seconds.",
+      "technical": "float seconds; constructor default 0.0f. Both StartStepMove overloads return without starting when Step_Time <= 0, then cache the row in StepRow4A8. Move mode 0x0F advances only while MovePhaseElapsed < Step_Time, then applies Step_Inertia_* and stops FloatInterp28. Homing mode 0x11 also uses Step_Time as its end time. CP_010 exports 0.2.",
       "evidence": [
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:5",
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1809",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:1826",
         "Source/Abrams/Private/GameCharacterMovementController.cpp:944",
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1789"
       ],
       "status": "verified"
     },
     "Step_Speed_Start": {
-      "simple": "Initial ground step speed.",
-      "technical": "Units/second, multiplied by GetStepDistanceRate() (1 + equipment StepDistance rate) in StartStepMove before FloatInterp28.Start. CP_010 exports 2800.",
+      "simple": "Initial ground step speed in world units/second.",
+      "technical": "float; constructor default 0.0f. Both StartStepMove overloads multiply it by GetStepDistanceRate() (1 + equipment StepDistance rate) and pass the result as FloatInterp28's From. StartHomingStepMove (mode 0x11) instead uses the raw value with no StepDistance multiplier. CP_010 exports 2800; exported row values span 2000-8000.",
       "evidence": [
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:6",
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1817",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:4031"
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:1835",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:2447",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4035"
       ],
       "status": "verified"
     },
     "Step_Speed_End": {
-      "simple": "Final ground step speed.",
-      "technical": "Units/second, also multiplied by GetStepDistanceRate() in StartStepMove. CP_010 exports 1450.",
+      "simple": "Final ground step speed in world units/second.",
+      "technical": "float; constructor default 0.0f. Multiplied by GetStepDistanceRate() in both StartStepMove overloads and passed as FloatInterp28's To; StartHomingStepMove uses it raw. CP_010 exports 1450. CP_210_AttackE_2 exports 0.0 as a literal zero target; the consumer has no special zero branch.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterMovementController.cpp:1818"
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:7",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:1818",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:1836",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:2447"
       ],
       "status": "verified"
     },
     "Step_InterpolateTime": {
-      "simple": "Duration of the ground step speed interpolation.",
-      "technical": "Seconds passed to FloatInterp28.Start. CP_010 exports 0.2.",
+      "simple": "Duration of the ground step speed interpolation in seconds.",
+      "technical": "float seconds; constructor default 0.0f. Passed as FloatInterp28's duration by both StartStepMove overloads and by StartHomingStepMove. Movement is cut off at Step_Time (or at the StepAir_Time gate for homing mode 0x11) and the interpolator is stopped there, so an InterpolateTime longer than the movement phase does not extend it (CP_210_AttackE_2: 0.48 vs Step_Time 0.35). CP_010 exports 0.2.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterMovementController.cpp:1819"
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:8",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:1819",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:2447",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:944"
       ],
       "status": "verified"
     },
     "Step_EasingType": {
-      "simple": "Easing for ground step speed interpolation.",
-      "technical": "EGameEasingType converted by ShikigamiMovement_ToEasingFunc. CP_010 exports None.",
+      "simple": "EGameEasingType selector for ground step speed interpolation.",
+      "technical": "EGameEasingType (uint8 enum); constructor default None. ShikigamiMovement_ToEasingFunc maps EaseIn/EaseOut/EaseInOut to the matching EEasingFunc and maps None (and any unrecognized value) to EaseOut, so exported None is not linear/no easing. All 14 exported rows use EGameEasingType::None; CP_010 exports None.",
       "evidence": [
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:9",
+        "Source/AbramsDataTable/Public/EGameEasingType.h:6",
+        "Source/Abrams/Private/GameShikigamiMovementControllerSteps.cpp:15",
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1819"
       ],
       "status": "verified"
     },
     "Step_Blend_Exp": {
-      "simple": "Exponent/shape for ground step speed interpolation.",
-      "technical": "Float passed as the blend exponent in FloatInterp28.Start. CP_010 exports 1.0.",
+      "simple": "Exponent for the ground step speed ease.",
+      "technical": "float; constructor default 0.0f. Passed as FloatInterp28's exponent; it affects EaseIn/EaseOut/EaseInOut (including the exported None -> EaseOut mapping). Exported values are 1.0 in 12 rows, 2.0 in CP_210_AttackE_1 and 3.0 in CP_210_AttackE_2; CP_010 exports 1.0.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterMovementController.cpp:1819"
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:10",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:1819",
+        "Source/Framework/Public/StudioFloatEaseInterpolator.h:81",
+        "Source/Framework/Public/StudioFloatEaseInterpolator.h:131"
       ],
       "status": "verified"
     },
     "Step_Inertia_Rate": {
-      "simple": "Inertia magnitude applied when a ground step ends.",
-      "technical": "Passed to SetInertia with EaseOut at the end of step/homing-step movement. CP_010 exports 1.0.",
+      "simple": "Multiplier on current speed when a ground step ends.",
+      "technical": "float; constructor default 0.0f. At the end of move mode 0x0F and mode 0x11, SetInertia(Rate, Rate, Step_Inertia_Time, EaseOut, false, false) starts current speed * Rate -> 0. Rate <= 0 or Time <= 0 resets inertia instead. Exported values are 1.0, 1.1 and 1.2; CP_010 exports 1.0.",
       "evidence": [
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:11",
+        "Source/Abrams/Private/GameActorMovementController.cpp:140",
         "Source/Abrams/Private/GameCharacterMovementController.cpp:954",
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1793"
       ],
       "status": "verified"
     },
     "Step_Inertia_Time": {
-      "simple": "Inertia duration when a ground step ends.",
-      "technical": "Seconds passed with Step_Inertia_Rate to SetInertia. CP_010 exports 0.5.",
+      "simple": "Duration in seconds of the end-of-ground-step inertia.",
+      "technical": "float seconds; constructor default 0.0f. Passed with Step_Inertia_Rate to SetInertia at the end of modes 0x0F and 0x11. Exported values are 0.25, 0.5, 0.6 and 0.75; CP_010 exports 0.5.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterMovementController.cpp:954"
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:12",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:954",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:1793",
+        "Source/Abrams/Private/GameActorMovementController.cpp:140"
       ],
       "status": "verified"
     },
     "Step_HomingInvalidateDistance": {
-      "simple": "Distance value used to arm the step homing-invalidation timer.",
-      "technical": "Passed as SetTimer(2, true, value, 0.05f) in the non-grounded branch of the step action and in several character-specific step controllers. Despite the name, GameCharacterAction_Step uses StepAir_HomingInvalidateDistance in its grounded branch and Step_HomingInvalidateDistance in its airborne branch. CP_010 exports 3000.0.",
+      "simple": "Homing-invalidation distance published by the stepping character (world units).",
+      "technical": "float world units; constructor default 0.0f. SetTimer(2, true, value, 0.05f) stores it as a timer Value on the character; GetTimerMinValue exposes the minimum nonnegative Value to attacker homing/target checks, which compare FVector::Dist to it. Used in GameCharacterAction_Step's non-grounded branch (which starts the ground step) and in CN_071/CN_120/CP_200/CP_270 attack-homing starts. All 14 exported rows use 3000.0; CP_010 exports 3000.0.",
       "evidence": [
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:13",
         "Source/Abrams/Private/GameCharacterAction_Step.cpp:93",
-        "Source/Abrams/Private/CP_200_ActionController.cpp:247"
+        "Source/Abrams/Private/CN_071_ActionController.cpp:1608",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:33",
+        "Source/Abrams/Private/CP_200_ActionController.cpp:247",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1191",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3637",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3659",
+        "Source/Abrams/Private/CN_050_ActionController.cpp:458"
       ],
       "status": "verified"
     },
     "StepEnd_PlayRate": {
-      "simple": "Base playback rate of the ground step end animation.",
-      "technical": "GetStepEndPlayRate returns max(StepEnd_PlayRate - StepRigidity binding-vow rate, 0.0001f). CP_010 exports 1.0.",
+      "simple": "Base playback rate of the ground step-end montage.",
+      "technical": "float multiplier; constructor default 0.0f. GetStepEndPlayRate returns max(StepEnd_PlayRate - StepRigidity binding-vow effect rate, 0.0001f). The step action selects it when IsGrounded() == false (the ground-step branch). All 14 exported rows use 1.0; CP_010 exports 1.0.",
       "evidence": [
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:14",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:4021",
-        "Source/Abrams/Public/GameCharacterStatusController.h:622"
+        "Source/Abrams/Private/GameCharacter.cpp:3587",
+        "Source/Abrams/Private/GameCharacterAction_Step.cpp:160"
       ],
       "status": "verified"
     },
     "StepAir_Time": {
-      "simple": "Air step movement duration.",
-      "technical": "Seconds. StartStepAirMove returns without starting when StepAir_Time <= 0; the air-step movement tick moves while MovePhaseElapsed < StepAir_Time, then applies inertia and stops. CP_010 exports 0.2.",
+      "simple": "Air step movement duration in seconds.",
+      "technical": "float seconds; constructor default 0.0f. StartStepAirMove returns without starting when StepAir_Time <= 0, caches the row in StepRow4A8, and move mode 0x10 advances only while MovePhaseElapsed < StepAir_Time before applying StepAir inertia. StartHomingStepMove also gate-checks StepAir_Time, although mode 0x11 then ends on Step_Time. Exported values are 0.17 and 0.2; CP_010 exports 0.2.",
       "evidence": [
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:15",
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1846",
-        "Source/Abrams/Private/GameCharacterMovementController.cpp:971"
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:971",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:2440"
       ],
       "status": "verified"
     },
     "StepAir_Speed_Start": {
-      "simple": "Initial air step speed.",
-      "technical": "Units/second multiplied by GetStepDistanceRate() in StartStepAirMove. CP_010 exports 2800.",
+      "simple": "Initial air step speed in world units/second.",
+      "technical": "float; constructor default 0.0f. StartStepAirMove multiplies it by GetStepDistanceRate() (1 + equipment StepDistance rate) and passes it as FloatInterp28's From. Exported values are 2000, 2800 and 2900; CP_010 exports 2800. It is not used by homing mode 0x11.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterMovementController.cpp:1854"
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:16",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:1854",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4035"
       ],
       "status": "verified"
     },
     "StepAir_Speed_End": {
-      "simple": "Final air step speed.",
-      "technical": "Units/second multiplied by GetStepDistanceRate() in StartStepAirMove. CP_010 exports 1450.",
+      "simple": "Final air step speed in world units/second.",
+      "technical": "float; constructor default 0.0f. Multiplied by GetStepDistanceRate() in StartStepAirMove and passed as FloatInterp28's To. Exported values are 1100, 1450 and 1500; CP_010 exports 1450. Not used by homing mode 0x11.",
       "evidence": [
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:17",
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1855"
       ],
       "status": "verified"
     },
     "StepAir_InterpolateTime": {
-      "simple": "Duration of the air step speed interpolation.",
-      "technical": "Seconds passed to FloatInterp28.Start in StartStepAirMove. CP_010 exports 0.2.",
+      "simple": "Duration of the air step speed interpolation in seconds.",
+      "technical": "float seconds; constructor default 0.0f. Passed as FloatInterp28's duration in StartStepAirMove; all 14 exported rows use 0.2, matching their StepAir_Time except the two 0.17 rows, where the movement phase still ends first. CP_010 exports 0.2.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterMovementController.cpp:1856"
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:18",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:1856",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:971"
       ],
       "status": "verified"
     },
     "StepAir_EasingType": {
-      "simple": "Easing for air step speed interpolation.",
-      "technical": "EGameEasingType converted by ShikigamiMovement_ToEasingFunc. CP_010 exports None.",
+      "simple": "EGameEasingType selector for air step speed interpolation.",
+      "technical": "EGameEasingType (uint8 enum); constructor default None. Converted by ShikigamiMovement_ToEasingFunc; None and unknown values map to EEasingFunc::EaseOut, not Linear. All 14 exported rows use EGameEasingType::None; CP_010 exports None.",
       "evidence": [
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:19",
+        "Source/AbramsDataTable/Public/EGameEasingType.h:6",
+        "Source/Abrams/Private/GameShikigamiMovementControllerSteps.cpp:15",
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1856"
       ],
       "status": "verified"
     },
     "StepAir_Blend_Exp": {
-      "simple": "Exponent/shape for air step speed interpolation.",
-      "technical": "Float passed as the blend exponent in FloatInterp28.Start. CP_010 exports 1.0.",
+      "simple": "Exponent for the air step speed ease.",
+      "technical": "float; constructor default 0.0f. Passed as FloatInterp28's exponent in StartStepAirMove; with the exported None -> EaseOut mapping it controls the ease-out shape. Exported values are 1.0 in 12 rows and 2.0 in CP_210_AttackE_1/2; CP_010 exports 1.0.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterMovementController.cpp:1856"
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:20",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:1856",
+        "Source/Framework/Public/StudioFloatEaseInterpolator.h:131"
       ],
       "status": "verified"
     },
     "StepAir_Inertia_Rate": {
-      "simple": "Inertia magnitude applied when an air step ends.",
-      "technical": "Passed to SetInertia with EaseOut at the end of the air-step movement phase. CP_010 exports 1.0.",
+      "simple": "Multiplier on current speed when an air step ends.",
+      "technical": "float; constructor default 0.0f. At the end of move mode 0x10, SetInertia(Rate, Rate, StepAir_Inertia_Time, EaseOut, false, false) starts current speed * Rate -> 0; nonpositive Rate or Time resets inertia. All 14 exported rows use 1.0; CP_010 exports 1.0.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterMovementController.cpp:981"
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:21",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:981",
+        "Source/Abrams/Private/GameActorMovementController.cpp:140"
       ],
       "status": "verified"
     },
     "StepAir_Inertia_Time": {
-      "simple": "Inertia duration when an air step ends.",
-      "technical": "Seconds passed with StepAir_Inertia_Rate to SetInertia. CP_010 exports 0.5.",
+      "simple": "Duration in seconds of the end-of-air-step inertia.",
+      "technical": "float seconds; constructor default 0.0f. Passed with StepAir_Inertia_Rate to SetInertia at the end of move mode 0x10. All 14 exported rows use 0.5; CP_010 exports 0.5.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterMovementController.cpp:981"
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:22",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:981",
+        "Source/Abrams/Private/GameActorMovementController.cpp:140"
       ],
       "status": "verified"
     },
     "StepAir_HomingInvalidateDistance": {
-      "simple": "Distance value used by the grounded branch of the step homing-invalidation timer.",
-      "technical": "Passed as SetTimer(2, true, value, 0.05f) when GameCharacterAction_Step sees IsGrounded() == true and calls StartStepAirMove. This name/branch mismatch is as written in the reconstructed source; CP_010 exports 2000.0.",
+      "simple": "Homing-invalidation distance published in the grounded step branch (world units).",
+      "technical": "float world units; constructor default 0.0f. GameCharacterAction_Step calls SetTimer(2, true, value, 0.05f) with this field when IsGrounded() == true, the same branch that starts the air step; the value is later read from the target's status timer by homing/target range checks. Other character homing starts use Step_HomingInvalidateDistance instead. All 14 exported rows use 2000.0; CP_010 exports 2000.0.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterAction_Step.cpp:81"
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:23",
+        "Source/Abrams/Private/GameCharacterAction_Step.cpp:81",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3637",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3659",
+        "Source/Abrams/Private/CN_050_ActionController.cpp:458"
       ],
       "status": "verified"
     },
     "StepAirEnd_PlayRate": {
-      "simple": "Base playback rate of the air step end animation.",
-      "technical": "GetStepAirEndPlayRate returns max(StepAirEnd_PlayRate - StepRigidity binding-vow rate, 0.0001f). CP_010 exports 1.0.",
+      "simple": "Base playback rate of the air step-end montage.",
+      "technical": "float multiplier; constructor default 0.0f. GetStepAirEndPlayRate returns max(StepAirEnd_PlayRate - StepRigidity binding-vow effect rate, 0.0001f). The step action selects it when IsGrounded() == true (the air-step branch). All 14 exported rows use 1.0; CP_010 exports 1.0.",
       "evidence": [
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionStep.cpp:24",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:4028",
-        "Source/Abrams/Public/GameCharacterStatusController.h:623"
+        "Source/Abrams/Private/GameCharacter.cpp:3585",
+        "Source/Abrams/Private/GameCharacterAction_Step.cpp:160"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "One exported table with 14 rows; no numbered shards or localization variants for this group.",
-    "Ground and air step parameter blocks are parallel; movement modes 0x0F and 0x10 implement them, and mode 0x11 is a homing step that reuses the ground Step_* timing/inertia fields.",
-    "In GameCharacterAction_Step the two homing-invalidation fields appear crossed relative to their names: the grounded path uses StepAir_HomingInvalidateDistance and the airborne path uses Step_HomingInvalidateDistance. This is documented rather than normalized.",
-    "Step speeds are multiplied by StatusController.GetStepDistanceRate() (1 + equipment StepDistance rate); end play rates are reduced by the StepRigidity binding-vow rate with a 0.0001 floor.",
-    "Evidence is reconstructed C++; exported CP_010 values illustrate defaults but do not describe every row. Available Content is partial."
+    "One exported DataTable with 14 complete rows; no numbered shards or localization variants in this group. The native row is FName Id + 19 floats + 2 EGameEasingType fields, all BlueprintReadWrite/EditAnywhere; there are no array fields or array indices.",
+    "Constructor defaults in the reconstruction are 0.0f for every numeric field and None for both easing fields. The exported rows supply explicit nonzero row values (the only zero numeric cell is CP_210_AttackE_2.Step_Speed_End); constructor defaults and exported row values are not the same thing.",
+    "Row precedence: a non-None studio/PvE ActionStepIdOverride wins over ActionDataTable.Id_ActionStep; the first matching row in ActionStepDataTables is used. The manager registers only ActionStepDataTable, and a missing required row makes ResolveDataRows/character setup return false. CP_200 and CP_270 explicit-row lookups fall back to the owner's cached row; CP_210 simply skips its step if the named row is absent.",
+    "Move modes 0x0F and 0x10 implement ground and air steps using Step_* and StepAir_* respectively. Homing mode 0x11 is a genuine mixed case: StartHomingStepMove gates on StepAir_Time, starts the ground Step_Speed_* / Step_InterpolateTime / Step_EasingType / Step_Blend_Exp interpolation without GetStepDistanceRate(), and TickModeHomingStep ends on Step_Time with Step_Inertia_*.",
+    "In GameCharacterAction_Step the two homing-invalidation fields and the two end-montage play rates are crossed relative to their names: IsGrounded() == true uses StepAir_HomingInvalidateDistance / GetStepAirEndPlayRate() and starts the air step, while the non-grounded branch uses Step_HomingInvalidateDistance / GetStepEndPlayRate() and starts the ground step. This is documented as written, not normalized.",
+    "Both homing-invalidation fields are SetTimer(key 2, true, value, 0.05f) calls. The field is a distance threshold, not the 0.05 s timer duration; GetTimerMinValue exposes it to attacker homing/target checks that stop homing within that distance. Every exported row uses 3000.0 for Step_HomingInvalidateDistance and 2000.0 for StepAir_HomingInvalidateDistance.",
+    "StartStepMove/StartStepAirMove multiply speed endpoints by GetStepDistanceRate() (1 + equipment StepDistance rate) and cache the row in StepRow4A8; StartHomingStepMove caches it in HomingStepRow4B0 without that multiplier. End-play-rate getters subtract the StepRigidity binding-vow rate with a 0.0001 floor. EGameEasingType::None maps to EEasingFunc::EaseOut.",
+    "Behavior is traced in reconstructed C++; exported values come from the available community DataTable export. No retail runtime, Blueprint execution, editor session or network access was used, so absent shop/online override behavior is not asserted."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:225",
+      "detail": "Registers the single ActionStepDataTable asset in ActionStepDataTables (name also listed in the manager's required-table names)."
+    },
+    {
       "source": "Source/Abrams/Private/GameCharacter.cpp:546",
-      "detail": "Resolves the required step row from ActionDataTable.Id_ActionStep or its override."
+      "detail": "ResolveDataRows resolves the override-or-ActionDataTable.Id_ActionStep row and caches it as ActionStepRow; a miss fails setup."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_210_ActionController.cpp:483",
+      "detail": "CP_210_FindActionStepRow finds the first matching row in the table list; CP_200/CP_270 use it for named rows and fall back to the owner row."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterMovementController.cpp:1809",
-      "detail": "Starts ground step speed interpolation and gates movement by Step_Time."
+      "detail": "StartStepMove gates on Step_Time, applies GetStepDistanceRate() to Step_Speed_Start/End, and starts the ground interpolation."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterMovementController.cpp:1846",
-      "detail": "Starts air step speed interpolation and gates movement by StepAir_Time."
+      "detail": "StartStepAirMove gates on StepAir_Time and starts the air interpolation from the StepAir_* fields."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterMovementController.cpp:954",
-      "detail": "Applies ground-step inertia when the movement phase ends."
+      "source": "Source/Abrams/Private/GameCharacterMovementController.cpp:2440",
+      "detail": "StartHomingStepMove uses the StepAir_Time gate but the ground Step_* speed/timing fields, with no StepDistance multiplier (mode 0x11)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterMovementController.cpp:944",
+      "detail": "Mode 0x0F tick reads the cached row, moves until Step_Time, then applies Step_Inertia_Rate/Time."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterMovementController.cpp:971",
+      "detail": "Mode 0x10 tick reads the cached row, moves until StepAir_Time, then applies StepAir_Inertia_Rate/Time."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterMovementController.cpp:1789",
+      "detail": "Homing mode 0x11 ends on Step_Time with Step_Inertia_Rate/Time."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterAction_Step.cpp:81",
-      "detail": "Arms homing invalidation timers, with the grounded/air field crossover noted above."
-    },
-    {
-      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:4021",
-      "detail": "Derives step-end animation play rate from StepEnd_PlayRate and StepRigidity vows."
+      "detail": "Start selects air/ground movement and arms status timer key 2 with the crossed homing-invalidation fields (lines 81 and 93)."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:4041",
-      "detail": "Copies CoolTime into the step cooldown timer."
+      "detail": "StartStepCoolTime copies CoolTime into StatusController.StepCoolTime after the end montage."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:4021",
+      "detail": "GetStepEndPlayRate and GetStepAirEndPlayRate (line 4028) reduce the row play rates by StepRigidity vows with a 0.0001 floor."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:3637",
+      "detail": "SetTimer stores the invalidation distance as key-2 timer Value; GetTimerMinValue (line 3659) feeds homing range checks."
     },
     {
       "source": "Source/Abrams/Private/CP_200_ActionController.cpp:127",
-      "detail": "Character-specific step action ends at CoolTime."
+      "detail": "Character-specific step actions end their scripted step at a positive CoolTime (CP_270 equivalent at line 1286)."
+    },
+    {
+      "source": "Source/Abrams/Public/CP_270_Actions.h:351",
+      "detail": "CP_270 named-row provider returns CP_270_AttackG_Dash or CP_270_AttackG_Jump for ExtraAttack follow-up steps."
     }
   ]
 }

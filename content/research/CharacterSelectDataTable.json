@@ -1,10 +1,13 @@
 {
-  "description": "Character-select presentation data: where each playable character appears in the character-select and visual-lobby grids, whether it is selectable at all, and whether its list item needs extra left padding.",
+  "description": "Per-ID presentation and ordering metadata for the character-select and visual-lobby/ranking UIs: row identity, main-list order (and -1 hide sentinel), visual-lobby/ranking order, and a flag that requests an extra list-item X offset. CP_000 is a synthetic random-select entry, not a playable character row.",
   "fields": {
     "ID": {
-      "simple": "Row key, normally the character ID pointed to by Character::Id_CharacterSelect.",
-      "technical": "FName primary key (ImportKeyField=Id in the export). CharacterSelect_FindRow (retail 0x1508460) resolves a character's Id_CharacterSelect across CharacterSelectDataTables (DTM +0x450) with optional None rejection; the special CP_000 row is fetched directly to fill the 'random' entry in the character-select list.",
+      "simple": "Row key, normally the CharacterSelect id pointed to by Character::Id_CharacterSelect; CP_000 is the separate random-select entry.",
+      "technical": "FName row key at offset +0x8 (export column 'ID', ImportKeyField='Id'). In the export all 27 non-CP_000 keys are referenced exactly once by Character::Id_CharacterSelect. CharacterSelect_FindRow (retail 0x1508460) walks DTM CharacterSelectDataTables (+0x450) and returns the first FindRow hit; it rejects NAME_None only when bCheckNone=true, and bUnused is ignored. BuildListData looks up the literal FName CP_000 to create the 'random' entry and dereferences that result without a null check.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSelect.h:11",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:701",
+        "Source/Abrams/Private/GameCharacter.cpp:556",
         "Source/Abrams/Private/GameCharacterSelectWidget.cpp:241",
         "Source/Abrams/Private/GameCharacterSelectWidget.cpp:249",
         "Source/Abrams/Private/GameCharacterSelectWidget.cpp:422"
@@ -12,36 +15,47 @@
       "status": "verified"
     },
     "PlacementIndex": {
-      "simple": "Sort/position index of the character in the main character-select list; -1 hides it.",
-      "technical": "int32 (row +0x10). The select widget removes Character rows whose Select row is missing or PlacementIndex == -1, then sorts the remainder ascending by this value. GameCharacter_GetCostumeCharacterIds-type helpers (GameItemOwnership) likewise require PlacementIndex >= 0 when building candidate/random-select character lists. Exported values are non-negative; CP_000 uses 27.",
+      "simple": "Zero-based order in the main character-select list; exactly -1 removes a Character row from that list.",
+      "technical": "int32 at row +0x10 (unitless ordinal; constructor default 0). BuildListData (retail 0x1506740) drops Character rows whose Select lookup misses or whose PlacementIndex == -1, then TArray::Sort ascending by this value (the comparator's 0 fallback for a missing row is unreachable after that filter). GameCharacter_PickRandomId (0x12fd200) uses a different test: it skips a missing Select row, PlacementIndex < 0, and ids in Exclude via Exclude.Contains(Select->Id) (the Select row key, equal to the Character id in this export). The export has unique values 0..27; CP_000's 27 is never compared by the main sort because CP_000 has no Character row and is appended after the sorted entries. No exported row uses the -1 hide sentinel.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSelect.h:15",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:702",
         "Source/Abrams/Private/GameCharacterSelectWidget.cpp:343",
         "Source/Abrams/Private/GameCharacterSelectWidget.cpp:353",
-        "Source/Abrams/Private/GameCharacterSelectWidget.cpp:360",
         "Source/Abrams/Private/GameCharacterSelectWidget.cpp:367",
+        "Source/Abrams/Private/GameItemOwnership.cpp:472",
+        "Source/Abrams/Private/GameItemOwnership.cpp:479",
         "Source/Abrams/Private/GameItemOwnership.cpp:485"
       ],
       "status": "verified"
     },
     "VisualLobbyPlacementIndex": {
-      "simple": "Ordering index for the character in visual-lobby/ranking lists; -1 excludes it from some grids.",
-      "technical": "int32 (row +0x14). Visual-lobby character-select, free-battle team select and ordered-selectable-ID helpers build TMap<CharacterId, VisualLobbyPlacementIndex> and ValueSort ascending; ranking widgets stable-sort with MAX_int32 as the fallback for a missing Select row. A negative value puts an entry before others in a plain ascending sort, which is why such rows are filtered in some paths (e.g. CP_000 has -1).",
+      "simple": "Zero-based ordering ordinal for visual-lobby, free-battle team and ranking character lists; it is not itself a C++ exclusion flag.",
+      "technical": "int32 at row +0x14 (constructor default 0). The visual-lobby top widget, free-battle team select and GameCharacter_GetOrderedSelectableIds (0x13081e0) build TMap<CharacterId, index> and ValueSort ascending; Next/PreviousSelectableId consume that order. Ranking's BuildCharacterFilters (0x16377f0) uses StableSort and substitutes MAX_int32 when a Select row is missing. None of these C++ paths tests the index sign: a negative value would sort first if it entered those maps, while CP_000's -1 never does because no Character row references CP_000 and the random item is appended separately. Export values are unique: -1 only on CP_000, otherwise 0..26.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSelect.h:18",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:703",
+        "Source/Abrams/Private/GameVisualLobbyCharacterSelectTopWidget.cpp:169",
         "Source/Abrams/Private/GameVisualLobbyCharacterSelectTopWidget.cpp:171",
-        "Source/Abrams/Private/GameVisualLobbyCharacterSelectTopWidget.cpp:174",
+        "Source/Abrams/Private/GameFreeBattleTeamCharacterSelectWidget.cpp:137",
         "Source/Abrams/Private/GameFreeBattleTeamCharacterSelectWidget.cpp:142",
+        "Source/Abrams/Private/GameItemOwnership.cpp:346",
         "Source/Abrams/Private/GameItemOwnership.cpp:348",
+        "Source/Abrams/Private/GameRankingWidgetBase.cpp:87",
         "Source/Abrams/Private/GameRankingWidgetBase.cpp:91"
       ],
       "status": "verified"
     },
     "bUseListItemLeftPadding": {
-      "simple": "Whether the character-select list item receives extra left padding.",
-      "technical": "bool (row +0x18). UGameCharacterSelectWidget sets UGameCharacterSelectCharacterListData::LeftPadding = ListItemLeftPaddingSize when true, else 0.0f; the special CP_000 'random' item reads the same field from its own row. ListItemLeftPaddingSize is an uninitialised widget member in the reconstruction's constructor (retail leaves it unset), so only the flag's selection behavior is established.",
+      "simple": "Flag requesting an extra X offset on a character-select list item; the offset size itself is a widget property, not a table field.",
+      "technical": "bool at row +0x18 in the retail game build (constructor default false; export 14 true and 14 false). BuildListData copies it into UGameCharacterSelectCharacterListData::LeftPadding as ListItemLeftPaddingSize when true, else 0.0f; the CP_000 row is read the same way for the random item. SetupFromData (0x1519080) adds LeftPadding to the saved BaseRenderTranslation.X only when a base translation is set. ListItemLeftPaddingSize (widget +0x568) gets no store in the C++ constructor (0x14a4440), so its effective layout-unit magnitude depends on widget defaults not verified here.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSelect.h:21",
+        "Tools/verify/layout-checks/LayoutCheckRuntimePad.cpp:916",
+        "Source/Abrams/Private/GameCharacterSelectWidget.cpp:49",
         "Source/Abrams/Private/GameCharacterSelectWidget.cpp:380",
         "Source/Abrams/Private/GameCharacterSelectWidget.cpp:426",
+        "Source/Abrams/Private/GameCharacterSelectCharacterListItemWidget.cpp:177",
         "Source/Abrams/Public/GameCharacterSelectCharacterListData.h:22",
         "Source/Abrams/Public/GameCharacterSelectWidget.h:61"
       ],
@@ -49,31 +63,56 @@
     }
   },
   "notes": [
-    "Export contains 28 rows including the CP_000 'random select' row; 27 have non-negative VisualLobbyPlacementIndex.",
-    "A Character row with Id_CharacterSelect = None or a missing Select row is excluded from several selectable-character pipelines, so presence here is a practical playability gate in addition to placement.",
-    "Single table asset 'CharacterSelectDataTable' loaded into DTM +0x450; no numbered shards or localization variants in the export.",
-    "Reconstructed source with cited retail RVAs; no claim about Blueprint-only consumers or byte-identical matching."
+    "Export contains one asset with 28 rows: 27 per-character keys, each referenced once by Character::Id_CharacterSelect in CharacterDataTable's 48 rows (21 Character rows have Id_CharacterSelect=None), plus CP_000 with no Character row. PlacementIndex 0..27 and VisualLobbyPlacementIndex -1..26 are unique.",
+    "Consumer conditions differ: the main select list removes only PlacementIndex == -1; GameCharacter_PickRandomId skips PlacementIndex < 0 and excludes by Select->Id; visual-lobby/ordered-selectable/ranking paths require a resolvable Select row but never test the index sign (ranking uses MAX_int32 for a missing row).",
+    "Row-constructor defaults are PlacementIndex=0, VisualLobbyPlacementIndex=0 and bUseListItemLeftPadding=false; Id has no explicit initializer (FName default None). The two indices are ordinals, not times or distances; this row struct has no arrays.",
+    "The reconstruction loads one CharacterSelectDataTable loader into DTM +0x450, while the finder APIs accept a table array and return the first matching row. AGameCharacter also caches the optional SelectRow at +0x3C0; no C++ reader of that cache was found in the reconstruction.",
+    "Reconstructed C++ with cited retail RVAs/offsets; retail Blueprint graphs and widget default values were not inspected, and no byte-identical matching claim is made."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:199",
-      "detail": "Loads CharacterSelectDataTable into AGameDataTableManager::CharacterSelectDataTables."
+      "detail": "Loads CharacterSelectDataTable into AGameDataTableManager::CharacterSelectDataTables (+0x450)."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterSelectWidget.cpp:241",
-      "detail": "CharacterSelect_FindRow resolves rows for the main select list."
+      "detail": "CharacterSelect_FindRow returns the first matching row in DTM +0x450, with optional None rejection."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterSelectWidget.cpp:343",
-      "detail": "Filters and sorts the select list by PlacementIndex and assigns list-item left padding."
+      "source": "Source/Abrams/Private/GameCharacterSelectWidget.cpp:353",
+      "detail": "BuildListData filters Character rows on a missing Select row or PlacementIndex == -1, sorts ascending by PlacementIndex, and reads the padding flag."
     },
     {
-      "source": "Source/Abrams/Private/GameVisualLobbyCharacterSelectTopWidget.cpp:171",
-      "detail": "Sorts visual-lobby icons by VisualLobbyPlacementIndex."
+      "source": "Source/Abrams/Private/GameCharacterSelectWidget.cpp:422",
+      "detail": "Reads CP_000's own row for the appended random-select entry, including its padding flag."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterSelectCharacterListItemWidget.cpp:177",
+      "detail": "SetupFromData applies the resolved LeftPadding to the item's saved BaseRenderTranslation.X."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemOwnership.cpp:348",
+      "detail": "GameCharacter_GetOrderedSelectableIds orders owned/selectable ids by VisualLobbyPlacementIndex; Next/PreviousSelectableId reuse that order."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemOwnership.cpp:466",
+      "detail": "GameCharacter_PickRandomId uses PlacementIndex >= 0 and Select row key against Exclude before a uniform random pick."
+    },
+    {
+      "source": "Source/Abrams/Private/GameVisualLobbyCharacterSelectTopWidget.cpp:169",
+      "detail": "Visual-lobby icons are sorted by the visual-lobby index of each selectable Character row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameFreeBattleTeamCharacterSelectWidget.cpp:137",
+      "detail": "Free-battle team icons use the same visual-lobby index ordering."
     },
     {
       "source": "Source/Abrams/Private/GameRankingWidgetBase.cpp:88",
-      "detail": "Ranking character lists use the same visual-lobby index for ordering."
+      "detail": "Ranking character filters stable-sort by this index, with MAX_int32 for a missing Select row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:556",
+      "detail": "Character setup optionally caches the resolved row on AGameCharacter::SelectRow (+0x3C0)."
     }
   ]
 }

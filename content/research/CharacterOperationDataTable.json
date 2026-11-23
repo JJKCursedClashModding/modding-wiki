@@ -1,20 +1,24 @@
 {
-  "description": "Per-character voice IDs for paired battle operation callouts (normal, onslaught, cooperation and careful) and the partner's short replies.",
+  "description": "Voice IDs for paired battle operation callouts (normal, onslaught/aggressive, cooperation and caution) and the teammate's answer voice, keyed by character-operation row.",
   "fields": {
     "Id": {
-      "simple": "Character ID used as the row key.",
-      "technical": "Unreal DataTable row name. ResolveDataRows reads CharacterDataTable.Id_CharacterOperation and FindRow against CharacterOperationDataTables; no override id is applied. The export has 27 character rows (CP_010-style keys).",
+      "simple": "Character-operation row key; most rows are keyed by a character ID, but several character rows deliberately share one operation row.",
+      "technical": "FName Id is the reflected struct field (serialized as ID in the export); the DataTable row name is the key passed to FindRow. AGameCharacter::ResolveDataRows reads CharacterDataTable.Id_CharacterOperation without an override, finds the first match in CharacterOperationDataTables (DTM +0x540), and caches it at OperationRow (+0x3D8); a miss fails character setup. All 27 exported row names equal their Id field.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterOperation.h:11",
+        "Source/Abrams/Private/GameCharacter.cpp:461",
         "Source/Abrams/Private/GameCharacter.cpp:518",
-        "Source/Abrams/Private/GameDataTableManager.cpp:214",
-        "Source/Abrams/Private/GameDataTableManager.cpp:362"
+        "Source/Abrams/Private/GameDataTableManager.cpp:214"
       ],
       "status": "verified"
     },
     "Id_Voice_Normal": {
       "simple": "Speaker's normal operation callout voice.",
-      "technical": "FName key into VoiceDataTables. When an exchange has Kind != 2/3/4, FStudioBattleSystem320::Tick copies this into SpeakerVoice, plays it via AGameSoundManager::PlayVoiceById with the speaker's character index, and shows BTL_HUD_LABEL_0201. PlayVoiceById resolves the Voice row to CueSheetName/CueName; a missing row returns handle -1.",
+      "technical": "FName Id_Voice_Normal. When Kind is not 2/3/4 (including the producer's Kind 1), Tick reads it from the speaker's cached operation row, shows BTL_HUD_LABEL_0201 (\"Normal\" in the English text export), and calls PlayVoiceById with Speaker->GetCharacterIndex().",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterOperation.h:15",
+        "Source/Abrams/Private/GameCharacterOperationController.cpp:135",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1760",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1761",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1765",
         "Source/Abrams/Private/GameSoundManager.cpp:960"
@@ -23,29 +27,39 @@
     },
     "Id_Voice_Receive_Normal": {
       "simple": "Partner's reply to a normal callout.",
-      "technical": "FName voice key copied into ResponderVoice for the default exchange kind; after the speaker clip finishes and the responder CanAnswerExchangeVoice, it is played 0.5 seconds later with the responder's character index.",
+      "technical": "FName Id_Voice_Receive_Normal. The default-kind responder key is copied from the responder's cached row. It plays only after the speaker handle is no longer playing, the responder passes CanAnswerExchangeVoice, and Timer reaches 0.5 s; the playback slot is Responder->GetCharacterIndex().",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterOperation.h:18",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1762",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1770",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1772",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1783",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1784",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1786"
       ],
       "status": "verified"
     },
     "Id_Voice_Onslaught": {
-      "simple": "Speaker's onslaught callout voice.",
-      "technical": "FName voice key selected for exchange Kind 2 (BTL_HUD_LABEL_0202), played as SpeakerVoice with the speaker's character index.",
+      "simple": "Speaker's onslaught/aggressive callout voice.",
+      "technical": "FName Id_Voice_Onslaught. Kind 2 selects this speaker key and BTL_HUD_LABEL_0202 (\"Aggressive\" in the English text export); PlayVoiceById uses the speaker's character index.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterOperation.h:21",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1740",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1742",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1743",
-        "Source/Abrams/Public/GameBattleSystems_A.h:88",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1765",
         "Source/Abrams/Private/GameSoundManager.cpp:960"
       ],
       "status": "verified"
     },
     "Id_Voice_Receive_Onslaught": {
-      "simple": "Partner's reply to an onslaught callout.",
-      "technical": "FName voice key selected with Id_Voice_Onslaught for Kind 2; copied to ResponderVoice and played after the speaker clip plus the 0.5 s reply delay when the responder can answer.",
+      "simple": "Partner's reply to an onslaught/aggressive callout.",
+      "technical": "FName Id_Voice_Receive_Onslaught. Kind 2 copies this responder key from the responder's cached row; after the speaker clip ends and CanAnswerExchangeVoice succeeds, the 0.5 s timer gates playback on the responder's character index.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterOperation.h:24",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1744",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1770",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1772",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1784",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1786"
       ],
@@ -53,38 +67,50 @@
     },
     "Id_Voice_Cooperation": {
       "simple": "Speaker's cooperation callout voice.",
-      "technical": "FName voice key selected for exchange Kind 3 (BTL_HUD_LABEL_0203); passed to PlayVoiceById for the speaker's character index.",
+      "technical": "FName Id_Voice_Cooperation. Kind 3 selects this speaker key and BTL_HUD_LABEL_0203 (\"Cooperative\" in the English text export); PlayVoiceById uses the speaker's character index.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterOperation.h:27",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1746",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1748",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1749",
-        "Source/Abrams/Public/GameBattleSystems_A.h:88",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1765",
         "Source/Abrams/Private/GameSoundManager.cpp:960"
       ],
       "status": "verified"
     },
     "Id_Voice_Receive_Cooperation": {
       "simple": "Partner's reply to a cooperation callout.",
-      "technical": "FName voice key paired with Id_Voice_Cooperation for Kind 3; held in ResponderVoice for the delayed answer playback.",
+      "technical": "FName Id_Voice_Receive_Cooperation. Kind 3 pairs this responder key with Id_Voice_Cooperation and holds it in ResponderVoice for the delayed answer playback on the responder's character index.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterOperation.h:30",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1750",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1772",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1784",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1786"
       ],
       "status": "verified"
     },
     "Id_Voice_Carefully": {
-      "simple": "Speaker's careful/caution callout voice.",
-      "technical": "FName voice key selected for exchange Kind 4 (BTL_HUD_LABEL_0204); passed to PlayVoiceById with the speaker's character index.",
+      "simple": "Speaker's careful/cautious callout voice.",
+      "technical": "FName Id_Voice_Carefully. Kind 4 selects this speaker key and BTL_HUD_LABEL_0204 (\"Cautious\" in the English text export); PlayVoiceById uses the speaker's character index.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterOperation.h:33",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1752",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1754",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1755",
-        "Source/Abrams/Public/GameBattleSystems_A.h:88",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1765",
         "Source/Abrams/Private/GameSoundManager.cpp:960"
       ],
       "status": "verified"
     },
     "Id_Voice_Receive_Carefully": {
-      "simple": "Partner's reply to a careful/caution callout.",
-      "technical": "FName voice key paired with Id_Voice_Carefully for Kind 4; copied to ResponderVoice and played after the speaker clip plus the 0.5 s answer timer.",
+      "simple": "Partner's reply to a careful/cautious callout.",
+      "technical": "FName Id_Voice_Receive_Carefully. Kind 4 pairs this responder key with Id_Voice_Carefully; after the speaker clip ends and CanAnswerExchangeVoice succeeds, it is played after the 0.5 s timer on the responder's character index.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterOperation.h:36",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1756",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1770",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1772",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1784",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1786"
       ],
@@ -92,31 +118,55 @@
     }
   },
   "notes": [
-    "The four kinds come from FStudioBattleVoiceExchange.Kind: 2 = onslaught, 3 = cooperation, 4 = carefully, anything else = normal. The message labels are BTL_HUD_LABEL_0201/0202/0203/0204 respectively.",
-    "Receiving voices are not played immediately: the speaker line must finish, the responder must pass CanAnswerExchangeVoice, and a 0.5-second timer must elapse.",
-    "No localization variants of this table were exported. VoiceDataTable supplies the actual cue sheet/cue; no direct consumer of OperationRow outside FStudioBattleSystem320 was found in the available source.",
-    "Evidence is reconstructed C++; it establishes current source behavior but is not a retail byte-match claim."
+    "Kind comes from FStudioBattleVoiceExchange.Kind, queued by AGameBattleManager::AddVoiceExchange from the released operation direction (Kinds 1-4). FStudioBattleSystem320::Tick maps 2/3/4 to BTL_HUD_LABEL_0202/0203/0204 and every other value, including Kind 1 and the struct default 0, to BTL_HUD_LABEL_0201. The English BattleTextDataTable labels those four messages Normal, Aggressive, Cooperative and Cautious.",
+    "One primary asset named CharacterOperationDataTable is resolved into DTM.CharacterOperationDataTables (+0x540). ResolveDataRows caches the first FindRow match in AGameCharacter.OperationRow (+0x3D8), and no operation-id override is applied; the only direct field reads in the available source are in FStudioBattleSystem320::Tick, while the controller and battle manager pass weak speaker/responder references plus Kind.",
+    "Exchange state: Step 0 discards the exchange if the speaker cannot speak or an operation message is already opening; otherwise it selects the speaker/responder voice pair, shows the HUD message and plays the speaker voice. Step 1 waits until that handle is no longer playing, then requires CanAnswerExchangeVoice; Step 2 accumulates DeltaTime in seconds until >= 0.5 before playing the reply; Step 3 discards the exchange when the reply stops. No distance, range or volume value is stored in this table.",
+    "PlayVoiceById resolves each FName against DTM.VoiceDataTables with GameScript_FindVoiceRow(..., bCheckNone=true, bUnknown=false); a missing Voice row returns handle -1. IsVoicePlaying(-1) is false, so a missing speaker key lets the state advance immediately after the responder check, while a missing responder key is discarded on the next tick. VoiceDataTable supplies CueSheetName/CueName, and PlayVoice appends \"_En\" to the cue at runtime when bAppendEnVoiceSuffix is set.",
+    "Export content: one unsharded, unlocalized table with 27 rows. Every row name equals its Id, all eight voice FNames are non-None and resolve to VoiceDataTable rows, and in every row the four receive fields are the same key (VoCha_<row>_08_2_010); the speaker fields use the _15_, _44_, _21_ and _45_ suffixes. Those numeric suffixes are observed data, not documented semantics.",
+    "CharacterData relationship: 47 of its 48 exported rows reference one of these 27 rows; CN_210 uses the FName None sentinel and would fail the non-optional operation lookup if set up. Sharing is intentional: 19 character rows point at CP_010, CP_081 at CP_080, and CN_260 at CP_160.",
+    "No localized variants of this table were exported; downstream BattleTextDataTable carries localized labels, and voice cue names are localized at playback. The 27 exported rows are the available content only: no claim is made about additional retail rows or Blueprint-only consumers.",
+    "Evidence is reconstructed C++ with retail RVAs recorded in source; it establishes the reconstructed runtime behavior but is not a retail byte-match claim. No retail Blueprint evidence was available."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:214",
+      "detail": "Resolves the single CharacterOperationDataTable primary asset into CharacterOperationDataTables (DTM +0x540)."
+    },
+    {
       "source": "Source/Abrams/Private/GameCharacter.cpp:518",
-      "detail": "Resolves the row by CharacterDataTable.Id_CharacterOperation and caches it in AGameCharacter.OperationRow."
+      "detail": "Resolves the row by CharacterDataTable.Id_CharacterOperation with no override and caches it in AGameCharacter.OperationRow (+0x3D8); a miss fails setup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterOperationController.cpp:135",
+      "detail": "Queues an exchange with the player as speaker, the selected ally as responder, and the released direction as Kind 1-4."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:2526",
+      "detail": "Stores the speaker, responder and Kind in a System320.Exchanges entry."
     },
     {
       "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:1740",
-      "detail": "Selects the speaker/receiver voice pair by exchange kind and labels the HUD operation message."
+      "detail": "Selects the speaker/receiver voice pair from both cached CharacterOperation rows by exchange kind and labels the HUD operation message."
     },
     {
       "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:1765",
-      "detail": "Plays the selected speaker voice using the speaker's character index."
+      "detail": "Plays the selected speaker voice with the speaker's character index."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:1770",
+      "detail": "Gates the reply on the speaker playback ending, the responder being able to answer, and the 0.5 s timer."
     },
     {
       "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:1786",
-      "detail": "Plays the selected reply voice using the responder's character index after the 0.5 s delay."
+      "detail": "Plays the selected reply voice with the responder's character index."
     },
     {
       "source": "Source/Abrams/Private/GameSoundManager.cpp:960",
-      "detail": "Turns the stored FName into CRI Atom cue sheet/cue playback via VoiceDataTables; returns -1 for a missing row."
+      "detail": "Resolves the FName through VoiceDataTables and turns its row into CRI Atom cue sheet/cue playback; returns -1 for a missing row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSoundManager.cpp:433",
+      "detail": "Appends the runtime English cue suffix when configured; this is downstream of the operation-to-voice lookup."
     }
   ]
 }

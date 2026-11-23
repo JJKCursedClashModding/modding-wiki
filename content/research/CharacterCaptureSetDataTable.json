@@ -1,51 +1,102 @@
 {
-  "description": "Per-character ordered bundle of CharacterCaptureDataTable row IDs, used to select the capture configuration appropriate to each UI capture context.",
+  "description": "Per-character bundle of CharacterCaptureDataTable row IDs used by AGameCharacterCaptureActor: Character::Id_CharacterCapture selects a set row, and the ordered list is scanned for the capture row whose CaptureType matches the requested UI capture context.",
   "fields": {
     "ID": {
-      "simple": "Row key, normally the character ID that Character::Id_CharacterCapture points to.",
-      "technical": "FName primary key (ImportKeyField=Id in the export). FindCharacterCaptureRow reads Character::Id_CharacterCapture and calls FindRow<FGameDataTableRow_CharacterCaptureSet> on each table in CharacterCaptureSetDataTables (DTM +0x430), stopping at the first hit. A None id on the Character row means no set is resolved.",
+      "simple": "Row key (exported as ID; native member Id), normally the character ID referenced by a Character row's Id_CharacterCapture.",
+      "technical": "FName primary key of FGameDataTableRow_CharacterCaptureSet, a USTRUCT(BlueprintType) derived from FTableRowBase; the export records ImportKeyField=Id and spells the row key/property ID. FindCharacterCaptureRow first resolves the Character row in CharacterDataTables (DTM +0x3E0) with DTM_FindCharacterRow using the requested character/slot ID, reads FGameDataTableRow_Character::Id_CharacterCapture, then calls UDataTable::FindRow<FGameDataTableRow_CharacterCaptureSet> on every table in CharacterCaptureSetDataTables (DTM +0x430), stopping at the first hit. The matched value is the DataTable row-map key; the row's own Id member is not read by the traced consumer. A None Character::Id_CharacterCapture returns no set.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCaptureSet.h:7",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCaptureSet.h:11",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Character.h:123",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:115",
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:116",
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:120",
-        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:121"
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:121",
+        "Source/Abrams/Public/GameDataTableManager.h:108"
       ],
       "status": "verified"
     },
     "Id_CharacterCapture": {
-      "simple": "Ordered list of CharacterCapture row IDs for this character's capture contexts.",
-      "technical": "TArray<FName>, 8 slots in every exported row (commonly six populated context-specific IDs followed by None padding). The capture actor iterates the list in order; encountering a None entry returns no capture, otherwise each ID is resolved via FindRow<FGameDataTableRow_CharacterCapture> across CharacterCaptureDataTables (DTM +0x440) and the first row whose CaptureType equals the requested slot type is returned. A missing capture row also ends the walk. The array order therefore controls both search order and the early-abort behaviour on padding.",
+      "simple": "Ordered FName list of CharacterCaptureDataTable row IDs for this character's capture contexts.",
+      "technical": "TArray<FName> (native offset +0x10; a dynamic array, not a fixed-size C array). The export serializes eight slots in every row: the 29 CP_xxx sets hold six context IDs in the order CHARACTER_SELECT, STORYCHARACTER_SELECT, VS_ALLY, VS_ENEMY, FREE_BATTLE, CUSTOMIZE followed by two None values, while the 16 CN_xxx sets hold one VS_ENEMY ID followed by seven None values. FindCharacterCaptureRow walks the list from index 0; each non-None ID is resolved with UDataTable::FindRow<FGameDataTableRow_CharacterCapture> across CharacterCaptureDataTables (DTM +0x440) and accepted only when that row's CaptureType equals the requested slot type, so the first matching type wins. The numeric index is not an enum slot: order controls precedence. A None element, a missing capture row, or exhausting the list returns nullptr; trailing None padding therefore terminates harmlessly, but any earlier None stops later candidates. All 190 exported references resolve to the 190 CharacterCapture rows, one per expected context/type in each set, with no duplicate non-None IDs inside a set. Do not confuse this array with FGameDataTableRow_Character::Id_CharacterCapture, the scalar FName that points to this set.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCaptureSet.h:15",
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:129",
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:131",
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:135",
-        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:143"
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:140",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:143",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:147",
+        "Source/Abrams/Public/GameDataTableManager.h:109"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Export contains 45 rows, each with exactly eight Id_CharacterCapture slots; populated prefixes in the sample data are <character>_CHARACTER_SELECT, _STORYCHARACTER_SELECT, _VS_ALLY, _VS_ENEMY, _FREE_BATTLE and _CUSTOMIZE, followed by None padding.",
-    "The join is Character::Id_CharacterCapture -> CharacterCaptureSet row -> CharacterCapture row filtered by capture type; the result feeds asset loading, spawning and montage playback in AGameCharacterCaptureActor.",
-    "There is a single retail table registered as 'CharacterCaptureSetDataTable' and loaded into DTM +0x430; no numbered shards are present in the export.",
-    "Reconstructed source with retail RVA comments; no claim about Blueprint-only consumers or uncooked content."
+    "Export scope: one CharacterCaptureSetDataTable.json shard with RowStruct GameDataTableRow_CharacterCaptureSet and ImportKeyField=Id; its 45 row keys are 29 CP_xxx and 16 CN_xxx IDs. Every non-None Id_CharacterCapture in the 48-row Character export points to a set with the same ID; CP_081, CN_170 and CN_210 have None and resolve no set. All 45 set rows are referenced by a Character row.",
+    "Every set row exports eight Id_CharacterCapture FNames. The generated row constructor is empty, so the native defaults are a None FName and an empty TArray; all eight serialized slots come from the DataTable export. The scan is by CaptureType, not by fixed slot semantics: a hypothetical reordered array would change precedence, and a None before a needed row would end the search.",
+    "Lookup chain: slot Parameter.CharacterId -> Character row (DTM +0x3E0) -> Character::Id_CharacterCapture -> set row (DTM +0x430) -> first CharacterCapture row (DTM +0x440) whose CaptureType equals the slot type. A missing Character, set or capture row returns no capture; the resolved capture row drives loader construction, character/shikigami spawning and montage/weapon setup. The helper is called both with Slot.Parameter.CharacterId and with CharacterRow->Id_CharacterCapture; no alias table is involved, and those forms coincide in the export because every non-None Character.ID equals its Id_CharacterCapture.",
+    "Table loading: StartInitialLoading registers one DataTable-primary loader named CharacterCaptureSetDataTable (Source/Abrams/Private/GameDataTableManager.cpp:345 and :488). Once DataTableLoaders complete, Tick resolves the UDataTable through the asset manager and AddLoadedDataTables pushes the non-null result into CharacterCaptureSetDataTables (DTM +0x430). No numbered shards or alternate loader names exist in the export; FindRow walks all tables in the array in order, so any hypothetical future shard would have first-hit precedence.",
+    "For SituationOverview-driven VsAlly, VsEnemy and Customize requests, the set-to-capture join still occurs, but the capture row's animation/most weapon fields are bypassed in favour of SituationOverviewPose data; Id_ShikigamiCharacter and ShikigamiDefaultMaterialPattern remain active. The 16 CN enemy-only sets still resolve their VsEnemy capture rows on that path.",
+    "Indirect reach: AGameWidgetManager creates and caches AGameCharacterCaptureActor instances by EGameWidgetCaptureType in SpawnedCaptureActorMap. Traced C++ request sites cover main-menu CharacterSelect, story select, free-battle team select, customize model and battle situation overview (VsAlly/VsEnemy); RequestCharacter stores the type/parameter in a slot and LoadCharacter invokes this lookup.",
+    "Evidence is reconstructed C++ with retail RVA comments plus read-only uncooked exports. Retail Blueprint graphs and loaded/cooked DataTable objects were not available, so Blueprint-only callers or rows outside the supplied export cannot be excluded; no byte-identical matching claim is made."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:197",
-      "detail": "Loads CharacterCaptureSetDataTable into AGameDataTableManager::CharacterCaptureSetDataTables."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:345",
+      "detail": "StartInitialLoading registers the single loader name CharacterCaptureSetDataTable; line 488 creates the DataTable-primary DataTableLoaders map."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:113",
-      "detail": "FindCharacterCaptureRow resolves the set using Character::Id_CharacterCapture."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:197",
+      "detail": "Tick resolves the loaded UDataTable and AddLoadedDataTables adds the non-null result to CharacterCaptureSetDataTables (DTM +0x430)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:115",
+      "detail": "FindCharacterCaptureRow resolves the Character row from the requested character/slot ID before reading Character::Id_CharacterCapture."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:121",
+      "detail": "The set row is found by row name across CharacterCaptureSetDataTables; the first table containing it wins."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:129",
-      "detail": "Iterates Id_CharacterCapture, stopping on None or a missing character-capture row."
+      "detail": "The set's Id_CharacterCapture FName array is walked in order from index 0."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:135",
+      "detail": "Each candidate capture ID is looked up across CharacterCaptureDataTables (DTM +0x440); a missing row ends the walk."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:143",
-      "detail": "Returns the first capture row whose CaptureType matches the slot."
+      "detail": "The first captured row whose CaptureType matches the requested slot type is returned; None elements stop the search."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1120",
+      "detail": "LoadCharacter uses the resolved capture row to collect character/shikigami/montage/weapon file names and create the slot's four asset loader maps."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:528",
+      "detail": "SpawnCharacter gates scene-capture character spawning on the resolved capture row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:447",
+      "detail": "SpawnShikigami uses the resolved capture row's Id_ShikigamiCharacter and ShikigamiDefaultMaterialPattern."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1228",
+      "detail": "GetCharacterAnimationMap and GetShikigamiAnimationMap use the resolved row's keys for non-SituationOverview captures."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1378",
+      "detail": "PlayIdleMontage resolves the capture row for the slot before idle montage, shikigami and weapon playback; PlayEnterMontage repeats this at line 1483."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetManager.cpp:1635",
+      "detail": "FindOrCreateCharacterCaptureActor reuses a cached actor per EGameWidgetCaptureType, the indirect entry into RequestCharacter and this lookup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameMenuSequence.cpp:583",
+      "detail": "Traced CharacterSelect request into the capture actor (other traced contexts: StoryCharacterSelect at GamePhase_StoryCharacterSelect.cpp:154, FreeBattle at GameFreeBattleTeamCharacterSelectWidget.cpp:386, Customize at GameCustomizeCharaModelWidget.cpp:130, VsAlly/VsEnemy at GameBattleSituationOverviewWidget.cpp:470/:481)."
     }
   ]
 }

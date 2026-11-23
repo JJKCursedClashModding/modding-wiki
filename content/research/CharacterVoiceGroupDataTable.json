@@ -1,66 +1,101 @@
 {
-  "description": "Intermediate per-action voice-group list selected by a CharacterVoiceGroupSet row; its entries point to VoiceGroupDataTable rows that hold the actual voice lottery candidates.",
+  "description": "One row is a 13-slot, action/situation-indexed bundle of VoiceGroupDataTable IDs for one character voice variant. A CharacterVoiceGroupSetDataTable field selects the row; PlayVoice selects one slot by voice Kind/Index, and the resolved VoiceGroup row runs the actual random voice-candidate lottery into VoiceDataTable cues.",
   "fields": {
     "Id": {
       "simple": "Row key / character voice-group ID.",
-      "technical": "FName primary key. CharacterVoiceGroupSetDataTable's action-specific FName fields (for example NormalAttack1, CursedEnergyAttack1_2, ExtraAttack1) are passed to Action_FindCharacterVoiceGroupRow over DTM.CharacterVoiceGroupDataTables (+0x530); the first typed table containing this Id wins. All observed callers pass bCheckNone=true, so None selections return no row. Export spells it ID.",
+      "technical": "FName primary key (export column ID, ImportKeyField=Id). CharacterVoiceGroupSetDataTable's action/situation FName fields - for example Id_CharacterVoiceGroup_NormalAttack1, Id_CharacterVoiceGroup_CursedEnergyAttack1_2 and Id_CharacterVoiceGroup_ExtraAttack1 - and the generic PlayVoice cases resolve this Id with Action_FindCharacterVoiceGroupRow over DTM.CharacterVoiceGroupDataTables (+0x530). The finder rejects None when bCheckNone=true and returns the first typed FindRow hit in table order; every reconstructed call site passes true, while CP_230's inline walk checks IsNone() explicitly. The constructor declares no special Id default, so an unset FName is NAME_None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroup.h:11",
         "Source/Abrams/Private/GameDataTableManager.cpp:653",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3182",
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:62",
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:155",
-        "Source/Abrams/Private/CP_020_ActionController.cpp:539"
+        "Source/Abrams/Private/CP_020_ActionController.cpp:539",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1129"
       ],
       "status": "verified"
     },
     "Id_VoiceGroup": {
-      "simple": "Ordered list of VoiceGroupDataTable IDs; one is chosen by the current action step/index.",
-      "technical": "TArray<FName>. The action object's GetVoiceGroupRow returns this row; PlayVoice then picks Id_VoiceGroup[GroupIndex] and resolves it through ActionController_FindVoiceGroupRow in DTM.VoiceGroupDataTables (+0x750). For generic action voice (Kind 2), GroupIndex is the voice request's Index, or GetAttackVoiceIndex() when Index==0; other Kind cases use Index or Index-1. There is no bounds check on the array; bCheckNone is true for most Kinds and false for Kind 2, but the finder also rejects None internally. Exported rows contain many trailing None placeholders.",
+      "simple": "Ordered 13-slot list of VoiceGroupDataTable IDs selected by the voice request's Kind/Index.",
+      "technical": "TArray<FName>. A group row comes either from the active attack action's virtual GetVoiceGroupRow (Kind 2) or from a generic PlayVoice set field; the chosen element is Id_VoiceGroup[Index] for Kinds 1/4/5/8/9/10, Id_VoiceGroup[Index-1] for Kinds 3/6/7 (which require Index>0), and Id_VoiceGroup[Index==0 ? GetAttackVoiceIndex() : Index] for Kind 2 (a negative fallback is rejected). The selected FName is resolved through ActionController_FindVoiceGroupRow over DTM.VoiceGroupDataTables (+0x750). No bounds check is applied at any read site; NAME_None is rejected by the finder/typed FindRow even though Kind 2 passes bCheckNone=false. The constructor adds no entries or default IDs: all 2,460 exported rows have exactly 13 slots, and 25,372 of their 31,980 slots are literal 'None' unused filler.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVoiceGroup.h:15",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3186",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3195",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3031",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3187",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3202",
         "Source/Abrams/Private/GameCharacterActionController.cpp:3207",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3298",
-        "Source/Abrams/Private/GameCharacterActionController.cpp:3031"
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3221",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3252",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3298"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Loaded as a 'DataTable' primary asset named CharacterVoiceGroupDataTable into DTM.CharacterVoiceGroupDataTables (+0x530); the shared finder walks tables in order and checks the row struct type before FindRow.",
-    "This table is the middle join of a three-level voice chain: CharacterSoundDataTable.Id_CharacterVoiceGroupSet -> CharacterVoiceGroupSetDataTable action field -> this table's Id_VoiceGroup -> VoiceGroupDataTable.Id_Voice -> VoiceDataTable cues.",
-    "Character-specific controller overrides (CP_020, CP_050, CP_070, CP_110, CP_120, CP_200, CP_230, CN_140, CN_230) choose different fields of the set row and therefore different rows here; normal and cursed-energy attack classes do the same based on attack substep and cursed-energy level.",
-    "The companion export contains 2,460 rows; retail completeness and Blueprint-only references are not asserted. Source is reconstructed from the retail binary, with retail RVAs recorded inline."
+    "At boot the manager creates a FPrimaryAssetId of type 'DataTable' and name CharacterVoiceGroupDataTable from the shipped AssetManager scan, resolves it to a UDataTable, and appends it to DTM.CharacterVoiceGroupDataTables (+0x530). Action_FindCharacterVoiceGroupRow walks that array in order and returns the first hit; Unreal's typed UDataTable::FindRow itself checks that RowStruct is a child of FGameDataTableRow_CharacterVoiceGroup and rejects NAME_None, so the finder needs no separate struct test. The 45 per-character JSON shards all carry the same Name, are a partition of the rows, and are export views rather than 45 runtime tables; their union exactly equals the 2,460-row master export.",
+    "Indirect selection chain: character setup caches a CharacterSoundDataTable row (AGameCharacter +0x3D0); its Id_CharacterVoiceGroupSet is an ordered candidate array. FindCharacterVoiceGroupSetRow(Mode) uses candidate 0 for mode 0, the saved NormalAttackVoiceIndex for mode 1, CursedEnergyAttackVoiceIndex for mode 2 and candidate 3 for low-HP mode 3, with bounds and None checks, then resolves the first matching CharacterVoiceGroupSet row. CP_051's passive buff overrides candidate IDs with CP_051_2/TYPEA_2/TYPEB_2/PINCH_2. The selected set field resolves this table; this table's selected slot then joins VoiceGroupDataTable.Id_Voice, whose entries join VoiceDataTable cues.",
+    "Consumer gating and precedence: the generic character route through AGameCharacter::GAISlot186 requires both bActionVoiceEnabled and bVoiceGroupPlaybackEnabled; direct action/controller PlayVoice calls bypass that wrapper. In PlayVoice, Kind 2's set mode comes from the active action's GetAttackVoiceGroupSetMode, and the low-HP mode-3 override can replace it except for Kind 1; Kind 4 applies that override only at Index==2 and Kind 5 only at Index 2/5/6. A qualified secondary target can rewrite Kind 2/3 requests with bSituationCheck into Kind 4 before any lookup.",
+    "Kind-to-field mapping for this row's upstream selector is Kind 1 DefaultAction, Kind 2 the Attack action's virtual GetVoiceGroupRow, Kind 3 Attack, Kind 4 SituationAttack, Kind 5 System, Kind 6 Damage1, Kind 7 SpecialDamage, Kind 8 Down, Kind 9 Guard and Kind 10 Unique. Normal/cursed-energy/super-attack actions choose their own set fields (including the cursed-energy level), and CN_140, CN_230, CP_020, CP_050, CP_070, CP_110, CP_120, CP_200 and CP_230 character actions override the virtual selector. The base FGameCharacterAction::GetVoiceGroupRow returns nullptr, so Kind 2 on an action without an override plays nothing.",
+    "This table selects a VoiceGroup row, not an individual cue. PlayVoice filters None out of that row's Id_Voice array, removes the last played ID when at least two candidates remain, picks uniformly from GameManager's studio random stream, resolves a VoiceDataTable row and calls PlayVoiceCue with its cue sheet/name; voice priority and history state can still suppress the result. No timing, distance or other numeric unit is stored in this table; Index is an array index whose zero/one-based convention depends on Kind.",
+    "Export checks: every one of the 2,460 rows has key == ID, exactly the two declared fields, and a 13-element TArray; 6,608 non-None entries reference 4,784 distinct VoiceGroupDataTable rows. Ten entries in ten rows name nine absent VoiceGroup rows (CN_040_BREAKFALL_01 in two Down rows and eight CP_230 CursedEnergyAttack2_* names). Conversely, eight non-None CharacterVoiceGroupSet extra-attack IDs for CP_250, CP_260, CN_122 and CN_250 have no row here, and nine group rows (CP_070/CP_081 variants) are unreferenced by the exported set fields. No reconstructed C++ reader was found for those four characters' extra-attack fields, so these are export/evidence gaps, not established retail behavior.",
+    "Native consumer evidence comes from the current Reconstruction sources with inline retail RVA annotations; no retail Blueprint graphs were reviewed, so Blueprint-only consumers cannot be excluded. Export row counts and cross-table references establish data relationships in the supplied snapshot but cannot prove retail completeness."
   ],
   "usages": [
     {
+      "source": "Config/DefaultGame.ini:24",
+      "detail": "Shipped AssetManager config scans /Game/DataTables as PrimaryAssetType DataTable, which makes the named table loadable."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:213",
+      "detail": "Resolves CharacterVoiceGroupDataTable into DTM.CharacterVoiceGroupDataTables (+0x530)."
+    },
+    {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:653",
-      "detail": "Typed first-row finder for CharacterVoiceGroupDataTable rows."
+      "detail": "Typed first-match finder for CharacterVoiceGroup rows; rejects None when requested."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:3449",
+      "detail": "Selects a CharacterVoiceGroupSet row by variant/low-HP mode, which supplies the Id looked up here."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:2901",
+      "detail": "Reads the cached CharacterSound row's Id_CharacterVoiceGroupSet candidate list."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_051_ActionController.cpp:853",
+      "detail": "CP_051 passive swaps the candidate set IDs to alternate rows, changing which row here is reached."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:3066",
+      "detail": "PlayVoice applies situation/low-HP rewrites, maps Kind to a set field and defines the Id_VoiceGroup index convention."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:3197",
+      "detail": "Kind 2 asks the active Attack action for its CharacterVoiceGroup row."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:59",
-      "detail": "Normal-attack action classes select a row by set field and substep."
+      "detail": "Normal and air attack actions choose normal-attack fields from the set."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:151",
-      "detail": "Cursed-energy attacks select level 1/2/3 rows from the set."
+      "source": "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:152",
+      "detail": "Cursed-energy and super attack classes choose level-specific or super fields from the set."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:3184",
-      "detail": "Generic Kind-1 path resolves the default-action row."
+      "source": "Source/Abrams/Private/CP_020_ActionController.cpp:536",
+      "detail": "Character-specific extra-attack overrides choose their own set fields."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:3195",
-      "detail": "Kind-2 path asks the active action object for this row."
+      "source": "Source/Abrams/Private/CP_230_ActionController.cpp:1124",
+      "detail": "CP_230 bypasses the shared finder with an inline None-checked table walk for CursedEnergyAttack2_1."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterActionController.cpp:3298",
       "detail": "Resolves the selected Id_VoiceGroup entry to a VoiceGroup row."
     },
     {
-      "source": "Source/Abrams/Private/CP_020_ActionController.cpp:536",
-      "detail": "Character-specific extra-attack overrides resolve rows from the set."
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:3305",
+      "detail": "Builds the downstream non-None voice candidate list and random lottery from the resolved VoiceGroup row."
     }
   ]
 }

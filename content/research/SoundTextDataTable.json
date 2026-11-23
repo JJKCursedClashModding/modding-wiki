@@ -1,32 +1,45 @@
 {
-  "description": "Localized display labels for BGM tracks (mostly BGM_* ids with 'Track NN' text). Bgm rows reference these ids through Id_SoundText for the sound collection UI and free-battle BGM selector.",
+  "description": "Localized display labels for BGM tracks. All 28 exported rows in every language use BGM_* keys and localized track-number text (English 'Track 01'..'Track 28'); Bgm.Id_SoundText points here for sound-collection titles and battle-BGM options.",
   "fields": {
     "ID": {
-      "simple": "BGM label text id (row key), e.g. BGM_MENU, BGM_BATTLE_01.",
-      "technical": "FName ID of FGameDataTableRow_GameText. FGameDataTableRow_Bgm::Id_SoundText stores this id; UGameCollectionSoundListItem::GetTitleTextId returns it for the collection sound item, and the free-battle rule screen adds Row->Id_SoundText.ToString() as an option with SetUseTextId(true) so options resolve through the text manager. The table is loaded as SoundTextDataTable_<Language> in slot 12 of the 14-table GameText array. Playback ids such as PlayBgm(FName(\"BGM_MENU\")) use the same strings, but playback itself is handled by the sound manager/Bgm table, not by this text table.",
+      "simple": "BGM label text id (DataTable row key), e.g. BGM_MENU, BGM_BATTLE_01.",
+      "technical": "FName ID (+0x0) of FGameDataTableRow_GameText. Runtime lookup calls UDataTable::FindRow(TextId), so it matches the DataTable row name; the export's ID field duplicates that row name in all 11 shards but is not itself the key used by FindRow. FGameDataTableRow_Bgm::Id_SoundText stores the same string; UGameCollectionSoundListItem::GetTitleTextId returns it (NAME_None when BgmRow is null), and the free-battle rule screen adds Row->Id_SoundText.ToString() as an option with SetUseTextId(true). SoundTextDataTable_<Language> is candidate position 12 (zero-based; 13th of 14) in StartLanguageLoading/Tick, with only non-null loaded tables appended. PlayBgm(FName(\"BGM_MENU\")) and similar calls use the same strings as cue-sheet/playback names; GameSoundManager::PlayBgm itself neither reads this text table nor looks up BgmDataTable.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:11",
         "Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:18",
+        "Source/Abrams/Private/GameCollectionSoundListItem.cpp:11",
+        "Source/Abrams/Private/GameFreeBattleRuleSelectWidget.cpp:391",
+        "Source/Abrams/Private/GameFreeBattleRuleSelectWidget.cpp:394",
+        "Source/Abrams/Private/GameFreeBattleRuleSelectWidget.cpp:395",
         "Source/Abrams/Private/GameTextManager.cpp:62",
         "Source/Abrams/Private/GameTextManager.cpp:561",
+        "Source/Abrams/Private/GameTextManager.cpp:595",
         "Source/Abrams/Private/GameTextManager.cpp:597",
-        "Source/Abrams/Private/GameCollectionSoundListItem.cpp:9",
-        "Source/Abrams/Private/GameCollectionSoundListItem.cpp:11",
-        "Source/Abrams/Private/GameFreeBattleRuleSelectWidget.cpp:389",
-        "Source/Abrams/Private/GameFreeBattleRuleSelectWidget.cpp:394",
-        "Source/Abrams/Private/GamePhase_DebugBoot.cpp:78"
+        "Source/Abrams/Private/GameTextManager.cpp:649",
+        "Source/Abrams/Private/GameTextManager.cpp:681",
+        "Source/Abrams/Public/GameTextManager.h:31",
+        "Source/Abrams/Public/GameTextManager.h:33",
+        "Source/Abrams/Private/GamePhase_DebugBoot.cpp:78",
+        "Source/Abrams/Private/GameSoundManager.cpp:392",
+        "Source/Abrams/Private/GameSoundManager.cpp:410"
       ],
       "status": "verified"
     },
     "Text": {
-      "simple": "The localized BGM track label shown in lists/option boxes.",
-      "technical": "FString row text (+0x10), resolved through GetText by any text block or option box using the id, with the normal FormatText substitution rules. Companion exports contain 28 rows per language, all nonempty; En values are 'Track 01'..'Track 28' in id order. Locked sound-collection entries substitute a different system text id (SYS_STORY_CORRELATION_DIAGRAM_LABEL_1003) instead of reading this text. The Bgm row's CueSheetName/Duration control actual audio and are unrelated to this field.",
+      "simple": "The localized BGM track label shown in collection lists and free-battle BGM option boxes.",
+      "technical": "FString row text (+0x10). UGameWidgetTextBlock::SetTextIdOnly builds a request and calls AGameTextManager::GetText; a UGameWidgetTextOptionBox with bUseTextId converts each option string to an FName and takes the same path. For non-SYS_ ids GetGameText finds the first matching row name in TextDataTables and returns Row->Text after FormatText parameter/glossary substitution; a missing row or empty Text yields an empty string. All 11 export shards have 28 rows with nonempty Text and identical row names/IDs; En values are 'Track 01'..'Track 28' in row order and contain no format tags. Locked collection entries substitute SYS_STORY_CORRELATION_DIAGRAM_LABEL_1003 instead of this text. Bgm CueSheetName/Duration drive audio/slider behavior, not this label.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:15",
+        "Source/Abrams/Private/GameTextManager.cpp:597",
+        "Source/Abrams/Private/GameTextManager.cpp:624",
+        "Source/Abrams/Private/GameTextManager.cpp:628",
         "Source/Abrams/Private/GameTextManager.cpp:667",
         "Source/Abrams/Private/GameTextManager.cpp:681",
         "Source/Abrams/Private/GameTextManager.cpp:683",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:52",
         "Source/Abrams/Private/GameWidgetTextBlock.cpp:72",
+        "Source/Abrams/Private/GameWidgetTextOptionBox.cpp:25",
+        "Source/Abrams/Private/GameWidgetTextOptionBox.cpp:29",
         "Source/Abrams/Private/GameCollectionSoundItemWidget.cpp:41",
         "Source/Abrams/Private/GameCollectionSoundItemWidget.cpp:42"
       ],
@@ -34,27 +47,45 @@
     }
   },
   "notes": [
-    "FGameDataTableRow_GameText with 11 exported language variants (28 identical ids each in the companion export). Slot 12 of the 14-table array; Config/DefaultGame.ini:35-45 assigns each language variant to its chunk.",
-    "The same BGM_* string is used in three roles: Bgm table row name / sound playback id (GameSoundManager::PlayBgm), Bgm.Id_SoundText pointing into this table, and this table's own row key. Only the second/third are text lookups; a PlayBgm call does not read SoundTextDataTable.",
-    "No prefix-specific dispatch: GetText resolves any non-SYS_ id across the combined 14-table array. Since BGM_* ids are distinctive, collisions are unlikely but not prevented by code.",
-    "Reconstruction caveat: FindTextRow/Tick are behaviour-certified rather than byte-identical (status/functions.json 0x14af290, 0x14c96f0; BEHAV BG03). Partial Content; no claim about all retail or Blueprint-only consumers."
+    "FGameDataTableRow_GameText has 11 exported language variants (28 rows each) and an empty reconstructed constructor (FName NAME_None / FString empty defaults); every exported row name equals its ID field, and all 28 SoundText keys are referenced by BgmDataTable Id_SoundText.",
+    "Load/chunk: StartLanguageLoading builds <Base>_<Language> primary-asset loader names and Tick rebuilds TextDataTables from 14 candidate tables; SoundTextDataTable_<Language> is zero-based slot 12 and non-null tables are appended in order. Config/DefaultGame.ini:35-45 maps En/Ja/Fr/Es/De/It/Ko/Zh_Hant/Zh_Hans/Pt/Es_LA to ChunkId 1-11; UAbramsAssetManager::DoesPrimaryAssetMatchCustomOverride uses case-insensitive EndsWith, so those suffixes do not overlap.",
+    "Name roles: BgmDataTable row ID/Id_SoundText/CueSheetName and all 28 SoundText row names are the same BGM_* strings in the exports. Playback call sites pass those strings to GameSoundManager::PlayBgm, which loads a cue sheet by that FName; free-battle and collection-title paths convert Id_SoundText into a GameText lookup. A PlayBgm call does not read SoundTextDataTable.",
+    "Lookup precedence/aliases: GetText branches only on a case-insensitive SYS_ prefix; all other ids are searched in TextDataTables order and the first row found wins. No exact BGM_* row-name collision exists among the exported GameText tables (BgmDataTable has the same names but lives in a different table array), and there is no resolved-string cache: FindRow/GetRows search the live tables on each call.",
+    "Consumer conditions: collection item titles use Bgm.Id_SoundText only when bUnlocked; locked entries use SYS_STORY_CORRELATION_DIAGRAM_LABEL_1003; GetTitleTextId returns NAME_None without a BgmRow. Free battle uses only Bgm rows whose Id contains 'BATTLE' (11 exported rows), appends a Random option, sets bUseTextId, and selects by Settings.BgmId (the Bgm row ID) rather than Id_SoundText; in the exports those strings match.",
+    "Reconstruction status: FindTextRow 0x14af290 and AGameTextManager::Tick 0x14c96f0 are behavioural, not byte-identical (BEHAV NA15 and BG03 respectively); GetGameText 0x14af510, GetText 0x14afde0 and StartLanguageLoading 0x14b5a90 are byte MATCH, though 0x14b5a90 carries a ZB02 behaviour-diverges marker for a contested call. Widget and manager behavior here is reconstructed C++; no retail Blueprint property/binding evidence was reviewed."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameCollectionSoundListItem.cpp:11",
-      "detail": "Returns BgmRow->Id_SoundText as the title text id for a sound-collection item."
+      "detail": "Returns BgmRow->Id_SoundText as the collection item's title text id, or NAME_None when there is no BgmRow."
     },
     {
       "source": "Source/Abrams/Private/GameCollectionSoundItemWidget.cpp:41",
-      "detail": "Applies the item's title id (or a locked placeholder system id) to the collection sound item's text block."
+      "detail": "Uses that title id only for unlocked entries; locked entries instead display SYS_STORY_CORRELATION_DIAGRAM_LABEL_1003."
     },
     {
       "source": "Source/Abrams/Private/GameFreeBattleRuleSelectWidget.cpp:391",
-      "detail": "Adds every battle Bgm row's Id_SoundText string as a BGM option and enables text-id resolution on the option box."
+      "detail": "Adds battle Bgm rows' Id_SoundText values plus a Random option, enables text-id display, then selects by Settings.BgmId (the Bgm row ID, equal to Id_SoundText in the exports)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetTextOptionBox.cpp:29",
+      "detail": "With bUseTextId enabled, converts an option string such as BGM_BATTLE_01 back into an FName text id for the option box's text block."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetTextBlock.cpp:72",
+      "detail": "Resolves a text-id request through AGameTextManager::GetText before displaying it."
     },
     {
       "source": "Source/Abrams/Private/GameTextManager.cpp:561",
-      "detail": "Loads SoundTextDataTable_<Language> into the shared GameText table array."
+      "detail": "Loads SoundTextDataTable_<Language> into the 14-table TextDataTables candidate list used for non-SYS_ lookups."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:681",
+      "detail": "Finds the first GameText row with the requested name and formats its Text for GetGameText/GetText."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:565",
+      "detail": "DTM_CollectBattleBgmRows filters Bgm rows whose Id contains 'BATTLE', constraining which Id_SoundText values reach the free-battle option box."
     }
   ]
 }

@@ -1,130 +1,203 @@
 {
-  "description": "Single-row configuration for ranked-match point changes after a battle.",
+  "description": "Scalar constants for the reconstructed post-battle rank-point delta; the result is cached in the battle result snapshot and applied to saved rank points by the online/ranked result path.",
   "fields": {
     "Id": {
-      "simple": "Calculation row name.",
-      "technical": "FName import key/row name for FGameDataTableRow_RankPointCalculation. The consumer does not search by a literal id: it takes the first row name of the first RankPointCalculationDataTables table that has rows and finds that row. The supplied export has one row named DEFAULT.",
+      "simple": "Calculation row name (export row DEFAULT).",
+      "technical": "FName import key/row name for FGameDataTableRow_RankPointCalculation; the export serializes it as \"ID\": \"DEFAULT\" under DataTable ImportKeyField Id. CalcRankPointDelta never reads the Id value or looks up a literal name: the row finder takes RowNames[0] from the first RankPointCalculationDataTables entry with rows, then FindRow for that name. Null tables are not skipped and a missing/empty set leaves the row pointer null, which the consumer dereferences.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:11",
         "Source/Abrams/Public/GameDataTableManager.h:98",
+        "Source/Abrams/Private/GameDataTableManager.cpp:187",
         "Source/Abrams/Private/GameBattleManager.cpp:598",
-        "Source/Abrams/Private/GameBattleManager.cpp:607"
+        "Source/Abrams/Private/GameBattleManager.cpp:602",
+        "Source/Abrams/Private/GameBattleManager.cpp:607",
+        "Source/Abrams/Private/GameBattleManager.cpp:624",
+        "JJKCCDatatables/datatables/RankPointCalculationDataTable.json"
       ],
       "status": "observed"
     },
     "Result_Win": {
       "simple": "Base rank-point delta for a win.",
-      "technical": "int32. AGameBattleManager::CalcRankPointDelta selects it when the player's team is the winner (winner team != 0xFF). Further evaluation, force-gauge, rank-gap and loss-floor adjustments are applied afterwards; a draw uses Result_Draw and a loss uses Result_Lose.",
+      "technical": "int32, constructor default 0, exported DEFAULT 23. GetWinnerTeam() maps Win_TeamA to 0, Win_TeamB to its enum value (1) and Timeover/Invalid to the 0xFF draw sentinel. After the invalid-player early return (delta 0), the consumer selects Result_Win only when the winner is not 0xFF and equals the player's team (GAISlot001). It is the base before evaluation, stock-gap, rank-gap and loss-floor steps.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:15",
-        "Source/Abrams/Private/GameBattleManager.cpp:633"
+        "Source/AbramsDataTable/Private/GameDataTableRow_RankPointCalculation.cpp:4",
+        "Source/Abrams/Private/GameBattleManager.cpp:627",
+        "Source/Abrams/Private/GameBattleManager.cpp:631",
+        "Source/Abrams/Private/GameBattleManager.cpp:633",
+        "Source/Abrams/Public/EGameBattleResultType.h:6",
+        "JJKCCDatatables/datatables/RankPointCalculationDataTable.json"
       ],
       "status": "verified"
     },
     "Result_Lose": {
       "simple": "Base rank-point delta for a loss.",
-      "technical": "int32. Selected when the winner team differs from the player's team. After other modifiers, a losing player's points are raised to the active RankPoint row's LoseLowerLimit (and to at least 0 when an AI-controlled ally flag is set). Draw results instead clamp the final points to <= 0.",
+      "technical": "int32, constructor default 0, exported DEFAULT -43. Selected for any non-draw winner that is not the player's team. After the other modifiers and rank-gap scaling, a non-draw loss is raised with FMath::Max to the LoseLowerLimit of the RankPointDataTable row found for the pre-battle RankPoint (GameRankPoint_FindRow checks GlobalThreshold ranges and keeps the first row encountered when no range matches); if no row is found, that floor is skipped. If any ally with a valid user-settings index has GetControlType() == 3 (AI control), the loss is then also raised to at least 0. Draws skip this branch and use the <= 0 clamp instead.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:18",
+        "Source/AbramsDataTable/Private/GameDataTableRow_RankPointCalculation.cpp:5",
         "Source/Abrams/Private/GameBattleManager.cpp:637",
+        "Source/Abrams/Private/GameBattleManager.cpp:700",
         "Source/Abrams/Private/GameBattleManager.cpp:704",
-        "Source/Abrams/Private/GameBattleManager.cpp:708",
-        "Source/Abrams/Private/GameBattleManager.cpp:698"
+        "Source/Abrams/Private/GameBattleManager.cpp:674",
+        "Source/Abrams/Private/GameBattleManager.cpp:706",
+        "Source/Abrams/Private/GamePlayerRankWidget.cpp:76",
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankPoint.h:26",
+        "JJKCCDatatables/datatables/RankPointCalculationDataTable.json",
+        "JJKCCDatatables/datatables/RankPointDataTable.json"
       ],
       "status": "verified"
     },
     "Result_Draw": {
       "simple": "Base rank-point delta for a draw.",
-      "technical": "int32. Selected when GetWinnerTeam() returns 0xFF; the final adjusted value is clamped with FMath::Min(Points, 0).",
+      "technical": "int32, constructor default 0, exported DEFAULT -10. Selected when GetWinnerTeam() returns the 0xFF sentinel for Timeover/Invalid. After the evaluation, stock-gap and rank-gap modifiers, the final value is clamped with FMath::Min(Points, 0); the non-draw loss-floor branch is skipped.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:21",
+        "Source/AbramsDataTable/Private/GameDataTableRow_RankPointCalculation.cpp:6",
+        "Source/Abrams/Private/GameBattleManager.cpp:627",
         "Source/Abrams/Private/GameBattleManager.cpp:629",
-        "Source/Abrams/Private/GameBattleManager.cpp:698"
+        "Source/Abrams/Private/GameBattleManager.cpp:696",
+        "Source/Abrams/Private/GameBattleManager.cpp:698",
+        "JJKCCDatatables/datatables/RankPointCalculationDataTable.json"
       ],
       "status": "verified"
     },
     "Evaluation_S": {
-      "simple": "Point adjustment for an S result evaluation.",
-      "technical": "int32 added to the base result when the battle evaluation rank is 4 (S). Other evaluation ranks use their own fields; unrecognised ranks add nothing.",
+      "simple": "Point adjustment for a S result evaluation.",
+      "technical": "int32, constructor default 0, exported DEFAULT 10. Added to the running total when the result-rank argument (Snapshot.Key00, produced by GetResultScoreRank) is 4 (S); the switch maps 1=C, 2=B, 3=A, 4=S and unrecognised ranks add nothing.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:24",
-        "Source/Abrams/Private/GameBattleManager.cpp:644"
+        "Source/AbramsDataTable/Private/GameDataTableRow_RankPointCalculation.cpp:7",
+        "Source/Abrams/Private/GameBattleManager.cpp:639",
+        "Source/Abrams/Private/GameBattleManager.cpp:644",
+        "Source/Abrams/Private/GameBattleManager.cpp:1380",
+        "Source/Abrams/Private/GameBattleManager.cpp:1382",
+        "JJKCCDatatables/datatables/RankPointCalculationDataTable.json"
       ],
       "status": "verified"
     },
     "Evaluation_A": {
-      "simple": "Point adjustment for an A result evaluation.",
-      "technical": "int32 added when evaluation rank is 3 (A).",
+      "simple": "Point adjustment for a A result evaluation.",
+      "technical": "int32, constructor default 0, exported DEFAULT 5. Added to the running total when the result-rank argument (Snapshot.Key00, produced by GetResultScoreRank) is 3 (A); the switch maps 1=C, 2=B, 3=A, 4=S and unrecognised ranks add nothing.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:27",
-        "Source/Abrams/Private/GameBattleManager.cpp:643"
+        "Source/AbramsDataTable/Private/GameDataTableRow_RankPointCalculation.cpp:8",
+        "Source/Abrams/Private/GameBattleManager.cpp:639",
+        "Source/Abrams/Private/GameBattleManager.cpp:643",
+        "Source/Abrams/Private/GameBattleManager.cpp:1380",
+        "Source/Abrams/Private/GameBattleManager.cpp:1382",
+        "JJKCCDatatables/datatables/RankPointCalculationDataTable.json"
       ],
       "status": "verified"
     },
     "Evaluation_B": {
       "simple": "Point adjustment for a B result evaluation.",
-      "technical": "int32 added when evaluation rank is 2 (B).",
+      "technical": "int32, constructor default 0, exported DEFAULT 0. Added to the running total when the result-rank argument (Snapshot.Key00, produced by GetResultScoreRank) is 2 (B); the switch maps 1=C, 2=B, 3=A, 4=S and unrecognised ranks add nothing.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:30",
-        "Source/Abrams/Private/GameBattleManager.cpp:642"
+        "Source/AbramsDataTable/Private/GameDataTableRow_RankPointCalculation.cpp:9",
+        "Source/Abrams/Private/GameBattleManager.cpp:639",
+        "Source/Abrams/Private/GameBattleManager.cpp:642",
+        "Source/Abrams/Private/GameBattleManager.cpp:1380",
+        "Source/Abrams/Private/GameBattleManager.cpp:1382",
+        "JJKCCDatatables/datatables/RankPointCalculationDataTable.json"
       ],
       "status": "verified"
     },
     "Evaluation_C": {
       "simple": "Point adjustment for a C result evaluation.",
-      "technical": "int32 added when evaluation rank is 1 (C). Exported DEFAULT values are S=10, A=5, B=0, C=-5.",
+      "technical": "int32, constructor default 0, exported DEFAULT -5. Added to the running total when the result-rank argument (Snapshot.Key00, produced by GetResultScoreRank) is 1 (C); the switch maps 1=C, 2=B, 3=A, 4=S and unrecognised ranks add nothing.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:33",
-        "Source/Abrams/Private/GameBattleManager.cpp:641"
+        "Source/AbramsDataTable/Private/GameDataTableRow_RankPointCalculation.cpp:10",
+        "Source/Abrams/Private/GameBattleManager.cpp:639",
+        "Source/Abrams/Private/GameBattleManager.cpp:641",
+        "Source/Abrams/Private/GameBattleManager.cpp:1380",
+        "Source/Abrams/Private/GameBattleManager.cpp:1382",
+        "JJKCCDatatables/datatables/RankPointCalculationDataTable.json"
       ],
       "status": "verified"
     },
     "ForceGaugeRate": {
-      "simple": "Points added per remaining stock difference.",
-      "technical": "int32 multiplier applied to (player character stock - rival stock). The stock values come from GetCharacterStock for the player and rival team; the product is added to the result/evaluation total before rank-gap scaling.",
+      "simple": "Points per team-stock difference.",
+      "technical": "int32 multiplier, constructor default 0, exported DEFAULT 2. After the result and evaluation terms, the consumer adds (GetCharacterStock(player team) - GetCharacterStock(rival team)) * ForceGaugeRate. GetCharacterStock returns the configured max for an unlimited team and 0 when no stock entry exists, so this is a stock-count difference, not a percentage or a normalized gauge value.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:36",
+        "Source/AbramsDataTable/Private/GameDataTableRow_RankPointCalculation.cpp:11",
+        "Source/Abrams/Private/GameBattleManager.cpp:647",
         "Source/Abrams/Private/GameBattleManager.cpp:648",
-        "Source/Abrams/Private/GameBattleManager.cpp:647"
+        "Source/Abrams/Private/GameBattleManager.cpp:1611",
+        "JJKCCDatatables/datatables/RankPointCalculationDataTable.json"
       ],
       "status": "verified"
     },
     "RankGapThreshold": {
       "simple": "Rank-point gap that triggers loss mitigation.",
-      "technical": "int32. The consumer averages online users' RankPoint values on each team; if (enemy average - ally average) >= this threshold and the player is on the losing team, the accumulated delta is scaled by RankGapRate.",
+      "technical": "int32, constructor default 0, exported DEFAULT 3000, in rank-point units. The consumer sums UserInfo.RankPoint from OnlineUserBattleSettings entries indexed by each character's GetCharacterIndex() (out-of-range indices are skipped; entries can include CPU users), integer-divides each team sum by its counted characters, and compares (enemy average - ally average) >= RankGapThreshold together with GetLoserTeam() == player team.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:39",
-        "Source/Abrams/Private/GameBattleManager.cpp:691"
+        "Source/AbramsDataTable/Private/GameDataTableRow_RankPointCalculation.cpp:12",
+        "Source/Abrams/Private/GameBattleManager.cpp:652",
+        "Source/Abrams/Private/GameBattleManager.cpp:660",
+        "Source/Abrams/Private/GameBattleManager.cpp:662",
+        "Source/Abrams/Private/GameBattleManager.cpp:683",
+        "Source/Abrams/Private/GameBattleManager.cpp:691",
+        "Source/Abrams/Public/GameOnlineUserInfo.h:21",
+        "JJKCCDatatables/datatables/RankPointCalculationDataTable.json"
       ],
       "status": "verified"
     },
     "RankGapRate": {
       "simple": "Multiplier applied to a mitigated loss.",
-      "technical": "float. Points are cast to float, multiplied by this rate and truncated back to int32 when the RankGapThreshold/loser-team condition holds. Exported DEFAULT uses 0.2.",
+      "technical": "float multiplier, constructor default 0.0f, exported DEFAULT 0.2. When the RankGapThreshold and loser-team conditions hold, the running int32 total is converted to float, multiplied by RankGapRate and cast back to int32 (truncation toward zero) before the draw clamp and the non-draw loss floor.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:42",
-        "Source/Abrams/Private/GameBattleManager.cpp:693"
+        "Source/AbramsDataTable/Private/GameDataTableRow_RankPointCalculation.cpp:13",
+        "Source/Abrams/Private/GameBattleManager.cpp:691",
+        "Source/Abrams/Private/GameBattleManager.cpp:693",
+        "Source/Abrams/Private/GameBattleManager.cpp:696",
+        "Source/Abrams/Private/GameBattleManager.cpp:704",
+        "JJKCCDatatables/datatables/RankPointCalculationDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset has exactly one row (DEFAULT) with FGameDataTableRow_RankPointCalculation; the manager loads RankPointCalculationDataTable into RankPointCalculationDataTables (DTM+0x390).",
-    "The row-selection helper reads the first row name of the first non-empty table rather than searching for DEFAULT by name, so table row order is significant if more rows are added.",
-    "The consumer CalcRankPointDelta is reconstructed at retail RVA 0x104bdf0; consult status/functions.json for byte status. Only available C++ and the export were reviewed."
+    "Export: one RankPointCalculationDataTable object with RowStruct GameDataTableRow_RankPointCalculation, ImportKeyField Id, and one row DEFAULT (Win 23, Lose -43, Draw -10, S 10, A 5, B 0, C -5, ForceGaugeRate 2, RankGapThreshold 3000, RankGapRate 0.2). Numeric constructor defaults are 0/0.0f and Id's FName default is None; no other export shard or alternate copy of this table was found.",
+    "Load path: StartInitialLoading names RankPointCalculationDataTable; DTM::Tick resolves the loaded asset through the Abrams AssetManager and AddLoadedDataTables adds only non-null UDataTable pointers to RankPointCalculationDataTables (DTM+0x390).",
+    "Row selection uses the first row name of the first non-empty table, not a DEFAULT lookup; row order is significant if more rows are added. The helper does not null-check tables, and a null result is dereferenced by the consumer rather than defaulted.",
+    "Calculation order: invalid PlayerCharacter returns 0; the base result is chosen by the winner sentinel (0/1/0xFF); evaluation 1=C, 2=B, 3=A, 4=S is added; the stock difference times ForceGaugeRate is added; the optional rank-gap product truncates to int32; draws clamp to <= 0; non-draw losses apply LoseLowerLimit (when a RankPoint row is found) and then the AI-ally >= 0 floor. The result is stored as FStudioBattleResultSnapshot.Value440.",
+    "Downstream: Value440 is included in the online result KPI row and, in FBattlePvPState_Result::OnResultRecorded when IsOnlineBattleMode() and StudioOnlineMode_79C == 1, is passed to AGameManager::AddRankPoint, which clamps saved RankPoint to [0, 99999] and updates the PvPRankPointMax record for positive deltas.",
+    "status/functions.json labels calc at 0x104bdf0 and the row finder at 0x104a5f0 as behaviour-certified reconstructions with unmatched bytes, not byte-identical retail code. No retail Blueprint or live-runtime evidence was inspected, so Blueprint/editor-only uses cannot be excluded."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameBattleManager.cpp:598",
-      "detail": "BattleManager_FirstRankPointCalculationRow picks the first row of the first non-empty table."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:187",
+      "detail": "Resolves the loaded RankPointCalculationDataTable asset into the RankPointCalculationDataTables cache (DTM+0x390); null tables are filtered by AddLoadedDataTables."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleManager.cpp:617",
-      "detail": "CalcRankPointDelta applies result, evaluation, stock-gap and rank-gap fields."
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:598",
+      "detail": "BattleManager_FirstRankPointCalculationRow takes RowNames[0] from the first non-empty cached table and returns that row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:616",
+      "detail": "CalcRankPointDelta applies result, evaluation, team-stock and rank-gap fields in that order, then draw/loss clamps."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1382",
+      "detail": "Stores the calculated delta in FStudioBattleResultSnapshot.Value440 for later result consumers."
     },
     {
       "source": "Source/Abrams/Private/GameBattleManager.cpp:702",
-      "detail": "Cross-table join to RankPoint.LoseLowerLimit clamps a loss after calculation."
+      "detail": "Cross-table join: the pre-battle RankPoint selects a RankPointDataTable row whose LoseLowerLimit floors a non-draw loss."
+    },
+    {
+      "source": "Source/Abrams/Private/GameOnlineManager.cpp:677",
+      "detail": "Includes Snapshot.Value440 as a field in the online battle-result KPI row."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2498",
+      "detail": "The online/ranked result path applies Snapshot.Value440 to saved rank points with AGameManager::AddRankPoint."
     }
   ]
 }

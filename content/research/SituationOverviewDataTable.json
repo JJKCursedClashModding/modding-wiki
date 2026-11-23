@@ -1,71 +1,119 @@
 {
-  "description": "Per-character list of selectable situation-overview (profile/card view) poses; the character row's Id_SituationOverview points here.",
+  "description": "Ordered per-character pose list for the situation-overview/card customization and battle capture views. Character.Id_SituationOverview selects a row by its Id; each Id_SituationOverviewPose element names a SituationOverviewPoseDataTable row that supplies the pose's animations, icons and weapon setup. The export has one 45-row table with six fixed slots per row and uses NAME_None for unused slots.",
   "fields": {
     "ID": {
-      "simple": "Character id that owns this pose list.",
-      "technical": "FName row key in SituationOverviewDataTables (DTM +0xAD0), looked up from Character.Id_SituationOverview. GameItemDescriptionTextWidget uses the row id itself as the character id for a pose item's owner name. Exported ids are character codes (CP_010, CN_041, ...).",
+      "simple": "Character id that owns this pose list (export row key and Id value).",
+      "technical": "FName declared as the row's first UPROPERTY (header line 11); the export writes it as both the row key and ID, with ImportKeyField=Id. Resolved from Character.Id_SituationOverview (Character row +0x100) against SituationOverviewDataTables (DTM +0xAD0). The typed finders (GameCharacter_FindSituationOverviewRow, capture FindRow, GameUserCustomize_FindRowInline and the model-viewer helper) walk the cached table array in order and return the first matching row; with the single exported shard there is no competing source. All 45 keys equal their ID and match Character row keys. Export exceptions to a strict one-to-one character link: CP_081/CN_170/CN_210 have Id_SituationOverview=None, CN_260's Character row points at CP_160, and the overview row CN_260 is therefore unreferenced by Character. GameItem_GetCharacterId for a SituationOverviewPose item uses Overview->Id to find a Character row, returns Character->Id, and GameItem_GetCharacterNameText formats that Character's Id_GlossaryText_Name into the CHARACTER_NAME parameter; it does not display the raw row key itself.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverview.h:11",
+        "Source/Abrams/Public/GameDataTableManager.h:214",
+        "Source/Abrams/Private/GameDataTableManager.cpp:303",
+        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:26",
+        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:54",
+        "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:100",
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:233",
-        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:57",
-        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:130",
-        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:132"
+        "Source/Abrams/Private/GameUserCustomizeInfo.cpp:101",
+        "Source/Abrams/Private/GameCustomizeCharaModelWidget.cpp:96",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:128",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:132",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:161"
       ],
       "status": "verified"
     },
     "Id_SituationOverviewPose": {
-      "simple": "Ordered pose ids available to this character.",
-      "technical": "TArray<FName>, row +0x10. Index 0 is the default/free pose: GameCharacter_IsSituationOverviewPoseAvailable and GameUserCustomize_IsPoseAvailable return true for index 0, and any SelectedPoseIndex not found in the array falls back to 0 or is reset. Capture and model-viewer code indexes the array by the saved SelectedPoseIndex; exported rows have six slots, many ending in None.",
+      "simple": "Zero-based ordered list of pose ids available to this character.",
+      "technical": "TArray<FName> (row +0x10). Consumers read this as a zero-based int32 index: FGameCharacterCaptureParameter::SituationOverviewPoseIndex and FGameSituationOverviewCharacter default to 0, saved FStudioCharacterSelection::SelectedPoseIndex defaults to 0, and battle slots use PoseIndex (MissionCharacter rows override enemy indices in Arcade/PvE). GameCharacter_IsSituationOverviewPoseAvailable and GameUserCustomize_IsPoseAvailable are id-based: the id found at index 0, or any id absent from the array, is free; an id found at a nonzero index requires an owned Item row of ItemType SituationOverviewPose whose VariableId equals that id. GameUserCustomize_SanitizeSelections resets a nonzero saved SelectedPoseIndex to 0 when IsValidIndex fails or the indexed pose is locked; GetPoseIndex maps an unlisted pose id to 0; the model-viewer distance-offset lookup falls back to Poses[0]. Capture resolution paths do not validate the index (GetData()[Index] / operator[]) and have no alternate-row fallback. All 45 exported arrays have six slots: 29 CP rows list six distinct pose ids; 16 CN rows have one real pose at index 0 and NAME_None in slots 1-5. All 190 non-None ids resolve in SituationOverviewPoseDataTable (each pose row is referenced once); NAME_None is the absent-slot sentinel, skipped by the pose tile but passed to capture's pose-row finder when indexed. There are no numeric values or units in this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverview.h:15",
+        "Source/Abrams/Public/GameCharacterCaptureParameter.h:17",
+        "Source/Abrams/Public/GameCharacterCaptureParameter.h:22",
         "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:60",
         "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:61",
         "Source/Abrams/Private/GameUserCustomizeInfo.cpp:106",
+        "Source/Abrams/Private/GameUserCustomizeInfo.cpp:107",
         "Source/Abrams/Private/GameUserCustomizeInfo.cpp:148",
         "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:113",
         "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:962",
+        "Source/Abrams/Private/GameCustomizeCharaViewPoseTileWidget.cpp:91",
+        "Source/Abrams/Private/GameCustomizeCharaViewPoseTileWidget.cpp:93",
         "Source/Abrams/Private/GameCustomizeCharaModelWidget.cpp:98",
         "Source/Abrams/Private/GameCustomizeCharaModelWidget.cpp:106",
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:237",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:626",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1153",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1213",
+        "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:146",
+        "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:257",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:130"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Repeated consumers: the capture actor resolves Character->Id_SituationOverview then Id_SituationOverviewPose[PoseIndex] without an index check (Source/Abrams/Private/GameCharacterCaptureActor.cpp:228-237, 621-626, 1148-1153, 1212-1213, 1260-1261, 1306-1310, 1393-1398); a missing overview or pose row aborts that capture path.",
-    "The pose tile widget only lists entries that are valid FNames and have an unlocked Item row whose VariableId is the pose id (Source/Abrams/Private/GameCustomizeCharaViewPoseTileWidget.cpp:91-121).",
-    "Row constructor is empty (Source/AbramsDataTable/Private/GameDataTableRow_SituationOverview.cpp:3). Single exported table, no shards or localization variants.",
-    "Evidence is from the reconstructed C++ in Source/ (row shape/counts from the exported table); status/ records byte matches for some owner TUs, but this file does not claim a retail byte comparison for every function or exhaustive Blueprint/runtime coverage."
+    "Manager/cache/precedence: StartInitialLoading registers the exact name SituationOverviewDataTable at GameDataTableManager.cpp:476, loads its primary asset at :303 with GameDataTableManager_ResolveLoadedTable (:162), and appends the non-null UDataTable to SituationOverviewDataTables (+0xAD0, header :214) through AddLoadedDataTables (:146). Every direct row finder walks that array in file order and returns the first match; the export contains one asset named SituationOverviewDataTable (RowStruct Class'GameDataTableRow_SituationOverview', ImportKeyField=Id), with no numbered shards or locale variants.",
+    "Capture path: IsSituationOverviewCapture covers VsAlly, VsEnemy and Customize. FindSituationOverviewPose (GameCharacterCaptureActor.cpp:232) resolves Character.Id_SituationOverview and Id_SituationOverviewPose[PoseIndex] with an unchecked index; other call sites at 621, 1148, 1212, 1260, 1306 and 1393 do the same. A missing overview or pose row is handled per call site: SpawnCharacter/LoadCharacter return early, the animation-map helpers return empty maps, and PlayIdleMontage skips montage setup; no call substitutes a different pose row. Out-of-range indices are not defended against in these reconstructed calls.",
+    "Customization: the pose tile (GameCustomizeCharaViewPoseTileWidget.cpp:89-121) skips NAME_None/invalid ids, resolves each remaining id in SituationOverviewPoseDataTable, requires an Item row with matching VariableId that passes GameItem_IsRowUnlocked, and sets bUnlocked from the ownership check. The GameItem_ResetAndGetOwnedItems call at :99 is executed but its result is not read. Ownership comes from GameManager.UserInfo.StudioItemStocks_590 via GameItem_GetOwnedItems; GameItem_IsRowUnlocked tests Item.UserProgressFlag. Thus a free index 0 still appears as a tile only if its Item row exists and is unlocked.",
+    "Selection/index sources: saved SelectedPoseIndex is read in GameSaveDataManager.cpp:504, sanitized in GameUserCustomizeInfo.cpp:147-152 by the sanitizer called at :256, saved back from GetPoseIndex in GameCustomizeCharaViewWidget.cpp:356-359, and passed to model/capture in GameCustomizeCharaModelWidget.cpp:121; menu/online paths copy it into BattleCharacterSettings.PoseIndex (GameMenuSequence.cpp:2495). Battle overviews copy slot PoseIndex at GameBattleSituationOverviewWidget.cpp:146 and override enemy indices from MissionCharacter at :207/:257, then send them in capture requests at :469/:480.",
+    "Export relationships: all 45 row keys equal ID; all 45 IDs exist as Character rows. Character.Id_SituationOverview is None for CP_081/CN_170/CN_210 and CN_260 points to CP_160, so overview CN_260 is unreferenced. Every non-None pose id in the overview arrays (190 unique ids) resolves to SituationOverviewPoseDataTable, and 162 of those have an Item row with ItemType SituationOverviewPose (28 do not and are skipped by tile/Item paths). Reverse item lookup scans all overview rows in table/row-name order and uses the first array containing Item.VariableId.",
+    "Row constructor is an empty out-of-line body (Source/AbramsDataTable/Private/GameDataTableRow_SituationOverview.cpp:3); FName defaults to None and TArray to empty before serialized data. The export supplies all six slots for every row.",
+    "Evidence is from reconstructed C++ plus DataTable exports. status/ marks some cited functions as byte-matched or behaviour-certified, but this file does not claim a retail byte comparison for every function, and no retail Blueprint graph, packaged asset availability or runtime behavior was inspected."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:303",
+      "detail": "Resolves the SituationOverviewDataTable primary asset and caches it in SituationOverviewDataTables (+0xAD0); the same exact name is registered at line 476, and AddLoadedDataTables (line 146) preserves non-null tables in array order."
+    },
+    {
       "source": "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:26",
-      "detail": "SituationOverview-specific row finder used by the tile, view and customize-info consumers."
+      "detail": "SituationOverview-specific first-match finder used by the card, character view, pose tile and customize-info consumers; its callers pass bCheckNone=false, while the capture FindRow rejects None by default."
     },
     {
       "source": "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:52",
-      "detail": "Pose ownership test: index 0 (or an unlisted pose) is free; all others require an owned SituationOverviewPose item matching the id."
+      "detail": "Pose ownership test: the id at array index 0, or a pose id absent from the array, is free; a pose id at a nonzero index needs an owned SituationOverviewPose item whose VariableId matches it. The duplicate check is GameUserCustomizeInfo.cpp:94."
     },
     {
-      "source": "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:953",
-      "detail": "Maps each selectable character's saved SelectedPoseIndex to a pose id for the tile widgets."
+      "source": "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:101",
+      "detail": "GetPoseIndex maps a pose id to its position in Id_SituationOverviewPose (0 when absent); lines 356-359 write that index to SelectedPoseIndex."
     },
     {
-      "source": "Source/Abrams/Private/GameUserCustomizeInfo.cpp:140",
-      "detail": "Validates and resets saved pose indices against the row's array."
+      "source": "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:955",
+      "detail": "Builds the pose tile's SavedSettings/CurrentSettings from each character's saved SelectedPoseIndex; the array read at line 962 is unguarded (default index 0)."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:228",
-      "detail": "Resolves the pose row used for animation, montage, weapon and shikigami setup in situation-overview captures."
+      "source": "Source/Abrams/Private/GameCustomizeCharaViewPoseTileWidget.cpp:89",
+      "detail": "Iterates the overview array, skips None/invalid ids, resolves pose rows, requires an unlocked Item row with VariableId=PoseId, and sets bUnlocked from the ownership check (lines 91-121)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameUserCustomizeInfo.cpp:147",
+      "detail": "Saved-selection sanitization: a nonzero SelectedPoseIndex is reset to 0 if it is not a valid array index or the indexed pose is locked; called from the sanitizer at line 256."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCustomizeCharaModelWidget.cpp:96",
+      "detail": "Camera-distance overrides use the selected pose id; no overview row or an empty array yields zero offsets, and an out-of-range index falls back to Poses[0]."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:232",
+      "detail": "Direct capture resolution: Character.Id_SituationOverview -> Id_SituationOverviewPose[PoseIndex] -> SituationOverviewPoseDataTables, with an unchecked index and a nullptr result for a missing overview row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:621",
+      "detail": "SpawnCharacter requires both rows, merges the selected pose's weapon lists with CharacterWeapon, and returns early when either row is missing."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1148",
+      "detail": "LoadCharacter gates weapon/id/montage preload on both rows and returns early when either is missing; the same index is reused by the animation-map helpers at 1205, 1249 and 1301 and by PlayIdleMontage at 1387."
     },
     {
       "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:127",
-      "detail": "Reverse lookup: finds the character that owns a pose item so its name can be shown."
+      "detail": "Reverse lookup: scans all cached overview rows for the first array containing a pose item's VariableId, then uses Overview->Id to find the Character row whose glossary name supplies CHARACTER_NAME."
     },
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:303",
-      "detail": "Loads SituationOverviewDataTable into SituationOverviewDataTables."
+      "source": "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:146",
+      "detail": "Indirect battle index source: copies battle-slot PoseIndex into SituationOverviewPoseIndex, overrides enemy indices from MissionCharacter in Arcade/PvE (lines 207, 257), and sends them in VsAlly/VsEnemy capture requests (lines 469, 480)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSaveDataManager.cpp:504",
+      "detail": "Indirect saved index source: SelectedPoseIndex is deserialized from the save, later sanitized, and copied into online BattleCharacterSettings.PoseIndex in GameMenuSequence.cpp:2495."
     }
   ]
 }

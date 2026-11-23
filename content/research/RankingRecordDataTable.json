@@ -1,78 +1,134 @@
 {
-  "description": "Catalog of obtainable in-battle ranking achievements, their unlock thresholds and leaderboard display priority.",
+  "description": "Catalog of ranking achievements, the battle/run values required to earn them, and their priority when the top three online-leaderboard records are selected.",
   "fields": {
     "Id": {
       "simple": "Ranking record row id.",
-      "technical": "FName import key/row name for FGameDataTableRow_RankingRecord. Consumers enumerate all rows rather than looking up by id; no direct member read was identified, so the row name only identifies the record in the exported asset.",
+      "technical": "FName at retail offset 0x8 and the DataTable ImportKeyField; the export writes it as ID and uses the same RANKING_RECORD_nn string as the row-map key. No reconstructed consumer reads the embedded Id member: the battle evaluator enumerates every row, while the PvE tally and leaderboard sorter find rows by RankingRecord. AGameDataTableManager loads the single RankingRecordDataTable asset into RankingRecordDataTables (+0x370), and FGameDataTableArray::GetRows returns non-null rows in table order then row-name order.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankingRecord.h:12",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:1356",
+        "Source/Abrams/Private/GameDataTableManager.cpp:185",
         "Source/Abrams/Public/GameDataTableManager.h:96",
-        "Source/Abrams/Private/GameBattleManager.cpp:1066",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2259"
+        "Source/Abrams/Public/GameDataTableArray.h:21",
+        "Source/Abrams/Private/GameBattleManager.cpp:1064",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2258"
       ],
       "status": "observed"
     },
     "RankingRecord": {
       "simple": "Enum identifying which ranking achievement this row represents.",
-      "technical": "EGameRankingRecord, default None. EvaluateRankingRecords switches on it: damage/debuff/hit records are checked against the player's total battle-log value, bonus-based records against EGameResultScore bonus entries, FirstDown against the first-down character, Scorer against the evaluation rank, and SpecialAttack_* variants against the character's current special attack row. PvE result code also finds rows by this enum for NoRecovery, BindingVowsWelcome and AnnihilationKing, and sorts leaderboard record ids by the corresponding rows.",
+      "technical": "uint8 EGameRankingRecord (None=0, Invalid=255), default None; all 51 exports use a distinct live value. EvaluateRankingRecords enumerates every row and switches on this value: log-type records require EvaluateLog(..., Target=Myself, bTotal=true) to find the player's total log and meet PrizeThreshold; FirstDown instead compares the player with GetFirstKillCharacter() and ignores PrizeThreshold; OverwhelmingBattle, Finisher and Runner only check for the matching EGameResultScore bonus; Scorer uses the 1..4 result rank; numbered SuperCursedEnergyAttack_* rows match the player's cached SpecialAttackRow->RankingRecord (resolved from CharacterSpecialAttackDataTable, with SpecialAttackIdOverride) and still require a SuperCursedEnergyAttack_Hit threshold. PvE tallying FindByPredicate-matches NoRecovery, BindingVowsWelcome and AnnihilationKing rows for their thresholds, adds CursedSpiritsHunter/BossKiller directly from MissionKind, and the leaderboard sorter matches each persisted count key back to a row. DomainExpansionMania has an exported row and a hardcoded UI label but no case in the reconstructed battle evaluator; unlisted enum values fall through to default.",
       "evidence": [
+        "Source/AbramsDataTable/Public/EGameRankingRecord.h:6",
         "Source/AbramsDataTable/Public/GameDataTableRow_RankingRecord.h:16",
         "Source/AbramsDataTable/Private/GameDataTableRow_RankingRecord.cpp:4",
-        "Source/Abrams/Private/GameBattleManager.cpp:1079",
+        "Source/Abrams/Private/GameCharacter.cpp:506",
+        "Source/Abrams/Private/GameBattleManager.cpp:1066",
+        "Source/Abrams/Private/GameBattleManager.cpp:1084",
+        "Source/Abrams/Private/GameBattleManager.cpp:1099",
+        "Source/Abrams/Private/GameBattleManager.cpp:1106",
         "Source/Abrams/Private/GameBattleManager.cpp:1135",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2262",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2304"
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2260",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2276",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2302",
+        "Source/Abrams/Public/GameRankingListViewData.h:66"
       ],
       "status": "verified"
     },
     "PrizeThreshold": {
-      "simple": "Value needed to earn the record.",
-      "technical": "int32, default 0. For log-based records the player's total log value is cast to int32 and compared with >= PrizeThreshold; Scorer compares the evaluation rank directly to it. In PvE result tallying, NoRecoveryCount, BindingVowCountTotal and total defeated enemies must be >= the respective row's threshold. Exported values vary widely (for example 1000 for SendDamage and 1 for AceAttacker).",
+      "simple": "Value needed to earn the record; its units follow the corresponding log counter, result rank, or PvE tally.",
+      "technical": "int32, default 0. In EvaluateRankingRecords, log-based records first require EvaluateLog to find the player's total (Target=Myself, bTotal=true), then compare static_cast<int32>(float log value) >= PrizeThreshold; the float is truncated toward zero. Scorer compares the 1..4 result rank (C/B/A/S mapped to 1/2/3/4) directly. FirstDown and the three bonus-flag records do not read it, while the 27 numbered super-attack rows do. In PvE tallying, NoRecoveryCount, BindingVowCountTotal and the summed per-result int32 player Dead total must be >= the matched row's threshold; CursedSpiritsHunter/BossKiller are unconditional. Exported values range from 1 to 9000: SendDamage 1000, AceAttacker 3, Scorer 4, DomainExpansionMania 3 despite Priority 0, and every numbered super attack 1.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankingRecord.h:19",
         "Source/AbramsDataTable/Private/GameDataTableRow_RankingRecord.cpp:5",
-        "Source/Abrams/Private/GameBattleManager.cpp:1073",
+        "Source/Abrams/Private/GameBattleManager.cpp:1070",
+        "Source/Abrams/Private/GameBattleManager.cpp:1084",
+        "Source/Abrams/Private/GameBattleManager.cpp:1099",
         "Source/Abrams/Private/GameBattleManager.cpp:1106",
+        "Source/Abrams/Private/GameBattleManager.cpp:1136",
+        "Source/Abrams/Private/GameBattleManager.cpp:725",
+        "Source/Abrams/Private/GameBattleManager.cpp:758",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2256",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2264",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2272",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2281"
       ],
       "status": "verified"
     },
     "Priority": {
       "simple": "Ordering weight for leaderboard display.",
-      "technical": "int32, default 0. When the top three ranking records are written to an online score entry, the record-count map is key-sorted by comparing the corresponding rows' Priority in descending order (larger Priority sorts first), then stably by count descending. Rows with no matching record fall back to raw enum ordering.",
+      "technical": "int32, default 0. PvEResult_WriteTopRankingRecords copies the persisted count map (GameUserInfo+0x820), KeyStableSorts its keys by the matched row's Priority descending (larger first), then ValueStableSorts by count descending; the stable second sort makes Priority the tie-breaker for equal counts. If either key has no matching row it compares the raw uint8 enum values. The first three keys with count > 0 are written to the online score's ExtBytes[0..2], and those same three bytes are copied to the other PvE/PvP leaderboard entries. Ties retain the count map's current order; the export has 27 rows at 30 and values from 0 to 30 overall, with DomainExpansionMania at 0. Visible label text is then resolved from the separate hardcoded GGameRankingRecordLabels map, not from this table.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankingRecord.h:22",
         "Source/AbramsDataTable/Private/GameDataTableRow_RankingRecord.cpp:6",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2294",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2300",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2310",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2314"
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2314",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2316",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2321",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2330",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2394",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2581",
+        "Source/Abrams/Private/GameUserCustomizeInfo.cpp:188",
+        "Source/Abrams/Private/GameRankingWidgetBase.cpp:48",
+        "Source/Abrams/Public/GameRankingListViewData.h:66"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset has 51 rows with FGameDataTableRow_RankingRecord; the manager loads RankingRecordDataTable into RankingRecordDataTables (DTM+0x370).",
-    "The same table drives two distinct phases: in-battle achievement detection (GameBattleManager::EvaluateRankingRecords) and post-battle online leaderboard ordering (PvE result helpers).",
-    "The battle evaluator enumerates every row, so adding a row can add an achievement without changing consumer code; enum mapping in the switch determines which data drives it.",
-    "Collectors 0x1049de0 and related helpers are reconstructed; consult status/functions.json for byte status. Content is partial and Blueprint uses were not exhaustively inspected."
+    "The only available export shard, RankingRecordDataTable.json, has 51 unique row keys (RANKING_RECORD_01..51) and 51 unique live EGameRankingRecord values; the manager loads one UDataTable through the RankingRecordDataTable primary-asset loader into RankingRecordDataTables at DTM+0x370.",
+    "This table participates in three related stages: per-battle record detection in AGameBattleManager::EvaluateRankingRecords, PvE run aggregation into the saved StudioUserIntMap_B98 user-int cache, and PvE/PvP selection of the top three record bytes for online leaderboard scores.",
+    "EvaluateRankingRecords itself is only called when the player is valid and has a BonusEntries map entry; the evaluator enumerates all table rows, but only switch cases produce records. Adding a row changes behavior only for an enum the consumer handles (or a PvE special case); an unhandled enum is ignored, and duplicate rows can duplicate enum bytes in the battle output.",
+    "FindByPredicate uses the first row matching a given RankingRecord in GetRows order for the PvE threshold checks and leaderboard priority lookup. The 51 exported enums are unique, so that ambiguity is not exercised by the available asset.",
+    "Earned record bytes are accumulated by enum value, not row name, and the visible text comes from the separate 51-entry GGameRankingRecordLabels table. Priority controls which records occupy ExtBytes[0..2] and therefore which labels are shown; it does not supply the label strings.",
+    "Reconstructed C++ is static evidence: retail RVA comments are provenance hints, while status/functions.json currently marks the row collector (0x1049de0), evaluator (0x104c1c0) and PvE tally (0x13e2d80) state=match. No retail Blueprint asset evidence was inspected, and the available Content is partial; no Blueprint logic is claimed."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:185",
+      "detail": "Resolves the RankingRecordDataTable primary asset after all table loads complete and adds it to the RankingRecordDataTables cache."
+    },
+    {
       "source": "Source/Abrams/Private/GameBattleManager.cpp:1064",
-      "detail": "Collects all ranking rows and evaluates battle-log/bonus conditions."
+      "detail": "Collects all ranking rows and evaluates battle-log, result-rank, bonus and character-specific conditions."
     },
     {
       "source": "Source/Abrams/Private/GameBattleManager.cpp:1106",
       "detail": "Uses PrizeThreshold for Scorer rank comparisons."
     },
     {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1383",
+      "detail": "Calls the evaluator only after computing a result rank from the player's bonus entries."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:506",
+      "detail": "Resolves and caches the CharacterSpecialAttack row whose RankingRecord value is joined against numbered ranking rows."
+    },
+    {
       "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2258",
-      "detail": "PvE tally looks up special record rows by RankingRecord and checks their thresholds."
+      "detail": "PvE tally finds special record rows by RankingRecord, checks their thresholds, and adds the mission-kind record unconditionally."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2247",
+      "detail": "Accumulates earned enum bytes and PvE special counts in the persisted StudioUserIntMap_B98 cache."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2300",
-      "detail": "Sorts the three displayed online records by Priority and count."
+      "detail": "Sorts the count-map keys by row Priority, then by count, for the three displayed online records."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2394",
+      "detail": "Writes the selected PvE records into the total-score entry and copies them to the best-score and task-score entries."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2581",
+      "detail": "Uses the same Priority/count selection for PvP rank-match leaderboard entries."
+    },
+    {
+      "source": "Source/Abrams/Private/GameRankingWidgetBase.cpp:48",
+      "detail": "Maps the stored ranking-record bytes to text through the separate GGameRankingRecordLabels table."
     }
   ]
 }

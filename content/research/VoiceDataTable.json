@@ -3,84 +3,157 @@
   "fields": {
     "Id": {
       "simple": "Row key / voice ID.",
-      "technical": "FName primary key. Producers pass this ID from BattleTalk.Id_Voice, CharacterVoiceGroup/VoiceGroup arrays, story-demo/short-story/DLC voice rows, custom-voice samples, unique-pair rows and PlayVoice candidate arrays. Finders walk DTM.VoiceDataTables (+0x740), reject None when requested, and return the first typed row. Export spells it ID.",
+      "technical": "FName native field and DataTable import key (the export writes the property as ID). Producers pass the ID from BattleTalk.Id_Voice, CharacterChat.Id_Voice and Stamp.Id_Voice, CharacterVoiceGroup/VoiceGroup arrays, story-demo/short-story/DLC voice rows, StoryVoiceOverride rows, custom-voice samples, unique-pair rows and PlayVoice candidate arrays. Runtime lookup is by UDataTable row key through FindRow, not by reading the Id property: the shared GameScript_FindVoiceRow helper and its inline equivalents walk DTM.VoiceDataTables (+0x740) in table order, return the first typed match, and reject NAME_None only when bCheckNone is true (several callers pass false and filter None first). The supplied export has one 34,165-row table; every row key equals ID and CueName, with no empty keys or duplicates.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Voice.h:12",
+        "Source/Abrams/Private/GameDataTableManager.cpp:246",
+        "Source/Abrams/Private/GameScriptCommands.cpp:848",
         "Source/Abrams/Private/GameSoundManager.cpp:962",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:1936",
+        "Source/Abrams/Private/GameBattleSituationOverviewChatMessageContentWidget.cpp:53",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:211",
-        "Source/Abrams/Private/GameScriptCommands.cpp:1024",
-        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:375",
+        "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:158",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:151",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:244",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:572",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthAnim.h:16",
         "JJKCCDatatables/datatables/VoiceDataTable.json"
       ],
       "status": "verified"
     },
     "CueSheetName": {
       "simple": "Name of the loaded CRI Atom cue sheet containing the voice.",
-      "technical": "FString. Passed to FindLoadedCueSheet before 2D/3D voice playback; a missing loaded sheet returns no handle. Preload collectors from battle talk, story voice tables and battle phases read this same string to request sheets. No empty-sheet fallback exists in PlayVoice/PlayVoice3D.",
+      "technical": "FString, cast to FName for the sound manager's CueSheetLoaders map. PlayVoiceById copies this field from the Voice row; PlayVoice and PlayVoice3DCue return -1 when no sheet is loaded (PlayVoice also gates on bSystemVoiceEnabled, while 3D adds bVoicePlaybackEnabled), and preview paths check or load the sheet before playback. The story script loader takes CueSheetName from the first matching StoryDemoVoice/DLC voice row; battle-story and level-sequencer collectors add it for StoryVoiceOverride rows, whereas battle-talk cue sheets are preloaded separately from BattleTalkSet.CueSheetName rather than from the Voice row. Customization and shop preview code also collect sample rows' cue sheets into load sets. Voice playback has no empty-sheet fallback (the SE_System fallback in SE paths does not apply). The export has 304 non-empty sheet names; Part has 2,152 rows and OutGame has 1,844.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Voice.h:16",
-        "Source/Abrams/Private/GameSoundManager.cpp:920",
+        "Source/Abrams/Private/GameSoundManager.cpp:444",
+        "Source/Abrams/Private/GameSoundManager.cpp:921",
+        "Source/Abrams/Private/GameSoundManager.cpp:922",
         "Source/Abrams/Private/GameSoundManager.cpp:967",
-        "Source/Abrams/Private/GamePhase_BattleStory.cpp:619",
-        "Source/Abrams/Private/GameScriptPlayer.cpp:190",
-        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:155"
+        "Source/Abrams/Private/GameSoundManager.cpp:1023",
+        "Source/Abrams/Private/GameSoundManager.cpp:1029",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:181",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:262",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:266",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:595",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:617",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:587",
+        "Source/Abrams/Private/GameShopWidget.cpp:315",
+        "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:997",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:155",
+        "JJKCCDatatables/datatables/VoiceDataTable.json"
       ],
       "status": "verified"
     },
     "CueName": {
       "simple": "CRI cue name for the spoken line.",
-      "technical": "FString. Set on the Atom voice player through GetLocalizedVoiceCueName, which appends \"_En\" when GameSoundManager.bAppendEnVoiceSuffix is set; English variants therefore exist as separate Voice rows with _En cue names. The same unlocalized CueName is used as a VoiceVolumeDataTable key (FName(CueName), default 1.0) for per-line volume, and sequencer volume tracks match active voice players by this name.",
+      "technical": "FString holding the CRI cue name. PlaySystemVoice, PlayVoice and PlayVoice3DCue call GetLocalizedVoiceCueName, which appends literal _En only when bAppendEnVoiceSuffix is set; language setup sets that flag true except for Japanese, Korean, Zh_Hant and Zh_Hans. The volume lookup still uses the original unsuffixed FName(CueName) against VoiceVolumeDataTable, with 1.0 when no row exists. The sequencer sound module instead reads the active component's cue name and strips a trailing _En before the same volume lookup, while the SetVoiceVolume track resolves a row by section ID and matches the raw row CueName against active 2D/3D voice players case-insensitively. The export has 17,080 explicit <base>_En rows, each paired with a base row on the same cue sheet, with ID and CueName identical throughout and no empty cue names. Among the traced producer exports, only CharacterMouthAnim rows reference those _En IDs: the unique-pair lip-sync path appends _En to its voice ID for that lookup. Normal playback IDs select base rows and localization derives the English cue at playback, so the two mechanisms must not be treated as the same lookup.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Voice.h:18",
+        "Source/Abrams/Private/GameManagerGraphics.cpp:286",
+        "Source/Abrams/Private/GameManagerGraphics.cpp:304",
         "Source/Abrams/Private/GameSoundManager.cpp:433",
-        "Source/Abrams/Private/GameSoundManager.cpp:437",
+        "Source/Abrams/Private/GameSoundManager.cpp:439",
+        "Source/Abrams/Private/GameSoundManager.cpp:486",
         "Source/Abrams/Private/GameSoundManager.cpp:946",
-        "Source/Abrams/Private/GameSoundManager.cpp:947",
         "Source/Abrams/Private/GameSoundManager.cpp:949",
-        "Source/AbramsSequencer/Private/AbramsSequencerSetVoiceVolumeEvaluate.cpp:36"
+        "Source/Abrams/Private/GameSoundManager.cpp:1052",
+        "Source/Abrams/Private/GameSoundManager.cpp:1055",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:263",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:251",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:255",
+        "Source/AbramsSequencer/Private/AbramsSequencerSetVoiceVolumeEvaluate.cpp:29",
+        "Source/AbramsSequencer/Private/AbramsSequencerSetVoiceVolumeEvaluate.cpp:36",
+        "Source/AbramsSequencer/Private/AbramsSequencerSetVoiceVolumeEvaluate.cpp:44",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:571",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:576",
+        "JJKCCDatatables/datatables/VoiceDataTable.json",
+        "JJKCCDatatables/datatables/VoiceVolumeDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
     "Loaded as a DataTable primary asset named VoiceDataTable into DTM.VoiceDataTables (+0x740).",
-    "This is the leaf audio table: nearly every other voice-related table stores an Id that resolves here; playback then consults VoiceVolumeDataTable using CueName and a loaded cue sheet named by CueSheetName.",
-    "Cue names carry an explicit _En variant in the exported rows and the sound manager can also append the suffix at runtime; both mechanisms were observed and should not be conflated.",
-    "The companion export is large but partial; no claim is made about all retail rows or Blueprint-only consumers. Sources are reconstructed retail C++ with retail RVAs recorded inline."
+    "This is the leaf audio table: other voice-related tables store IDs that ultimately resolve here; playback then consults VoiceVolumeDataTable using CueName and a loaded cue sheet named by CueSheetName.",
+    "Explicit _En rows and runtime localization are separate. The export pairs 17,080 suffixed rows with base rows, while GetLocalizedVoiceCueName derives the same suffix from a base cue at playback; the traced playback producers use base IDs, and CharacterMouthAnim uses the explicit _En IDs for lip-sync matching.",
+    "The supplied export is one 34,165-row table and is not complete: four StoryDemoVoice Id_Voice values do not resolve in it, and five base Voice rows lack an _En partner. No claim is made about all retail rows. Nothing here was verified against retail Blueprint assets.",
+    "Lookup precedence is table order, first typed match; only one VoiceDataTable asset is loaded in this build. Voice-player queues copy CueSheetName and CueName strings, while some widgets cache the returned row pointer; group and PlayVoice consumers apply weighted/random picks, history exclusions and None filtering before lookup.",
+    "Failure behavior: PlayVoice/PlayVoice3DCue return -1 for a disabled gate, missing loaded cue sheet or no available player slot; VoiceVolumeDataTable falls back to 1.0 when no row is found. Some direct inline finders omit the shared helper's explicit RowStruct check, but FindRow<T> still performs a typed lookup.",
+    "All behavioral statements come from reconstructed retail C++ and static exports with retail RVAs recorded inline; no launch, editor session, network access or retail runtime verification was used."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:246",
-      "detail": "Resolves VoiceDataTable into DTM.VoiceDataTables."
+      "detail": "Resolves the VoiceDataTable primary asset into DTM.VoiceDataTables (+0x740) after all DataTable loaders complete."
     },
     {
       "source": "Source/Abrams/Private/GameSoundManager.cpp:960",
-      "detail": "PlayVoiceById resolves a row and plays its cue sheet/cue on a voice slot."
+      "detail": "PlayVoiceById resolves a Voice row, then forwards CueSheetName and CueName to PlayVoice; a missing row or unloaded sheet yields -1."
     },
     {
       "source": "Source/Abrams/Private/GameSoundManager.cpp:920",
-      "detail": "PlayVoice checks that the row cue sheet is loaded, applies localization and per-cue volume."
+      "detail": "PlayVoice checks the loaded sheet and system-voice gate, localizes the cue, applies the unsuffixed cue's VoiceVolume row (default 1.0), and uses the requested or first idle 2D slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSoundVoicePlayer.cpp:101",
+      "detail": "Action/character-sound paths pick a non-None VoiceGroup ID, choose a weighted candidate and resolve the leaf Voice row."
     },
     {
       "source": "Source/Abrams/Private/GameSoundVoicePlayer.cpp:209",
-      "detail": "Queues Voice rows resolved from PlayVoice/Group IDs."
+      "detail": "System-voice playback groups PlayVoice rows by PlayIndexOrder, selects a lottery variation index shared across groups, resolves those Voice IDs and queues copies of their sheet/cue strings."
     },
     {
       "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:1936",
-      "detail": "Battle-talk lines play their Id_Voice on the speaker slot."
+      "detail": "Battle-talk lines pass BattleTalk.Id_Voice to PlayVoiceById on the speaker's character-indexed slot."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:3329",
+      "detail": "Character action voices resolve a randomly selected VoiceGroup member after excluding the last pick, with priority checks before 3D playback."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigamiActionController.cpp:518",
+      "detail": "Shikigami action voices resolve a group member and play it through PlayVoice3DCue on character slot + 6."
     },
     {
       "source": "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:149",
-      "detail": "Sequencer 2D/3D voice playback resolves rows by SoundId."
+      "detail": "Sequencer 2D/3D voice tracks resolve SoundId through VoiceDataTables and pass the row's sheet/cue to the sound manager."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:251",
+      "detail": "After playback, sequencer volume logic strips a trailing _En from the component's actual cue name before the VoiceVolume lookup."
     },
     {
       "source": "Source/Abrams/Private/GameScriptCommands.cpp:1017",
-      "detail": "Story message commands resolve Voice rows for delayed playback."
+      "detail": "Story message ParseVoice maps DLC, regular story or short-story message rows to a Voice row and queues its sheet/cue with the message delay."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptPlayer.cpp:181",
+      "detail": "Script loading preloads the cue sheet obtained from the first matching story/DLC voice row; sub-story scripts use the hardcoded Part sheet and gallery scripts have an empty lookup map."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:617",
+      "detail": "Battle-story asset collection adds the cue sheet of each matching StoryVoiceOverride row; battle-talk sheets come separately from BattleTalkSet."
+    },
+    {
+      "source": "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:158",
+      "detail": "The sound settings preview caches a randomly selected PlayVoice sample row for later playback."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:182",
+      "detail": "Customization voice previews resolve sample IDs, check that the cue sheet is loaded, play the row and advance the sample index."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopWidget.cpp:315",
+      "detail": "Shop preview resolves every custom-voice sample to collect cue sheets for loading; the confirm dialog plays the next queued sample."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:572",
+      "detail": "Unique-pair lip-sync appends _En to the voice ID for CharacterMouthAnim matching when the English flag is set; this is separate from Voice-row playback lookup."
     },
     {
       "source": "Source/AbramsSequencer/Private/AbramsSequencerSetVoiceVolumeEvaluate.cpp:29",
-      "detail": "Sequencer volume track matches active players by row CueName."
+      "detail": "Sequencer volume tracks resolve the row by section ID and match its raw CueName against active voice and 3D voice players."
     }
   ]
 }

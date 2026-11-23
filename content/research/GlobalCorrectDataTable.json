@@ -1,21 +1,24 @@
 {
-  "description": "Single multi-purpose correction row applied to combat damage multipliers, cursed-energy experience and movement/action rigidity rates; its first row is cached by the data-table manager and sampled by characters and status controllers.",
+  "description": "Single multi-purpose correction row for combat damage multipliers, tag-combo down-damage rate, cursed-energy experience rates and movement/action rigidity rates; the manager caches the loaded table array, while every traced consumer re-fetches the first row on demand.",
   "fields": {
     "ID": {
       "simple": "Row identifier.",
-      "technical": "FName Id (constructed default NAME_None); the only exported row is named Default. Consumers do not look the row up by this member: AGameDataTableManager::FindGlobalCorrectRow calls FirstGlobalCorrectRow(GlobalCorrectDataTables), which reads the first row name of the first non-empty table and FindRow<FGameDataTableRow_GlobalCorrect> on it. No traced C++ reads Id itself.",
+      "technical": "FName Id (default constructed as NAME_None; the reconstructed constructor does not assign it). The export writes the row field as \"ID\": \"Default\" while the asset's ImportKeyField and native member are \"Id\". Consumers do not look the row up by this member: AGameDataTableManager::FindGlobalCorrectRow calls FirstGlobalCorrectRow(GlobalCorrectDataTables), which reads the first row name of the first table whose row-name array is non-empty and calls FindRow<FGameDataTableRow_GlobalCorrect> on it. No traced C++ reads Id itself.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:11",
         "Source/Abrams/Private/GameDataTableManager.cpp:578",
-        "Source/Abrams/Public/GameDataTableManager.h:85"
+        "Source/Abrams/Public/GameDataTableManager.h:83",
+        "Source/Abrams/Public/GameDataTableManager.h:87",
+        "Source/Abrams/Public/GameDataTableManager.h:88"
       ],
       "status": "observed"
     },
     "SuperArmor_Damage": {
       "simple": "Damage multiplier while super armor absorbs a hit.",
-      "technical": "float, constructor default 0.0f; exported Default value 1.0. AGameCharacter::GetReceivedDamageRate multiplies the accumulated receive-damage rate by it only when IsHitBlockedBySuperArmor(DamageRow) is true; it is independent of bIgnoreComboCorrect and is applied after the combo, action, tag-combo and casual multipliers.",
+      "technical": "float, constructor default 0.0f; exported Default value 1.0. AGameCharacter::GetReceivedDamageRate multiplies the accumulated rate by it only when IsHitBlockedBySuperArmor(DamageRow) is true. That predicate requires a Normal/NormalAir hit that is not throwing, guard-breaking or SimpleDomainCounterStun and whose super-armor ignore is absent or resisted. The multiplier is independent of bIgnoreComboCorrect and is applied after the base ally/status/action rates and the combo, damage-action, tag-combo and casual multipliers.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2862",
+        "Source/Abrams/Private/GameCharacter.cpp:3195",
         "Source/Abrams/Public/GameCharacter.h:687",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:15",
         "Source/AbramsDataTable/Private/GameDataTableRow_GlobalCorrect.cpp:4"
@@ -24,9 +27,10 @@
     },
     "HyperArmor_Damage": {
       "simple": "Damage multiplier while hyper armor absorbs a hit.",
-      "technical": "float, default 0.0f in the constructor; exported Default value 0.5. AGameCharacter::GetReceivedDamageRate multiplies the accumulated rate by it only when IsHitBlockedByHyperArmor(DamageRow) is true, after the super-armor branch.",
+      "technical": "float, constructor default 0.0f; exported Default value 0.5. AGameCharacter::GetReceivedDamageRate multiplies the accumulated rate by it only when IsHitBlockedByHyperArmor(DamageRow) is true, after the super-armor branch. That predicate rejects Coercion and SimpleDomainCounterStun hits and unresisted bIgnoreHyperArmor, then requires an active hyper-armor notify or action-level hyper armor.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2866",
+        "Source/Abrams/Private/GameCharacter.cpp:3167",
         "Source/Abrams/Public/GameCharacter.h:687",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:18",
         "Source/AbramsDataTable/Private/GameDataTableRow_GlobalCorrect.cpp:5"
@@ -35,23 +39,26 @@
     },
     "TagCombo_DownDamage": {
       "simple": "Down-damage-rate override installed at the start of tag-combo damage actions.",
-      "technical": "float, constructor default 0.0f; exported Default value 1.0. Five tag-combo action starts read it via FindGlobalCorrectRow and pass it to StatusController->SetDownDamageRate (row member +0x18), then set an unlimited collision lock 4: TagComboDamage, TagComboDamageBlow, TagComboProjectionSorceryReceive, TagComboProjectionSorceryReceiveBlow and the restraint tag-combo variant. Down-damage rate is consumed by AGameCharacter::GetDownDamageRate.",
+      "technical": "float, constructor default 0.0f; exported Default value 1.0. Five tag-combo action starts read it via FindGlobalCorrectRow and pass it to StatusController->SetDownDamageRate (status DownDamageRate at reconstructed +0x19C; the GlobalCorrect field itself is at row +0x18), then set an unlimited collision lock 4: TagComboDamage, TagComboDamageBlow, TagComboProjectionSorceryReceive, TagComboProjectionSorceryReceiveBlow and the restraint tag-combo variant. AGameCharacter::GetDownDamageRate multiplies that status rate by the action-controller rate (and ComboDown_Casual for applicable casual non-cursed-energy hits); GameBattleManager uses the result to reduce DownValue.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:539",
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1373",
         "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:349",
         "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:580",
         "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:115",
-        "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:538",
+        "Source/Abrams/Private/GameCharacter.cpp:2672",
+        "Source/Abrams/Private/GameBattleManager.cpp:2409",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:21"
       ],
       "status": "verified"
     },
     "Combo_Base": {
       "simple": "Base of the exponential received-damage combo scaling.",
-      "technical": "float, constructor default 0.0f; exported Default value 0.9. AGameCharacter::GetReceivedDamageRate computes max(Combo_Base ^ ComboCount, Combo_Min) when DamageRow->bIgnoreComboCorrect is false. ComboCount is GAISlot056 when Flag==1, otherwise GetReceivedComboCount(); the result multiplies the incoming damage rate.",
+      "technical": "float, constructor default 0.0f; exported Default value 0.9. AGameCharacter::GetReceivedDamageRate multiplies by max(Combo_Base ^ ComboCount, Combo_Min) when DamageRow->bIgnoreComboCorrect is false. ComboCount is GetFlaggedHitComboCount() (status ReceiveComboFlaggedCount, header comment GAISlot056) when Flag==1, otherwise GetReceivedComboCount() (status ReceiveComboCount, GAISlot055).",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2846",
+        "Source/Abrams/Private/GameCharacter.cpp:3636",
+        "Source/Abrams/Private/GameCharacter.cpp:3637",
         "Source/Abrams/Public/GameCharacter.h:685",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:24",
         "Source/AbramsDataTable/Private/GameDataTableRow_GlobalCorrect.cpp:7"
@@ -176,39 +183,43 @@
     },
     "CursedEnergyExp_Level": {
       "simple": "Per-level-difference slope for cursed-energy experience gain.",
-      "technical": "float, constructor default 0.0f; exported Default value -0.05. AGameCharacter::GetCursedEnergyExpRate computes Rate = (LevelDifference * Level + 1.0f) * (StockRate * TeamRate), where LevelDifference is Receiver->GetCursedEnergyLevelDifference(attacker's clamped level) and TeamRate comes from the battle manager. Buff/debuff records from the receiver that name this attacker are then multiplied in.",
+      "technical": "float, constructor default 0.0f; exported Default value -0.05. AGameCharacter::GetCursedEnergyExpRate computes Rate = (LevelDifference * Level + 1.0f) * (StockRate * TeamRate), where LevelDifference is Receiver->GetCursedEnergyLevelDifference(attacker's clamped level) and TeamRate comes from the battle manager. Buff/debuff records from the receiver that name this attacker are then multiplied in; the returned value is StatusController->GetCursedEnergyExpRate() * Rates.Scale60 * Rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2616",
+        "Source/Abrams/Private/GameCharacter.cpp:2629",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:63"
       ],
       "status": "verified"
     },
     "Rigidity_JumpBegin": {
       "simple": "Rigidity multipliers indexed by the jump-start animation type.",
-      "technical": "TArray<float>, constructor leaves it empty; exported Default values [0.8, 0.7, 0.6]. UGameCharacterStatusController::GetJumpBeginRigidityRate selects the element with GameAnimNotify_TypeIndex(Owner->GetActionJumpRow()->Rigidity_JumpBegin); that helper returns enum value - 1, so None maps to -1, Light/Normal/Heavy to 0/1/2. Invalid/out-of-range values fall back to 1.0f. BuffDebuff float corrections are not applied in this getter.",
+      "technical": "TArray<float>, default-constructed empty (the constructor does not assign it); exported Default values [0.8, 0.7, 0.6]. UGameCharacterStatusController::GetJumpBeginRigidityRate selects element GameAnimNotify_TypeIndex(Owner->GetActionJumpRow()->Rigidity_JumpBegin); that helper returns enum value - 1, so None -> -1, Light/Normal/Heavy -> 0/1/2. Invalid/out-of-range values fall back to 1.0f. BuffDebuff float corrections are not applied in this getter. The result is passed as the jump-begin animation play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3864",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3878",
         "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:5",
+        "Source/Abrams/Private/GameCharacterAction_Jump.cpp:28",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:66"
       ],
       "status": "verified"
     },
     "Rigidity_RunJumpBegin": {
       "simple": "Rigidity multipliers for running jump starts.",
-      "technical": "TArray<float>; exported Default values [0.8, 0.7, 0.6]. UGameCharacterStatusController::GetRunJumpBeginRigidityRate looks up GetActionJumpRow()->Rigidity_RunJumpBegin through Status_RigidityRate (enum - 1, range-checked, default 1.0f).",
+      "technical": "TArray<float>, default-constructed empty; exported Default values [0.8, 0.7, 0.6]. UGameCharacterStatusController::GetRunJumpBeginRigidityRate looks up GetActionJumpRow()->Rigidity_RunJumpBegin through Status_RigidityRate (enum - 1, range-checked, default 1.0f). The result is used as the run-jump-begin animation play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3864",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3885",
+        "Source/Abrams/Private/GameCharacterAction_Jump.cpp:28",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:69"
       ],
       "status": "verified"
     },
     "Rigidity_DashJumpBegin": {
       "simple": "Rigidity multipliers for dash jump starts.",
-      "technical": "TArray<float>; exported Default values [0.75, 0.7, 0.65]. UGameCharacterStatusController::GetDashJumpBeginRigidityRate indexes it with GetActionJumpRow()->Rigidity_DashJumpBegin (enum - 1); out-of-range yields 1.0f.",
+      "technical": "TArray<float>, default-constructed empty; exported Default values [0.75, 0.7, 0.65]. UGameCharacterStatusController::GetDashJumpBeginRigidityRate indexes it with GetActionJumpRow()->Rigidity_DashJumpBegin (enum - 1); out-of-range yields 1.0f. The result is used as the dash-jump-begin animation play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3892",
+        "Source/Abrams/Private/GameCharacterAction_Jump.cpp:28",
         "Source/AbramsDataTable/Public/EGameActionRigidityType.h:6",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:72"
       ],
@@ -216,90 +227,111 @@
     },
     "Rigidity_JumpAirBegin": {
       "simple": "Rigidity multipliers for aerial jump starts.",
-      "technical": "TArray<float>; exported Default values [1.0, 1.0, 1.0]. UGameCharacterStatusController::GetJumpAirBeginRigidityRate indexes it with GetActionJumpRow()->Rigidity_JumpAirBegin (enum - 1, range-checked; fallback 1.0f).",
+      "technical": "TArray<float>, default-constructed empty; exported Default values [1.0, 1.0, 1.0]. UGameCharacterStatusController::GetJumpAirBeginRigidityRate indexes it with GetActionJumpRow()->Rigidity_JumpAirBegin (enum - 1, range-checked; fallback 1.0f). The result is used by both JumpAirBegin and RunJumpAirBegin as their begin-animation play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3906",
+        "Source/Abrams/Private/GameCharacterAction_Jump.cpp:28",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:75"
       ],
       "status": "verified"
     },
     "Rigidity_DashBegin": {
       "simple": "Rigidity multipliers for dash starts.",
-      "technical": "TArray<float>; exported Default values [1.0, 0.9, 0.8]. UGameCharacterStatusController::GetDashBeginRigidityRate starts at 1.0f, replaces it with the element selected by GameActionRigidity_ToIndex(current dash row Rigidity_DashBegin) when in range, then applies each CP_010_Passive buff as Rate += FloatValue[1] - 1.0f.",
+      "technical": "TArray<float>, default-constructed empty; exported Default values [1.0, 0.9, 0.8]. UGameCharacterStatusController::GetDashBeginRigidityRate starts at 1.0f, replaces it with the element selected by current dash row Rigidity_DashBegin (enum - 1, in range only), then applies each CP_010_Passive buff as Rate += FloatValue[1] - 1.0f. AGameCharacter::GetDashBeginPlayRate multiplies the result by the action-controller play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2787",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2791",
+        "Source/Abrams/Private/GameCharacter.cpp:1486",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:78"
       ],
       "status": "verified"
     },
     "Rigidity_DashEnd": {
       "simple": "Rigidity multipliers for dash ends.",
-      "technical": "TArray<float>; exported Default values [1.0, 0.92, 0.88]. UGameCharacterStatusController::GetDashEndRigidityRate starts at 1.0f, selects by current dash row Rigidity_DashEnd (enum - 1, in-range only), then adds CP_010_Passive FloatValue[1] and CP_240_Passive FloatValue[2] corrections (each minus 1.0f) and clamps the result to at least 0.0f.",
+      "technical": "TArray<float>, default-constructed empty; exported Default values [1.0, 0.92, 0.88]. UGameCharacterStatusController::GetDashEndRigidityRate starts at 1.0f, selects by current dash row Rigidity_DashEnd (enum - 1, in range only), then adds CP_010_Passive FloatValue[1] and CP_240_Passive FloatValue[2] corrections (each minus 1.0f). The getter returns the adjusted value directly; no clamp is applied in GetDashEndRigidityRate. AGameCharacter::GetDashEndPlayRate multiplies it by the action-controller play rate.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:2684",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2690",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2694",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2713",
+        "Source/Abrams/Private/GameCharacter.cpp:1546",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:81"
       ],
       "status": "verified"
     },
     "Rigidity_DashAirBegin": {
       "simple": "Rigidity multipliers for aerial dash starts.",
-      "technical": "TArray<float>; exported Default values [1.0, 0.925, 0.9]. UGameCharacterStatusController::GetDashAirBeginRigidityRate starts at 1.0f, selects by current dash row Rigidity_DashAirBegin (enum - 1, in-range only), then applies CP_010_Passive FloatValue[1] - 1.0f.",
+      "technical": "TArray<float>, default-constructed empty; exported Default values [1.0, 0.925, 0.9]. UGameCharacterStatusController::GetDashAirBeginRigidityRate starts at 1.0f, selects by current dash row Rigidity_DashAirBegin (enum - 1, in range only), then applies CP_010_Passive FloatValue[1] - 1.0f. AGameCharacter::GetDashAirBeginPlayRate multiplies the result by the action-controller play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2811",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2815",
+        "Source/Abrams/Private/GameCharacter.cpp:1553",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:84"
       ],
       "status": "verified"
     },
     "Rigidity_DashAirEnd": {
       "simple": "Rigidity multipliers for aerial dash ends.",
-      "technical": "TArray<float>; exported Default values [1.0, 1.0, 1.0]. UGameCharacterStatusController::GetDashAirEndRigidityRate starts at 1.0f, selects by current dash row Rigidity_DashAirEnd (enum - 1, in-range only), then applies CP_010_Passive FloatValue[1] and CP_240_Passive FloatValue[2] corrections (each minus 1.0f).",
+      "technical": "TArray<float>, default-constructed empty; exported Default values [1.0, 1.0, 1.0]. UGameCharacterStatusController::GetDashAirEndRigidityRate starts at 1.0f, selects by current dash row Rigidity_DashAirEnd (enum - 1, in range only), then applies CP_010_Passive FloatValue[1] and CP_240_Passive FloatValue[2] corrections (each minus 1.0f). AGameCharacter::GetDashAirEndPlayRate multiplies the result by the action-controller play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2835",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2839",
+        "Source/Abrams/Private/GameCharacter.cpp:1560",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:87"
       ],
       "status": "verified"
     },
     "Rigidity_Landing": {
       "simple": "Rigidity multipliers for landing.",
-      "technical": "TArray<float>; exported Default values [1.1, 1.0, 0.9]. UGameCharacterStatusController::GetLandingRigidityRate indexes it with GetCurrentActionMoveRow()->Rigidity_Landing through Status_RigidityRate (enum - 1, in-range only, otherwise 1.0f).",
+      "technical": "TArray<float>, default-constructed empty; exported Default values [1.1, 1.0, 0.9]. UGameCharacterStatusController::GetLandingRigidityRate indexes it with GetCurrentActionMoveRow()->Rigidity_Landing through Status_RigidityRate (enum - 1, in-range only, otherwise 1.0f). The result is passed as the landing animation play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3899",
-        "Source/Abrams/Public/GameCharacterStatusController.h:585",
+        "Source/Abrams/Public/GameCharacterStatusController.h:587",
+        "Source/Abrams/Private/GameCharacterAction_Jump.cpp:366",
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:90"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The retail asset has one row (Default) with the export ImportKeyField Id; the reconstructed row struct is FGameDataTableRow_GlobalCorrect in /Script/AbramsDataTable. AGameDataTableManager::Tick resolves GlobalCorrectDataTable into GlobalCorrectDataTables (+0x2F0), and FindGlobalCorrectRow/FirstGlobalCorrectRow always take the first row of the first table whose row names are non-empty. No consumer was found that selects a different row by Id.",
-    "The name Combo_* members are ours; retail comments in the reconstructed source preserve the member offsets (row +0x18 TagCombo_DownDamage, +0x24 Combo_Damage, +0x28 Combo_Blow, +0x2C Combo_BlowSmall, +0x30 Combo_BlowLarge, +0x34 Combo_Down, +0xD8 Rigidity_Landing). They are static evidence, not claims of retail-readable source names.",
-    "Rigidity arrays are indexed by EGameActionRigidityType minus one (None=-1, Invalid=254); out-of-range reads return 1.0f. This mapping is shared with other animation-notification enum tables via GameAnimNotify_TypeIndex.",
-    "No exported row other than Default and no runtime/Blueprint variation was observed. Static reconstructed C++ plus the supplied export were the only inputs; uninspected content or Blueprint uses cannot be excluded."
+    "The shipped export contains one row (Default) with ImportKeyField \"Id\"; the row object writes its key as \"ID\": \"Default\" (the export convention), while the native member is FName Id in FGameDataTableRow_GlobalCorrect (/Script/AbramsDataTable). AGameDataTableManager::Tick resolves GlobalCorrectDataTable into GlobalCorrectDataTables (+0x2F0); FindGlobalCorrectRow/FirstGlobalCorrectRow return the first row of the first table whose row-name array is non-empty and whose first-row FindRow succeeds. No traced C++ selects a different row by Id, and FirstGlobalCorrectRow returns nullptr when no such row exists; every traced caller dereferences that pointer without a null check.",
+    "The name Combo_* members are ours; retail comments in the reconstructed source preserve member offsets (row +0x18 TagCombo_DownDamage, +0x24 Combo_Damage, +0x28 Combo_Blow, +0x2C Combo_BlowSmall, +0x30 Combo_BlowLarge, +0x34 Combo_Down, +0xD8 Rigidity_Landing). They are static evidence, not claims of retail-readable source names.",
+    "Rigidity indices come from EGameActionRigidityType via GameAnimNotify_TypeIndex (uint8 value - 1): None=0 -> -1, Light=1 -> 0, Normal=2 -> 1, Heavy=3 -> 2, and the reconstruction's Invalid=255 -> 254 (not \"Invalid=254\"). All exported ActionDash/ActionJump/ActionMove rigidity values are Light/Normal/Heavy, matching the three serialized array entries; None, Invalid and any other out-of-range index fall back to 1.0f.",
+    "The reconstructed row constructor explicitly sets the 17 scalar floats to 0.0f and does not assign Id or the nine TArray<float> members (default-constructed NAME_None/empty). The exported Default row supplies all values listed above; the float and array entries are used as dimensionless damage/rate multipliers, not time or angular units.",
+    "The rigidity getters do not change speed directly: jump and landing rates are passed to PlayAnimation, while the four dash rates multiply the corresponding action-controller play rates in AGameCharacter. Jump rows supply the four jump-related indices, ActionDash rows supply the dash indices and ActionMove rows supply Rigidity_Landing.",
+    "Evidence layers differ: the one-row asset, its values and ImportKeyField are observations from the supplied cooked-data export; headers, constructors and all consumer paths are the current C++ reconstruction. Several relevant RVAs (notably 0x14109C450, manager Tick/StartInitialLoading and 0x14126C110) are behavioural reconstructions rather than byte-identical matches. Field status \"verified\" here means the path is traced in that reconstruction and/or observed in the export; it is not a claim about unavailable retail source. No Blueprint assets or broader uninspected content were available, so additional Blueprint uses or row variation cannot be excluded."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:325",
+      "detail": "StartInitialLoading registers GlobalCorrectDataTable for primary-asset loading."
+    },
+    {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:177",
-      "detail": "Resolves the loaded GlobalCorrectDataTable asset into GlobalCorrectDataTables once all loaders complete."
+      "detail": "Tick resolves the loaded GlobalCorrectDataTable asset into GlobalCorrectDataTables once all loaders complete; the table array is cached, not a single row."
     },
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:578",
-      "detail": "FirstGlobalCorrectRow returns the first row of the first non-empty table; FindGlobalCorrectRow wraps it and is called by all traced consumers."
+      "detail": "FirstGlobalCorrectRow returns the first row of the first non-empty table that FindRow can resolve; FindGlobalCorrectRow wraps it and re-runs it on every call. A miss returns nullptr, which consumers dereference."
     },
     {
       "source": "Source/Abrams/Private/GameCharacter.cpp:2610",
       "detail": "GetCursedEnergyExpRate applies the stock and level slopes and clamps to build the receiver's cursed-energy experience rate."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacter.cpp:2676",
-      "detail": "GetDownDamageRate applies ComboDown_Casual for non-cursed-energy casual attacks."
+      "source": "Source/Abrams/Private/GameCharacter.cpp:2672",
+      "detail": "GetDownDamageRate applies the status down-damage rate (set by tag-combo starts), the action rate and ComboDown_Casual for applicable casual non-CE hits."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacter.cpp:2844",
-      "detail": "GetReceivedDamageRate applies combo, tag-combo, casual, super-armor and hyper-armor corrections in sequence."
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:2409",
+      "detail": "Down-damage handling consumes the receiver's GetDownDamageRate and DamageRow->Down_Damage when reducing DownValue."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:2837",
+      "detail": "GetReceivedDamageRate applies, in order, ally/status/action base rates, combo pow/floor, action damage-combo rate, tag-combo, casual, super-armor and hyper-armor corrections."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:1477",
+      "detail": "The damage action controller dispatches GetDamageComboRate to the active damage-layer action, which is where the Combo_Damage/Blow/Down overrides are read."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterAction_Damage.cpp:243",
@@ -311,15 +343,19 @@
     },
     {
       "source": "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1373",
-      "detail": "Tag-combo damage action Start installs TagCombo_DownDamage as the victim's down damage rate."
+      "detail": "Tag-combo damage action Start installs TagCombo_DownDamage as the victim's status down-damage rate and sets an unlimited collision lock 4."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2684",
-      "detail": "Dash rigidity rate getters map the current action row's rigidity enum to an array index, then layer CP_010/CP_240 buff corrections."
+      "detail": "Dash rigidity rate getters map the current ActionDash row's rigidity enum to an array index, then layer CP_010/CP_240 buff corrections without a clamp in the getter."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:3864",
       "detail": "Status_RigidityRate performs the shared range-checked array lookup with a 1.0f fallback for jump, run-jump, dash-jump, air-jump and landing rates."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Jump.cpp:28",
+      "detail": "Jump-begin actions pass their rigidity rate to PlayAnimation; landing does the same at GameCharacterAction_Jump.cpp:366."
     }
   ]
 }

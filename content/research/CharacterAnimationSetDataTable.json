@@ -1,65 +1,117 @@
 {
-  "description": "Per-character bundle of CharacterAnimation group IDs that defines which montage sets are preloaded and installed for a character.",
+  "description": "Per-character (plus six suffixed) bundle of CharacterAnimation row IDs. A Character row selects a set by name; battle and level-sequencer preload expands its entries into AnimMontage primary-asset loader names, and spawn paths bind the loaded montages into a character anim instance.",
   "fields": {
     "Id": {
-      "simple": "Character ID used as the row key.",
-      "technical": "Unreal DataTable row name (exported as ID). CharacterDataTable.Id_CharacterAnimationSet selects it, with FStudioBattleCharacterOverrides.AnimationSetIdOverride taking priority in battle/level-sequence setup. The export has 52 rows.",
+      "simple": "Set row key, normally the character ID, used to select this bundle.",
+      "technical": "FName row identity exported as ID; all 52 aggregate rows have Id equal to their DataTable row name, and no traced consumer reads the struct property as a value. Callers pass the row name from CharacterDataTable.Id_CharacterAnimationSet, or a non-None FStudioBattleCharacterOverrides.AnimationSetIdOverride, to a first-match FindRow over AGameDataTableManager.CharacterAnimationSetDataTables (+0x4B0). Battle PreparePhase case 1 and SpawnBattleCharacter prefer the override and otherwise use Character.Id_CharacterAnimationSet; MissionCharacter.Id_CharacterAnimationSet fills that override in PvE/story/arcade setup. BattlePreload and both level-sequencer paths use only the Character value. The manager requests one DataTable primary asset named CharacterAnimationSetDataTable, resolves it to UDataTable after all DataTable loaders complete, and adds it to that array. The constructor is empty, so there is no code-level default; an absent or None name returns no row under the checked finders. The 46 per-character export shards partition the same 52 rows and repeat the aggregate Properties, including ImportKeyField=Id.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterAnimationSet.h:11",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterAnimationSet.cpp:3",
+        "Source/Abrams/Private/GameDataTableManager.cpp:172",
+        "Source/Abrams/Private/GameDataTableManager.cpp:204",
+        "Source/Abrams/Private/GameDataTableManager.cpp:352",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Character.h:39",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:68",
+        "Source/Abrams/Private/GamePvESettings.cpp:233",
+        "Source/Abrams/Public/StudioBattleCharacterEntry.h:26",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:253",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:255",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:744",
-        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:286",
-        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:576"
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:282",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:576",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:651"
       ],
       "status": "verified"
     },
     "Id_CharacterAnimation": {
-      "simple": "Ordered list of CharacterAnimation group IDs belonging to the set.",
-      "technical": "TArray<FName>; all 52 exported rows have 31 slots with None placeholders. Each non-None ID is resolved against CharacterAnimationDataTables. BattleAssets_AnimMontages_12BC030 appends every resolved row's FileName entries to a preload list; battle and sequencer character installs instead loop the resolved rows and bind each Key/FileName pair. None entries are skipped; a missing animation row is skipped rather than fatal.",
+      "simple": "Ordered CharacterAnimation row IDs whose montages belong to this set; None marks an unused slot.",
+      "technical": "TArray<FName>; the empty constructor supplies no defaults, all 52 exported rows have exactly 31 slots with interspersed None placeholders (5-29 per row), and no traced consumer uses the slot position as an index. Every non-None entry is looked up by row name in the first matching table of CharacterAnimationDataTables (+0x4A0). BattleAssets_AnimMontages_12BC030 appends each resolved row's whole FileName array (including None names, without checking Key) to the preload list; loader creation drops None names and deduplicates by name before FPrimaryAssetId(AnimMontage, FileName) populates caches such as StudioAnimMontageLoaders_270/_810/_7C0. Battle and sequencer spawn paths instead iterate Key.Num(), pair Key[Index] with FileName[Index], skip None IDs or either-None pairs, resolve the loader with FindChecked, and call SetAnimationAsset; battle requests a transient duplicate only for the two seeded names Idle and Fall_01, while the sequencer passes false. A missing set row, None ID, or missing animation row is skipped; a missing montage loader is fail-fast, and ragged Key/FileName arrays would be unsafe because no length comparison is made. Of 904 non-None references in the export, 15 occurrences (12 unique IDs, including CN_080_ATTACKD through CN_080_ATTACKL and CP_010_ATTACKA_AIR/ATTACKF_AIR/ATTACKF_AIR_SOLO) have no exported CharacterAnimation row and are skipped by these consumers.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterAnimationSet.h:15",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterAnimationSet.cpp:3",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterAnimation.h:15",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterAnimation.h:18",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:32",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:79",
-        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:88",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:83",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:90",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:96",
-        "Source/Abrams/Private/GamePhase_BattleBase.cpp:748",
-        "Source/Abrams/Private/GamePhase_BattleBase.cpp:753",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:98",
+        "Source/Abrams/Private/GameDataTableManager.cpp:87",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:286",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:291",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:751",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:764",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:768",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:773",
         "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:651",
-        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:657"
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:654",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:660",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:669"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "This is a join table only: it contains no montage names itself; the cross-table chain is AnimationSet -> CharacterAnimation -> FileName -> AnimMontage primary-asset loader.",
-    "CP_010's exported set mixes the base character group with facial, guard, step, jump and attack groups and several None slots; other sets may differ.",
-    "FindDataTableAnimationSetRow / BattleStory_FindRowOutOfLine implement the shared first-matching-table row search over the manager's CharacterAnimationSetDataTables array.",
-    "No localization variants of this table were exported; available Content is partial. Evidence is reconstructed source, not a retail byte-match claim."
+    "This is a join table only: it stores no montage names or asset paths. The traced chain is set row -> Id_CharacterAnimation -> CharacterAnimation row -> Key/FileName -> AnimMontage primary-asset loader -> UGameAnimInstance::SetAnimationAsset. There are no numeric fields or units, and the empty constructor applies no sentinel replacement; native empty FName is None and the export writes the string None.",
+    "Lookup order is first matching row in array order. BattleAssets_FindRow, BattleStory_FindRowOutOfLine, Preload_FirstRow, GamePhase_LevelSequencer_FindRow, and FindDataTableAnimationSetRow are equivalent first-hit walkers over the supplied table array; BattleStory_FindRowOutOfLine rejects NAME_None when bCheckNone is true (battle PreparePhase passes true at line 255, and SpawnBattleCharacter uses the default true at line 748), while FindDataTableAnimationSetRow applies its bExact None check when the sequencer passes true at line 651. BattleAssets_FindAnimationSet is defined and declared but has no traced caller in this checkout. The manager currently supplies only the single table named CharacterAnimationSetDataTable, so the array-order choice is not exercised by these exports.",
+    "Selection precedence differs by consumer: MissionCharacter.Id_CharacterAnimationSet is copied into FStudioBattleCharacterOverrides.AnimationSetIdOverride by GameMissionCharacter_CopyOverrideIds, and battle PreparePhase/SpawnBattleCharacter prefer that non-None override over Character.Id_CharacterAnimationSet. UGamePhase::PreloadAnimMontages and both level-sequencer paths read only Character.Id_CharacterAnimationSet, so an override that names a different set is not reflected in those preload collectors. In the exports, four MissionCharacter rows reference three suffixed sets (CP_050_ST_01, CP_020_ST_02, CP_140_ST_01); CharacterDataTable has 47 non-None set references (46 unique, CN_210 is None) and none are missing.",
+    "All 52 rows have 31 FName slots; shared groups are common (CP_010_FACIALPARTS_BROW appears in 37 sets, CP_010_STEP in 16, CP_010_DAMAGE in 11). CP_010 has 23 non-None groups and 8 None slots; CP_020 has 9 None slots; CP_020_ST_01 and CP_020_ST_02 repeat CP_020_ATTACKA_ST_01. The six _ST_01/_ST_02 rows are not referenced by CharacterDataTable but three of them are referenced by exported MissionCharacter overrides.",
+    "The 46 per-character shards partition the aggregate export exactly (52 unique rows, no extra or duplicate rows, identical row properties); they are export views, not separate localized or runtime tables. No CharacterAnimationSetDataTable_* localization variant was exported. The local Content checkout has 350 .uasset files and contains neither this table nor the referenced montages.",
+    "All behavior described here comes from reconstructed C++ consumers carrying retail RVAs in their comments plus the community exports; no retail Blueprint graph or retail runtime observation was available. 'Verified' means a consumer was traced in the reconstruction, not that byte equivalence or retail execution was proven."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:79",
-      "detail": "Shared finder resolves the set row by id over CharacterAnimationSetDataTables."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:204",
+      "detail": "After all DataTable loaders complete, resolves the single loader named CharacterAnimationSetDataTable into CharacterAnimationSetDataTables (+0x4B0); StartInitialLoading requests that name at line 352."
     },
     {
-      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:88",
-      "detail": "Walks Id_CharacterAnimation and appends each animation row's FileName array to the montage preload names."
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:233",
+      "detail": "GameMissionCharacter_CopyOverrideIds copies MissionCharacter.Id_CharacterAnimationSet into FStudioBattleCharacterOverrides.AnimationSetIdOverride for battle setup; the PvE/story/arcade producers call this copier."
+    },
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:79",
+      "detail": "BattleAssets_FindAnimationSet wraps the shared first-match FindRow over CharacterAnimationSetDataTables; the definition has no traced caller in this checkout."
+    },
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:83",
+      "detail": "Shared collector is null-safe, skips None animation IDs, finds each CharacterAnimation row, and appends its full FileName array to the caller's preload name list."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:286",
-      "detail": "Uses Id_CharacterAnimationSet to create anim-montage primary asset loaders for battle characters."
+      "detail": "Battle preload resolves each slot character's Id_CharacterAnimationSet (skipping None/unresolved sets), collects montage names through the shared collector, and builds StudioAnimMontageLoaders_270 at line 291."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:748",
-      "detail": "Applies a studio AnimationSetIdOverride when present, otherwise the character's set id, during battle character setup."
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:255",
+      "detail": "Battle PreparePhase case 1 uses AnimationSetIdOverride when non-None, otherwise Character.Id_CharacterAnimationSet, to collect montages into StudioAnimMontageLoaders_810 at line 295."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:753",
-      "detail": "Iterates set IDs to install keyed montages on the spawned character."
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:744",
+      "detail": "SpawnBattleCharacter applies the same override precedence, resolves the set with the shared out-of-line finder at line 748, and installs each paired Key/FileName montage at lines 751-775, with transient duplicates only for Idle and Fall_01."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:85",
+      "detail": "Explicit instantiation of BattleStory_FindRowOutOfLine for this row type; the implementation walks the supplied table array and returns the first matching row, with bCheckNone handling NAME_None."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:576",
-      "detail": "Resolves the set for sequencer characters and preloads its montages."
+      "detail": "Studio character preload uses Character.Id_CharacterAnimationSet (no override), collects montages with the shared collector, and creates StudioAnimMontageLoaders_7C0 at line 593."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:651",
+      "detail": "Studio character spawn uses FindDataTableAnimationSetRow(..., true) and installs each non-None Key/FileName pair from the resolved animation rows with FindChecked loader lookups and bDuplicate=false."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_WidgetTest.cpp:429",
-      "detail": "Out-of-line shared row finder used by widget/battle phases to look up CharacterAnimationSet rows."
+      "detail": "Definition of the shared bExact/bCheckNone first-match finder for this row struct; its traced caller is the level-sequencer spawn path at GamePhase_LevelSequencer.cpp:651, not a widget or battle phase."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:82",
+      "detail": "GamePrimaryAssetLoader_CreateLoadersForIds empties the loader map, drops None primary-asset names and duplicate names, so repeated FileName entries in a set do not create extra loaders."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimInstance.cpp:14",
+      "detail": "SetAnimationAsset stores the resolved montage under the Key FName with blend times; bDuplicate makes a transient duplicate and ignores a null montage."
     }
   ]
 }

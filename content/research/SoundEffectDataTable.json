@@ -1,86 +1,164 @@
 {
-  "description": "Registry of one-shot and looping sound effects, keyed by sound-effect ID and resolving to a CRI cue sheet plus cue name.",
+  "description": "Gameplay sound-effect lookup: each row maps an FName ID to a CRI cue name and an optional cue-sheet name. Character, shikigami, trap, effect, map-ground, script and sequencer consumers resolve IDs here for one-shot, looping, ambient and 3D playback; the row itself has no volume, duration, pitch, attenuation or loop flag.",
   "fields": {
     "Id": {
       "simple": "Row key / sound-effect ID.",
-      "technical": "FName primary key. Producers supply this ID from many sources: hard-coded literals in character controllers, MapGround footstep/ground/jump/landing arrays, damage/effect/trap rows, script PlaySe/StopLoopSe commands, sequencer section IDs and NPC model-derived IDs. Status_FindSoundEffectRow walks DTM.SoundEffectDataTables (+0x730), rejects None by default, and returns the first typed row. Script loop SE handles are keyed by this same Id. Export spells it ID.",
+      "technical": "FName primary key (exported as ID; the catalog import key is Id) with the default NAME_None. Status_FindSoundEffectRow walks DTM.SoundEffectDataTables (+0x730) in array order, optionally rejects NAME_None (bCheckNone defaults to true in the declaration) and returns the first row found. Script PlaySe/PlayLoopSe/StopLoopSe explicitly pass false. The shared logic has several inlined and aliased forms; most precheck IsNone, but some rely on the caller to do so. The loader currently contributes one table named SoundEffectDataTable, so first-hit precedence matters only if more tables are added. IDs come from hard-coded literals, MapGround arrays indexed by footstep/ground type, Damage rows (including the CP_040 weapon remap), Effect arrays, destructible/trap fields, script commands and sequencer section IDs. Script loop handles are keyed by this same Id.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SoundEffect.h:11",
+        "Source/Abrams/Public/GameDataTableManager.h:44",
+        "Source/Abrams/Private/GameDataTableManager.cpp:245",
         "Source/Abrams/Private/GameDataTableManager.cpp:708",
         "Source/Abrams/Private/GameScriptCommands.cpp:180",
-        "Source/Abrams/Private/GameScriptCommands.cpp:220",
-        "Source/Abrams/Private/GameAnimNotify_Footstep.cpp:57",
-        "Source/AbramsSequencer/Private/AbramsSequencerSetSeVolumeEvaluate.cpp:32",
-        "Source/Abrams/Private/CN_250_ActionController.cpp:2115"
+        "Source/Abrams/Private/GameScriptCommands.cpp:196",
+        "Source/Abrams/Private/GameAnimNotify_Footstep.cpp:53",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:173",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:133",
+        "Source/AbramsSequencer/Private/AbramsSequencerSetSeVolumeEvaluate.cpp:30",
+        "JJKCCDatatables/datatables/SoundEffectDataTable.json"
       ],
       "status": "verified"
     },
     "CueSheetName": {
-      "simple": "CRI Atom cue sheet containing the effect, or empty for the system sheet.",
-      "technical": "FString, default empty. Passed with CueName to SoundManager PlaySe/PlaySe3D/PlaySeLoop/Loop variants. An empty string maps to the built-in SE_System sheet in PlaySe, PlayAmbientSe and the shikigami loop path; PlaySe3D with an empty sheet instead uses its cue-name-only overload. Exported rows split between empty system cues and named character sheets.",
+      "simple": "CRI Atom cue sheet to use; empty means the built-in SE_System sheet.",
+      "technical": "FString, constructor default empty. Most row-based consumers pass it with CueName to SoundManager PlaySe, PlaySe3D, PlayAmbientSe, PlaySeLoop and PlaySe3DLoop. An empty string resolves to the loaded sheet named SE_System; PlaySe3D's sheet overload delegates to its cue-name-only overload on an empty name, which reaches the same fallback. The shikigami loop-at-socket path performs the same fallback before FindLoadedCueSheet/PlaySe3DLoopCue. GameScriptPlayer preloads only non-empty sheet names collected from ScriptData.SoundEffectList. Not every path honors the field: damage-hit playback and sequencer PlaySystemSe pass only CueName, forcing SE_System. In the companion export all 1,170 rows have an empty CueSheetName, although the runtime still supports named sheets.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SoundEffect.h:15",
         "Source/AbramsDataTable/Public/GameDataTableRow_SoundEffect.h:20",
-        "Source/Abrams/Private/GameScriptCommands.cpp:180",
-        "Source/Abrams/Private/GameSoundManager.cpp:1110",
-        "Source/Abrams/Private/GameSoundManager.cpp:1214",
+        "Source/Abrams/Private/GameSoundManager.cpp:801",
+        "Source/Abrams/Private/GameSoundManager.cpp:1108",
+        "Source/Abrams/Private/GameSoundManager.cpp:1120",
+        "Source/Abrams/Private/GameSoundManager.cpp:1212",
+        "Source/Abrams/Private/GameSoundManager.cpp:1252",
+        "Source/Abrams/Private/GameSoundManager.cpp:1295",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:304",
         "Source/Abrams/Private/GameShikigami.cpp:1927",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:220",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:407",
         "JJKCCDatatables/datatables/SoundEffectDataTable.json"
       ],
       "status": "verified"
     },
     "CueName": {
-      "simple": "CRI cue name to play inside the sheet.",
-      "technical": "FString, default empty. Used as the second argument of all SE playback calls and as the identity compared with UAtomComponent::GetCueName when the sequencer SetSeVolume track locates active SE/SE3D players to adjust their volume. No localization suffix is applied to SE cues in these consumers.",
+      "simple": "CRI cue name to play inside the selected cue sheet.",
+      "technical": "FString, constructor default empty. Playback looks it up by exact FString equality in the selected sheet's CueInfos; a missing sheet or cue and an unavailable player produce handle -1. The sequencer SetSeVolume track uses Row->CueName alone to find an active player by UAtomComponent::GetCueName, scanning 2D players first and then 3D players; it does not check CueSheetName. Damage-hit playback and sequencer PlaySystemSe also use CueName alone against SE_System. No observed SE consumer appends a localization suffix; the _En suffix logic belongs to voice playback. All 1,170 exported rows have a non-empty CueName identical to their ID.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SoundEffect.h:18",
         "Source/AbramsDataTable/Public/GameDataTableRow_SoundEffect.h:20",
-        "Source/Abrams/Private/GameScriptCommands.cpp:180",
-        "Source/Abrams/Private/GameCharacter.cpp:2909",
-        "Source/AbramsSequencer/Private/AbramsSequencerSetSeVolumeEvaluate.cpp:38",
-        "Source/AbramsSequencer/Private/AbramsSequencerSetSeVolumeEvaluate.cpp:47"
+        "Source/Abrams/Private/GameSoundManager.cpp:746",
+        "Source/Abrams/Private/GameSoundManager.cpp:1133",
+        "Source/Abrams/Private/GameSoundManager.cpp:1225",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:220",
+        "Source/Abrams/Private/GameShikigami.cpp:2531",
+        "Source/AbramsSequencer/Private/AbramsSequencerSetSeVolumeEvaluate.cpp:30",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:407",
+        "Source/Abrams/Private/GameSoundManager.cpp:431",
+        "JJKCCDatatables/datatables/SoundEffectDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Loaded as a DataTable primary asset named SoundEffectDataTable into DTM.SoundEffectDataTables (+0x730). There are many typed finder implementations and inlined table walks; all take the first row with a matching Id.",
-    "This table is a leaf lookup: sound-effect IDs live in Damage/Effect/MapGround/Character/Shikigami/Trap/script/sequencer data, and this row supplies the actual CRI sheet and cue.",
-    "An empty CueSheetName is intentional for system sounds; exported rows pair it with CueName values such as SE_SYS_000_01001.",
-    "The companion export contains 1,170 rows; retail completeness and Blueprint-only references are not asserted. Source is reconstructed retail C++ with retail RVAs recorded inline."
+    "Loaded as a DataTable primary asset named SoundEffectDataTable into DTM.SoundEffectDataTables (+0x730); Status_FindSoundEffectRow at retail 0x141014BB0 is the shared finder. The loader adds one table here, and every shared or inlined walk returns the first matching row. Duplicate IDs in later tables would be ignored; there is no merge or override step.",
+    "This is a leaf resolver: IDs are stored in MapGround, Damage, Effect, Character/Shikigami/Trap data, script commands and sequencer sections. There is no row-level volume, pitch, attenuation, duration or loop flag. PlaySe/PlaySe3D derive LoopSetting from the CRI cue's bLooping, while explicit PlaySeLoop/PlaySe3DLoop force looping; callers supply FGameSoundPlayParameter, whose infinite defaults are normalized to pitch 0 and cue attenuation distances.",
+    "An empty CueSheetName is a supported value meaning the loaded SE_System sheet, and an empty CueName would fail cue lookup or be skipped by SetSeVolume. In the only companion export shard, all 1,170 rows have an empty sheet and CueName equal to ID; this is unlike a split between system and named-character sheets.",
+    "Some row consumers ignore CueSheetName: the Damage-hit paths in GameCharacterActionController and GameShikigami call the cue-name-only PlaySe3D overload, and sequencer PlaySystemSe calls PlaySystemSe(Row->CueName). Those paths use SE_System regardless of the row's sheet. SetSeVolume likewise matches only the cue name, so its player choice is independent of sheet.",
+    "Sentinels and indices: NAME_None is rejected by the default finder and most inline helpers, but script SE commands pass bCheckNone=false. MapGround footstep and ground IDs are selected with a 1-based Type-1 index and explicit bounds checks. Playback returns -1 for a missing row, sheet, cue or free player; script LoopSeHandleMap stores the handle by Id and StopLoopSe validates the row and handle before fading and removing it.",
+    "Indirect routes include IGameActorInterface PlaySe/PlaySeLoop virtuals into AGameCharacter, AGameShikigami and AGameTrap, CP_040's damage-ID remap for the CP_040_50 weapon variation, and GameScriptPlayer's preload pass over ScriptData.SoundEffectList. The last pass adds only non-empty CueSheetName values, so the current export contributes no sheet names to that cache.",
+    "Evidence scope: the companion export has one SoundEffectDataTable shard with 1,170 rows and exactly the ID/CueSheetName/CueName fields; no duplicate keys were found. Retail table completeness and Blueprint-only references are not asserted because no retail Blueprint or full asset reference inventory was available. Source is reconstructed retail C++ with retail RVAs recorded inline."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:245",
+      "detail": "Resolves the loaded SoundEffectDataTable into DTM.SoundEffectDataTables."
+    },
+    {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:708",
-      "detail": "Shared typed row finder for sound-effect IDs."
+      "detail": "Shared typed row finder; returns the first matching row after an optional NAME_None rejection."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptPlayer.cpp:304",
+      "detail": "Script-data preload pass reads CueSheetName from the first row for each SoundEffectList ID and loads only non-empty sheets."
     },
     {
       "source": "Source/Abrams/Private/GameScriptCommands.cpp:180",
-      "detail": "PlaySe script command plays the row sheet/cue."
+      "detail": "PlaySe resolves the row with bCheckNone=false and plays sheet/cue with the default parameter."
     },
     {
       "source": "Source/Abrams/Private/GameScriptCommands.cpp:196",
-      "detail": "PlayLoopSe keeps a handle keyed by the row ID."
+      "detail": "PlayLoopSe plays the row and stores the returned handle in LoopSeHandleMap keyed by the row ID."
     },
     {
-      "source": "Source/Abrams/Private/GameAnimNotify_Footstep.cpp:57",
-      "detail": "Footstep notify resolves a MapGround-provided ID and plays it at the hit location."
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:220",
+      "detail": "StopLoopSe validates the row and stored handle, fades the SE and removes the map entry."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacter.cpp:2907",
-      "detail": "Character sound-effect calls resolve IDs from action data."
+      "source": "Source/Abrams/Public/GameActorInterface.h:514",
+      "detail": "PlaySe/PlaySeLoop virtual aliases route animation and controller callers to character, shikigami or trap implementations."
     },
     {
-      "source": "Source/Abrams/Private/GameEffect.cpp:1219",
-      "detail": "Effect system resolves row IDs into SE playback."
+      "source": "Source/Abrams/Private/GameCharacter.cpp:2903",
+      "detail": "Character 2D/3D/loop wrappers resolve IDs only while bPlaySoundEffectsEnabled is set."
     },
     {
-      "source": "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:131",
-      "detail": "Sequencer SE playback resolves a row by SoundId."
+      "source": "Source/Abrams/Private/GameShikigami.cpp:1877",
+      "detail": "Shikigami wrappers resolve IDs for 2D, socket and looping playback; loop-at-socket applies the SE_System sheet fallback explicitly."
     },
     {
-      "source": "Source/AbramsSequencer/Private/AbramsSequencerSetSeVolumeEvaluate.cpp:32",
-      "detail": "Sequencer volume track resolves rows by section ID and matches active players by CueName."
+      "source": "Source/Abrams/Private/GameTrap.cpp:141",
+      "detail": "Trap wrappers resolve IDs for 2D, location, socket and looping playback."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimNotify_PlaySe.cpp:16",
+      "detail": "Animation notify calls the actor's 2D or socket PlaySe virtual using its stored Id_SoundEffect."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimNS_PlaySe.cpp:16",
+      "detail": "Looping animation notify resolves through the actor's PlaySeLoop virtuals and retains handles per actor."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimNotify_Footstep.cpp:53",
+      "detail": "Selects a MapGround footstep ID by Type-1 with bounds checks, resolves the row and plays 3D at the socket location."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimNotify_PlayGroundEffect.cpp:56",
+      "detail": "Selects a bounded MapGround ground-Sound ID by Type-1 and plays it 3D, optionally attaching the player."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:211",
+      "detail": "Damage-hit SE resolves the Damage row ID (or alias) but calls the cue-name-only PlaySe3D overload, ignoring CueSheetName."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_040_ActionController.cpp:133",
+      "detail": "Character-specific alias remaps two Damage SE IDs for the CP_040_50 weapon variation before the table lookup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:2758",
+      "detail": "Jump-begin and landing effects resolve MapGround IDs with bCheckNone=true and play them 3D."
+    },
+    {
+      "source": "Source/Abrams/Private/GameEffect.cpp:1212",
+      "detail": "Effect initialization walks Id_SoundEffect, skips None and plays 3D; the separate loop-ID path follows at line 1225."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1678",
+      "detail": "Map ambient sound resolves MapRow.Id_SoundEffect and passes sheet/cue to PlayAmbientSe."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigamiAction.cpp:516",
+      "detail": "Shikigami action helper resolves an ID and returns -1 when no row is found before 3D playback."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:129",
+      "detail": "Sequencer 2D/3D sound modules resolve SoundId and choose PlaySe/Loop or PlaySe3D/Loop by section settings."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:407",
+      "detail": "Sequencer PlaySystemSe resolves a SoundEffect row but uses only its CueName on the system player."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSetSeVolumeEvaluate.cpp:30",
+      "detail": "SetSeVolume resolves a row by section ID, then matches active 2D and then 3D players solely by CueName."
     }
   ]
 }

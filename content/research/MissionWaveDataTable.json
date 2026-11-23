@@ -1,31 +1,36 @@
 {
-  "description": "Shared per-wave configuration for Story, Arcade and PvE battles: layout, time/force-gauge rules, enemies, order/task links and battle music.",
+  "description": "Shared per-wave configuration for Story, Arcade and PvE battles: spawn layout, time/force-gauge rules, enemy slots and revival flags, order/task links and battle music.",
   "fields": {
     "Id": {
       "simple": "Mission wave identifier.",
-      "technical": "FName import key/row name for FGameDataTableRow_MissionWave. Waves are resolved by ids from the enclosing mission or by PvE lottery results. Beyond being the key, the value is copied into PvESettings.PickedWaveIds on PvE result entry and passed into situation-overview parameters, so it also acts as a stable wave tag.",
+      "technical": "FName import key/row name for FGameDataTableRow_MissionWave (the export spells the column `ID`). Waves are looked up by ids from Arcade missions and StoryMissionWave rows, or by ids picked from PvEMissionWaveLottery rows. The PvE picker initializes its output with `PVE_X_WAVE_0000`, which is itself an exported row, so an empty/failed lottery can leave a fallback wave rather than a null. On PvE result entry the wave's Id is appended to PvESettings.PickedWaveIds; that list is later used to halve the weight of previously used waves. The id is also passed as the PvE situation-overview wave id.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:11",
-        "Source/Abrams/Public/GameDataTableManager.h:195",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:744",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:1734",
+        "Source/Abrams/Private/GameDataTableManager.cpp:284",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:149",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:191",
+        "Source/Abrams/Private/GamePvESettings.cpp:580",
+        "Source/Abrams/Private/GamePvESettings.cpp:616",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:746",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:1839"
       ],
       "status": "verified"
     },
     "MissionLayoutIndex": {
       "simple": "Selects which map layout to use for spawn positions.",
-      "technical": "int32, default 0. AGameBattleManager::GetCharacterStartTransform requires MapRow->Id_MissionLayout to be a valid index and non-None at this position; the resulting id is resolved against MissionLayoutDataTables. A value of -1 or any out-of-range index skips the mission layout override and keeps the battle area's transform. Exported rows include -1.",
+      "technical": "int32, default 0. It indexes the current Map row's `Id_MissionLayout` array (16 entries in the export), not MissionLayoutDataTables directly. GetCharacterStartTransform applies a layout only when the map row is found, `IsValidIndex(MissionLayoutIndex)` is true and that slot is not None; the id then resolves through MissionLayoutDataTables, overriding translation/rotation components that are valid for the character slot. -1, an out-of-range index or a None slot keeps the battle-area transform. Exported values are -1 (133 rows) and 0-13.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:15",
         "Source/Abrams/Private/GameBattleManager.cpp:1487",
-        "Source/Abrams/Private/GameBattleManager.cpp:1491"
+        "Source/Abrams/Private/GameBattleManager.cpp:1491",
+        "Source/Abrams/Private/GameBattleManager.cpp:1493",
+        "Source/Abrams/Private/GameBattleManager.cpp:1497"
       ],
       "status": "verified"
     },
     "TimeLimit": {
       "simple": "Wave-specific battle time limit in seconds.",
-      "technical": "float, default 0.0f. If > 0, UGamePhase_BattleMissionBase::GetBattleTimeLimit returns it instead of the battle-level request's TimeLimit or Global TimeLimit[0]. If < 0, GetBattleTimeLimitInfinite returns true regardless of the level request. A value of 0 means fall back to the level/global setting. The versus-enemy interval widget displays a special infinite label for negative values and uses Global TimeLimit[0] when the value is 0. Exported rows use -1, 0 and positive values such as 30/60.",
+      "technical": "float, default 0.0f, in seconds. In mission phases, a value > 0 wins over StudioBattleLevelRequest_CA0.TimeLimit and Global TimeLimit[0]; a value < 0 makes GetBattleTimeLimitInfinite return true regardless of the level request's bTimeLimitInfinity; 0 falls back to the level/global setting. The versus-enemy interval widget shows a special infinite label for negative values and, for 0, uses Global TimeLimit[0] only when that array is nonempty. Exported rows use -1, 0 and positive values from 30 to 360.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:18",
         "Source/Abrams/Private/GamePhase_BattleMissionBase.cpp:120",
@@ -37,91 +42,106 @@
     },
     "ForceGaugeMax": {
       "simple": "Maximum force gauge stock for side 1 in this wave.",
-      "technical": "int32, default 0. UGamePhase_BattleMissionBase::GetBattleSideRule and UGamePhase_BattlePvEBase::GetBattleSideRule read it for Side==1; a value of 0 is replaced with the default 4, while other values (including exported -1) are returned as-is. Side 0 in PvE is instead derived from binding vows, and mission-base side 0 stays 4.",
+      "technical": "int32, default 0. Mission and PvE GetBattleSideRule read it for Side==1: 0 becomes the default 4, while any other value is returned unchanged. ApplyBattleRules feeds that result to SetCharacterStockMax/SetCharacterStock and calls SetCharacterStockUnlimited when it is negative, so the exported -1 (113 rows) means unlimited stock. Mission-base Side 0 stays 4; PvE Side 0 is instead computed from binding vows. Exports also use 1-4.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:21",
-        "Source/Abrams/Private/GamePhase_BattleMissionBase.cpp:152",
+        "Source/Abrams/Private/GamePhase_BattleMissionBase.cpp:154",
         "Source/Abrams/Private/GamePhase_BattleMissionBase.cpp:159",
         "Source/Abrams/Private/GamePhase_BattlePvEBase.cpp:116",
-        "Source/Abrams/Private/GamePhase_BattlePvEBase.cpp:118"
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:541",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:543"
       ],
       "status": "verified"
     },
     "Id_MissionCharacter_Enemy": {
       "simple": "Ordered list of enemy mission-character rows for the wave.",
-      "technical": "TArray<FName>, default empty. Index 0 is used by root-info, situation-overview and interval UI previews. Battle-entry builders use Index-2 for enemy slots (slots 0/1 come from the player pair), resolving each non-None id against MissionCharacterDataTables; some paths omit bounds checks. The first-wave enemy list is also used to gather unique character ids for image preloading. Exported arrays are padded with None.",
+      "technical": "TArray<FName>, default empty. Exported rows have four slots padded with None. Story entry setup iterates all slots, skipping None/missing MissionCharacter rows; Arcade and PvE entry builders use slot `Index-2` for battle slots 2+ without bounds or None checks. Several UI previews first resolve the mission's wave 0 and then read this array; IntervalArcade_BattlePairFromWave uses the leading non-None count, while Story_GetBattleLayout uses the total non-None count together with the ally count. Preload paths gather unique character ids from all non-None entries.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:24",
-        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:123",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:258",
         "Source/Abrams/Private/GamePhase_BattleArcade.cpp:204",
         "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:579",
-        "Source/Abrams/Private/GamePhase_BattleStory.cpp:258",
+        "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:95",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:390",
+        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:123",
         "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:200"
       ],
       "status": "verified"
     },
     "bRevivalEnabled": {
       "simple": "Per-enemy flag controlling revival/down behaviour.",
-      "technical": "TArray<bool>, default empty. It is aligned with the enemy character array and copied by index into FStudioBattleCharacterSetup::StatusSetup.Byte4D in Story (Index) and Arcade/PvE (Index-2). Downstream code tests StatusSetup.Byte4D: value 1 allows BounceUp follow-ups and prevents immediate disappearance/deactivation on defeat; value 0 can release traps on deactivation. Entries are not uniformly true in the export.",
+      "technical": "TArray<bool>, default empty; every exported row has four entries. It is aligned with the enemy slots and copied by index into FStudioBattleCharacterSetup::StatusSetup.Byte4D (Story `Index`; Arcade/PvE `Index-2`). Byte4D==1 permits a BounceUp follow-up only when the extra movement/defeated/armor conditions also hold, prevents DownEnd disappearance/deactivation of a defeated character when ActionControllerSlot181(0) is false, and blocks down-recovery completion before Global Dead_Time. Byte4D!=1 allows that disappearance, and CP_150 releases traps on deactivation. Both true and false entries occur in the export.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:27",
         "Source/Abrams/Private/GamePhase_BattleStory.cpp:269",
         "Source/Abrams/Private/GamePhase_BattleArcade.cpp:212",
         "Source/Abrams/Private/GameCharacterActionController.cpp:2032",
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:148",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:586",
         "Source/Abrams/Private/CP_150_ActionController.cpp:1096"
       ],
       "status": "verified"
     },
     "Id_MissionOrder": {
       "simple": "Mission-order row governing the wave.",
-      "technical": "FName, default None. Resolved against MissionOrderDataTables (DTM+0x9D0) in SetupArcade/SetupPvE/SetupStory and in many widgets. Passing the id through Battle_FindMissionOrderRow with bCheckNone=true lets None yield a null order. The order then drives win conditions, UI text and boss behaviour; the wave id is also passed to wave-transition widgets.",
+      "technical": "FName, default None. Resolved against MissionOrderDataTables (DTM+0x9D0) in SetupArcade/SetupPvE/SetupStory and in many widgets; Battle_FindMissionOrderRow with bCheckNone=true returns null for None. The order row controls win/result checks, name/detail text, boss versus normal transition variants and boss cost/radar checks, and IntervalPvE uses its ExcludeBindingVowsEffectType to filter vow candidates. The order id, not the wave row id, is what is passed to PlayBattleStartMissionWave/SetMissionWaveInfo.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:30",
         "Source/Abrams/Private/GameBattleSystems_B.cpp:781",
         "Source/Abrams/Private/GameBattleMissionOrderWidget.cpp:47",
         "Source/Abrams/Private/GameBattleOverlayWidget.cpp:50",
-        "Source/Abrams/Private/GameBattleRadarWidget.cpp:170"
+        "Source/Abrams/Private/GameBattleRadarWidget.cpp:170",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:638",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:150"
       ],
       "status": "verified"
     },
     "Id_MissionTaskLottery": {
       "simple": "Lottery row used to pick the wave's mission task.",
-      "technical": "FName, default None. Arcade setup calls BattleArcade_PickLotteryTask on it (wave +0x48); PvE settings reuse that helper; Story demo helpers resolve a MissionTaskLottery row from it and use the first candidate. A null or empty lottery yields no task rather than a crash in the observed helpers.",
+      "technical": "FName, default None. Story and Arcade setup and GamePvE_MakeMissionTasks call BattleArcade_PickLotteryTask on it: a null row or empty task/weight arrays yields NAME_None; otherwise None tasks are removed with their weights and one task is picked randomly in proportion to the remaining weights. Story_GetDemoMissionTask instead takes the first candidate from the lottery row. Exported rows contain None and 134 named lotteries.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:33",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:94",
         "Source/Abrams/Private/GamePhase_BattleArcade.cpp:157",
         "Source/Abrams/Private/GamePvESettings.cpp:674",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:197",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:568"
       ],
       "status": "verified"
     },
     "Id_Bgm": {
       "simple": "Battle music row for this wave.",
-      "technical": "FName, default None. GetBattleBgmName resolves it through BgmDataTables with bCheckNone=true; if no row is found it falls back to Game->StudioBattleLevelRequest_CA0.BgmId and finally to BGM_BATTLE_01. The returned value is the Bgm row's CueSheetName (or an empty name when empty).",
+      "technical": "FName, default None. Mission-base GetBattleBgmName resolves it through BgmDataTables with bCheckNone=true; if no row is found it retries StudioBattleLevelRequest_CA0.BgmId and finally returns BGM_BATTLE_01. With no current wave it proceeds directly to the level-request path. A found row contributes its CueSheetName string as an FName (empty name when that string is empty). Exported rows contain 11 named BGM ids and None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:36",
         "Source/Abrams/Private/GamePhase_BattleMissionBase.cpp:172",
-        "Source/Abrams/Private/GamePhase_BattleMissionBase.cpp:182",
-        "Source/Abrams/Private/GamePhase_BattleMissionBase.cpp:185"
+        "Source/Abrams/Private/GamePhase_BattleMissionBase.cpp:176",
+        "Source/Abrams/Private/GamePhase_BattleMissionBase.cpp:181",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:1044",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:1053"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset has 1774 rows with FGameDataTableRow_MissionWave; the manager loads MissionWaveDataTable into MissionWaveDataTables (DTM+0x9A0). StoryMissionWaveDataTable is a separate join table and is not this table.",
-    "The active wave pointer is cached in FStudioBattleMissionTaskSystem (AGameBattleManager::GetMissionWave). Many consumers referenced as Wave are aliases of that pointer; the UI/interval paths instead resolve the row directly from an id.",
-    "Exported rows use fixed-width arrays padded with None; gameplay consumers do not consistently validate parallel array lengths before indexing.",
-    "Finders and entry builders are reconstructed (status/functions.json labels several behavioural). No claim is made about all retail or Blueprint uses because Content is partial."
+    "The only exported MissionWaveDataTable variant has 1,774 unique row keys; every row has nine fields, its key equals its `ID`, and both parallel arrays have four entries. The manager registers the table as MissionWaveDataTables (DTM+0x9A0). StoryMissionWaveDataTable is a separate story-wave-to-MissionWave join table.",
+    "The active wave is cached in FStudioBattleMissionTaskSystem: SetupArcade/SetupPvE/SetupStory store the resolved row array and select MissionWave = MissionWaves[RetryCount], exposed by GetMissionWave/GetMissionWaves. Most phase/UI consumers use that cache; interval and menu paths resolve rows directly from ids.",
+    "Cross-export check: every non-None enemy id, task lottery, mission order and BGM id referenced by the 1,774 rows resolves in the corresponding available export, as do all 90 distinct ArcadeMission wave ids and 1,589 distinct PvEMissionWaveLottery wave ids. One StoryMissionWave row (`STMSN_06090S`) references a MissionWave id that is absent from the export.",
+    "Exported arrays are fixed-width and None-padded; consumers do not consistently validate parallel lengths. Story indexes bRevivalEnabled[Index] after checking the enemy id, while Arcade/PvE use `Index-2` without bounds checks.",
+    "Finders and entry builders are reconstructed (status/functions.json labels several of these functions behavioural). Claims describe reconstructed native behavior; no complete retail Blueprint call graph was available because Content is partial."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameBattleManager.cpp:1471",
-      "detail": "Uses MissionLayoutIndex to select spawn locations/rotations."
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1487",
+      "detail": "Uses MissionLayoutIndex against the current map row's Id_MissionLayout and applies the resolved layout transform."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_BattleMissionBase.cpp:120",
-      "detail": "Uses TimeLimit, ForceGaugeMax and Id_Bgm to set battle rules and music."
+      "source": "Source/Abrams/Private/GamePhase_BattleMissionBase.cpp:123",
+      "detail": "Uses TimeLimit, ForceGaugeMax and Id_Bgm for the time limit, infinite flag, side-1 stock and BGM fallback."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:540",
+      "detail": "Applies the derived side rule as character stock max/stock and marks negative rules unlimited."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:182",
@@ -133,7 +153,19 @@
     },
     {
       "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:769",
-      "detail": "Caches the wave, mission order and task for the active retry index."
+      "detail": "Caches the wave array, current wave, mission order and task for the active retry index."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalArcade.cpp:95",
+      "detail": "Derives BattlePair from the leading non-None enemy slots; the first wave also drives previews and character preloading."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:576",
+      "detail": "Picks PvE wave ids (including the PVE_X_WAVE_0000 sentinel) and rolls task ids from Id_MissionTaskLottery."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:370",
+      "detail": "Story launch layout uses the MissionWave's non-None enemy count together with the Story wave's ally count."
     },
     {
       "source": "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:123",

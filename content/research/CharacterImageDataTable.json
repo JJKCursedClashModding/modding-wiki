@@ -1,22 +1,30 @@
 {
-  "description": "Central catalog of UI texture and sprite asset names for each character variation: character-select icons, cut-ins, battle face-icon sets, ranking/out-game images and command-list portraits.",
+  "description": "Central catalog of UI texture and sprite asset-name keys shared by character variations: character-select icons, cut-ins, battle face-icon sets, ranking/out-game images and command-list portraits.",
   "fields": {
     "ID": {
       "simple": "Row key referenced by CharacterVariation::Id_CharacterImage.",
-      "technical": "FName primary key (ImportKeyField=Id in the export), typically a variation ID (CP_xxx_yy). GameCharacter_FindImageRow(Id, bLookUpCharacter) resolves a Character ID via its first variation, or takes a variation ID directly, then finds this row using Variation->Id_CharacterImage across CharacterImageDataTables (DTM +0x480).",
+      "technical": "FName primary key (struct member Id; export rows label it ID and ImportKeyField=Id). GameCharacter_FindImageRow(Id, bLookUpCharacter) resolves a Character row to its first Id_CharacterVariation element when the flag is true, or treats Id as a CharacterVariation row ID when false; it then reads Variation->Id_CharacterImage (+0x30) and returns the first matching row in CharacterImageDataTables (DTM +0x480). Image->Id is also used as the key for Character_* exchange-image UV offsets.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterImage.h:10",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:27",
         "Source/Abrams/Private/GameItemOwnership.cpp:641",
-        "Source/Abrams/Private/GameItemOwnership.cpp:671",
-        "Source/Abrams/Private/GameWidgetManager.cpp:1720"
+        "Source/Abrams/Private/GameItemOwnership.cpp:649",
+        "Source/Abrams/Private/GameItemOwnership.cpp:656",
+        "Source/Abrams/Private/GameItemOwnership.cpp:667",
+        "Source/Abrams/Private/GameItemOwnership.cpp:676",
+        "Source/Abrams/Private/GameArcadeRootInfoMissionWidget.cpp:102",
+        "Source/Abrams/Private/GameBattleSituationOverviewArcadeMissionWidget.cpp:75",
+        "Source/Abrams/Private/GameVsEnemyIntervalCharacterWidget.cpp:93"
       ],
       "status": "verified"
     },
     "CharacterSelectIconFileName": {
       "simple": "Square character-select icon texture name.",
-      "technical": "FName (row +0x10), e.g. T_UI_Character_CharacterSelect_Icon_Square_CP_010_00. Loaded/resolved via WidgetManager's WidgetTextureLoaders by the character-select list item and the visual-lobby top widget; also included in widget-texture preload lists for selection screens.",
+      "technical": "FName (row +0x10). WidgetManager preloads square-icon names for all characters into WidgetTextureLoaders; the character-select list item and visual-lobby top resolve the loaded texture through that loader map, and the free-battle team icon reads the loader directly. The name is also collected into selection-screen widget-texture preload lists.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterSelectCharacterListItemWidget.cpp:197",
         "Source/Abrams/Private/GameFreeBattleTeamCharacterSelectIconWidget.cpp:47",
+        "Source/Abrams/Private/GameVisualLobbyCharacterSelectTopWidget.cpp:133",
         "Source/Abrams/Private/GameVisualLobbyCharacterSelectTopWidget.cpp:189",
         "Source/Abrams/Private/GameWidgetManager.cpp:849"
       ],
@@ -24,7 +32,7 @@
     },
     "CharacterSelectVerticalIconFileName": {
       "simple": "Tall/portrait character-select icon texture name.",
-      "technical": "FName (row +0x18); dynamically loaded for replay/collection items and collected into texture preload lists by MainMenuCollection. Exported rows can set this to None when no vertical art exists.",
+      "technical": "FName (row +0x18); dynamically loaded for replay/collection items and collected into texture preload lists by MainMenuCollection. Exported rows set this to None in the 18 rows without vertical select art.",
       "evidence": [
         "Source/Abrams/Private/GameCollectionBattleReplayItemWidget.cpp:92",
         "Source/Abrams/Private/GamePhase_MainMenuCollection.cpp:126"
@@ -33,19 +41,23 @@
     },
     "CutInImageFileName": {
       "simple": "Battle cut-in illustration texture name.",
-      "technical": "FName (row +0x20). Battle cut-in widget falls back to this when a BattleTalk row has no BattleTalkImageFileName, and lobby/battle setup preloads it. BattleStory preload also collects it from variations.",
+      "technical": "FName (row +0x20). GameWidget_FindCutInTexture resolves the row from the character model name with bLookUpCharacter=false and dynamically loads this name as a texture; main-menu lobby and battle preload collect it. Battle-talk fallback uses BattleTalkImageFileName, not this field.",
       "evidence": [
-        "Source/Abrams/Private/GameBattleTalkWidget.cpp:118",
+        "Source/Abrams/Private/GameBattleCutInImageWidget.cpp:111",
+        "Source/Abrams/Private/GameBattleCutInImageWidget.cpp:118",
         "Source/Abrams/Private/GameBattleCutInImageWidget.cpp:123",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:249",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:257",
         "Source/Abrams/Private/GamePhase_BattlePreload.cpp:394",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:417",
+        "Source/Abrams/Private/GamePhase_MainMenuLobby.cpp:240",
         "Source/Abrams/Private/GamePhase_MainMenuLobby.cpp:243"
       ],
       "status": "verified"
     },
     "CornerCutInImageChanceFileName": {
       "simple": "Sprite sheet for the player-team/chance corner cut-in.",
-      "technical": "FName (row +0x28), dynamically loaded as a UPaperSprite by the battle corner cut-in widget when bPlayerTeam is true; its Slate atlas data drives the cut-in material. Also preloaded by BattleCharacterAssetCollectors::BattleAssets_WidgetSprites_12BD370.",
+      "technical": "FName sprite name (row +0x28), dynamically loaded as a UPaperSprite by the battle corner cut-in widget when bPlayerTeam is true; its Slate atlas data drives the cut-in material. Also preloaded by BattleCharacterAssetCollectors::BattleAssets_WidgetSprites_12BD370.",
       "evidence": [
         "Source/Abrams/Private/GameBattleCornerCutInWidget.cpp:151",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:316"
@@ -62,59 +74,78 @@
       "status": "verified"
     },
     "BattleTalkImageFileName": {
-      "simple": "Portrait texture used for battle-talk/symbol-chat messages.",
-      "technical": "FName (row +0x38). GameBattleTalkWidget prefers the BattleTalk row's own BattleTalkImageFileName and falls back to this field. BattleStory preload collects it, and the preloaded texture is used in talk/cut-in display.",
+      "simple": "Portrait texture used for battle-talk messages.",
+      "technical": "FName (row +0x38). In GameBattleTalkWidget and battle preload, a non-None BattleTalk row’s own BattleTalkImageFileName (+0x24) takes precedence; only when it is None do they look up the variation’s Image row and use this field. If the resolved name is still None, the talk portrait is collapsed.",
       "evidence": [
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:107",
         "Source/Abrams/Private/GameBattleTalkWidget.cpp:110",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:112",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:116",
         "Source/Abrams/Private/GameBattleTalkWidget.cpp:118",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:120",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:663",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:668",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:673",
         "Source/Abrams/Private/GamePhase_BattleStory.cpp:678",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:697",
         "Source/Abrams/Private/GamePhase_BattleStory.cpp:702"
       ],
       "status": "verified"
     },
     "BattleCharacterIconNormalFileName": {
       "simple": "Base name of the normal battle face-icon sprite.",
-      "technical": "FName; AGameWidgetManager::GetCharacterFaceIconSpriteName selects this base for EGameWidgetCharacterFaceIconType::Normal (and the default case) and appends a size suffix such as _Sprite or _VerySmall_Sprite. Missing row or None name produces an empty FName.",
+      "technical": "FName (row +0x40). Default/base for EGameWidgetCharacterFaceIconType::Normal and the builder’s default case. The row-based name builder appends _Sprite, _Small_Sprite, _VerySmall_Sprite, _Tiny_Sprite or _VeryTiny_Sprite according to the resolution-derived size; the character-ID overload returns an empty FName when no row is found. It is also the non-pinch HUD fallback.",
       "evidence": [
-        "Source/Abrams/Private/GameWidgetManager.cpp:1695",
+        "Source/Abrams/Private/GameWidgetManager.cpp:1666",
+        "Source/Abrams/Private/GameWidgetManager.cpp:1668",
         "Source/Abrams/Private/GameWidgetManager.cpp:1671",
-"Source/Abrams/Private/GameWidgetManager.cpp:1671"
+        "Source/Abrams/Private/GameWidgetManager.cpp:1677",
+        "Source/Abrams/Private/GameWidgetManager.cpp:1679",
+        "Source/Abrams/Private/GameWidgetManager.cpp:1686",
+        "Source/Abrams/Private/GameWidgetManager.cpp:1695",
+        "Source/Abrams/Private/GameBattleCharacterDataWidget.cpp:244"
       ],
       "status": "verified"
     },
     "BattleCharacterIconAttackFileName": {
       "simple": "Base name of the attack-state battle face-icon sprite.",
-      "technical": "FName selected for EGameWidgetCharacterFaceIconType::Attack in GetCharacterFaceIconSpriteName; the same size suffix is appended. Some rows reuse the normal sprite name for this state.",
+      "technical": "FName (row +0x48). Selected for EGameWidgetCharacterFaceIconType::Attack; HUD choices include the targeted state and the timed post-target state. The same size suffix is appended. Some rows reuse the normal sprite name for this state.",
       "evidence": [
         "Source/Abrams/Private/GameWidgetManager.cpp:1691",
-        "Source/Abrams/Private/GameWidgetManager.cpp:1671"
+        "Source/Abrams/Private/GameWidgetManager.cpp:1679",
+        "Source/Abrams/Private/GameBattleCharacterDataWidget.cpp:231",
+        "Source/Abrams/Private/GameBattleCharacterDataWidget.cpp:250"
       ],
       "status": "verified"
     },
     "BattleCharacterIconDamageFileName": {
       "simple": "Base name of the damage-state battle face-icon sprite.",
-      "technical": "FName selected for EGameWidgetCharacterFaceIconType::Damage in GetCharacterFaceIconSpriteName and suffixed by icon size.",
+      "technical": "FName (row +0x50). Selected for EGameWidgetCharacterFaceIconType::Damage; the HUD checks the Dead HP-gauge rate type first and uses Damage. The same size suffix is appended.",
       "evidence": [
         "Source/Abrams/Private/GameWidgetManager.cpp:1692",
-        "Source/Abrams/Private/GameWidgetManager.cpp:1671"
+        "Source/Abrams/Private/GameWidgetManager.cpp:1679",
+        "Source/Abrams/Private/GameBattleCharacterDataWidget.cpp:229"
       ],
       "status": "verified"
     },
     "BattleCharacterIconPinchFileName": {
       "simple": "Base name of the pinch/low-HP battle face-icon sprite.",
-      "technical": "FName selected for EGameWidgetCharacterFaceIconType::Pinch in GetCharacterFaceIconSpriteName and suffixed by icon size.",
+      "technical": "FName (row +0x58). Selected for EGameWidgetCharacterFaceIconType::Pinch when the HUD’s non-attack fallback has a Pinch HP-gauge rate type. The same size suffix is appended.",
       "evidence": [
         "Source/Abrams/Private/GameWidgetManager.cpp:1693",
-        "Source/Abrams/Private/GameWidgetManager.cpp:1671"
+        "Source/Abrams/Private/GameWidgetManager.cpp:1679",
+        "Source/Abrams/Private/GameBattleCharacterDataWidget.cpp:244"
       ],
       "status": "verified"
     },
     "BattleCharacterIconCursedEnergyMaxFileName": {
       "simple": "Base name of the max-cursed-energy battle face-icon sprite.",
-      "technical": "FName selected for EGameWidgetCharacterFaceIconType::CursedEnergyMax in GetCharacterFaceIconSpriteName; also the sprite name used by UI effects tied to max cursed energy.",
+      "technical": "FName (row +0x60). Selected for EGameWidgetCharacterFaceIconType::CursedEnergyMax when the HUD’s TrackedBool80 state is true. The same size suffix is appended.",
       "evidence": [
         "Source/Abrams/Private/GameWidgetManager.cpp:1694",
-        "Source/Abrams/Private/GameWidgetManager.cpp:1671"
+        "Source/Abrams/Private/GameWidgetManager.cpp:1679",
+        "Source/Abrams/Private/GameBattleCharacterDataWidget.cpp:238",
+        "Source/Abrams/Private/GameBattleCharacterDataWidget.cpp:240"
       ],
       "status": "verified"
     },
@@ -129,30 +160,36 @@
       "status": "verified"
     },
     "OutGameImageFileName": {
-      "simple": "Portrait/character image used outside battle (menus, customize, VS settings).",
-      "technical": "FName (row +0x70). Dynamically loaded by command-list, VS-enemy interval/settings and other out-game widgets; added to preload lists by battle/interval/free-battle/story setup. Sometimes paired with the previous/next character's image for transitions.",
+      "simple": "Portrait/character image used outside battle (command list, PvE interval, VS settings).",
+      "technical": "FName (row +0x70). Dynamically loaded by command-list, VS-enemy interval/settings and other out-game widgets; collected by battle base, interval PvE, free-battle and main-menu story setup. VS-enemy settings keeps current/previous/next portraits and their matching backgrounds loaded for switches.",
       "evidence": [
         "Source/Abrams/Private/GameCommandListWidget.cpp:409",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:289",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:398",
         "Source/Abrams/Private/GameVsEnemyCharacterSettingsWidget.cpp:298",
-        "Source/Abrams/Private/GameVsEnemyIntervalCharacterWidget.cpp:89"
+        "Source/Abrams/Private/GameVsEnemyIntervalCharacterWidget.cpp:89",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:598"
       ],
       "status": "verified"
     },
     "OutGameBackgroundImageFileName": {
       "simple": "Background art paired with the out-game character image.",
-      "technical": "FName (row +0x78); VS-enemy character settings passes the current/previous/next characters' values together with their OutGameImageFileName values into the character-switch display so background art swaps with the portrait.",
+      "technical": "FName (row +0x78). Paired by row with OutGameImageFileName: GameVsEnemyCharacterSettingsWidget gathers the current/previous/next values of both fields (six names, at most 10 loaders), then displays the current portrait and applies the current background texture to the material. No wider consumer for this field was found in the reconstructed C++.",
       "evidence": [
+        "Source/Abrams/Private/GameVsEnemyCharacterSettingsWidget.cpp:294",
         "Source/Abrams/Private/GameVsEnemyCharacterSettingsWidget.cpp:301",
         "Source/Abrams/Private/GameVsEnemyCharacterSettingsWidget.cpp:302",
-        "Source/Abrams/Private/GameVsEnemyCharacterSettingsWidget.cpp:303"
+        "Source/Abrams/Private/GameVsEnemyCharacterSettingsWidget.cpp:303",
+        "Source/Abrams/Private/GameVsEnemyCharacterSettingsWidget.cpp:331",
+        "Source/Abrams/Private/GameVsEnemyCharacterSettingsWidget.cpp:341",
+        "Source/Abrams/Private/GameVsEnemyCharacterSettingsWidget.cpp:349",
+        "Source/Abrams/Private/GameVsEnemyCharacterSettingsWidget.cpp:359"
       ],
       "status": "verified"
     },
     "OutGameFaceIconFileName": {
       "simple": "Base name of the out-game face icon texture.",
-      "technical": "FName; GameWidget_GetOutGameFaceIconName appends a size suffix ('' / _Small / _VerySmall / _Tiny / _VeryTiny); the Icon enum argument is read in retail but all icon kinds resolve to the same base name. None short-circuits to an empty FName. Dynamically loaded via GameWidget_GetOutGameFaceIconTexture by character ID.",
+      "technical": "FName (row +0x80). GameWidget_GetOutGameFaceIconName returns an empty FName for a null row or None base, otherwise appends the size suffix (Normal='', Small='_Small', VerySmall='_VerySmall', Tiny='_Tiny', VeryTiny='_VeryTiny'). The Icon enum is read but every icon kind uses this same base; GameWidget_GetOutGameFaceIconTexture resolves that name from the widget manager’s dynamic-load texture map by character ID.",
       "evidence": [
         "Source/Abrams/Private/GameWidgetManager.cpp:1744",
         "Source/Abrams/Private/GameWidgetManager.cpp:1767",
@@ -162,11 +199,12 @@
     },
     "CommandListIconFileName": {
       "simple": "Portrait icon used in command lists, arcade root info and result/story lists.",
-      "technical": "FName (row +0x88). Dynamically loaded by command list, arcade mission info, battle situation overview, result player list, story relation/reward widgets; preloaded by battle base, interval arcade and main-menu setups. Typically T_UI_Item_Costume- or T_UI_Character_CommandListIcon-style names.",
+      "technical": "FName (row +0x88). Dynamically loaded by command list, arcade root/mission info, battle situation overview, result player list, and story relation/reward widgets; preloaded by battle base, interval arcade, free battle, and main-menu setups. All 36 non-None exported values use T_UI_Character_CommandListIcon_<id>; 12 rows are None.",
       "evidence": [
         "Source/Abrams/Private/GameCommandListWidget.cpp:405",
         "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:155",
         "Source/Abrams/Private/GameArcadeRootInfoMissionWidget.cpp:96",
+        "Source/Abrams/Private/GameBattleSituationOverviewArcadeMissionWidget.cpp:72",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:288",
         "Source/Abrams/Private/GameResultPlayerListContentWidget.cpp:59"
       ],
@@ -174,10 +212,13 @@
     }
   },
   "notes": [
-    "Export contains 48 rows, keyed by variation ID; CharacterVariation::Id_CharacterImage selects the row, so alternate costumes can point at a shared image row.",
-    "Most fields are plain FName asset keys, not loaded UObject references; resolution goes through WidgetManager texture/sprite loaders or dynamic-load maps, and many rows use None for unused art slots.",
-    "No localization variants exist for this table; the same texture keys are used in all languages. No claim about Blueprint-only consumers or assets absent from the partial Content export.",
-    "Reconstructed source with cited retail RVAs; no claim of byte-identical matching."
+    "Export contains 48 rows keyed by CharacterImage ID, not one per variation: all 437 CharacterVariation rows resolve to these 48 image rows, and many variations share one. CN_040_00, CN_070_00, CN_080_00 and CN_110_00 are image-row IDs but not themselves CharacterVariation row IDs.",
+    "All 17 fields are FName keys in FGameDataTableRow_CharacterImage; the 16 non-key fields occupy row +0x10 through +0x88. There are no numeric units, arrays or booleans in this row struct.",
+    "Most fields are plain FName asset keys, not loaded UObject references; resolution goes through WidgetManager texture/sprite loaders or dynamic-load maps. None is the unused-art sentinel: 18 rows leave the nine select/cut-in/ranking/out-game fields empty, nine also leave BattleTalkImageFileName empty, 12 leave CommandListIconFileName empty, while all 48 populate the five battle-icon bases. In 18 rows all four non-normal battle-icon bases reuse the normal base.",
+    "Lookup precedence differs by consumer: GameCharacter_FindImageRow(flag=true) goes Character.Id -> first Id_CharacterVariation element -> Variation.Id_CharacterImage -> first table hit, flag=false treats the input as a variation ID; BattleTalk and BattleStory use the BattleTalk row image before the Image-row fallback. IntervalArcade inlines the first-variation chain without Num/None guards.",
+    "Battle face-icon state precedence in the HUD is Dead->Damage, targeted->Attack (with a timed post-target Attack), then TrackedBool80->CursedEnergyMax, then Pinch/Normal; size is derived from current screen resolution (width below 1920 selects index 2) minus a caller offset and clamped to [0,4].",
+    "The export set contains no CharacterImageDataTable localization shards; all 48 rows use language-neutral texture keys.",
+    "Verified behavior comes from reconstructed C++ with cited retail RVAs, not byte-identical matching. Retail Blueprint graphs were unavailable, so no Blueprint-only consumer or asset-existence claim is made."
   ],
   "usages": [
     {
@@ -186,19 +227,39 @@
     },
     {
       "source": "Source/Abrams/Private/GameItemOwnership.cpp:641",
-      "detail": "GameCharacter_FindImageRow resolves the row from a character or variation ID."
+      "detail": "GameCharacter_FindImageRow resolves the row through a Character row or a CharacterVariation row."
     },
     {
-      "source": "Source/Abrams/Private/GameWidgetManager.cpp:1666",
-      "detail": "Battle face-icon sprite names are built from the five BattleCharacterIcon* base names plus a size suffix."
+      "source": "Source/Abrams/Private/GameBattleTalkWidget.cpp:107",
+      "detail": "Battle-talk image resolves the Talk row name first, then this table’s BattleTalkImageFileName."
     },
     {
-      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:257",
-      "detail": "Cut-in and corner-cut-in textures are gathered into battle preload lists."
+      "source": "Source/Abrams/Private/GameBattleCutInImageWidget.cpp:111",
+      "detail": "Battle cut-in resolves the row by character model name with bLookUpCharacter=false."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetManager.cpp:1677",
+      "detail": "Battle face-icon sprite names are built from the five BattleCharacterIcon* bases plus a size suffix."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetManager.cpp:1742",
+      "detail": "Out-game face-icon names are built from OutGameFaceIconFileName plus a size suffix; Icon kind does not change the base."
+    },
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:249",
+      "detail": "Cut-in texture names are gathered into battle preload lists."
+    },
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:298",
+      "detail": "All five face-icon bases times five sizes, plus both corner-cut-in sprites, are gathered into the widget-sprite preload list."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:288",
       "detail": "Out-game image and command-list icon are preloaded for battle."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemIconWidget.cpp:189",
+      "detail": "Custom-voice item icons construct a \"<voice character>_00\" image-row ID and look this table up directly for OutGameFaceIconFileName."
     }
   ]
 }

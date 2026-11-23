@@ -1,66 +1,94 @@
 {
-  "description": "Supplies Japanese and English labels to internal debug widgets by row name.",
+  "description": "Supplies Japanese and English labels and explanatory strings for internal debug widgets. Rows are addressed by the FName passed to a debug text block, not by the row's ID column.",
   "fields": {
     "ID": {
-      "simple": "Serialized debug text identifier.",
-      "technical": "The lookup uses the UDataTable row name passed to SetDebugText. The native row also declares an ID property. SetDebugText stores its argument as DebugTextId after a successful lookup, and the available consumer leaves the row's ID member unread.",
+      "simple": "Declared FName identifier on the row; the traced lookups do not read it.",
+      "technical": "BlueprintReadWrite/EditAnywhere FName at retail row offset 0x8. The retail FindRow helper at 0xe79710 hashes the FName argument and compares it with UDataTable row names; 0xe87eb0 and 0xe87df0 use the returned row but never dereference its ID member. The empty constructor assigns no explicit default or sentinel, so only FName's NAME_None default applies.",
       "evidence": [
         "Source/Framework/Public/DataTableRow_DebugText.h:11",
-        "Source/Framework/Private/DebugWidgetTextBlock.cpp:15"
+        "Source/Framework/Private/DebugWidgetTextBlock.cpp:20",
+        "Tools/verify/layout-checks/LayoutCheckReshapePad.cpp:111",
+        "Tools/verify/OWNER/proximity-wave6-N.json:2235"
       ],
       "status": "verified"
     },
     "Ja": {
-      "simple": "Japanese debug label.",
-      "technical": "When SetDebugText finds a row and bEnglish is false, it wraps Ja with FText::FromString and assigns the result to the text block.",
+      "simple": "Japanese label displayed when English mode is off.",
+      "technical": "FString at retail row offset 0x10. Retail 0xe87eb0 finds the row using FDataTableRow_DebugText::StaticStruct, converts row+0x10 with FText::FromString when bEnglish is false, and passes it to UWidgetTextBlock::SetText. The reconstructed DebugWidgetTextBlock.cpp expresses the same branch.",
       "evidence": [
-        "Source/Framework/Private/DebugWidgetTextBlock.cpp:23"
+        "Source/Framework/Public/DataTableRow_DebugText.h:14",
+        "Source/Framework/Private/DebugWidgetTextBlock.cpp:23",
+        "Tools/verify/layout-checks/LayoutCheckReshapePad.cpp:113"
       ],
       "status": "verified"
     },
     "En": {
-      "simple": "English debug label.",
-      "technical": "When SetDebugText finds a row and bEnglish is true, it wraps En with FText::FromString and assigns the result to the text block.",
+      "simple": "English label displayed when English mode is on.",
+      "technical": "FString at retail row offset 0x20. Retail 0xe87eb0 selects row+0x20 when bEnglish is true, converts it with FText::FromString, and passes it to UWidgetTextBlock::SetText; the false branch reads Ja instead. Row names, not this string, are the lookup keys.",
       "evidence": [
-        "Source/Framework/Private/DebugWidgetTextBlock.cpp:23"
+        "Source/Framework/Public/DataTableRow_DebugText.h:17",
+        "Source/Framework/Private/DebugWidgetTextBlock.cpp:23",
+        "Tools/verify/layout-checks/LayoutCheckReshapePad.cpp:120"
       ],
       "status": "verified"
     },
     "JaExplanation": {
-      "simple": "Japanese explanation text declared by the schema.",
-      "technical": "A Blueprint-editable FString. The reconstructed text-block lookup reads Ja or En. No direct consumer for JaExplanation was found in the available native source.",
+      "simple": "Japanese explanation string read by the retail debug explanation text block.",
+      "technical": "FString at retail row offset 0x30. The vtable ownership record attributes 0x1449adcf0 to UDebugWidgetExplanationTextBlock; its slot-103 body at retail 0xe87df0 calls the same FDataTableRow_DebugText FindRow helper and, when bEnglish is false, converts row+0x30 with FText::FromString before setting the text. The reconstruction's UDebugWidgetExplanationTextBlock is currently an empty subclass that inherits the base setter, so this is retail binary evidence rather than transcribed C++ behavior.",
       "evidence": [
         "Source/Framework/Public/DataTableRow_DebugText.h:20",
-        "Source/Framework/Private/DebugWidgetTextBlock.cpp:23"
+        "Tools/verify/layout-checks/LayoutCheckReshapePad.cpp:127",
+        "Tools/verify/OWNER/anon-vtable-owners.json:723",
+        "Tools/verify/OWNER/owner.json:18403"
       ],
-      "status": "unresolved"
+      "status": "verified"
     },
     "EnExplanation": {
-      "simple": "English explanation text declared by the schema.",
-      "technical": "A Blueprint-editable FString. The reconstructed text-block lookup reads En or Ja. No direct consumer for EnExplanation was found in the available native source.",
+      "simple": "English explanation string read by the retail debug explanation text block.",
+      "technical": "FString at retail row offset 0x40. The retail explanation-text-block slot-103 body at 0xe87df0 selects row+0x40 when bEnglish is true and converts it with FText::FromString; the false branch reads JaExplanation. No native code path here applies GameTextManager parameter formatting or glossary substitution to this string.",
       "evidence": [
         "Source/Framework/Public/DataTableRow_DebugText.h:23",
-        "Source/Framework/Private/DebugWidgetTextBlock.cpp:23"
+        "Tools/verify/layout-checks/LayoutCheckReshapePad.cpp:134",
+        "Tools/verify/OWNER/anon-vtable-owners.json:723",
+        "Tools/verify/OWNER/owner.json:18403"
       ],
-      "status": "unresolved"
+      "status": "verified"
     }
   },
   "usages": [
     {
       "source": "Source/Framework/Private/DebugWidgetBase.cpp:25",
-      "detail": "Stores the weak table pointer and distributes a valid pointer to the registered debug text blocks."
+      "detail": "SetDebugTextTable stores a weak UDataTable pointer on the widget and copies it to TextBlockArray entries only when the pointer is valid; the caller must keep the table alive."
     },
     {
       "source": "Source/Framework/Private/DebugWidgetTextBlock.cpp:15",
-      "detail": "Looks up the requested row and selects Ja or En. Falls back to displaying the requested row name when the table or row is unavailable."
+      "detail": "SetDebugText looks up the FName argument in that table. On success it sets Ja/En (or the explanation columns in the retail override) and only then records the key as DebugTextId; an invalid table or missing row silently falls back to FText::FromName(Id)."
+    },
+    {
+      "source": "Source/Framework/Private/DebugWidgetTextBlock.cpp:31",
+      "detail": "SetDebugTextLanguage re-runs the lookup with the stored key unless that key is the SelfSetting sentinel, which preserves designer-set text."
     },
     {
       "source": "Source/Framework/Private/DebugWidgetBase.cpp:77",
-      "detail": "Fans out language changes. Each text block re-runs the lookup for its stored key unless that key is SelfSetting."
+      "detail": "The debug widget forwards each language change to every registered text block, using the bool directly rather than the EDebugWidgetLanguage enum."
+    },
+    {
+      "source": "Source/Framework/Private/WidgetManager.cpp:139",
+      "detail": "Indirect top-level fan-out: the widget manager's language hook calls SetDebugTextLanguage on every UDebugWidgetBase in DebugWidgetArray."
+    },
+    {
+      "source": "Tools/verify/OWNER/owner.json:18403",
+      "detail": "Retail vtable slot 103 of UDebugWidgetExplanationTextBlock (0xe87df0) is a separate lookup that reads JaExplanation/EnExplanation rather than Ja/En; the base text block's slot 103 is 0xe87eb0."
+    },
+    {
+      "source": "Source/Framework/Private/DebugWidgetBase.cpp:157",
+      "detail": "The explanation widget embedded by InitializeWidget has its own text block explicitly switched to SelfSetting, so that particular instance skips debug-table relookups."
     }
   ],
   "notes": [
-    "DebugTextTable is the widget's table property name. The available dataset supplies no matching asset or imported row list.",
-    "The native widget reads this as a UDataTable with FDataTableRow_DebugText."
+    "DebugTextTable is the catalog name and the native widget-side property label, not a shipped DataTable asset: the inspected retail package index has no /Game/.../DebugTextTable package and none of the 321 supplied export JSON files contains this table or its row struct. The 14 language-suffixed GameText tables, SystemTextDataTable, AGameTextManager's TextDataTableLoaders, and its glossary parameter cache are separate systems; GameTextManager.cpp does not load this table. The private AGameTextManager::DebugTextDataTable UPROPERTY is also a distinct member with no traced loader or consumer in the available source.",
+    "Lookup precedence is row-name based: the FName passed to SetDebugText is hashed against UDataTable row names by the specialized FindRow helper (0xe79710), validated against FDataTableRow_DebugText::StaticStruct, and never compared with the row's ID field. A missing/invalid table or missing row displays FText::FromName(requested key); DebugTextId is not overwritten on that failure. There is no special row-value sentinel beyond NAME_None, and the empty row constructor sets no explicit defaults.",
+    "SelfSetting is the key sentinel in the widget member, not in the table: it leaves the existing Slate/designer text untouched on language changes. bDebugTextEnglish defaults to false in the reconstructed debug-widget constructor, but no native reader of that stored flag was found; language selection reaches the text block through the bool argument chain above.",
+    "Retail has two row consumers: the normal debug text block reads offsets 0x10/0x20, while UDebugWidgetExplanationTextBlock's slot-103 override reads 0x30/0x40. The current reconstruction only transcribes the former, so the explanation-column behavior rests on static retail disassembly and the vtable ownership record. Retail Blueprint assets are not available here, so the concrete row keys, which widget assigns the table, and whether any shipped UI instantiates an explanation text block with a real key remain unproven."
   ]
 }

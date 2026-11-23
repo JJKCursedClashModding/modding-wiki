@@ -3,47 +3,98 @@
   "fields": {
     "Id": {
       "simple": "Rule name that selects a payout constant.",
-      "technical": "FName import key/row name for FGameDataTableRow_ArcadeCalculation. Consumers do not read the member as data: they construct names such as MONEY_RESULT_EVALUATE_<rank>, MONEY_MISSION_TASK_CLEAR_BONUS and MONEY_MODE_CLEAR_RESULT_EVALUATE_<points> and look the row up over ArcadeCalculationDataTables (DTM+0x990). Default FName; no table is tested for null before dereferencing the returned row.",
+      "technical": "FName import key/row name for FGameDataTableRow_ArcadeCalculation (export field ID, ImportKeyField Id). Consumers do not read the member as data: BattleArcade_BuildRewards constructs MONEY_RESULT_EVALUATE_<C|B|A|S> from result rank 1..4, the fixed MONEY_MISSION_TASK_CLEAR_BONUS, and MONEY_MODE_CLEAR_RESULT_EVALUATE_<0..15> from accumulated rank points, then looks rows up over ArcadeCalculationDataTables (DTM+0x990). The finder is called with bCheckNone=false and returns the first matching row in table order; null table pointers are filtered when the manager populates that array, but the returned row pointer is not null-checked before Value is read. Default FName is None.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeCalculation.h:11",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeCalculation.h:10",
         "Source/Abrams/Public/GameDataTableManager.h:194",
+        "Source/Abrams/Private/GameDataTableManager.cpp:146",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:118",
         "Source/Abrams/Private/GameBattleStoryStates.cpp:415",
-        "Source/Abrams/Private/GameBattleStoryStates.cpp:448"
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:448",
+        "JJKCCDatatables/datatables/ArcadeCalculationDataTable.json"
       ],
       "status": "observed"
     },
     "Value": {
       "simple": "Money amount awarded by the selected rule.",
-      "technical": "float, constructor default 0.0f. BattleArcade_BuildRewards reads row +0x10 through StoryFindRowOutOfLine and truncates it to int32. It is used only for a win: (1) MONEY_RESULT_EVALUATE_<evaluate> from the battle result key, (2) the fixed MONEY_MISSION_TASK_CLEAR_BONUS when completed-task count >= 1, and (3) MONEY_MODE_CLEAR_RESULT_EVALUATE_<sum> on the final mission, where sum is the mapped results plus the current result minus ContinueCount and negative sums are clamped to 0. The three values are returned as an int32 array for the result window; missing rows are not guarded.",
+      "technical": "float, constructor default 0.0f; all 21 exported values are whole numbers. BattleArcade_BuildRewards reads row +0x10 through StoryFindRowOutOfLine and static_cast<int32> truncates toward zero (no rounding). It fills three int32 slots only when GetWinnerTeam()==0: [0] the rank-money row MONEY_RESULT_EVALUATE_<C|B|A|S> (rank keys 1..4 map to C/B/A/S); [1] a flat MONEY_MISSION_TASK_CLEAR_BONUS when the current snapshot's completed-task count is at least 1, not one bonus per task; [2] on the final mission only, MONEY_MODE_CLEAR_RESULT_EVALUATE_<sum>, where sum is the rank-point contributions of prior BattleResults (rank 1..4 -> 0..3) plus the current result minus ContinueCount. A sum <= 0 selects row _0 (100), 1..15 select the matching rows, and a sum above 15 has no map entry and leaves slot [2] zero. Missing rows are not guarded, and the snapshot's 0xFF/unmapped rank contributes neither a money row nor rank points. The three int32 values are summed into AddUserMoney (final balance clamped to 0..999999999) and displayed in order as Money, TaskBonusMoney and MissionClearBonusMoney.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeCalculation.h:15",
         "Source/AbramsDataTable/Private/GameDataTableRow_ArcadeCalculation.cpp:4",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:418",
         "Source/Abrams/Private/GameBattleStoryStates.cpp:424",
         "Source/Abrams/Private/GameBattleStoryStates.cpp:444",
         "Source/Abrams/Private/GameBattleStoryStates.cpp:455",
         "Source/Abrams/Private/GameBattleStoryStates.cpp:459",
-        "Source/Abrams/Private/GameBattleStoryStates.cpp:478"
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:464",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:475",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:478",
+        "Source/Abrams/Private/GameBattleManager.cpp:1350",
+        "Source/Abrams/Private/GameBattleManager.cpp:1380",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:607",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:494",
+        "Source/Abrams/Private/GameResultRewardWidget.cpp:38",
+        "Source/Abrams/Private/GameManager.cpp:956",
+        "JJKCCDatatables/datatables/ArcadeCalculationDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset has 21 rows and serializes Id/Value; the source row struct is FGameDataTableRow_ArcadeCalculation and the manager loads exactly ArcadeCalculationDataTable into ArcadeCalculationDataTables.",
-    "Retail RVAs are recorded in source comments (finder 0x1625310, reward builder 0x1628460). status/functions.json currently labels 0x1628460 behavioural, so this description documents the reconstructed behaviour rather than asserting byte-identical parity.",
-    "Only the reconstructed C++ consumers and the exported asset available here were inspected; partial Content and uninspected Blueprint/editor uses cannot be ruled out."
+    "The only ArcadeCalculation export in the supplied 321-file datatables set has one asset/variant, 21 unique rows, ImportKeyField Id and RowStruct FGameDataTableRow_ArcadeCalculation in /Script/AbramsDataTable. Every row key equals its serialized ID and every row has only ID (the export spelling of Id) and Value. There are no numbered or localization shards for this table. Exported values are rank C/B/A/S = 500/700/1000/1500, MONEY_MISSION_TASK_CLEAR_BONUS = 500, and MONEY_MODE_CLEAR_RESULT_EVALUATE_0..15 = 100/500/700/1000/1500/2000/2500/3000/4000/5000/6000/7000/8000/9000/10000/15000.",
+    "Row names come from static maps in GameBattleStoryStates.cpp: result rank 1..4 maps to C/B/A/S money rows and to 0/1/2/3 clear points; clear points 0..15 map to the corresponding mode-clear rows. GameResultLabelTables.h also contains a retail-derived 0..15 -> row-name map, but no reconstructed C++ consumer references that symbol; the reward builder uses its own map. The manager loads one ArcadeCalculationDataTable into ArcadeCalculationDataTables (DTM+0x990) after all DataTableLoaders report completion.",
+    "Rewards[0] and Rewards[1] are independent win-only payouts, while Rewards[2] requires the final mission; on a loss all three remain zero. The reward widget hides any zero-valued panel, and the result state sums all three into the player balance before passing them to the result window. ContinueCount increments on retry and reduces the clear-point sum; a nonpositive sum still reads the 100-value row _0 rather than paying zero.",
+    "Source comments cite retail RVAs 0x1625310 (row finder) and 0x1628460 (reward builder). status/functions.json currently labels both behavioural; the T08 record certifies the builder's callees, control flow, constants, side effects and return, but this is not a byte-identical MATCH. This documentation describes reconstructed/behaviour-certified code rather than claiming byte parity.",
+    "Only the available reconstructed C++ and exported asset were reviewed. The Content tree is partial (no ArcadeCalculationDataTable .uasset is present here), and retail Blueprint/editor-only uses were not inspected, so no Blueprint-level behaviour is independently evidenced."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:283",
-      "detail": "Resolves the loaded ArcadeCalculationDataTable asset into the ArcadeCalculationDataTables array."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:456",
+      "detail": "Creates the primary-asset loader named ArcadeCalculationDataTable."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:444",
-      "detail": "BattleArcade_BuildRewards reads three named calculation rows and truncates Value into the Arcade result money array."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:283",
+      "detail": "Resolves the loaded asset into ArcadeCalculationDataTables (DTM+0x990); null tables are filtered by AddLoadedDataTables."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:118",
+      "detail": "StoryFindRowOutOfLine iterates the table array and returns the first row matching the requested FName; its caller does not null-check the result."
     },
     {
       "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:780",
-      "detail": "Explicit out-of-line template instantiation for the ArcadeCalculation row finder."
+      "detail": "Explicit out-of-line template instantiation for the ArcadeCalculation row finder (retail 0x1625310)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:415",
+      "detail": "Static maps translate result rank 1..4 to the C/B/A/S money rows and to 0..3 clear points; points 0..15 map to mode-clear row names."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:446",
+      "detail": "BattleArcade_BuildRewards fills Rewards[0..2] from the three named calculation rows under win/final-mission/task conditions."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1380",
+      "detail": "Computes the 1..4 result rank from the score thresholds that drives both the rank-money and clear-point rows."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:607",
+      "detail": "Increments the completed-task count copied into the current result snapshot; one or more tasks enable the flat task-clear bonus."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleArcade.cpp:284",
+      "detail": "Determines the final mission from the Arcade root, difficulty byte and completed-result index, gating Rewards[2]."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:494",
+      "detail": "OpenResultWindow sums the three rewards, calls AddUserMoney, and passes the array to the result widget."
+    },
+    {
+      "source": "Source/Abrams/Private/GameResultRewardWidget.cpp:38",
+      "detail": "Displays Rewards[0..2] as Money, TaskBonusMoney and MissionClearBonusMoney and collapses zero-valued panels."
+    },
+    {
+      "source": "Source/Abrams/Private/GameManager.cpp:956",
+      "detail": "AddUserMoney applies the final 0..999999999 balance clamp to the combined payout."
     }
   ]
 }

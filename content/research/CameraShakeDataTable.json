@@ -1,94 +1,139 @@
 {
-  "description": "Named rotational camera-shake presets applied by battle damage (duration, blend times, pitch/yaw oscillation).",
+  "description": "Named rotational camera-shake presets used by unguarded player-side battle damage; each row supplies legacy ULegacyCameraShake duration, blend and pitch/yaw oscillator values.",
   "fields": {
     "ID": {
       "simple": "Camera shake preset name, e.g. NormalBlow_N.",
-      "technical": "FName row key. FStudioBattleSystem2E0::PlayCameraShakes iterates the ShakeIds arrays supplied by a Damage row (Id_CameraShake_Attacker / Id_CameraShake_Receiver), skips NAME_None, and finds the first row named Id in CameraShakeDataTables (+0x7B0). 48 exported rows including TEST and NormalStumble_*/NormalBlow_* variants.",
+      "technical": "Exported as ID but declared in C++ as FName Id (the export's ImportKeyField is Id). The runtime playback lookup does not read the struct member: FStudioBattleSystem2E0::PlayCameraShakes takes each FName from a Damage row's Id_CameraShake_Attacker or Id_CameraShake_Receiver array, skips NAME_None (exported as \"None\"), scans DataTables->CameraShakeDataTables (+0x7B0) in order, and accepts the first UDataTable::FindRow<FGameDataTableRow_CameraShake> hit with warnings disabled. A missing ID yields a null row and no shake. The master export has 48 unique named rows; every row key equals its ID, and all 10 by-character CameraShake exports are exact subsets of those rows.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CameraShake.h:11",
+        "Source/Abrams/Public/GameDataTableManager.h:164",
         "Source/Abrams/Private/GameBattleDamage.cpp:218",
-        "Source/Abrams/Private/GameBattleDamage.cpp:232",
-        "Source/Abrams/Private/GameBattleDamage.cpp:614",
-        "Source/AbramsDataTable/Public/GameDataTableRow_Damage.h:231"
+        "Source/Abrams/Private/GameBattleDamage.cpp:225",
+        "Source/Abrams/Private/GameBattleDamage.cpp:228",
+        "Source/Abrams/Private/GameBattleDamage.cpp:233",
+        "Source/Abrams/Private/GameBattleDamage.cpp:235",
+        "Source/Abrams/Private/GameBattleDamage.cpp:242"
       ],
       "status": "verified"
     },
     "OscillationDuration": {
-      "simple": "How long the shake oscillates.",
-      "technical": "Float seconds copied to UGameCameraShake::OscillationDuration in the AddCameraShake initializer lambda (row +0x10 in the struct after Id). Export values include 0.2 s for TEST/NormalStumble/NormalBlow rows.",
+      "simple": "Oscillation lifetime in seconds.",
+      "technical": "float copied verbatim to UGameCameraShake::OscillationDuration by the AddCameraShake initializer. In UE 5.1 ULegacyCameraShake, a positive value is a finite duration, zero disables oscillation, and a negative value is indefinite; all exported values are positive and range from 0.2 s (basic rows) to 2.0 s (CP_140 rows). The reconstructed row constructor defaults it to 0.0; exported rows always supply their own value.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CameraShake.h:15",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CameraShake.cpp:4",
         "Source/Abrams/Private/GameCameraManager.cpp:261",
-        "Source/AbramsDataTable/Private/GameDataTableRow_CameraShake.cpp:4"
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Public/LegacyCameraShake.h:136",
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Private/LegacyCameraShake.cpp:114"
       ],
       "status": "verified"
     },
     "OscillationBlendInTime": {
-      "simple": "Ease-in time of the shake.",
-      "technical": "Float seconds copied to UGameCameraShake::OscillationBlendInTime. Export commonly 0.05 s.",
+      "simple": "Fade-in time at the start of the shake.",
+      "technical": "float seconds copied verbatim to UGameCameraShake::OscillationBlendInTime. UE 5.1 scales the oscillation from 0 to 1 over this interval. The row constructor default is 0.0; exported values range from 0.0 (three CP_040_ATTACKH_02_01_* rows) to 0.2 s (CP_010_ATTACKE_01_01_3), with 0.05 s most common.",
       "evidence": [
-        "Source/Abrams/Private/GameCameraManager.cpp:262"
+        "Source/AbramsDataTable/Public/GameDataTableRow_CameraShake.h:18",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CameraShake.cpp:4",
+        "Source/Abrams/Private/GameCameraManager.cpp:262",
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Public/LegacyCameraShake.h:140",
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Private/LegacyCameraShake.cpp:264"
       ],
       "status": "verified"
     },
     "OscillationBlendOutTime": {
-      "simple": "Ease-out time of the shake.",
-      "technical": "Float seconds copied to UGameCameraShake::OscillationBlendOutTime. Export is 0.05 for TEST and 0.1 for NormalStumble/NormalBlow rows.",
+      "simple": "Fade-out time at the end of the shake.",
+      "technical": "float seconds copied verbatim to UGameCameraShake::OscillationBlendOutTime. UE 5.1 starts fading from 1 to 0 when remaining oscillation time falls below this value, so a blend-out equal to or longer than the duration fades from the start. The row constructor default is 0.0; exported values range from 0.05 s to 2.0 s, with 0.05 s for TEST/MultiHit/shot rows and longer tails for cursed and CP_140 rows.",
       "evidence": [
-        "Source/Abrams/Private/GameCameraManager.cpp:263"
+        "Source/AbramsDataTable/Public/GameDataTableRow_CameraShake.h:21",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CameraShake.cpp:4",
+        "Source/Abrams/Private/GameCameraManager.cpp:263",
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Public/LegacyCameraShake.h:144",
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Private/LegacyCameraShake.cpp:230"
       ],
       "status": "verified"
     },
     "RotOscillation_Pitch_Amplitude": {
-      "simple": "Pitch shake amplitude.",
-      "technical": "Float written verbatim to GameShake->RotOscillation.Pitch.Amplitude (row +0x24). Directional variants zero this field to make a yaw-only shake (e.g. NormalStumble_H); constructor default 0.0.",
+      "simple": "Pitch shake amplitude in degrees.",
+      "technical": "float copied verbatim to GameShake->RotOscillation.Pitch.Amplitude. The engine adds the oscillator result to a FRotator pitch, so this is a degree offset; 0 disables visible pitch oscillation. Exported values range from 0.0 to 10.0. The V-suffixed NormalStumble/NormalBlow rows and CP_070_ATTACKG_01_01_* rows use 0 with nonzero yaw amplitude; the row constructor default is also 0.0.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CameraShake.h:24",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CameraShake.cpp:4",
         "Source/Abrams/Private/GameCameraManager.cpp:264",
-        "Source/AbramsDataTable/Private/GameDataTableRow_CameraShake.cpp:4"
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Public/LegacyCameraShake.h:93",
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Private/LegacyCameraShake.cpp:285"
       ],
       "status": "verified"
     },
     "RotOscillation_Pitch_Frequency": {
-      "simple": "Pitch shake frequency.",
-      "technical": "Float written verbatim to GameShake->RotOscillation.Pitch.Frequency; values in the export are commonly 60 (engine FOscillator frequency units).",
+      "simple": "Pitch oscillator phase rate.",
+      "technical": "float copied verbatim to GameShake->RotOscillation.Pitch.Frequency. In the checked UE 5.1 FFOscillator implementation, phase advances by DeltaSeconds * Frequency before Sin, so the stored value is angular radians/second, not degrees or hertz (60-100 is about 9.5-15.9 cycles/s). Exported values range from 50.0 to 100.0; a row with zero pitch amplitude shows no pitch effect regardless of this value. The row constructor default is 0.0.",
       "evidence": [
-        "Source/Abrams/Private/GameCameraManager.cpp:265"
+        "Source/AbramsDataTable/Public/GameDataTableRow_CameraShake.h:27",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CameraShake.cpp:4",
+        "Source/Abrams/Private/GameCameraManager.cpp:265",
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Public/LegacyCameraShake.h:55",
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Private/LegacyCameraShake.cpp:31"
       ],
       "status": "verified"
     },
     "RotOscillation_Yaw_Amplitude": {
-      "simple": "Yaw shake amplitude.",
-      "technical": "Float written verbatim to GameShake->RotOscillation.Yaw.Amplitude. Directional variants zero it for pitch-only shakes (e.g. NormalStumble_V); constructor default 0.0.",
+      "simple": "Yaw shake amplitude in degrees.",
+      "technical": "float copied verbatim to GameShake->RotOscillation.Yaw.Amplitude. The engine adds the oscillator result to a FRotator yaw, so this is a degree offset; 0 disables visible yaw oscillation. Exported values range from 0.0 to 10.0. The H-suffixed NormalStumble/NormalBlow rows use 0 with nonzero pitch amplitude, while the row constructor default is also 0.0.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CameraShake.h:30",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CameraShake.cpp:4",
         "Source/Abrams/Private/GameCameraManager.cpp:266",
-        "Source/AbramsDataTable/Private/GameDataTableRow_CameraShake.cpp:4"
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Public/LegacyCameraShake.h:97",
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Private/LegacyCameraShake.cpp:286"
       ],
       "status": "verified"
     },
     "RotOscillation_Yaw_Frequency": {
-      "simple": "Yaw shake frequency.",
-      "technical": "Float written verbatim to GameShake->RotOscillation.Yaw.Frequency (commonly 60 in the export).",
+      "simple": "Yaw oscillator phase rate.",
+      "technical": "float copied verbatim to GameShake->RotOscillation.Yaw.Frequency. As with pitch, UE 5.1 advances phase by DeltaSeconds * Frequency before Sin, so this is angular radians/second, not hertz. Exported values range from 40.0 to 100.0; a row with zero yaw amplitude shows no yaw effect regardless of this value, and the row constructor default is 0.0.",
       "evidence": [
-        "Source/Abrams/Private/GameCameraManager.cpp:267"
+        "Source/AbramsDataTable/Public/GameDataTableRow_CameraShake.h:33",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CameraShake.cpp:4",
+        "Source/Abrams/Private/GameCameraManager.cpp:267",
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Public/LegacyCameraShake.h:55",
+        "UE 5.1 Engine/Plugins/Cameras/GameplayCameras/Private/LegacyCameraShake.cpp:31"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "AGameCameraManager::PlayCameraShake (retail 0x105d9a0) requires a non-null row, a cached camera-shake modifier, Scale > 0 and bCameraShakeEnabled; battle calls pass Scale 1.0. The array index of the ShakeIds entry selects between UGameCameraShake_01 and UGameCameraShake_02 classes, so only two simultaneous shakes can be started from one Damage row.",
-    "The row fields are applied in an initializer delegate on the newly created shake; no roll oscillation, location oscillation or per-shake asset reference exists in this row struct or the 48 exported rows.",
-    "CameraShakeDataTables is manager slot +0x7B0; registered at GameDataTableManager.cpp:426 and resolved at line 253. Only the damage system was found to look rows up in this table in the available source."
+    "Loading and lookup: AGameDataTableManager registers the single primary-asset loader name CameraShakeDataTable (GameDataTableManager.cpp:426) and resolves that loader into CameraShakeDataTables at +0x7B0 (GameDataTableManager.cpp:253; declaration at GameDataTableManager.h:164). PlayCameraShakes scans that array in order and the first table containing the row wins; FindRow is called with bWarnIfRowMissing=false (GameBattleDamage.cpp:233-240).",
+    "Damage-side conditions: In ApplyCharacterDamage the guarded branch returns without any shake (GameBattleDamage.cpp:502-607). Only the unguarded branch plays shakes: if the attacker is a player it uses Id_CameraShake_Attacker and also starts the hit marker/force feedback; otherwise, in an else-if, if the receiver is a player it uses Id_CameraShake_Receiver (GameBattleDamage.cpp:609-622). The attacker test therefore has precedence. ApplyShikigamiDamage uses Id_CameraShake_Attacker only, and only when the attacker is a player (GameBattleDamage.cpp:870-873).",
+    "Index and sentinel behavior: Every exported Damage shake-ID array has exactly two FName slots, and the exported sentinel for NAME_None is the string \"None\", which PlayCameraShakes skips. Index 0 selects UGameCameraShake_01 and index 1 selects UGameCameraShake_02; only CP_081 damage rows populate slot 1, with CP_081_ATTACK_01. PlayCameraShake indexes a two-element raw C++ array without a bounds check, so a longer or differently indexed Damage array would be invalid even though no export does that. Scale is hard-coded to 1.0 at every call site.",
+    "Playback gates and lifecycle: AGameCameraManager::PlayCameraShake returns null when the row is null, the inherited cached UCameraModifier_CameraShake is null, Scale <= 0, or ACameraManager::bCameraShakeEnabled is false (GameCameraManager.cpp:251-254). That flag defaults to true (Framework/Public/CameraManager.h:20 and GameSettings.h:23) and is written by AGameManager::SetCameraShakeEnabled (GameManagerGraphics.cpp:218-221). Battle finish/KO/time-up paths can later call StopAllCameraShakes(true) (GameBattleState_05.cpp:203; GameBattleState_10.cpp:502, 595, 614, 640).",
+    "Row scope: The row struct has only FName Id plus the seven float fields checked here. The initializer writes only duration, blend times and pitch/yaw oscillator amplitude/frequency; it writes no roll, location or FOV oscillator and no camera-anim/asset reference. The selected UGameCameraShake, UGameCameraShake_01 and UGameCameraShake_02 subclasses add no members in the reconstruction (GameCameraShake*.h). All seven float fields default to 0.0 in the reconstructed row constructor (0x32d47f0), although ULegacyCameraShake's own CDO has nonzero blend defaults that are overwritten here.",
+    "Export coverage: The master datatables/CameraShakeDataTable.json has 48 unique rows; 10 datatables_by_character/*/CameraShakeDataTable.json shards contain exact subsets with no changed values. Across all 60 exported Damage files, every referenced shake ID exists in the master export; 37 camera-shake IDs are referenced by a Damage shake-ID array and 11 IDs are not referenced by any such array (mostly character-specific rows; CursedBlow_H is one exception). TEST is referenced by CN_041 damage rows, so it is not merely an unused test row.",
+    "Evidence strength: The runtime description above is reconstructed C++ backed by static retail RVAs, not retail Blueprint graphs. status/functions.json records 0x105d9a0 (PlayCameraShake) as byte-matched and 0x32d47f0 (row constructor) as an ICF-matched leaf, while 0x102b3a0 (PlayCameraShakes) is BEHAV-certified but not byte-matched (Tools/verify/BEHAV/records/RD05.json). No Blueprint-derived behavior is claimed. A separate GameDebugManager::CameraShakeDisabled flag exists and defaults false, but no reader for it was found in the available source, so it is not treated as a traced playback gate."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:253",
-      "detail": "Resolves 'CameraShakeDataTable' into CameraShakeDataTables (+0x7B0)."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:426",
+      "detail": "Registers CameraShakeDataTable as a primary asset to load; line 253 resolves it into CameraShakeDataTables at +0x7B0."
     },
     {
       "source": "Source/Abrams/Private/GameBattleDamage.cpp:218",
-      "detail": "PlayCameraShakes resolves each Damage-row shake ID to a row over +0x7B0 and calls the camera manager with the row, ShakeIds index and scale 1.0 (retail 0x102b3a0)."
+      "detail": "PlayCameraShakes resolves non-None Damage IDs to rows over +0x7B0, first match wins, then calls the player camera manager with the array index and scale 1.0."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:612",
+      "detail": "Unguarded character damage selects the attacker array when the attacker is a player, otherwise the receiver array when the receiver is a player; guarded hits return earlier."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:870",
+      "detail": "Shikigami damage plays only the attacker shake array and only for a player attacker."
     },
     {
       "source": "Source/Abrams/Private/GameCameraManager.cpp:249",
-      "detail": "PlayCameraShake transfers all seven numeric fields to the spawned UGameCameraShake and adds it through the cached modifier."
+      "detail": "PlayCameraShake gates on row/modifier/scale/bCameraShakeEnabled, copies all seven numeric fields in an initializer, and selects _01 for index 0 or _02 for index 1."
+    },
+    {
+      "source": "Source/Abrams/Private/GameManagerGraphics.cpp:218",
+      "detail": "The saved game setting can disable camera shake by writing AGameCameraManager::bCameraShakeEnabled; the default is true."
     }
   ]
 }

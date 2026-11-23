@@ -1,47 +1,56 @@
 {
-  "description": "Domain-expansion tuning row of movement, damage and down-time multipliers; only its serialized schema and loading path are identifiable in the available source.",
+  "description": "Serialized domain-expansion rate profile with movement and damage multipliers plus additive down-time adjustments; only its schema, data and loading path are identifiable in the available source.",
   "fields": {
     "Id": {
       "simple": "Row key (e.g. CP_140, CP_140_ALLY, CP_140_ENEMY).",
-      "technical": "FName row key; export label ID. DomainExpansionDataTable stores Id_DomainExpansionRate/_Ally/_Enemy references, but no consumer of those names or of this table array was found outside loading.",
+      "technical": "FName row key; the export writes it as `ID` and declares `Id` as ImportKeyField. Its C++ constructor does not initialize it, so the default is NAME_None. DomainExpansionDataTable declares Id_DomainExpansionRate/_Ally/_Enemy FName fields, but all seven exported domain rows set them to None and no consumer resolves those fields against this table; no reader of this row array was found outside loading.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansionRate.h:10",
         "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansionRate.h:80",
         "Source/Abrams/Private/GameDataTableManager.cpp:256",
-        "Source/Abrams/Private/GameDataTableManager.cpp:429"
+        "Source/Abrams/Private/GameDataTableManager.cpp:429",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:56"
       ],
       "status": "observed"
     },
     "Run_Speed_End_Rate": {
       "simple": "Named multiplier for final run speed.",
-      "technical": "float; default 0.0 in C++ (exported 0.9-1.1). No direct consumer found, so whether it is a multiplier, additive rate, or which movement system applies it is unverified.",
+      "technical": "float; default 0.0 in C++ (exported 0.9-1.1). Its name mirrors ActionMoveDataTable.Run_Speed_End, which movement scales by AGameCharacter::GetRunSpeedRate() (a constant 1.0 in reconstructed retail code), but no code reads this rate field. Multiplier semantics and the movement system, if any, remain unverified.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansionRate.h:14",
         "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansionRate.h:80",
         "Source/Abrams/Private/GameDataTableManager.cpp:256",
-        "Source/Abrams/Private/GameDataTableManager.cpp:429"
+        "Source/Abrams/Private/GameDataTableManager.cpp:429",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ActionMove.h:38",
+        "Source/Abrams/Private/GameCharacterMovementController.cpp:341",
+        "Source/Abrams/Public/GameCharacterStatusController.h:609"
       ],
       "status": "observed"
     },
     "Dash_Cancel_Time_Rate": {
       "simple": "Named multiplier for dash cancel timing.",
-      "technical": "float; default 0.0 (exported 0.8-1.0). No C++ reader found; units and application point are unverified.",
+      "technical": "float; default 0.0 (exported 0.8-1.0). No reader of this field was found. The traced dash-cancel paths instead multiply ActionDashDataTable cancel times by AGameCharacter::GetRunSpeedRate(), which reconstructed retail code folds to 1.0; the application point and units of this rate remain unverified.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansionRate.h:17",
         "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansionRate.h:80",
         "Source/Abrams/Private/GameDataTableManager.cpp:256",
-        "Source/Abrams/Private/GameDataTableManager.cpp:429"
+        "Source/Abrams/Private/GameDataTableManager.cpp:429",
+        "Source/Abrams/Private/GameCharacterAction_Dash.cpp:382",
+        "Source/Abrams/Private/GameCharacterAction_Dash.cpp:743",
+        "Source/Abrams/Public/GameCharacterStatusController.h:609"
       ],
       "status": "observed"
     },
     "Dash_GaugeConsumeBegin_Rate": {
       "simple": "Named multiplier for the up-front dash gauge cost.",
-      "technical": "float; default 0.0 (exported 0.8-1.1). No C++ reader found; relationship to ActionDash.GaugeConsumeBegin is unverified.",
+      "technical": "float; default 0.0 (exported 0.8-1.1). No C++ reader found; its name mirrors the ActionDashDataTable.Dash_GaugeConsumeBegin base cost, but a relationship to that field is unverified.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansionRate.h:20",
         "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansionRate.h:80",
         "Source/Abrams/Private/GameDataTableManager.cpp:256",
-        "Source/Abrams/Private/GameDataTableManager.cpp:429"
+        "Source/Abrams/Private/GameDataTableManager.cpp:429",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ActionDash.h:28",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2628"
       ],
       "status": "observed"
     },
@@ -200,8 +209,8 @@
       "status": "observed"
     },
     "Damage_Rate": {
-      "simple": "Named multiplier for damage dealt/received in a domain.",
-      "technical": "float; default 0.0 (exported 0.9-1.1). No reader of this DomainExpansionRate field was found. The identically named hits in GamePvESettings.cpp are FGameDataTableRow_MissionCharacter, not this struct.",
+      "simple": "Named damage-rate adjustment.",
+      "technical": "float; default 0.0 (exported 0.9-1.1). No reader of this DomainExpansionRate field was found, and the direction (dealt versus received) is unverified. The identically named hits in GamePvESettings.cpp are FGameDataTableRow_MissionCharacter, not this struct.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansionRate.h:65",
         "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansionRate.h:80",
@@ -256,11 +265,13 @@
     }
   },
   "notes": [
-    "AGameDataTableManager::Tick resolves only DomainExpansionRateDataTable into DomainExpansionRateDataTables (Source/Abrams/Private/GameDataTableManager.cpp:256), and StartInitialLoading requests that asset by name (line 429).",
-    "No substantive C++ consumer of this row struct or any of its rate fields was found in Source/, Plugins/ or Config/. DomainExpansionDataTable has Id_DomainExpansionRate/_Ally/_Enemy references, but no source code resolves those IDs against this table, so their use is not proven here.",
-    "The GamePvESettings.cpp:250/253/254 matches for Damage_Rate, Down_Damage_Rate and GuardDurability_Damage_Rate are MissionCharacter row fields (GameMissionCharacter_CopyOverrideRates), not DomainExpansionRate fields; they are deliberately not cited.",
-    "All fields are therefore marked observed: their names, types, defaults and exported value ranges are known, but runtime application is unverified. Three exported rows (CP_140 and ally/enemy variants) share the schema; no localization variants were identified.",
-    "Partial Content means Blueprint/uncooked consumers cannot be excluded."
+    "AGameDataTableManager::StartInitialLoading registers `DomainExpansionRateDataTable` as a `DataTable` primary asset (Source/Abrams/Private/GameDataTableManager.cpp:429, 488); once all loaders complete, Tick resolves it and appends the non-null UDataTable to DomainExpansionRateDataTables (lines 162-164, 172, 256). Config/DefaultGame.ini:24 scans primary assets of that type under /Game/DataTables.",
+    "No substantive C++ consumer of this row struct or any of its rate fields was found in Source/, Plugins/ or Config/. DomainExpansionDataTable declares Id_DomainExpansionRate/_Ally/_Enemy, but all seven exported domain rows set them to None and no source code resolves those IDs against this table, so no runtime join is proven.",
+    "The GamePvESettings.cpp:250/253/254 matches for Damage_Rate, Down_Damage_Rate and GuardDurability_Damage_Rate are MissionCharacter row fields (GameMissionCharacter_CopyOverrideRates), not DomainExpansionRate fields; they are deliberately not cited as consumers.",
+    "All fields are therefore marked observed: their names, types, C++ defaults and exported values are known, but runtime application is unverified. The 0.0f C++ defaults are not neutral multiplier values; every exported field is explicitly populated, and no sentinel value or alternate unit is documented in the header or export.",
+    "The sole export contains one asset and three rows: CP_140 (speed 1.1, air/homing gauge cost 0.6, damage 0.9, down-time adds 1.0), CP_140_ALLY (neutral multipliers 1.0 and down-time adds 0.0), and CP_140_ENEMY (speed 0.9, air/homing gauge cost 1.2, mostly damage 1.1). The names suggest side-specific profiles, but the exported DomainExpansion rows never reference them; no localization variants or numbered shards were identified.",
+    "The S/M/E names mirror ActionDashDataTable ground, air and homing-air speed fields (for example NormalDash_Speed_S/M/E); C++ interpolates S to M to E in those base actions, but no code multiplies those base speeds by these rate values. Likewise, the gauge fields mirror the corresponding ActionDash *GaugeConsumeBegin / *GaugeConsume fields without a demonstrated link.",
+    "Project guidance says retail Blueprints contain no logic, but the available Content snapshot is partial and string searches found no table or row-key references in it, so uncooked or Blueprint consumers cannot be independently excluded."
   ],
   "usages": [
     {
@@ -278,6 +289,14 @@
     {
       "source": "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:55",
       "detail": "Domain rows expose Id_DomainExpansionRate/_Ally/_Enemy references, but no resolver for these IDs was identified."
+    },
+    {
+      "source": "Source/Abrams/Public/GameDataTableManager.h:167",
+      "detail": "Caches the resolved table in DomainExpansionRateDataTables at manager offset +0x7E0; no source code reads that array after loading."
+    },
+    {
+      "source": "Config/DefaultGame.ini:24",
+      "detail": "Scans /Game/DataTables as DataTable primary assets, allowing the name-based loader to resolve the sole /Game/DataTables/DomainExpansionRateDataTable asset."
     }
   ]
 }

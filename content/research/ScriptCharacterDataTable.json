@@ -1,42 +1,79 @@
 {
-  "description": "Maps a story-script character id to its selectable costume/portrait rows in ScriptCharacterClothesDataTable.",
+  "description": "Maps story-demo character ids to ordered costume-row ids used to resolve the portrait and facial textures drawn by story-demo sequencer character images.",
   "fields": {
     "ID": {
-      "simple": "Story-script character id (e.g. CP_010).",
-      "technical": "FName row key used as the lookup argument in UGameStoryDemoImage's clothes helper (ScriptCharacterDataTables, retail DTM +0xA60). Exported ids are character codes such as CP_010 / CN_122.",
+      "simple": "Story-demo character id (e.g. CP_010).",
+      "technical": "Native FName Id; the supplied export spells the key `ID` and declares ImportKeyField as `Id`. All 14 exported row keys are unique and equal their ID values (CP_010 through CP_150, plus CN_122). GameStoryDemoImage_FindClothesRow passes the caller's CharacterId to FindRow on ScriptCharacterDataTables (DTM +0xA60), scanning table order and stopping at the first match with the missing-row warning disabled; the row's own `Id` member is not read. SetCharacter rejects NAME_None before this lookup. The id is authored on UAbramsSequencerStoryDemoCharacterParameterSection::CharacterId, whose C++ default is NAME_None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ScriptCharacter.h:11",
+        "Source/Abrams/Public/GameDataTableManager.h:207",
+        "Source/Abrams/Private/GameDataTableManager.cpp:296",
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:478",
         "Source/Abrams/Private/GameStoryDemoImage.cpp:481",
-        "Source/Abrams/Private/GameStoryDemoImage.cpp:483"
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:483",
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:509",
+        "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoCharacterParameterEvaluate.cpp:128",
+        "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoCharacterParameterSection.cpp:15"
       ],
       "status": "verified"
     },
     "Id_ScriptCharacterClothes": {
-      "simple": "Costume rows available for this character.",
-      "technical": "TArray<FName>; indexed by the sequencer section's ClothesIndex. IsValidIndex guards the access; a None entry still reaches the clothes-row lookup, which returns null for that slot. Exported rows have four fixed slots.",
+      "simple": "Ordered costume row ids for the character.",
+      "technical": "TArray<FName>. The sequencer section's zero-based int32 ClothesIndex (C++ default 0) is checked with IsValidIndex before `Character->Id_ScriptCharacterClothes[ClothesIndex]` is taken; an out-of-range index returns no clothes row. The chosen id is looked up across ScriptCharacterClothesDataTables (DTM +0xA70), with the first matching table winning. NAME_None is passed through and finds no row in the supplied export; a missing row leaves the clothes texture null. The separate uint8 Facial argument indexes the resolved clothes row's FacialFileName array, not this array. Every supplied row has exactly four slots: 27 non-None ids, all of which resolve to ScriptCharacterClothesDataTable rows, and 29 None slots.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ScriptCharacter.h:15",
+        "Source/Abrams/Private/GameDataTableManager.cpp:297",
         "Source/Abrams/Private/GameStoryDemoImage.cpp:489",
         "Source/Abrams/Private/GameStoryDemoImage.cpp:494",
-        "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoCharacterParameterEvaluate.cpp:128"
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:497",
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:547",
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:548",
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:550",
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:551",
+        "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoCharacterParameterSection.cpp:16"
       ],
       "status": "verified"
     }
   },
   "notes": [
     "Row constructor is empty; no default costume ids are injected in C++ (Source/AbramsDataTable/Private/GameDataTableRow_ScriptCharacter.cpp:3).",
-    "The only identified consumer is the story-demo portrait path; no direct Blueprint calls are claimed (Blueprints are not a source of behaviour in this project), and the available Content is partial.",
-    "Single exported table, no numbered shards or localization variants.",
-    "Evidence is from the reconstructed C++ in Source/ (row shape/counts from the exported table); status/ records byte matches for some owner TUs, but this file does not claim a retail byte comparison for every function or exhaustive Blueprint/runtime coverage."
+    "The manager registers one DataTable primary-asset loader named ScriptCharacterDataTable (Source/Abrams/Private/GameDataTableManager.cpp:469), resolves it after all loads complete, and appends it to the single-element ScriptCharacterDataTables array while skipping null tables (GameDataTableManager.cpp:146-158, 296). The clothes helper is the only source consumer of that cache; SetCharacter calls it twice, once for the clothes texture and once for the facial texture. First matching table wins if additional tables are ever present; the supplied export has one table and no duplicate row keys.",
+    "The only identified consumer is the story-demo portrait path. No direct Blueprint call is claimed, and the shipped Blueprint/UMG animation asset values that author CharacterId and ClothesIndex were not supplied; the available Content is partial.",
+    "The supplied datatables directory contains one ScriptCharacterDataTable asset with 14 rows and no numbered shards or localization variants. All 27 non-None costume ids resolve uniquely in the supplied ScriptCharacterClothesDataTable; the 29 None entries are explicit data sentinels rather than constructor defaults.",
+    "Runtime behavior is described from reconstructed C++ and exported data. The helper (retail 0x166e880) and SetCharacter (0x1685ad0) are BEHAV-certified but not byte-matched; the sequencer evaluate (0x179c360) is byte-matched. No retail Blueprint asset, retail runtime, or editor inspection was performed, so this is not an exhaustive claim about retail or Blueprint use."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameStoryDemoImage.cpp:478",
-      "detail": "Resolves CharacterId in DTM +0xA60, then uses the indexed costume id for DTM +0xA70."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:469",
+      "detail": "Registers ScriptCharacterDataTable as a DataTable primary asset."
     },
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:296",
-      "detail": "Loads ScriptCharacterDataTable into ScriptCharacterDataTables."
+      "detail": "Resolves the loaded asset and appends it to ScriptCharacterDataTables (DTM +0xA60)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryDemoImage.cpp:481",
+      "detail": "Scans the ScriptCharacterDataTables cache in order and stops at the first row found for CharacterId."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryDemoImage.cpp:489",
+      "detail": "Rejects a missing character row or an out-of-range ClothesIndex before indexing this field."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryDemoImage.cpp:494",
+      "detail": "Indexes this field and looks up the resulting FName across ScriptCharacterClothesDataTables (DTM +0xA70), returning the first match."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryDemoImage.cpp:547",
+      "detail": "SetCharacter uses the resolved clothes row's ClothesFileName; a null or None result clears the clothes texture."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryDemoImage.cpp:550",
+      "detail": "Repeats the same lookup for FacialFileName[Facial], where Facial is a separate uint8 sequencer channel value."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoCharacterParameterEvaluate.cpp:128",
+      "detail": "Supplies CharacterId, ClothesIndex and Facial from the evaluated UMG sequencer section to SetCharacter; the widget slot comes from sorted section CharacterIndex values."
     }
   ]
 }

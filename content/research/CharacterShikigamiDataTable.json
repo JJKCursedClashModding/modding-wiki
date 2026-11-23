@@ -1,53 +1,71 @@
 {
-  "description": "Per-character shikigami sets: ordered lists of ShikigamiDataTable character IDs that a character can summon or pose in battles, cutscenes and UI captures.",
+  "description": "Per-character shikigami spawn sets: CharacterDataTable.Id_CharacterShikigami selects one or more rows here, and each row's ordered Id_Shikigami list selects ShikigamiDataTable rows for battle/level-sequence preload and spawning. The row struct contains only the row key and the ID list; no timings, stats, or capture-only data live here.",
   "fields": {
     "ID": {
-      "simple": "Row key referenced by Character::Id_CharacterShikigami entries.",
-      "technical": "FName primary key (ImportKeyField=Id in the export). Battle asset collection and battle/level-sequence setup iterate the character's Id_CharacterShikigami set IDs, skip None and resolve each via CharacterShikigamiDataTables (DTM +0x4F0).",
+      "simple": "Row key (CP_xxx or CN_xxx) used by CharacterDataTable.Id_CharacterShikigami to select a shikigami set.",
+      "technical": "Native FName Id (the export writes the property as ID; ImportKeyField is Id). All ten exported row keys equal their ID value. Runtime consumers do not read the struct member: they pass the key from Character.Id_CharacterShikigami to FindRow<T> over AGameDataTableManager::CharacterShikigamiDataTables (DTM +0x4F0), which walks the table array in registration order and returns the first matching row. The manager registers one CharacterShikigamiDataTable primary asset (GameDataTableManager.cpp:357; loader map built at line 488), resolves it into +0x4F0 in Tick (line 209), and the canonical export plus asset registry contain one table, with no numbered or localized shards. Every Character row with a non-None set reference resolves.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterShikigami.h:11",
+        "Source/Abrams/Public/GameDataTableManager.h:120",
+        "Source/Abrams/Private/GameDataTableManager.cpp:209",
+        "Source/Abrams/Private/GameDataTableManager.cpp:357",
+        "Source/Abrams/Private/GameDataTableManager.cpp:488",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:192",
-        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:198",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:904"
       ],
       "status": "verified"
     },
     "Id_Shikigami": {
-      "simple": "Ordered list of shikigami character IDs belonging to this set.",
-      "technical": "TArray<FName>, up to nine slots in the export. The asset collector walks the list, skips None, resolves each Shikigami row (DTM +0x6C0), appends its FileName_BP and expands its Id_ShikigamiAnimation rows' FileName arrays into preload lists. BattleBase spawns each listed shikigami from its loaded FileName_BP class and installs its montages; LevelSequencer resolves the same rows for sequence setup. Duplicate IDs in a set are preserved (e.g. CP_120 repeats CN_050), so slots are meaningful and not deduplicated here.",
+      "simple": "Ordered list of ShikigamiDataTable row IDs spawned for the character.",
+      "technical": "TArray<FName>; all ten exported rows have nine entries, with NAME_None right-padding where fewer than nine shikigami are used. The shared collector (retail 0x12bd9b0) and level-sequence spawn loop skip None and resolve each remaining ID in ShikigamiDataTables (+0x6C0); BattleBase passes IDs straight to FindRow, which also rejects a None key. BattleBase loads ShikigamiRow.FileName_BP from StudioShikigamiLoaders_950, spawns one AGameShikigami per entry (GameCharacter.cpp:1829) and installs its ShikigamiAnimation.Key/FileName montages; the level-sequencer path spawns through the same loader map but does not install those shikigami montages. Preload adds FileName_BP and ShikigamiAnimation.FileName names to loader maps; GamePrimaryAssetLoader_CreateLoaders drops None and duplicate names, but the array iteration itself is not deduplicated, so duplicate IDs (CN_050 x3 in CP_120, CN_110 x6 in CP_130, CN_220 x9 in CP_240, etc.) produce repeated collector entries and repeated spawns. All 20 distinct non-None IDs resolve in the 20-row ShikigamiDataTable export. The array is iterated in order, but no consumer interprets a slot index or applies index-parallel data.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterShikigami.h:15",
-        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:199",
-        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:206",
-        "Source/Abrams/Private/GamePhase_BattleBase.cpp:910",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:203",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:209",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:214",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:915",
-        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:756"
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:923",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:931",
+        "Source/Abrams/Private/GameCharacter.cpp:1829",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:758",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:766",
+        "Source/Abrams/Private/GameDataTableManager.cpp:87"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Export contains 10 rows, uniformly with nine Id_Shikigami slots; unused slots are None.",
-    "This table stores only the shikigami ID list; actual Blueprint names, animation IDs and stats live in ShikigamiDataTable and related tables.",
-    "The same set is also consulted independently by capture code only when a CharacterCapture row has a non-None Id_ShikigamiCharacter; capture does not read this table directly.",
-    "Single table asset 'CharacterShikigamiDataTable' loaded into DTM +0x4F0; no numbered shards or localization variants in the export.",
-    "Reconstructed source with cited retail RVAs; no claim about Blueprint-only uses or byte-identical matching."
+    "Canonical export shape: one DataTable named CharacterShikigamiDataTable, RowStruct GameDataTableRow_CharacterShikigami, ImportKeyField Id, ten rows (CP_030, CP_110, CP_120, CP_130, CP_160, CP_121, CP_240, CP_260, CN_230, CN_122), each with nine Id_Shikigami entries. The ten datatables_by_character/<id>/CharacterShikigamiDataTable.json files are one-row subsets whose row values are identical to the canonical rows, not separate retail shards; no numbered or localized variants were found.",
+    "Relationship check: the ten Character rows with non-None Id_CharacterShikigami reference exactly these ten set IDs, and the 20 distinct non-None shikigami IDs used by the sets are exactly the 20 ShikigamiDataTable row keys. Every non-None reference resolves; there are no orphan set rows or missing shikigami rows in these exports.",
+    "Sentinels and defaults: NAME_None marks unused slots. The collector and level-sequencer loops skip it, loader creation drops it, and UDataTable::FindRow returns no row for a None key even though BattleBase has no explicit IsNone check there. The C++ row constructor is empty, so no field defaults are supplied beyond empty FName/TArray construction; there are no numeric fields or units in this table.",
+    "Precedence and caches: all FindRow helpers walk AGameDataTableManager's arrays in registration order and return the first hit; the current export/code registers one table, so no cross-shard precedence applies. Actor classes are fetched through FGamePrimaryAssetLoader maps and UAbramsAssetManager::GetPrimaryAssetObject; loader creation deduplicates by FName and drops None names.",
+    "Capture is a separate path: GameCharacterCaptureActor.cpp:451 resolves CharacterCaptureRow.Id_ShikigamiCharacter (CN_080 on CP_160's capture rows) directly in ShikigamiDataTables (+0x6C0) and never looks up CharacterShikigamiDataTables. Capture-only animations come from CharacterCapture/SituationOverviewPose rows, not from this table.",
+    "Evidence scope: all consumers above are reconstructed C++ with cited retail RVAs/comments in the source. Retail Blueprint graphs and a byte-level cooked-table comparison were not available, so no BP-only behavior is asserted."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:205",
-      "detail": "Loads CharacterShikigamiDataTable into AGameDataTableManager::CharacterShikigamiDataTables."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:357",
+      "detail": "Registers the single CharacterShikigamiDataTable name in StartInitialLoading's DataTable loader list; the loader map is built at line 488."
     },
     {
-      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:198",
-      "detail": "Resolves each shikigami set and collects shikigami Blueprints and animations into preload lists."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:209",
+      "detail": "Tick resolves the loaded primary asset into AGameDataTableManager::CharacterShikigamiDataTables (+0x4F0); AddLoadedDataTables skips null tables."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:910",
-      "detail": "Battle setup resolves the set and spawns the listed shikigami."
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:185",
+      "detail": "Shared retail 0x12bd9b0 collector: Character.Id_CharacterShikigami -> this row -> Shikigami.Id_Shikigami -> ShikigamiAnimation.FileName. Called by battle preload (GamePhase_BattlePreload.cpp:367), battle loader build (GamePhase_BattleBase.cpp:259) and level-sequence preload (GamePhase_LevelSequencer.cpp:579)."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:756",
-      "detail": "Level-sequencer setup resolves the same set for cutscene shikigami."
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:351",
+      "detail": "PreloadShikigami feeds the collector from battle slots and creates Shikigami loaders (StudioShikigamiLoaders_3B0) and montage loaders (StudioShikigamiAnimLoaders_400); these are later retained by GamePhase.cpp:246-249."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:904",
+      "detail": "Battle spawn walks every set ID, resolves this row and spawns each listed shikigami (line 923), installing montages from ShikigamiAnimation rows (line 931). Battle's own loader build calls the shared collector at line 259."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:753",
+      "detail": "Level-sequence spawn walks the same set IDs and spawns listed shikigami via StudioShikigamiLoaders_950 (line 764); it does not install Id_ShikigamiAnimation montages on them, although level-sequence preload collects those montage names at line 579."
     }
   ]
 }

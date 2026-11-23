@@ -1,87 +1,162 @@
 {
-  "description": "Defines the small set of promotional/news banners shown on the main menu, including their localized message key, artwork, unlock-progress gate, and display order.",
+  "description": "Defines the main-menu DLC store banners: localized DLC-name text keys, full and small resolution-dependent texture IDs, and the save-progress bit that marks a DLC acquired and controls carousel ordering.",
   "fields": {
     "Id": {
-      "simple": "Banner row identifier.",
-      "technical": "FName row key. RefreshBanners collects the rows, drops those whose UserProgressFlag is -1, and uses each surviving row's Id to build BannerIds; unacquired banners are ordered before acquired ones, and the first is passed to SetBanner. SetBanner also looks a row up by this name in each table in BannerDataTables, stopping at the first hit and silently doing nothing when no row matches.",
+      "simple": "Banner row identifier (native field Id, serialized in the export as ID).",
+      "technical": "FName declared as FGameDataTableRow_Banner::Id and named as the DataTable ImportKeyField; the export spells the stored value ID. RefreshBanners collects rows with FGameDataTableArray::GetRows in table/row-name order, skips UserProgressFlag == -1, partitions the surviving Row->Id values by the current flag bit, appends unacquired IDs before acquired ones, and passes BannerIds[0] to SetBanner when the resulting list is non-empty. SetBanner calls UDataTable::FindRow<FGameDataTableRow_Banner>(BannerId, TEXT(\"\"), false) on each BannerDataTables entry and stops at the first hit; a miss returns before changing CurrentBannerId, the acquired/new icons, caption, pagination, or textures, and emits no warning. The ID is otherwise used only as the row key and as the value carried through BannerIds / SlideBanner.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Banner.h:11",
+        "Source/Abrams/Public/GameDataTableArray.h:21",
+        "Source/Abrams/Private/GameBannerWidget.cpp:89",
         "Source/Abrams/Private/GameBannerWidget.cpp:179",
         "Source/Abrams/Private/GameBannerWidget.cpp:263",
-        "Source/Abrams/Private/GameBannerWidget.cpp:270",
+        "Source/Abrams/Private/GameBannerWidget.cpp:266",
+        "Source/Abrams/Private/GameBannerWidget.cpp:272",
+        "Source/Abrams/Private/GameBannerWidget.cpp:276",
+        "Source/Abrams/Private/GameBannerWidget.cpp:280",
         "Source/Abrams/Private/GameBannerWidget.cpp:284"
       ],
       "status": "verified"
     },
     "Id_BannerMessage": {
-      "simple": "Localized text key for the banner caption.",
-      "technical": "FName passed to BannerText->SetTextIdOnly when the banner becomes current; the exported rows use GLS_NAME_DLC_* keys. It is a localization key, not literal display text.",
+      "simple": "Localized DLC-name text key displayed as the banner caption.",
+      "technical": "FName passed unchanged to BannerText->SetTextIdOnly when SetBanner selects the row. SetTextIdOnly creates a parameterless FGameTextRequest; GameTextManager routes only SYS_-prefixed IDs to SystemTextDataTable and resolves GLS_NAME_DLC_* from the current-language TextDataTables, whose first table is GlossaryTextDataTable_<language>. The export uses GLS_NAME_DLC_0110, GLS_NAME_DLC_0120, GLS_NAME_DLC_0210 and GLS_NAME_DLC_0220; the English glossary resolves them to Hidden Inventory/Premature Death, Anime Season 1 Ending Theme 1 Outfits, The Shibuya Incident and Kyoto Jujutsu High School Girls' Outfits respectively. These are localization keys, not literal display strings. The same keys appear in GameDlcContentDisplayNames for DLC07, DLC10, DLC08 and DLC11, matching the rows' progress flags.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Banner.h:15",
-        "Source/Abrams/Private/GameBannerWidget.cpp:194"
+        "Source/Abrams/Private/GameBannerWidget.cpp:194",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:52",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:58",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:72",
+        "Source/Abrams/Private/GameTextManager.cpp:550",
+        "Source/Abrams/Private/GameTextManager.cpp:571",
+        "Source/Abrams/Private/GameTextManager.cpp:605",
+        "Source/Abrams/Private/GameTextManager.cpp:622",
+        "Source/Abrams/Private/GameUnlockDlcContentDialogWidget.cpp:18"
       ],
       "status": "verified"
     },
     "BannerTextureName": {
-      "simple": "Large banner image asset name.",
-      "technical": "FName resolved through the widget manager's FindDynamicLoadTexture and supplied to BannerButton->SetBannerTextures as the large texture. Main-menu startup also collects every banner's large and small names into WidgetTexture primary-asset loaders so both variants are preloaded.",
+      "simple": "Large/high-resolution banner texture asset name.",
+      "technical": "FName used as a WidgetTexture primary-asset ID. MainMenuTop state 0 collects this field and SmallBannerTextureName from every collected banner row, creates WidgetTexture loaders, waits for them in state 1, then inserts each loaded UTexture2D into GameWidgetManager::DynamicLoadTextureMap under its FName key. SetBanner resolves both names with FindDynamicLoadTexture (null on a miss) and passes them to BannerButton->SetBannerTextures. The variable named LargeTexture is selected when the current screen-resolution X is at least HighResolutionThreshold (3840); below that threshold the small variant is selected instead, so the two fields are resolution alternatives rather than two simultaneously displayed images.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Banner.h:18",
         "Source/Abrams/Private/GameBannerWidget.cpp:224",
         "Source/Abrams/Private/GameBannerWidget.cpp:226",
-        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:150",
-        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:160"
+        "Source/Abrams/Private/GameBannerButtonWidget.cpp:106",
+        "Source/Abrams/Private/GameBannerButtonWidget.cpp:110",
+        "Source/Abrams/Private/GameBannerButtonWidget.cpp:116",
+        "Source/Abrams/Private/GameBannerButtonWidget.cpp:117",
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:152",
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:160",
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:185",
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:190",
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:194",
+        "Source/Framework/Public/WidgetManager.h:94",
+        "Source/Framework/Public/WidgetManager.h:96"
       ],
       "status": "verified"
     },
     "SmallBannerTextureName": {
-      "simple": "Small/focused banner image asset name.",
-      "technical": "FName resolved through FindDynamicLoadTexture and supplied to BannerButton->SetBannerTextures as the small texture; also included in the main-menu WidgetTexture prefetch list.",
+      "simple": "Small/low-resolution banner texture asset name.",
+      "technical": "FName resolved through the same WidgetTexture-loader and GameWidgetManager::DynamicLoadTextureMap chain as BannerTextureName. SetBanner supplies it as SmallTexture to BannerButton->SetBannerTextures, which selects it when the current screen-resolution X is below HighResolutionThreshold (3840); at or above 3840 the large texture is used. MainMenuTop prefetches this name for every exported banner row, including any row with UserProgressFlag -1 that RefreshBanners excludes from the carousel.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Banner.h:21",
         "Source/Abrams/Private/GameBannerWidget.cpp:225",
         "Source/Abrams/Private/GameBannerWidget.cpp:226",
+        "Source/Abrams/Private/GameBannerButtonWidget.cpp:106",
+        "Source/Abrams/Private/GameBannerButtonWidget.cpp:110",
+        "Source/Abrams/Private/GameBannerButtonWidget.cpp:115",
+        "Source/Abrams/Private/GameBannerButtonWidget.cpp:117",
         "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:153",
-        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:160"
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:160",
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:194",
+        "Source/Abrams/Private/GameBannerWidget.cpp:266"
       ],
       "status": "verified"
     },
     "UserProgressFlag": {
-      "simple": "Progress bit that decides whether the banner is already acquired/unlocked.",
-      "technical": "int32 encoded as an index into AGameManager::UserInfo.UserProgressFlagWords: low two bits select one of four bits in word (Flag >> 2); words outside 0..127 are treated as unset. SetBanner uses it to swap NewIcon/AcquiredIcon visibility. RefreshBanners explicitly skips rows with -1, partitions the rest by the flag, and places unacquired rows first in the carousel. The manager loads BannerDataTable into BannerDataTables at +0xB60.",
+      "simple": "Saved DLC-entitlement bit index that marks a banner's DLC acquired and groups it in the carousel.",
+      "technical": "int32 bit index, defaulted to 0 by the reconstructed row constructor; exported values are 6, 7, 9 and 10. IsProgressFlagSet computes word = uint32(Flag) >> 2 and bit = uint32(Flag) & 3, rejects word >= 128 (the 128-word progress array), and otherwise tests GameManager::UserInfo.UserProgressFlagWords[word]. SetBanner uses the result only to swap NewIcon and AcquiredIcon visibility. RefreshBanners skips the exact -1 sentinel, partitions all other rows by the same bit, and puts unset flags before set ones; other negative values cast to a huge unsigned word and read as unset. Each exported flag is an entitlement bit set/cleared by GM_DiffDlcEntitlements from Steam receipts: 6 = DLC07 (BANNER_0110), 7 = DLC08 (BANNER_0210), 9 = DLC10 (BANNER_0120), 10 = DLC11 (BANNER_0220). Those DLC IDs have the same GLS text keys used by the rows' Id_BannerMessage fields. The DataTable manager loads the table into BannerDataTables only after all primary-asset DataTable loads complete.",
       "evidence": [
-        "Source/Abrams/Private/GameBannerWidget.cpp:92",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Banner.h:24",
+        "Source/AbramsDataTable/Private/GameDataTableRow_Banner.cpp:4",
+        "Source/Abrams/Private/GameBannerWidget.cpp:94",
         "Source/Abrams/Private/GameBannerWidget.cpp:97",
+        "Source/Abrams/Private/GameBannerWidget.cpp:98",
+        "Source/Abrams/Private/GameBannerWidget.cpp:99",
         "Source/Abrams/Private/GameBannerWidget.cpp:103",
         "Source/Abrams/Private/GameBannerWidget.cpp:191",
         "Source/Abrams/Private/GameBannerWidget.cpp:266",
+        "Source/Abrams/Private/GameBannerWidget.cpp:270",
+        "Source/Abrams/Private/GameBannerWidget.cpp:280",
+        "Source/Abrams/Public/GameManager.h:229",
+        "Source/Abrams/Private/GameDlcEntitlementTable.h:78",
+        "Source/Abrams/Private/GameDlcEntitlementTable.h:110",
+        "Source/Abrams/Private/GameDlcEntitlementTable.h:123",
+        "Source/Abrams/Private/GameDlcEntitlementTable.h:134",
+        "Source/Abrams/Private/GameManager.cpp:461",
+        "Source/Abrams/Private/GameManager.cpp:469",
+        "Source/Abrams/Private/GameManager.cpp:497",
+        "Source/Abrams/Private/GameManager.cpp:501",
+        "Source/Abrams/Private/GameManager.cpp:505",
         "Source/Abrams/Private/GameDataTableManager.cpp:312"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The manager supports more than one BannerDataTable object in BannerDataTables; consumers iterate all of them and use the first table containing the requested row, so row names must be unique across shards to avoid shadowing.",
-    "The export contains four rows (BANNER_0110, BANNER_0120, BANNER_0220, and one more); it is the exported retail table, not a complete statement about all possible localization or platform-specific tables.",
-    "The reconstruction comments identify a non-warning row lookup; a missing row leaves SetBanner without a current banner update rather than logging an error."
+    "The sole export contains one BannerDataTable asset with four rows: BANNER_0110/flag 6/DLC07, BANNER_0120/flag 9/DLC10, BANNER_0220/flag 10/DLC11 and BANNER_0210/flag 7/DLC08. Their textures are T_UI_Banner_BannerImage_00..03 and T_UI_Banner_BannerImage_Small_00..03 in that row order. No localized or platform BannerDataTable variant was present among the supplied exports.",
+    "There is no display-order field. the main-menu OpenFriendIcon path calls RefreshBanners before opening the banner window, preserving the row collector's order within the unacquired and acquired partitions; arrows and the auto-slide tick then cycle BannerIds with wraparound. Pagination icons are initially created for every collected row, but SetBanner hides icons beyond the filtered BannerIds count.",
+    "These are DLC store promotions, not generic news entries: activating the banner opens SYS_DIALOG_MESSAGE_0501 (English: 'Proceed to the Steam Store?'), the Yes result sets main-menu selection 8 (Store), and the main-menu phase calls ShowDlcStore.",
+    "BannerDataTables is a TArray and both the row collector and SetBanner walk it with first-hit precedence, so duplicate row names across hypothetical extra tables would shadow later rows. StartInitialLoading registers only one loader named BannerDataTable and the available export has one asset, so banner sharding is a generic container capability, not observed retail data.",
+    "The export writes the row key property as ID while the header and ImportKeyField call it Id; they are the same native FName field. The reconstructed row constructor explicitly defaults only UserProgressFlag to 0; FName members default to NAME_None, and every exported row supplies all five values.",
+    "A missing BannerId is a silent SetBanner no-op (FindRow is called with warnings disabled). FindDynamicLoadTexture returns null for a missing texture name; no explicit null check occurs before the textures are passed to the banner button.",
+    "Behavior above is traced through reconstructed C++ annotated with retail addresses and the supplied DataTable/glossary exports. The retail banner UMG widget tree, bound widget names, actual texture packages and runtime screenshots were not available, so their asset-side wiring is not independently observed; the reconstruction guide states that gameplay logic is native C++ rather than Blueprint."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:312",
-      "detail": "Resolves the BannerDataTable loader and adds it to the BannerDataTables array consumed by the UI."
+      "detail": "After all DataTable primary assets finish loading, resolves the BannerDataTable loader and adds the loaded UDataTable to BannerDataTables (+0xB60)."
     },
     {
-      "source": "Source/Abrams/Private/GameBannerWidget.cpp:87",
-      "detail": "Collects all FGameDataTableRow_Banner rows from BannerDataTables to build one pagination icon per banner."
+      "source": "Source/Abrams/Private/GameBannerWidget.cpp:89",
+      "detail": "Collects every typed banner row across BannerDataTables; the count also drives one pagination icon per raw row at line 130."
     },
     {
       "source": "Source/Abrams/Private/GameBannerWidget.cpp:170",
-      "detail": "SetBanner selects a row by ID, tests its progress flag, sets the localized caption and large/small textures, and updates carousel pagination."
+      "detail": "SetBanner resolves BannerId by FindRow across all tables, then updates the flag icons, text key, pagination and the two dynamically cached textures."
     },
     {
       "source": "Source/Abrams/Private/GameBannerWidget.cpp:258",
-      "detail": "RefreshBanners filters flag -1 rows and orders unacquired banners before acquired ones."
+      "detail": "RefreshBanners filters -1, partitions rows by current entitlement bit, places unacquired rows first, and selects BannerIds[0]."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWindowBase.cpp:161",
+      "detail": "The banner tick decrements SlideRemainingTime and auto-advances with SlideBanner(true, false) when more than one banner is listed and auto-slide is enabled."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:150",
-      "detail": "Main-menu startup prefetches every banner texture through GamePrimaryAssetType_WidgetTexture."
+      "detail": "Main-menu preparation collects both texture FNames from every banner row and creates WidgetTexture loaders; lines 190-194 later place the loaded textures in the dynamic texture cache."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBannerButtonWidget.cpp:106",
+      "detail": "Chooses the supplied small or large texture by current width versus the 3840-pixel threshold and slides/promotes it into the centre banner image."
+    },
+    {
+      "source": "Source/Abrams/Private/GameMainMenuWidget.cpp:807",
+      "detail": "Main-menu startup calls RefreshBanners immediately before opening the banner window; input handling at line 492 advances it with NextMenu/PrevMenu."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBannerWidget.cpp:42",
+      "detail": "Banner activation opens the Yes/No Steam-store confirmation; main-menu line 595 turns the Yes result into selected menu 8, which MainMenuTop line 457 handles with ShowDlcStore."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:622",
+      "detail": "Routes non-SYS_ banner text IDs such as GLS_NAME_DLC_* to the language text tables, beginning with GlossaryTextDataTable_<language>."
+    },
+    {
+      "source": "Source/Abrams/Private/GameManager.cpp:456",
+      "detail": "Diffs Steam DLC receipts against the entitlement table and sets or clears the same UserProgressFlag bits that the banner rows reference."
     }
   ]
 }

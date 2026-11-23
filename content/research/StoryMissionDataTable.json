@@ -2,123 +2,199 @@
   "description": "Defines a story battle mission: map, wave chain and flags controlling appearance, result screen and score scaling.",
   "fields": {
     "ID": {
-      "simple": "Story mission id (usually STMSN_xxxxxM).",
-      "technical": "FName row key in StoryMissionDataTables (DTM +0x8D0), resolved by Story_FindMissionRow and used as the StudioMissionRecords_680 key and in FStudioPhaseRequest.Name34. Many exported ids match a StoryDemo row id.",
+      "simple": "Story mission id (STMSN_xxxxxM or STMSN_xxxxxS; 68 M and 22 S in the export).",
+      "technical": "FName native Id and the export ImportKeyField/row key; all 90 exported rows have key == Id. Launch normally reaches the row through StoryDemo.Id_StoryMission: Story_ResolveDemoLaunch writes that id to FStudioPhaseRequest.Name34, which GamePhase copies to GameManager.StudioStoryMissionId_CE0. Story_FindMissionRow and the out-of-line finders then search StoryMissionDataTables (DTM +0x8D0). The same id keys StudioMissionRecords_680 on a story win, and Story_GetFreeMissions compares it with Demo.Id_StoryMission. Suffix M is classified as a main mission by telemetry/UI code; the tutorial row STMSN_01000M is also hard-coded in battle/tutorial logic.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMission.h:11",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:635",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:637",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1578",
-        "Source/Abrams/Private/GamePhase_BattleStory.cpp:474"
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:460",
+        "Source/Abrams/Private/GamePhase.cpp:218",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:406",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:846",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:851",
+        "Source/Abrams/Private/GameOnlineManager.cpp:472",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:1281",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:1328",
+        "Source/Abrams/Public/GameDataTableManager.h:182"
       ],
       "status": "verified"
     },
     "Id_Map": {
       "simple": "Battle map id.",
-      "technical": "FName (row +0x10). Story_GetMissionMapId returns this id when set, otherwise a uniformly random Map row with MapSelectPlacementIndex >= 0. Story_ResolveDemoLaunch copies the result into the battle level; the map's FileName list supplies the levels when there is no pre-battle script.",
+      "technical": "FName (row +0x10). Story_GetMissionMapId and the inline ternary in Story_ResolveDemoLaunch use this id when it is not NAME_None; otherwise (including a null mission row in the helper) Story_PickRandomMapId_12FD510 picks a uniformly random Map row whose MapSelectPlacementIndex >= 0. The chosen id is written to the battle request, and when the demo has no pre-battle script the matching Map row FileName list supplies the loaded levels. Character-select code also reads the raw id for the map thumbnail and can dereference an unguarded Map lookup. All 90 exports set a map id (18 distinct keys that all resolve in MapDataTable; none is None), although three of those map rows have MapSelectPlacementIndex -1 and therefore would not be candidates for the random fallback.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMission.h:15",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:42",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:367",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:480",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:487",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:640",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:642",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:643",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:458",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:486"
+        "Source/Abrams/Private/GamePhase_StoryCharacterSelect.cpp:128",
+        "Source/Abrams/Private/GamePhase_StoryCharacterSelect.cpp:396",
+        "Source/Abrams/Private/GameStoryCharacterSelectWidget.cpp:128"
       ],
       "status": "verified"
     },
     "Id_StoryMissionWave": {
       "simple": "Ordered StoryMissionWave rows for the mission's waves.",
-      "technical": "TArray<FName> (row +0x18), four exported slots. The first entry is dereferenced unguarded in several launch helpers to get PlayableCharacterIndex and wave data; Story_GetMissionAllyCharacters iterates all entries, resolving each as a StoryMissionWave row (DTM +0x8E0), while Story_GetBattleLayout uses the indexed entry for the wave's ally/enemy layout. None entries are not filtered before the [0] accesses.",
+      "technical": "TArray<FName> (row +0x18). Every export has four slots: 89 use slot 0 and leave slots 1-3 None; STMSN_09112M uses four valid ids. All 93 referenced ids resolve in StoryMissionWaveDataTable. Slot 0 supplies the first wave used for PlayableCharacterIndex, allies, MissionWave/task and battle-talk lookups. Several launch and select paths dereference GetData()[0] or [0] without a Num check; Story_FindFirstWave and the battle notify helpers do check. The mission retry count indexes this array for later waves; Story_GetBattleLayout returns 255 for a null row, out-of-range index or missing wave/MissionWave row and maps tabulated ally/enemy counts to EGameBattlePair values 0-11 (unsupported counts leave 0). Story_GetMissionAllyCharacters resolves None slots by failed lookup rather than an explicit filter, skips them, stops after the first successful wave when bAllWaves is false, and walks every slot only when bAllWaves is true.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMission.h:18",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:43",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:371",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:373",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:378",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:395",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:446",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:474",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:651",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:655",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:667",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:718",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:708",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:720",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:424"
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:183",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:586",
+        "Source/Abrams/Private/GameStoryCharacterSelectMissionInfoWidget.cpp:69",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:813"
       ],
       "status": "verified"
     },
     "bAppearanceDisabled": {
-      "simple": "Suppresses the character appearance/intro for this mission on the first attempt.",
-      "technical": "bool (row +0x28), constructor default false. AGameBattleManager::IsAppearanceEnabled returns false when RetryCount <= 0 and this flag is true, otherwise true (and false for any retry). The row pointer is cached on the battle task system but the source notes its writer still needs probing.",
+      "simple": "Skips the first-attempt battle appearance intro.",
+      "technical": "bool (row +0x28), constructor default false. AGameBattleManager::IsAppearanceEnabled returns (flag != 1) only when RetryCount <= 0 and a StoryMission row is cached; any retry returns false regardless of the flag, while a missing story row returns true on the first attempt. The intro state jumps to step 10 when the result is false. This reconstruction traces the cache write from GamePhase_BattleStory::SetupBattleCharacterEntries through AGameBattleManager::SetupStoryMission into FStudioBattleMissionTaskSystem::SetupStory (System360) and FStudioBattleSystem390::SetStoryMission. 49/90 exported rows set true.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMission.h:21",
-        "Source/AbramsDataTable/Private/GameDataTableRow_StoryMission.cpp:3",
-        "Source/Abrams/Private/GameBattleManager.cpp:1734",
+        "Source/AbramsDataTable/Private/GameDataTableRow_StoryMission.cpp:4",
+        "Source/Abrams/Private/GameBattleManager.cpp:1735",
         "Source/Abrams/Private/GameBattleManager.cpp:1738",
         "Source/Abrams/Private/GameBattleManager.cpp:1742",
-        "Source/Abrams/Public/GameBattleSystems_B.h:200"
+        "Source/Abrams/Private/GameBattleFreeStates.cpp:83",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:202",
+        "Source/Abrams/Private/GameBattleManager.cpp:393",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:808",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:815",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:1323"
       ],
       "status": "verified"
     },
     "bResultDisabled": {
-      "simple": "Skips the normal battle result phase on a win.",
-      "technical": "bool (row +0x29), constructor default false. In the story battle end state, a winning mission with this flag calls OnBattleFinished/OnBattleWon directly and sets BattleEndRequest = 0 instead of requesting the result state.",
+      "simple": "Skips the normal result phase when the player wins the final wave.",
+      "technical": "bool (row +0x29), constructor default false. In FBattleStoryState_Finish::RequestState this is checked only after HasNextMissionWave() is false and GetWinnerTeam() == 0 (Team A win). When true, the game calls OnBattleFinished/OnBattleWon and sets BattleEndRequest = 0 instead of requesting the normal result state. Losses, non-final waves and false rows follow the normal path. 40/90 exported rows set true.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMission.h:24",
-        "Source/AbramsDataTable/Private/GameDataTableRow_StoryMission.cpp:3",
+        "Source/AbramsDataTable/Private/GameDataTableRow_StoryMission.cpp:5",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:320",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:323",
         "Source/Abrams/Private/GameBattleStoryStates.cpp:328",
         "Source/Abrams/Private/GameBattleStoryStates.cpp:330",
-        "Source/Abrams/Private/GameBattleStoryStates.cpp:333"
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:333",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:830"
       ],
       "status": "verified"
     },
     "ResultEvaluationScoreRate": {
-      "simple": "Multiplier applied to the raw battle score before rank evaluation.",
-      "technical": "float (row +0x2C), constructor default 0.0f. AGameBattleManager::GetResultEvaluationScoreRate starts at 1.0, uses this value when a StoryMission row is set, then lets an ArcadeMission row override it; the result snapshot multiplies its Value43C by the rate before GetResultScoreRank. Exported values are 1.0, 1.2, 1.5 and 2.0.",
+      "simple": "Dimensionless multiplier on the score used for result rank thresholds.",
+      "technical": "float (row +0x2C), constructor default 0.0f. GetResultEvaluationScoreRate starts at 1.0f, replaces it with StoryMission->ResultEvaluationScoreRate when System360 has a story row, then lets ArcadeMission->ResultEvaluationScoreRate override it whenever that cache is also set. The result snapshot builder uses the same precedence: it converts float(Value43C) * rate to int32 (truncation toward zero) and passes the score to GetResultScoreRank; that block runs only when PlayerCharacter is valid and BonusEntries has an entry for the character index. The PvE result state also passes GetResultEvaluationScoreRate() to GetBonusScoreRank to raise MissionWaveRank. Exported rates are 1.0 (83 rows), 1.2 (5), 1.5 (1) and 2.0 (1); no row omits the field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMission.h:27",
-        "Source/AbramsDataTable/Private/GameDataTableRow_StoryMission.cpp:3",
-        "Source/Abrams/Private/GameBattleManager.cpp:407",
+        "Source/AbramsDataTable/Private/GameDataTableRow_StoryMission.cpp:6",
+        "Source/Abrams/Private/GameBattleManager.cpp:409",
         "Source/Abrams/Private/GameBattleManager.cpp:414",
+        "Source/Abrams/Private/GameBattleManager.cpp:418",
+        "Source/Abrams/Private/GameBattleManager.cpp:715",
+        "Source/Abrams/Private/GameBattleManager.cpp:722",
         "Source/Abrams/Private/GameBattleManager.cpp:1369",
         "Source/Abrams/Private/GameBattleManager.cpp:1373",
-        "Source/Abrams/Private/GameBattleManager.cpp:1379"
+        "Source/Abrams/Private/GameBattleManager.cpp:1377",
+        "Source/Abrams/Private/GameBattleManager.cpp:1383",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:738"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Constructor sets the two bools false and the rate 0.0f; exported rows always set explicit values, but a row missing the float would scale scores to zero if loaded.",
-    "The battle systems cache the StoryMission pointer (GameBattleSystems_B.h:202) and a wave pointer array; the cache writer is noted NEED-PROBE in source, so the linkage from launch request to the cached row is reconstructed rather than fully proven in this file.",
-    "90 exported rows; no numbered shards or localization variants found. Id_Map can be None, in which case a random eligible Map row is chosen."
+    "The reconstructed struct constructor sets both bools false and the rate 0.0f; all 90 exported rows explicitly supply all six values. A row that actually reached either score consumer with the constructor 0.0f would yield score 0; the serialization behavior for a missing field was not independently tested.",
+    "The battle row cache is traced here: GamePhase_BattleStory::SetupBattleCharacterEntries (0x102a560 area) -> AGameBattleManager::SetupStoryMission -> FStudioBattleMissionTaskSystem::SetupStory and FStudioBattleSystem390::SetStoryMission. The remaining NEED-PROBE comment on GameBattleSystems_B.h:201 is stale relative to those reconstructed writers; no runtime launch was used to re-observe it.",
+    "Export check across every JSON file in JJKCCDatatables: one StoryMissionDataTable (90 rows, no numbered shard, localization variant, or per-character copy), 90/90 row key == Id, 68 M and 22 S ids, 18 valid MapDataTable references, 93/93 StoryMissionWaveDataTable references, and 89/90 mission ids referenced by a StoryDemo (STMSN_06090S is unreferenced). In every matched demo reference the StoryDemo row name equals the mission id.",
+    "Array/order precedence: slot 0 is the first wave, and the mission retry count selects later wave entries; Story_GetBattleLayout bounds-checks that index and returns 255 on invalid/missing rows. Several select and launch paths still read slot 0 unguarded. A non-None Id_Map wins over random selection, Arcade score rate wins over Story score rate, a pending next wave wins over bResultDisabled, and retries always win over bAppearanceDisabled.",
+    "Behavior marked verified is static retail-aligned reconstruction in C++ (retail RVAs/finder addresses are recorded in the source comments), not a separate retail Blueprint inspection. No retail Blueprint logic or live game/editor trace was available for this review; project guidance states shipped gameplay behavior is in C++."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:271",
+      "detail": "Loads the sole exported table into StoryMissionDataTables (DTM +0x8D0)."
+    },
+    {
       "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:635",
-      "detail": "Story_FindMissionRow resolves a mission by id."
+      "detail": "Story_FindMissionRow resolves a mission id (retail 0x12fb6e0)."
     },
     {
-      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:640",
-      "detail": "Map id resolution with random fallback."
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:460",
+      "detail": "Story_ResolveDemoLaunch copies Demo.Id_StoryMission into FStudioPhaseRequest.Name34; GamePhase.cpp:218 copies it to GM+0xCE0."
     },
     {
-      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:648",
-      "detail": "First-wave lookup used for playable-character and ally collection."
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:444",
+      "detail": "Launch looks up the mission from StoryDemo.Id_StoryMission and reads its first wave."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:480",
+      "detail": "Id_Map is used directly unless None, in which case an eligible random Map id is selected; line 487 uses the map FileName list as levels."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:474",
+      "detail": "First-wave and playable-ally chain dereferences Id_StoryMissionWave[0] without a Num check."
     },
     {
       "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:708",
-      "detail": "Story_GetMissionAllyCharacters walks all waves to collect MissionCharacter rows."
+      "detail": "Story_GetMissionAllyCharacters uses one wave or every wave according to bAllWaves."
     },
     {
-"source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:371",
-      "detail": "Story_GetBattleLayout maps wave ally/enemy counts to a battle pair layout."
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:371",
+      "detail": "Story_GetBattleLayout maps the indexed wave ally/enemy counts to a battle pair, with 255 for invalid/missing data."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleManager.cpp:1734",
-      "detail": "Appearance gating for the first attempt."
+      "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:180",
+      "detail": "Battle setup dereferences the mission and wave chain; line 202 passes the row to the battle manager."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:393",
+      "detail": "SetupStoryMission caches the row in System360 and System390."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:1281",
+      "detail": "System390 special-cases Id == STMSN_01000M for tutorial brain changes; line 1328 initializes tutorial steps from the id."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:406",
+      "detail": "A win writes progress into StudioMissionRecords_680 keyed by StudioStoryMissionId_CE0."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1735",
+      "detail": "IsAppearanceEnabled applies bAppearanceDisabled only before the first retry."
     },
     {
       "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:328",
-      "detail": "Result-phase suppression on a win."
+      "detail": "bResultDisabled short-circuits the result phase only after the last wave on a Team A win."
     },
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:271",
-      "detail": "Loads StoryMissionDataTable into StoryMissionDataTables."
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1369",
+      "detail": "Story rate (then Arcade override) scales Value43C before the story result rank lookup."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:738",
+      "detail": "PvE result uses GetResultEvaluationScoreRate indirectly for bonus rank."
+    },
+    {
+      "source": "Source/Abrams/Private/GameOnlineManager.cpp:472",
+      "detail": "Telemetry classifies Mission.Id ending in M as main and other ids as side missions."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:846",
+      "detail": "Free-mission filtering compares StoryDemo.Id_StoryMission to Mission.Id."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryCharacterSelectWidget.cpp:128",
+      "detail": "Mission Id_Map selects the map icon; GamePhase_StoryCharacterSelect.cpp:396 uses the helper with random fallback for battle settings."
     }
   ]
 }

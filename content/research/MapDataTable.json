@@ -30,7 +30,7 @@
     },
     "Filename": {
       "simple": "Ordered list of level packages that make up the map.",
-      "technical": "TArray<FName> (native FileName, row +0x18; constructor default empty). StartBattleLevelPreload and FStudioBattleSystem2D0::RequestStageLevels call RequestStreamLevel on each name without an IsNone guard. Most phase transitions either call PhaseTrans_RequestLevels(..., MapRow->FileName, ...) or copy the array into StudioRequestedLevelNames_F8 for the phase mailbox. Story helpers append StoryRoomPlacement.LevelDesignName after the map levels, return the list for a Script row, and Story_PrepareBattleRequest unguardedly copies the active map's array. Exported arrays are 4 names: base map, *_Environment, *_LevelDesign and an optional foliage/battle-area level or None; the CharacterCapture row contains only CharacterCapture.",
+      "technical": "TArray<FName> (native FileName, row +0x18; constructor default empty). StartBattleLevelPreload and FStudioBattleSystem2D0::RequestStageLevels call RequestStreamLevel on each name without an IsNone guard. Most phase transitions either call PhaseTrans_RequestLevels(..., MapRow->FileName, ...) or copy the array into StudioRequestedLevelNames_F8 for the phase mailbox. Story helpers append StoryRoomPlacement.LevelDesignName after the map levels, return the list for a Script row, and Story_PrepareBattleRequest unguardedly copies the active map's array. Exported arrays always have 4 entries: base map, *_Environment, *_LevelDesign and an optional foliage/battle-area level or None; the CharacterCapture row has CharacterCapture plus three None entries.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:18",
         "Source/Abrams/Private/GamePhase_BattlePreload.cpp:80",
@@ -108,7 +108,7 @@
     },
     "CharacterContrast": {
       "simple": "Map-specific character material contrast.",
-      "technical": "float (constructor default 0.0f). ApplyMapCharacterLighting sets scalar parameter 'Character Contrast' through the shared material controller; the fan-out reaches all managed characters' character/weapon/shikigami controllers and sequencer targets. For character capture the CharacterCapture map row supplies the initial value, after which the widget's FGameWidgetCharacterCaptureCommonParameter.CharacterContrast overrides it (default 1.0 in that struct). Export values include 0.9 (MAP_06) and 1.0 for most stages.",
+      "technical": "float (constructor default 0.0f). ApplyMapCharacterLighting sets scalar parameter 'Character Contrast' through the shared material controller; the fan-out reaches all managed characters' character/weapon/shikigami controllers and sequencer targets. For character capture the CharacterCapture map row supplies the initial value, after which the widget's FGameWidgetCharacterCaptureCommonParameter.CharacterContrast overrides it (default 1.0 in that struct). Export values include 0.9 (MAP_06) and 1.0 (15 of 30 rows).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:37",
         "Source/Abrams/Private/GameActorMaterialController.cpp:43",
@@ -225,7 +225,7 @@
     },
     "MapSelectIconFileName": {
       "simple": "Stage-select icon texture name.",
-      "technical": "FName (row +0xE8; default empty). Consumers add it to WidgetTexture primary-asset loader batches or call FindDynamicLoadTexture and set it as a brush/texture parameter. Main-menu FreeBattle/PvE/PvP and FreeBattleRuleSelect gate loading on MapSelectPlacementIndex >= 0; IntervalPvE and WidgetTest preload every row's icon; BattleSettingsBackgroundWidget, BattleSituationOverviewWidget, FreeBattleWidget, StageSelectWidget and StoryCharacterSelectWidget display it. Some callers fall back to hard-coded T_UI_Common_StageImage_MAP_00 for the synthetic MAP_00/random-stage case. Export is a T_UI_Common_StageImage_* name for selectable maps, T_UI_Lobby_* for VLM_01 and None for DEM_02/03, SDM_*, SRM_* and CharacterCapture.",
+      "technical": "FName (row +0xE8; default empty). Consumers add it to WidgetTexture primary-asset loader batches or call FindDynamicLoadTexture and set it as a brush/texture parameter. Main-menu FreeBattle/PvE/PvP preload icons only for rows with MapSelectPlacementIndex >= 0; FreeBattleRuleSelect applies the same sign test to stage options but does not preload this icon. IntervalArcade, IntervalPvE and WidgetTest preload every row's icon; MainMenuLobby preloads its VLM_01 icon and StoryCharacterSelect preloads the active story mission map's icon. BattleSettingsBackgroundWidget, BattleSituationOverviewWidget, FreeBattleWidget, StageSelectWidget and StoryCharacterSelectWidget display it. Some callers fall back to hard-coded T_UI_Common_StageImage_MAP_00 for the synthetic MAP_00/random-stage case. Export is a T_UI_Common_StageImage_* name for selectable maps, T_UI_Lobby_* for VLM_01 and None for DEM_02/03, SDM_*, SRM_* and CharacterCapture.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:67",
         "Source/Abrams/Private/GameStageSelectWidget.cpp:110",
@@ -254,7 +254,7 @@
     },
     "Id_MissionLayout": {
       "simple": "Mission-layout ids indexed by the current wave.",
-      "technical": "TArray<FName> (default empty; 16 slots in every exported row). AGameBattleManager::GetCharacterStartTransform uses the active MissionWave->MissionLayoutIndex: if MapRow->Id_MissionLayout is valid at that index and the entry is not None, it resolves the id in MissionLayoutDataTables (DTM +0x9B0) and overrides the start transform's translation/rotation from Layout.Location[Index] / Layout.Rotation[Index] (each guarded by IsValidIndex). The final Z is then ground-traced, so the layout's Z is not authoritative. Export ids use per-map ST/DLC01 and PVE00..PVE05 naming, with None filling unused slots; story-only maps are all None.",
+      "technical": "TArray<FName> (default empty; 16 slots in every exported row). AGameBattleManager::GetCharacterStartTransform uses the active MissionWave->MissionLayoutIndex: if MapRow->Id_MissionLayout is valid at that index and the entry is not None, it resolves the id in MissionLayoutDataTables (DTM +0x9B0) and overrides the start transform's translation/rotation from Layout.Location[CharacterIndex] / Layout.Rotation[CharacterIndex] (each guarded by IsValidIndex; CharacterIndex is the spawn index, not MissionLayoutIndex). The final Z is then ground-traced, so the layout's Z is not authoritative. Export ids use per-map ST/DLC01 and PVE00..PVE05 naming, with None filling unused slots; story-only maps are all None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:73",
         "Source/Abrams/Private/GameBattleManager.cpp:1470",
@@ -267,7 +267,7 @@
     },
     "ReverbRate": {
       "simple": "Reverb bus send amount for the stage.",
-      "technical": "float (row +0x108; constructor default 0.0f). GameBattle_ApplyStageMapRow and its inlined copies, battle phases/states and the studio level-sequencer cast spawn assign it to AGameSoundManager::ReverbBusSendLevel (+0x398). Every voice/SE player later receives Player->SetBusSendLevelByName(ReverbBusName, ReverbBusSendLevel), with ReverbBusName defaulting to 'Reverb'. Transition paths explicitly reset the manager value to 0 when leaving battle/sequencer stages. Export values are 0.0, 0.05, 0.1 and 0.15.",
+      "technical": "float (row +0x108; constructor default 0.0f). GameBattle_ApplyStageMapRow and its inlined copies, battle phases/states and the studio level-sequencer cast spawn assign it to AGameSoundManager::ReverbBusSendLevel (+0x398). Voice and ordinary/3D SE playback paths call Player->SetBusSendLevelByName(ReverbBusName, ReverbBusSendLevel), with ReverbBusName defaulting to 'Reverb'; the traced ambient-SE player path does not set this bus send. Transition paths explicitly reset the manager value to 0 when leaving battle/sequencer stages. Export values are 0.0, 0.05, 0.1 and 0.15.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:76",
         "Source/Abrams/Private/GameBattleSequenceState.cpp:355",
@@ -275,6 +275,7 @@
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:524",
         "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:819",
         "Source/Abrams/Private/GameSoundManager.cpp:1195",
+        "Source/Abrams/Private/GameSoundManager.cpp:809",
         "Source/Abrams/Public/GameSoundManager.h:120"
       ],
       "status": "verified"
@@ -299,7 +300,8 @@
     "GameBattle_ApplyStageMapRow is the shared battle hand-out: ApplyMapCharacterLighting, ApplyMapColors, SetMapRow, SetBattleLevelRequest(MapRow->Id), ReverbRate and PlayMapAmbientSe. Battle states 05/07/08/10 and battle phases contain inlined variants; for domain expansions, state 07 switches between the caster's DomainExpansion.Id_Map and the active battle level depending on bFinished.",
     "ApplyMapCharacterLighting fans out through AGameCharacterManager to every managed character and then through character/weapon/shikigami controllers to their material controllers; sequencer SetMapColor can apply the same row to a bound character, NPC, sequencer level object, shikigami or weapon, caching AppliedMapRow by the EGameSequencerMapDataType channel (1 = current map, other values = enum-name row lookup). OnTearDown reapplies the current map's row.",
     "Character-capture actors explicitly look up the 'CharacterCapture' row for lighting; their widget Common parameter struct subsequently overwrites CharacterLightShadowColor and all five scalar grade parameters, so only CharacterLightColor/OverlayColor from the map row remain authoritative at capture time. No launch or network was used; all statuses come from static consumer traces and the available export.",
-    "MapDataTable's colors/levels are per-stage and global/material-parameter based. They are distinct from MapGroundDataTable, whose surface-keyed rows drive footstep/bound effects and the sequencer's ground-color trace. Vector component fields (X/Y/Z) are omitted here because the renderer inherits the parent FVector annotation."
+    "Direct GetRows/finder helpers also expose rows: GameBattle_FindMapRow and BattleFree_FindMapRow iterate MapDataTables with first-match semantics, while stage/rule-selection UI uses GetRows<FGameDataTableRow_Map>(). Character lighting is also applied indirectly to trap materials, MainMenuStory room-map characters, battle-spawned characters/weapons/shikigami and level-sequencer cast actors, not only by the shared stage hand-out.",
+    "MapDataTable's colors/levels are per-stage values applied through material parameters: EffectColor, DecalColor, CharacterShadowColor, CharacterLightColor and BloodColor go to the world MaterialParameterCollection, while character lights and scalar grades are written to per-actor material controllers. They are distinct from MapGroundDataTable, whose surface-keyed rows drive footstep/bound effects and the sequencer's ground-color trace. Vector component fields (X/Y/Z) are omitted here because the renderer inherits the parent FVector annotation."
   ],
   "usages": [
     {

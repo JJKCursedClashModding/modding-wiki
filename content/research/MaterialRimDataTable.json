@@ -1,79 +1,97 @@
 {
-  "description": "Rim-lighting preset rows for SUPERARMOR/HYPERARMOR; in the available reconstruction only the table's loading and row layout are proven, not its runtime consumer.",
+  "description": "Serialized two-row rim preset table (SUPERARMOR, HYPERARMOR). The reconstruction verifies the row struct, one loaded UDataTable, and manager caching at +0x820; no C++ consumer reads a row or its fields, so runtime application of these values is unverified.",
   "fields": {
     "ID": {
-      "simple": "Rim preset name (exported: SUPERARMOR, HYPERARMOR).",
-      "technical": "Serialized FName row key at struct offset 0x08. 'MaterialRimDataTable' is registered as a primary asset loader (GameDataTableManager.cpp:433) and resolved into MaterialRimDataTables (+0x820) at line 260, but no FindRow call over that array exists in the available Source/Plugins code and no consumer was identified in the verification records. Status is loader/serialization only; do not assume it is looked up like MaterialOutline's buff IDs.",
+      "simple": "Rim preset row key (exported: SUPERARMOR, HYPERARMOR).",
+      "technical": "FName declared in FGameDataTableRow_MaterialRim and serialized as ImportKeyField 'Id'; retail layout puts it at 0x08. The reconstructed constructor leaves Id to FName's default (NAME_None). StartInitialLoading adds a DataTable primary-asset loader named 'MaterialRimDataTable' (line 433; loaders are created at line 488). After all loaders complete, Tick resolves that loader and appends the loaded UDataTable to MaterialRimDataTables (+0x820) at line 260. There is no FindRow/FindRowInline call for this array or row type, and the exported key strings do not occur in C++ source; no lookup condition, precedence, or sentinel behavior is established.",
       "evidence": [
-        "Source/Abrams/Private/GameDataTableManager.cpp:260",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:12",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:30",
+        "Source/Abrams/Private/GameDataTableManager.cpp:321",
         "Source/Abrams/Private/GameDataTableManager.cpp:433",
+        "Source/Abrams/Private/GameDataTableManager.cpp:488",
+        "Source/Abrams/Private/GameDataTableManager.cpp:168",
+        "Source/Abrams/Private/GameDataTableManager.cpp:260",
         "Source/Abrams/Public/GameDataTableManager.h:171",
         "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:1200"
       ],
       "status": "observed"
     },
     "Color": {
-      "simple": "Serialized rim color vector.",
-      "technical": "FVector at offset 0x10 (constructor default FVector::ZeroVector). Export: SUPERARMOR (1,1,0) yellow, HYPERARMOR (0.8,0.2,0.2) red. No source consumer reads this field from the row; material controllers do maintain separate material parameters named RimColor (GameCharacterMaterialController.cpp:173-178, GameShikigamiMaterialController.cpp:40-45, GameWeaponMaterialController.cpp:116-121), but no linkage from this table to those parameters was found.",
+      "simple": "Serialized rim color vector (X/Y/Z).",
+      "technical": "FVector at retail offset 0x10; constructor default FVector::ZeroVector. Both rows override it: SUPERARMOR (1.0, 1.0, 0.0), HYPERARMOR (0.8, 0.2, 0.2). The catalog and export expose X/Y/Z as double components, but no consumer proves an X/Y/Z-to-RGB conversion for this table. Character, shikigami and weapon material controllers independently cache material parameters named RimColor (GameCharacterMaterialController.cpp:173-178, GameShikigamiMaterialController.cpp:40-45, GameWeaponMaterialController.cpp:116-121); no C++ path connects a MaterialRim row's Color to those caches.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:16",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:30",
         "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:1201",
-        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:30"
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:173",
+        "Source/Abrams/Private/GameShikigamiMaterialController.cpp:40",
+        "Source/Abrams/Private/GameWeaponMaterialController.cpp:116"
       ],
       "status": "observed"
     },
     "Intensity": {
-      "simple": "Serialized rim intensity value.",
-      "technical": "float at offset 0x2C; 5.0 in both exported rows; constructor default 0.0. No direct consumer found.",
+      "simple": "Serialized rim intensity scalar.",
+      "technical": "float at retail offset 0x28; 5.0 in both exported rows; constructor default 0.0. No reconstructed consumer reads this field, so its scale, clamping and units are not established.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:20",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:19",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:30",
         "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:1202"
       ],
       "status": "observed"
     },
     "Offset": {
-      "simple": "Serialized rim offset value.",
-      "technical": "float at offset 0x30; 0.5 in both exported rows; constructor default 0.0. Material controllers expose RimOffset/ShadowRimOffset animator parameters, but the available C++ writes those with hard-coded values (e.g. CN_070_Actions.cpp:541) rather than from this row. No direct consumer of this field found.",
+      "simple": "Serialized rim offset scalar.",
+      "technical": "float at retail offset 0x2C; 0.5 in both exported rows; constructor default 0.0. Material controllers cache a separate RimOffset scalar parameter, and action code animates ShadowRimOffset with hard-coded or character-unique values (for example CN_070_Actions.cpp:541 passes -1.0 and 0.0), but none reads this row field. No consumer establishes the quantity, range, or sign convention.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:24",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:22",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:30",
         "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:1203",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:180",
         "Source/Abrams/Private/CN_070_Actions.cpp:541"
       ],
       "status": "observed"
     },
     "FadeInTime": {
-      "simple": "Serialized rim fade-in duration.",
-      "technical": "float at offset 0x34; 0.0 in both exported rows; constructor default 0.0. No direct consumer found.",
+      "simple": "Serialized fade-in time value (nominal duration).",
+      "technical": "float at retail offset 0x30; 0.0 in both exported rows; constructor default 0.0. No row consumer exists, so the units and whether zero means an immediate change are not proven here.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:28",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:25",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:30",
         "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:1204"
       ],
       "status": "observed"
     },
     "FadeOutTime": {
-      "simple": "Serialized rim fade-out duration.",
-      "technical": "float at offset 0x38; 0.2 in both exported rows; constructor default 0.0. No direct consumer found.",
+      "simple": "Serialized fade-out time value (nominal duration).",
+      "technical": "float at retail offset 0x34; 0.2 in both exported rows; constructor default 0.0. No row consumer exists, so the units and any reset behavior are not proven here.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:29",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:28",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MaterialRim.h:30",
         "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:1205"
       ],
       "status": "observed"
     }
   },
   "notes": [
-    "Explicit limit: exhaustive searches of Source and Plugins for MaterialRimDataTables, FGameDataTableRow_MaterialRim, StartRim*/SetRim* and the field names found only the loader, the row struct/constructor, and unrelated material-parameter machinery. No row lookup, no per-field read and no manager accessor for this array is present in the reconstruction. Meaning beyond serialized values is therefore not claimed.",
-    "The layout is decomp-backed: Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:1200-1205 pins Id 0x08, Color 0x10, Intensity 0x2C, Offset 0x30, FadeInTime 0x34, FadeOutTime 0x38; the retail TCppStructOps::Construct at 0x16c5df0 is recorded as MATCH in status/verdicts.json.",
-    "Do not conflate these two rows with MaterialOutlineDataTable's SUPER_ARMOR/HYPER_ARMOR rows: the outline table is actively read by character/shikigami status code, whereas this table's consumers are unknown.",
-    "Content is partial; a Blueprint or sequencer consumer may exist in retail but is not available as evidence here."
+    "Export coverage is one DataTable asset with no numbered shards: the catalog lists one variant, the registry summary has one /Game/DataTables/MaterialRimDataTable entry, and the export has two unique keys (SUPERARMOR, HYPERARMOR) with ImportKeyField 'Id'. The loader registers only 'MaterialRimDataTable', so MaterialRimDataTables receives one loaded UDataTable.",
+    "Retail-derived layout evidence pins a 56-byte (0x38) row: Id 0x08, Color 0x10, Intensity 0x28, Offset 0x2C, FadeInTime 0x30, FadeOutTime 0x34 (Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:1200-1205). The retail TCppStructOps::Construct at 0x16c5df0 is recorded as MATCH in status/verdicts.json:50858.",
+    "Searches of Source and Plugins for MaterialRim, MaterialRimDataTables, FGameDataTableRow_MaterialRim, exact row keys, RimColor/RimOffset/ShadowRimOffset names, Start*/Set*/Reset* rim symbols, and manager FindRowInline instantiations found only the loader, member declaration, row struct/constructor, and unrelated material-parameter or action code. No row lookup, per-field read, cache alias, or manager accessor was found.",
+    "Do not conflate this table with MaterialOutlineDataTable: the outline keys are SUPER_ARMOR/HYPER_ARMOR, which character C++ explicitly maps from status bits to AddOutline/RemoveOutline (GameCharacter.cpp:323-334). No MaterialRim field stores a cross-table key or references those names.",
+    "Retail Blueprint assets were not used as evidence here (the project guide records that Blueprints contain no logic). The absence of a traced C++ consumer is therefore an evidence gap, not proof that retail never uses the table; no retail Blueprint or sequencer binding is claimed."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:321",
+      "detail": "StartInitialLoading builds the DataTable loader name list ('MaterialRimDataTable' at line 433) and creates the primary-asset loaders at line 488; it does not itself resolve the table."
+    },
+    {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:260",
-      "detail": "StartInitialLoading resolves 'MaterialRimDataTable' into the MaterialRimDataTables array at manager offset +0x820; the loader name is registered at line 433."
+      "detail": "Inside AGameDataTableManager::Tick (line 168), after StudioLoadFlag_B90 is set and all loaders complete, the loader is resolved to a UDataTable and AddLoadedDataTables appends non-null instances to MaterialRimDataTables (+0x820, declared in GameDataTableManager.h:171)."
     },
     {
       "source": "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:1200",
-      "detail": "Retail-derived static assertions pin every serialized field's offset and the row struct's layout; this is structural evidence only, not a behavioural consumer."
+      "detail": "Retail-derived static assertions pin every serialized field offset and the row layout; this is structural evidence only, not a behavioural consumer."
     }
   ]
 }

@@ -1,53 +1,81 @@
 {
-  "description": "PvE binding-vow lottery rows that define the candidate vow IDs available from a mission-selected lottery.",
+  "description": "PvE binding-vow lottery pools: each row supplies the candidate BindingVows row IDs offered after a mission-weighted choice selects that lottery.",
   "fields": {
     "Id": {
       "simple": "Lottery row key selected from the PvE mission's Id_BindingVowsLottery/Weights lists.",
-      "technical": "FName key in BindingVowsLotteryDataTable; export label ID. IntervalPvE_PickBindingVows builds (lottery Id, weight) pairs from the PvEMission row, picks a weighted index, then resolves that key with IntervalPvE_FindRowInline over BindingVowsLotteryDataTables. There is no bank-specific weighting inside this table; every non-None candidate receives weight 1.0. None keys are skipped by the mission side.",
+      "technical": "Native FName row key (export label ID; ImportKeyField Id) in BindingVowsLotteryDataTable; all 119 exported ID labels equal their row keys. IntervalPvE_PickBindingVows builds (lottery key, mission weight) pairs from PvEMission.Id_BindingVowsLottery/Weights, skips NAME_None keys, picks one with GameSound_PickWeightedIndex, then resolves the selected key with IntervalPvE_FindRowInline over BindingVowsLotteryDataTables. The consumer looks up by row key and never reads the selected row's Id member. The native default is NAME_None; mission-side None slots are skipped. This struct has no weight field: the only weights that choose a pool live in PvEMission.Weights, and the inline finder is first-table-wins if multiple tables are ever registered. All 119 non-None keys are referenced by the exported PvE mission rows.",
       "evidence": [
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:604",
+        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVowsLottery.h:11",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:608",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:611",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:613",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:615",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:622",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:625",
-        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVowsLottery.h:10"
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:31",
+        "Source/Abrams/Private/GameDataTableManager.cpp:292",
+        "datatables/BindingVowsLotteryDataTable.json",
+        "datatables/PvEMissionDataTable.json"
       ],
       "status": "verified"
     },
     "Id_BindingVows": {
       "simple": "Candidate BindingVowsDataTable IDs in this lottery.",
-      "technical": "TArray<FName>. Each non-None ID becomes a candidate with weight 1.0; duplicates are ignored (ContainsByPredicate on the key). Candidates are then filtered by MissionOrder/MissionTask ExcludeBindingVowsEffectType, using each vow's resolved BindingVowsEffect rows, and a weighted distinct pick selects Count IDs for the mission. All exported rows have 12 slots, but the consumer does not assume a fixed length and skips None.",
+      "technical": "Native TArray<FName>; the row constructor leaves it empty. Each distinct non-None ID becomes a transient candidate with weight 1.0: NAME_None is skipped and a ContainsByPredicate key test suppresses later duplicates. There is no stored weight, rank, count, or difficulty per slot and no numeric unit; all 119 exported rows have 12 slots (291 None slots overall), with None used as padding or interspersed filler. Slot position has no weighting meaning, only first-occurrence order before deduplication; no exported row repeats a non-None ID. Candidates are filtered by MissionOrder and MissionTask ExcludeBindingVowsEffectType using GameBindingVows_GetEffectRows, which resolves the first matching vow row and then first-hit effect rows; missing vow/effect rows contribute no effects and cannot trigger exclusion. The wave and task passes are sequential and any matching excluded EffectType removes the candidate. Weighted picks without replacement then select Count IDs; both runtime call sites pass Count=5, and if filtering leaves fewer candidates the loop returns fewer IDs (none for an empty pool). The resulting IDs are passed to the PvE vow-selection UI as candidate buttons.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVowsLottery.h:15",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:628",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:630",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:643",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:665",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:677",
-        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVowsLottery.h:14"
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:632",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:641",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:659",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:673",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:679",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:241",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:245",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:253",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:973",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:1117",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:1294",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:1578",
+        "Source/Abrams/Private/GameVsEnemyIntervalWidget.cpp:304",
+        "datatables/BindingVowsLotteryDataTable.json",
+        "datatables/BindingVowsDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "AGameDataTableManager::Tick resolves only the single retail asset BindingVowsLotteryDataTable into BindingVowsLotteryDataTables (Source/Abrams/Private/GameDataTableManager.cpp:292, Source/Abrams/Public/GameDataTableManager.h:203).",
-    "The only identifiable row-struct consumer in the reconstructed source is IntervalPvE_PickBindingVows; no other C++ reader of this exact struct was found. Blueprint/uncooked consumers cannot be excluded from the partial Content set.",
-    "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:611-633",
-    "Evidence is reconstructed retail-behaviour source plus serialized export schema; exported array values are not treated as semantic proof."
+    "AGameDataTableManager::StartInitialLoading registers the single retail primary-asset name BindingVowsLotteryDataTable (Source/Abrams/Private/GameDataTableManager.cpp:465); after loaders complete, Tick resolves it through the asset manager and appends the UDataTable to the plain TArray in BindingVowsLotteryDataTables (Source/Abrams/Private/GameDataTableManager.cpp:168-176,292; Source/Abrams/Public/GameDataTableManager.h:203; Source/Abrams/Public/GameDataTableArray.h:11). IntervalPvE_FindRowInline skips nothing itself but is called with non-None keys and returns the first table hit; no other table alias or dedicated row cache was found.",
+    "The only identifiable row-struct consumer in the reconstructed source is IntervalPvE_PickBindingVows; no other C++ reader of FGameDataTableRow_BindingVowsLottery was found. Indirect consumers receive only its resulting vow-ID array.",
+    "Exported data relationships: every non-None lottery row key is referenced by PvEMission.Id_BindingVowsLottery; the 1137 non-None slots contain 145 distinct BindingVows IDs, all present in BindingVowsDataTable. No exported row repeats a non-None ID, so the runtime duplicate suppression is not exercised by the supplied data.",
+    "Downstream path: PvEMission Id_BindingVowsLottery/Weights choose one lottery, its non-None Id_BindingVows entries become equal-weight candidates, MissionWave/MissionOrder and MissionTask exclusions remove candidates by joined effect type, and up to five distinct IDs are written to MissionValues. Both offline and online intervals pass those IDs to OpenBindingVowsSelect, which copies them to CandidateVowIds and binds them to the vow buttons in output order (Source/Abrams/Private/GamePhase_IntervalPvE.cpp:604-681,973,1117,1294,1578; Source/Abrams/Private/GameVsEnemyIntervalWidget.cpp:304-312; Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:37-62).",
+    "Evidence is reconstructed static C++ annotated to retail RVAs plus the serialized export schema and values. No retail Blueprint graph or uncooked consumer evidence was inspected; the partial Content set contained no BindingVowsLottery asset, so additional non-C++ consumers cannot be excluded."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:604",
-      "detail": "IntervalPvE_PickBindingVows assembles mission lottery keys and weights."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:168-176,292,465",
+      "detail": "Registers the single BindingVowsLotteryDataTable primary asset, resolves it after loading, and appends it to BindingVowsLotteryDataTables."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:625",
-      "detail": "Resolves the weighted-selected lottery row from BindingVowsLotteryDataTables."
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:604-681",
+      "detail": "IntervalPvE_PickBindingVows chooses a mission lottery by PvE weights, deduplicates its non-None vow IDs, applies MissionOrder/MissionTask effect-type exclusions, and picks distinct IDs without replacement."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:628",
-      "detail": "Turns Id_BindingVows into unique unit-weight candidates, filters by effect type exclusions, then picks distinct vows."
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:611-626",
+      "detail": "Pairs PvEMission.Id_BindingVowsLottery with Weights by index, skips None, uses GameSound_PickWeightedIndex, and resolves the selected row through the first matching BindingVowsLotteryDataTables entry."
     },
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:292",
-      "detail": "Load/registry path for BindingVowsLotteryDataTable."
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:241-271",
+      "detail": "GameBindingVows_GetEffectRows joins each candidate vow ID through BindingVowsDataTable and BindingVowsEffectDataTable with first-table/first-hit precedence; unresolvable IDs yield no effects for the exclusion checks."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:973,1117,1294,1578",
+      "detail": "Offline and online interval setup request five candidate IDs and pass MissionValues to the binding-vow selection UI."
+    },
+    {
+      "source": "Source/Abrams/Private/GameVsEnemyIntervalWidget.cpp:304-312; Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:37-62",
+      "detail": "Copies the chosen IDs into CandidateVowIds and binds them, in order, to visible vow-selection buttons; surplus buttons are hidden."
     }
   ]
 }

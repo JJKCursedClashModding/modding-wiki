@@ -1,68 +1,121 @@
 {
-  "description": "Maps player-card emblem rows to a character and rarity grade so the UI can select the matching emblem item artwork for a profile.",
+  "description": "Maps player-card emblem rows to a character and rarity grade so the UI can select the matching emblem item artwork for a profile. The row stores no texture or ownership state; it is the numeric ID bridge between a saved card selection, an Item row and the widget texture cache.",
   "fields": {
     "Id": {
-      "simple": "Emblem row identifier.",
-      "technical": "FName key saved in FGamePlayerCardParameter::EmblemId and packed into leaderboard cards as a numeric string. Validate() resets the ID to '10' when no row exists; ResetUnownedIds also resets to '10' when the corresponding owned/unlocked emblem item is missing. Customize tiles copy the row ID into their tile item and then map to an Item row through VariableId for the new-item flag.",
+      "simple": "Emblem row identifier used as the saved player-card emblem ID.",
+      "technical": "FName. The native property is Id; the retail export writes the value as ID and declares ImportKeyField Id. Direct lookups use the UDataTable row name (all 113 exported keys equal their ID value), and PlayerCard_FindEmblemRow returns the first non-null row across PlayerCardEmblemDataTables (DTM+0xAB0). FGamePlayerCardParameter::Validate and leaderboard decode fall back to FName('10') when the row is absent; ResetUnownedIds falls back to '10' when the chosen ID is not in the owned/unlocked emblem-row set. FGameUserCustomizePlayerCardInfo constructs the save block with EmblemId '10', and SetEmblem maps invalid/None input to '10'. The editor copies the row Id into the tile item, then joins Item::VariableId -> row Id for the new-item flag and brush display. Leaderboard packing converts the decimal row key with FCString::Atoi into a uint16 EmblemNumber and reconstructs it with FString::FromInt; exported keys are numeric 10..2230.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardEmblem.h:11",
+        "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardEmblem.h:12",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:135",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:164",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:218",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:339",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:645",
-        "Source/Abrams/Private/GameCustomizeCardEmblemTileWidget.cpp:17"
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:675",
+        "Source/Abrams/Private/GamePlayerCardEmblemWidget.cpp:16",
+        "Source/Abrams/Private/GameCustomizeCardEmblemTileWidget.cpp:36",
+        "Source/Abrams/Private/GameUserCustomizePlayerCardInfo.cpp:7",
+        "Source/Abrams/Public/GameOnlineLeaderboardRecord.h:19"
       ],
       "status": "verified"
     },
     "GradeType": {
       "simple": "Emblem grade/rarity tier.",
-      "technical": "EGameEmblemGradeType (None, Grade1..Grade4, Invalid=255). SetEmblem casts it to uint8 and passes it with Id_Character to PlayerCard_FindEmblemItemId, which scans emblem rows for the same character/grade pair, then finds an Emblem-typed Item row whose VariableId is that emblem row's Id; the resulting Item ID selects the emblem texture. Exported rows use Grade1..Grade4.",
+      "technical": "EGameEmblemGradeType : uint8 with None=0, Grade1=1, Grade2=2, Grade3=3, Grade4=4 and Invalid=255. The row constructor defaults it to None; the export uses only Grade1 (29 rows) and Grade2..Grade4 (28 rows each). UGamePlayerCardEmblemWidget::SetEmblem casts the value to uint8 and passes it with the row's Id_Character to PlayerCard_FindEmblemItemId(..., false). That finder enumerates all emblem rows in table/row-name order, takes the first row whose Id_Character and numeric GradeType match, then the first Emblem-typed Item row whose VariableId is that row's Id; a missing Item returns NAME_None immediately instead of trying later emblem rows. The resulting Item ID is the key for the EmblemParameterMap texture lookup. No grade, unlock flag or sort value is stored on this row; those come from the associated Item row and save stock.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameEmblemGradeType.h:6",
+        "Source/AbramsDataTable/Private/GameDataTableRow_PlayerCardEmblem.cpp:4",
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardEmblem.h:16",
         "Source/Abrams/Private/GamePlayerCardEmblemWidget.cpp:23",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:364",
-        "Source/Abrams/Private/GamePlayerCardParameter.cpp:375"
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:375",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:379",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:385",
+        "Source/Abrams/Private/GameWidgetDynamicIconParameter.cpp:73"
       ],
       "status": "verified"
     },
     "Id_Character": {
-      "simple": "Character whose emblem design this row represents.",
-      "technical": "FName compared against the selected character ID in PlayerCard_FindEmblemItemId. Together with GradeType it identifies the emblem row whose ID is used to find the Emblem Item row and thus the texture asset. Owned-emblem collection also joins from Item::VariableId back to this row's Id.",
+      "simple": "Character identity associated with the emblem design.",
+      "technical": "FName. In the traced display path SetEmblem does not receive a character argument: it finds the row by EmblemId and then passes Row->Id_Character back into the finder, which compares it for equality with each emblem row's Id_Character. It is therefore a self-consistent pair key with GradeType for row -> Item resolution, not the active/selected character and not a runtime-validated Character foreign key (no Character row is dereferenced). The export has 27 CP_* values, CN_240 and the literal NAME_None on row 486; all are matched literally. Item::VariableId joins back to the row Id rather than to this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardEmblem.h:19",
-        "Source/Abrams/Private/GamePlayerCardParameter.cpp:367",
+        "Source/Abrams/Private/GamePlayerCardEmblemWidget.cpp:17",
+        "Source/Abrams/Private/GamePlayerCardEmblemWidget.cpp:23",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:375",
-        "Source/Abrams/Private/GamePlayerCardParameter.cpp:379"
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:379",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:218"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The export contains 113 rows across four grades and 29 character IDs. Multiple PlayerCardEmblemDataTable shards are supported; finders use the first row matching the ID.",
-    "This row has no direct texture field: the display path is Emblem row -> (Id_Character, GradeType) lookup -> matching Emblem Item row's ID -> GetEmblemTexture. The reverse path for ownership is Item::VariableId -> Emblem row.",
-    "Only the supplied retail export and partial Content are available; no claim is made about all Blueprint or editor-tool uses."
+    "Exported data: one PlayerCardEmblemDataTable object with 113 rows (29 Grade1, 28 Grade2, 28 Grade3, 28 Grade4) and 29 distinct Id_Character values (27 CP_* IDs, CN_240 and the literal NAME_None on row 486). Every row key equals its ID field, every key is numeric, no (Id_Character, GradeType) pair repeats, and all 113 rows map one-to-one to Emblem-typed Item rows by Item::VariableId = row ID (Item IDs ITM_EMBLEM_*, Id_ItemText = Item::Id). PossessionMax=1 for all; 27 Grade1 items have InitialPossession=1 and the other 86 have 0. UserProgressFlag -1 means always unlocked; flags 3/6/7 are progress-bit gates.",
+    "Manager/loader: StartInitialLoading registers one primary-asset loader named PlayerCardEmblemDataTable, and Tick resolves that single asset into PlayerCardEmblemDataTables (DTM+0xAB0). FGameDataTableArray's generic helpers can enumerate multiple tables, but no numbered PlayerCardEmblemDataTable shards or per-character slices exist in the supplied export tree; first-hit/first-match precedence only matters if duplicate keys or duplicate (character, grade) pairs are introduced.",
+    "Display path: SetEmblem reads no texture from this row. It resolves row -> (Id_Character, GradeType) -> first matching Emblem Item -> GameWidgetManager::GetEmblemTexture(Item::Id) -> EmblemParameterMap entry or a null default texture; a missing row/Item/map entry hides the icon, while ClearEmblem clears the brush. bUnlockedOnly is false here, so display does not require ownership. Tile setup uses the owned/unlocked item path instead: stock count > 0 plus the UserProgressFlag unlock test, Item::VariableId -> row ID, stable-sorted by Item::SortingOrder (6001..6412), with GameItem_IsNew(Item::Id) setting the new flag.",
+    "Default/fallback sentinel '10' is row 10 (CP_010/Grade1); its Item ITM_EMBLEM_0010 is initially owned (InitialPossession=1) and unlocked (UserProgressFlag=-1). Validate and leaderboard decode use it for a missing row, ResetUnownedIds after DLC sanitize uses it when the chosen ID is not owned/unlocked, and SetEmblem uses it for invalid/None input.",
+    "Evidence boundary: runtime claims are from reconstructed C++ with cited retail RVAs and status checks (0x1639090 SetEmblem, 0x16238d0 Validate, 0x1629e80 owned-row collection and 0x1626f00 reset are byte MATCH; 0x1625450 row finder is EQUIV; 0x12c5b00 item-ID finder and 0x1629650/0x16299b0 leaderboard paths are behavior-certified). EmblemParameterMap population is not in Source, and no retail Blueprint graphs, editor assets or live game run were inspected."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:301",
-      "detail": "Loads PlayerCardEmblemDataTable into PlayerCardEmblemDataTables."
+      "detail": "After all primary-asset loaders complete, resolves the single PlayerCardEmblemDataTable asset into PlayerCardEmblemDataTables (DTM+0xAB0); the loader name is also registered at line 474."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:135",
+      "detail": "Validate finds the saved EmblemId by row name with bCheckNone/bUnknown set and resets it to '10' when no emblem row exists."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:164",
+      "detail": "PlayerCard_FindEmblemRow is the shared first-table, first-row lookup for the saved emblem ID and returns null on a miss."
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:210",
-      "detail": "Builds the owned emblem row list by resolving owned/unlocked Emblem Item rows' VariableId to emblem rows."
+      "detail": "PlayerCard_GetOwnedEmblemRows maps owned (stock count > 0) and unlocked Emblem Item rows' VariableId to PlayerCardEmblem rows, optionally stable-sorted by Item::SortingOrder."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:319",
+      "detail": "PlayerCard_ResetUnownedIds checks that set during customize/DLC sanitize and resets a non-owned EmblemId to '10'."
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:364",
-      "detail": "Finds the emblem Item row for a character/grade pair using Id_Character and GradeType."
+      "detail": "PlayerCard_FindEmblemItemId uses Id_Character plus the uint8 GradeType to pick the first matching emblem row and then its Item row, returning the Item ID or NAME_None."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:644",
+      "detail": "Leaderboard card decode converts the packed EmblemNumber to a decimal FName and keeps it only when the emblem row exists, otherwise '10'; line 675 performs the Atoi pack."
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardEmblemWidget.cpp:14",
-      "detail": "Draws the emblem texture selected by the saved emblem ID through the row's character/grade pair."
+      "detail": "SetEmblem defaults invalid/None IDs to '10', finds the row, passes its character/grade pair to the item-ID finder and sets or hides the cached emblem texture."
     },
     {
-      "source": "Source/Abrams/Private/GameCustomizeCardEmblemTileWidget.cpp:4",
-      "detail": "Builds owned emblem selection tiles and uses the row ID to query new-item state."
+      "source": "Source/Abrams/Private/GameWidgetManager.cpp:1514",
+      "detail": "GetEmblemTexture forwards the Item ID to GameWidgetDynamicIconParameter::FindEmblemTexture, which reads EmblemParameterMap or a null default parameter."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCustomizeCardEmblemTileWidget.cpp:23",
+      "detail": "SetupTiles builds owned emblem tiles from the row set, copies Row->Id into each tile item and queries the new flag through the matching Item row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCustomizeCardEmblemTileWidget.cpp:174",
+      "detail": "Focusing a tile clears the save's new flag on the Item row resolved from the tile's emblem row ID."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCustomizeCardEmblemTileItemWidget.cpp:17",
+      "detail": "Each tile entry passes its stored emblem row ID back into UGamePlayerCardEmblemWidget::SetEmblem."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCustomizePlayerCardEditWidget.cpp:270",
+      "detail": "The editor save sends the emblem tile's selected row ID to GM_SetPlayerCardIds_1320A70 and BuildEditedCard, which writes the player-card copy."
+    },
+    {
+      "source": "Source/Abrams/Private/GameManager.cpp:370",
+      "detail": "GM_SetPlayerCardIds_1320A70 accepts the emblem selection only when the FName is valid and non-None into UserCustomize.PlayerCard.EmblemId."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemIconWidget.cpp:154",
+      "detail": "Inventory emblem icons bypass this row and resolve the Item ID directly through the same GetEmblemTexture cache."
     }
   ]
 }

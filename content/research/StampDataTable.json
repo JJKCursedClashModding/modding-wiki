@@ -3,82 +3,127 @@
   "fields": {
     "Id": {
       "simple": "Stamp row identifier.",
-      "technical": "FName row key. Selecting a stamp sends this ID in an EGameOnlineSendMessageType::Stamp network message; the receiving ChatMessageWidget resolves the row by Request.RowName in StampDataTables and uses the first matching table. The ID is not used for the sprite or text directly.",
+      "technical": "FName; the export's ImportKeyField is Id and all 31 rows use the same STAMP_0xx string as row key and ID. Selecting a stamp puts this value in FGameOnlineSendMessage::ID with Type=EGameOnlineSendMessageType::Stamp; after online filtering/broadcast, UGameChatMessageWidget copies it to FPendingRequest::RowName and FindRow<FGameDataTableRow_Stamp> scans StampDataTables in array order, stopping at the first match (no row means no stamp display). The value is not read to choose the sprite, caption, or voice; those come from other fields of the matched row.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Stamp.h:11",
         "Source/Abrams/Private/GameCommonChatListWidget.cpp:159",
         "Source/Abrams/Private/GameCommonChatListWidget.cpp:167",
+        "Source/Abrams/Private/GameOnlineManager.cpp:3564",
+        "Source/Abrams/Private/GameOnlineManager.cpp:1441",
+        "Source/Abrams/Private/GameChatMessageWidget.cpp:132",
         "Source/Abrams/Private/GameChatMessageWidget.cpp:368"
       ],
       "status": "verified"
     },
     "FileName": {
       "simple": "Paper sprite asset name for the stamp image.",
-      "technical": "FName. Stamp list entries resolve it with FindDynamicLoadSprite and set it on the stamp image; incoming stamp messages use the same field for ShowStampMessage. Lobby/battle-interval startup and WidgetTest also prefetch every stamp sprite as GamePrimaryAssetType_WidgetSprite from this field.",
+      "technical": "FName used as a WidgetSprite primary-asset name. Stamp list items pass it to FindDynamicLoadSprite (a DynamicLoadSpriteMap lookup, not an on-demand load) and set the result on the stamp image; incoming stamps copy it into FGameStampMessageRequest::FileName, and ShowStampMessage repeats the cache lookup. Visual-lobby, PvE-interval, and WidgetTest setup create GamePrimaryAssetType_WidgetSprite loaders from every row's FileName and later insert the loaded sprites under the same key; a missing prefetch leaves a null brush.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Stamp.h:15",
         "Source/Abrams/Private/GameStampListViewItemWidget.cpp:20",
         "Source/Abrams/Private/GameChatMessageWidget.cpp:378",
         "Source/Abrams/Private/GameChatMessageWidget.cpp:399",
         "Source/Abrams/Private/GamePhase_BattleVisualLobby.cpp:1580",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:380"
+        "Source/Abrams/Private/GamePhase_BattleVisualLobby.cpp:1584",
+        "Source/Abrams/Private/GamePhase_BattleVisualLobby.cpp:1621",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:380",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:385",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:450",
+        "Source/Abrams/Private/GamePhase_WidgetTest.cpp:104",
+        "Source/Abrams/Private/GamePhase_WidgetTest.cpp:122",
+        "Source/Abrams/Private/GamePhase_WidgetTest.cpp:154",
+        "Source/Framework/Public/WidgetManager.h:98",
+        "Source/Framework/Public/WidgetManager.h:101"
       ],
       "status": "verified"
     },
     "Id_StampText": {
-      "simple": "Localized caption/button text for the stamp.",
-      "technical": "FName. Set as the stamp entry's button text with SetButtonTextId (EApplicationLanguage::Invalid), and copied into FGameStampMessageRequest::TextId for incoming chat stamps so the message text uses the row's caption.",
+      "simple": "Localized caption text ID for the stamp.",
+      "technical": "FName key, not the localized string itself. List items call SetButtonTextId(Id_StampText, EApplicationLanguage::Invalid); Invalid makes SetButtonTextId use SetTextIdOnly/current language. Incoming stamps copy the key into FGameStampMessageRequest::TextId, and ShowStampMessage also calls SetTextIdOnly, which resolves non-SYS IDs through AGameTextManager's shared GameText tables. StampTextDataTable_<Language> is one of those tables; every exported stamp ID has a row in all 11 exported locales. A missing ID resolves to an empty string; no shipped row is empty.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Stamp.h:19",
         "Source/Abrams/Private/GameStampListViewItemWidget.cpp:19",
         "Source/Abrams/Private/GameChatMessageWidget.cpp:377",
-        "Source/Abrams/Private/GameChatMessageWidget.cpp:397"
+        "Source/Abrams/Private/GameChatMessageWidget.cpp:397",
+        "Source/Abrams/Private/GameWidgetButton.cpp:114",
+        "Source/Abrams/Private/GameTextManager.cpp:56",
+        "Source/Abrams/Private/GameTextManager.cpp:555",
+        "Source/Abrams/Private/GameTextManager.cpp:681"
       ],
       "status": "verified"
     },
     "Id_Voice": {
-      "simple": "Voice ID played when the stamp is sent/shown.",
-      "technical": "FName passed to AGameSoundManager::PlayVoiceById with the sender's character index. It is used on the receiving display path in ShowStampMessage; the export uses VoCha_* IDs matching the stamp's character.",
+      "simple": "Voice ID played when an incoming stamp is displayed.",
+      "technical": "FName key into VoiceDataTables. UGameChatMessageWidget::ShowRequest (not ShowStampMessage itself) calls AGameSoundManager::PlayVoiceById(Id_Voice, sender index) after a stamp row is found; it resolves the Voice row to CueSheetName/CueName and plays it on the sender's slot, returning -1 when no Voice row exists. The local send-selection path does not play this voice. All 31 exported IDs are VoCha_* values present in VoiceDataTable, with CP_* prefixes matching their caption IDs; that is an export naming pattern, not a runtime check of the sender's character.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Stamp.h:22",
-        "Source/Abrams/Private/GameChatMessageWidget.cpp:379"
+        "Source/Abrams/Private/GameChatMessageWidget.cpp:379",
+        "Source/Abrams/Private/GameSoundManager.cpp:960",
+        "Source/Abrams/Private/GameSoundManager.cpp:962",
+        "Source/Abrams/Private/GameCommonChatListWidget.cpp:159"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The export contains 31 rows. Multiple StampDataTable shards are supported; incoming messages scan tables in order and use the first matching row.",
-    "The stamp list is built from all rows in StampDataTables and paired with the chat list in UGameCommonChatListWidget::InitializeWidget; no separate ownership/progress field exists in this row.",
-    "Only the supplied retail export and partial Content are available; no claim is made about all Blueprint or editor-tool uses."
+    "The supplied export has exactly one StampDataTable shard with 31 rows (STAMP_001-STAMP_031). Each Id equals its row key, and Id, FileName, Id_StampText, and Id_Voice are all populated and unique within the export. There are no numeric fields, units, or coded sentinel values in the row; the empty native constructor leaves FName members as NAME_None only for rows that omit them.",
+    "FGameDataTableArray can hold multiple UDataTable pointers and incoming lookup scans them in array order, breaking at the first matching row, but AGameDataTableManager::StartInitialLoading requests only the primary asset named StampDataTable and AddLoadedDataTables skips nulls. The reconstructed retail load path therefore has at most one stamp table; no numbered StampDataTable shards were supplied or referenced.",
+    "InitializeWidget builds the stamp list from every row (table order, then row-name order) with no character or chat-category filter, and SetupChatList passes that same list to the chat window. The row has no ownership, unlock, progress, or array-index field.",
+    "Indirect dependencies are locale-specific StampTextDataTable_<Language> for Id_StampText, WidgetSprite primary assets cached in DynamicLoadSpriteMap for FileName, and VoiceDataTable for Id_Voice. Missing text, sprite, or voice data yields an empty string, null brush, or -1 respectively rather than a fallback row.",
+    "No retail Blueprint/editor-tool source or full Content tree was available. C++ conclusions come from the reconstructed static source and the supplied exports, not a runtime retail capture."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:262",
-      "detail": "Loads StampDataTable into StampDataTables."
+      "detail": "Resolves the single StampDataTable primary asset into StampDataTables after all loaders complete; StartInitialLoading registers only that name (:435)."
     },
     {
       "source": "Source/Abrams/Private/GameCommonChatListWidget.cpp:42",
-      "detail": "Builds the selectable stamp list from all rows."
+      "detail": "Rebuilds all stamp item data from every row in InitializeWidget; SetupChatList passes the unfiltered list to the chat window (:221)."
     },
     {
       "source": "Source/Abrams/Private/GameCommonChatListWidget.cpp:159",
-      "detail": "Sends the selected row's Id as a Stamp chat message."
+      "detail": "On selection sends the row's Id as an FGameOnlineSendMessage with Type=Stamp, arms the shared fixed-phrase cooldown, and closes the chat window."
+    },
+    {
+      "source": "Source/Abrams/Private/GameOnlineManager.cpp:3564",
+      "detail": "Sends the Stamp message to the local user and unmuted users when online communication is enabled; the receive path filters blocked/muted senders before broadcasting to widgets (:1441)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameChatMessageWidget.cpp:122",
+      "detail": "Queues Chat/Stamp messages only while the chat message widget is open; Message.ID becomes the pending row name (:132)."
     },
     {
       "source": "Source/Abrams/Private/GameStampListViewItemWidget.cpp:15",
-      "detail": "Displays each stamp's caption and sprite."
+      "detail": "Displays each stamp's localized caption and cached sprite on its list button, clearing the brush when released (:25)."
     },
     {
       "source": "Source/Abrams/Private/GameChatMessageWidget.cpp:365",
-      "detail": "Resolves an incoming stamp row and shows its text, sprite, and voice."
+      "detail": "Resolves the first StampDataTables row matching the incoming row name, copies text/sprite IDs, plays the voice by sender slot, and shows a pooled stamp content widget."
+    },
+    {
+      "source": "Source/Abrams/Private/GameChatMessageWidget.cpp:395",
+      "detail": "ShowStampMessage applies the localized text, sender name, and cached sprite to the stamp content."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattleVisualLobby.cpp:1578",
-      "detail": "Prefetches all stamp sprites for the visual lobby/battle chat."
+      "detail": "Creates GamePrimaryAssetType_WidgetSprite loaders from all stamp FileNames, then caches the loaded sprites in the widget manager's DynamicLoadSpriteMap (:1584, :1621)."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:380",
-      "detail": "Prefetches all stamp sprites for PvE battle intervals."
+      "detail": "Adds all stamp FileNames to the PvE-interval WidgetSprite prefetch and caches the loaded sprites (:385, :450)."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_WidgetTest.cpp:103",
+      "detail": "The test phase also prefetches every stamp sprite through WidgetSprite loaders and the sprite cache (:122, :154)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:555",
+      "detail": "Loads locale-specific StampTextDataTable_<Language> into the shared GameText tables used by SetTextIdOnly."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSoundManager.cpp:960",
+      "detail": "PlayVoiceById resolves Id_Voice through VoiceDataTables and plays CueSheetName/CueName on the supplied slot, returning -1 for a missing row."
     }
   ]
 }

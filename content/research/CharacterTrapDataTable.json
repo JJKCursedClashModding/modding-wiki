@@ -1,45 +1,79 @@
 {
-  "description": "Per-character lists of trap actor Blueprint asset names used by the character's traps; consumed as a battle preload source rather than as per-trap tuning data.",
+  "description": "Per-character lists of trap Blueprint asset names collected by the shared retail trap asset collector during battle preparation and battle preload; this table holds asset selection, not per-trap tuning data.",
   "fields": {
     "ID": {
-      "simple": "Row key referenced from Character::Id_CharacterTrap entries.",
-      "technical": "FName primary key (ImportKeyField=Id in the export). BattleAssets_Traps_12BCE80 iterates Character::Id_CharacterTrap, skips None and resolves each entry against CharacterTrapDataTables (DTM +0x4C0).",
+      "simple": "Row key, matching the character-side Id_CharacterTrap entries.",
+      "technical": "FName FGameDataTableRow_CharacterTrap::Id at row+0x08 behind the 8-byte FTableRowBase; the export writes it as ID while ImportKeyField is Id. All five exported rows have ID equal to their row key (CP_130, CP_140, CP_150, CN_122, CN_250), and each is referenced once by CharacterDataTable::Id_CharacterTrap; the second trap-ID slot is None in each referencing character. BattleAssets_Traps_12BCE80 skips None trap IDs and resolves each remaining ID with FindRow<FGameDataTableRow_CharacterTrap>(Id, TEXT(\"\"), false) over CharacterTrapDataTables (DTM +0x4C0), taking the first non-null matching row without a missing-row warning. The stored Id value is not otherwise read by the observed consumers; no Blueprint-only reader can be confirmed from the available evidence.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterTrap.h:11",
+        "Tools/layout/class-layouts.json",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Character.h:42",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:111",
-        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:117"
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:113",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:117",
+        "Source/Abrams/Public/GameDataTableManager.h:117"
       ],
       "status": "verified"
     },
     "FileName_BP": {
-      "simple": "Array of trap Blueprint asset names to preload for the character.",
-      "technical": "TArray<FName>, row +0x10, values such as TR_040_00_BP. The asset collector appends the entire array to the battle preload/prepare asset-name list; the row provides no trap stats, sockets or spawn rules. Missing rows are ignored. This is the only identifiable direct consumer in the reconstructed source, so no further runtime behavior is claimed.",
+      "simple": "Array of Trap primary-asset Blueprint names to preload for the traps listed by the character.",
+      "technical": "TArray<FName> at row+0x10; the constructor leaves it empty, so every exported value comes from data. Each of the five exported rows serializes exactly ten positional slots with no per-index behavior: 13 non-None names and 37 None entries in total. BattleAssets_Traps_12BCE80 appends the entire array for every resolved trap row, including None entries, unlike the None trap-ID filter; GamePrimaryAssetLoader_CreateLoaders then skips None names and duplicate asset names and keeps the first occurrence when building the GamePrimaryAssetType_Trap loader map. These are FName asset names, not trap row IDs, and no statistics, sockets, spawn rules or units are stored. All 13 exported names match FileName_BP values in TrapDataTable (TR_010_00_BP is shared by TR_010_00/_01/_02 and TR_032_00_BP comes from TR_030_00), but no code joins the two tables. The collector has two direct call sites: battle prepare collects TrapNames into StudioTrapLoaders_860, and battle preload collects Names into StudioTrapLoaders_2C0; both maps are later merged into StudioRetainedLoaders_90. The level-sequencer path creates an empty TrapNames list and does not read this table. Missing CharacterTrap rows contribute nothing. Runtime spawning independently reads TrapDataTable's own FileName_BP through AGameTrapManager::SpawnPooled and the same Trap primary asset type; that shared asset identity is an indirect relationship, not a read of this row.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterTrap.h:15",
-        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:117",
-        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:118",
-        "Source/Abrams/Public/BattleCharacterAssetCollectors.h:19"
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterTrap.cpp:3",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:104",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:119",
+        "Source/Abrams/Private/GameDataTableManager.cpp:82",
+        "Source/Abrams/Private/GameDataTableManager.cpp:87",
+        "Source/Abrams/Private/GameDataTableManager.cpp:111",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:256",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:296",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:304",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:306",
+        "Source/Abrams/Private/GamePhase.cpp:240",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:1073",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:541",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:594",
+        "Source/Abrams/Private/GameTrapManager.cpp:186",
+        "Config/DefaultGame.ini:18"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Export contains 5 rows with up to ten FileName_BP slots each; most slots are None.",
-    "Distinct from TrapDataTable (DTM +0x670), which is used for the track-sequence/voice trap lookups; this table's only observed use is character asset collection.",
-    "Single table asset 'CharacterTrapDataTable' loaded into DTM +0x4C0; no shards or localization variants in the export.",
-    "Reconstructed source with cited retail RVAs; Blueprint-only consumers and uncooked assets are out of scope."
+    "Export contains exactly one CharacterTrapDataTable asset with 5 rows; every row has ten FileName_BP slots, of which 13 are populated and 37 are None. The None asset entries are passed to the loader builder but discarded there.",
+    "Distinct from TrapDataTable (DTM +0x670), which supplies trap rows, ActionType and spawn asset names to gameplay controllers and AGameTrapManager. The CharacterTrap collector does not read TrapDataTable or ActionType; the two converge only on Trap primary asset names.",
+    "Lookup precedence is first non-null row in CharacterTrapDataTables in array order; only the single 'CharacterTrapDataTable' loader is registered in this export/build (DTM +0x4C0), after all DataTable loaders complete. The resulting trap loaders are retained in UGamePhase::StudioRetainedLoaders_90 on phase exit.",
+    "The collector is recorded as a byte MATCH at retail RVA 0x12bce80 in status/verdicts.json; loader/cache and spawn contexts are reconstructed C++ with retail RVA comments. Retail Blueprint graphs and cooked assets were not available, so Blueprint-only consumers cannot be excluded."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:206",
-      "detail": "Loads CharacterTrapDataTable into AGameDataTableManager::CharacterTrapDataTables."
+      "detail": "Resolves the single 'CharacterTrapDataTable' primary asset into AGameDataTableManager::CharacterTrapDataTables (+0x4C0)."
     },
     {
-      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:111",
-      "detail": "Iterates Character::Id_CharacterTrap, skipping None IDs."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:354",
+      "detail": "Registers 'CharacterTrapDataTable' in the DataTable primary-asset name list."
     },
     {
-      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:117",
-      "detail": "Resolves the trap row and appends FileName_BP to preload lists."
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:104",
+      "detail": "BattleAssets_Traps_12BCE80 resolves Character::Id_CharacterTrap entries and appends FileName_BP to the caller's name array."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:256",
+      "detail": "Battle prepare state 1 collects trap names for the StudioTrapLoaders_860 map built at line 296."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:304",
+      "detail": "Battle preload collects trap names for the StudioTrapLoaders_2C0 map built at line 306."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase.cpp:240",
+      "detail": "StudioTrapLoaders_2C0 is appended to StudioRetainedLoaders_90 on phase exit; the battle-prepare map is retained in GamePhase_BattleBase.cpp:1073."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTrapManager.cpp:186",
+      "detail": "Indirect asset-name convergence: spawn-time traps are resolved from TrapDataTable FileName_BP through the same Trap primary asset type, not from this table."
     }
   ]
 }

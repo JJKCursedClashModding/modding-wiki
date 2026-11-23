@@ -1,83 +1,182 @@
 {
-  "description": "Per-shikigami material-pattern definitions: which named material sections are shown for patterns P1-P5 while others are hidden.",
+  "description": "Per-shikigami material-pattern definitions: five TArray<FName> arrays select the parent-material names whose mesh sections UGameShikigamiMaterialController shows or hides for zero-based patterns P1-P5.",
   "fields": {
     "ID": {
-      "simple": "Material set ID, e.g. CN_040.",
-      "technical": "FName row key referenced by ShikigamiDataTable.Id_ShikigamiMaterial. Both UGameShikigamiMaterialController::SetMaterialPattern (retail 0x141497b80) and the targeted-show variant resolve the row from ShikigamiMaterialDataTables (+0x6D0) using Shikigami_FindRow; None/missing rows leave materials unchanged. 3 exported rows.",
+      "simple": "Material-pattern row ID, e.g. CN_040.",
+      "technical": "FName native member Id, exported as ID with ImportKeyField=Id; its value equals each exported row key. ShikigamiDataTable.Id_ShikigamiMaterial selects this row. When the controller receives a null Row, it casts its owner to AGameShikigami and uses Shikigami_FindRow over the manager's ShikigamiMaterialDataTables (+0x6D0): the finder rejects NAME_None and returns the first matching row in registration order, or nullptr. A missing/None ID therefore returns before any section toggle or MaterialPattern write. Both table-consuming methods in the reconstructed C++ are called with a null Row, so the optional explicit-Row bypass is not exercised by a known caller. The manager registers the single loader name ShikigamiMaterialDataTable, resolves it to a UDataTable only after all DataTable loads complete, and skips a null result. The export has three rows (CN_040, CN_052, CN_080); four exported shikigami rows point at them (CN_040, CN_052, CN_052_10, CN_080) and all four resolve, while the other 16 shikigami rows use None. The C++ row constructor leaves Id and all arrays at their defaults; the seven exported slots are data convention, not a fixed native array size.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiMaterial.h:11",
+        "Source/AbramsDataTable/Private/GameDataTableRow_ShikigamiMaterial.cpp:3",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Shikigami.h:18",
+        "Source/Abrams/Private/GameShikigami.cpp:798",
         "Source/Abrams/Private/GameShikigami.cpp:1710",
         "Source/Abrams/Private/GameShikigami.cpp:1787",
-        "Source/AbramsDataTable/Public/GameDataTableRow_Shikigami.h:18",
-        "Source/Abrams/Private/GameDataTableManager.cpp:239"
+        "Source/Abrams/Private/GameDataTableManager.cpp:146",
+        "Source/Abrams/Private/GameDataTableManager.cpp:239",
+        "Source/Abrams/Private/GameDataTableManager.cpp:411",
+        "JJKCCDatatables/datatables/ShikigamiMaterialDataTable.json",
+        "JJKCCDatatables/datatables/ShikigamiDataTable.json"
       ],
       "status": "verified"
     },
     "MaterialName_P1": {
-      "simple": "Material section names for pattern 0 (P1).",
-      "technical": "TArray<FName> (7 slots in every exported row, NAME_None padded). Pattern index 0 selects this array; the controller builds 8 pattern entries, sorts the selected one first and calls ShowMaterialSections(mesh, indices, bShow) for each valid name, hiding the other patterns' sections. Export CN_040 P1: MI_CN_040_00_Outline.",
+      "simple": "Parent-material names used by pattern 1 (index 0).",
+      "technical": "TArray<FName>; pattern index 0 selects it. All three exports use seven slots with None padding. After the row and float-based 0.0..7.0 bounds checks, SetMaterialPattern builds eight entries and sorts hidden entries before the one selected entry, so this array is shown last and the other populated P arrays are hidden first. Each non-None FName is looked up exactly in the material controller's MaterialParameters cache, whose key is the parent material's FName and whose value supplies the mesh MaterialIndex; a match calls ShowMaterialSections on that one index for every LOD of a USkinnedMeshComponent. Unmatched and None names do nothing. Exported P1 contents are MI_CN_040_00_Outline (CN_040), seven MI_CN_050_00_* names (CN_052), and three MI_CN_080_00_*_P1 names (CN_080). AddMaterialPattern(0) shows only these names and stores the pattern without hiding others. Pattern 0 is also the spawn default and every exported CharacterCapture row's ShikigamiDefaultMaterialPattern is 0.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiMaterial.h:15",
+        "Source/Abrams/Private/GameShikigami.cpp:1716",
         "Source/Abrams/Private/GameShikigami.cpp:1729",
-        "Source/Abrams/Private/GameShikigami.cpp:1748",
-        "Source/Abrams/Private/GameShikigami.cpp:1754"
+        "Source/Abrams/Private/GameShikigami.cpp:1733",
+        "Source/Abrams/Private/GameShikigami.cpp:1743",
+        "Source/Abrams/Private/GameShikigami.cpp:1750",
+        "Source/Abrams/Private/GameShikigami.cpp:1758",
+        "Source/Abrams/Private/GameShikigami.cpp:1765",
+        "Source/Abrams/Private/GameShikigami.cpp:1800",
+        "Source/Abrams/Private/GameShikigamiMaterialController.cpp:81",
+        "Source/Abrams/Private/GameActorMaterialController.cpp:148",
+        "JJKCCDatatables/datatables/ShikigamiMaterialDataTable.json"
       ],
       "status": "verified"
     },
     "MaterialName_P2": {
-      "simple": "Material section names for pattern 1 (P2).",
-      "technical": "TArray<FName> selected by Pattern==1; same show-this/hide-others path. Export CN_040 P2: MI_CN_040_00_Outline_P1 and MI_CN_040_00_Ring_P1.",
+      "simple": "Parent-material names used by pattern 2 (index 1).",
+      "technical": "TArray<FName>; switch case 1 selects it in both table-consuming methods. SetMaterialPattern applies it last when Pattern==1 and hides it for every other valid pattern; AddMaterialPattern(1) only shows matching sections and stores Pattern==1. CN_040 has MI_CN_040_00_Outline_P1 and MI_CN_040_00_Ring_P1, CN_052 has seven MI_CN_050_00_*_P1 names, and CN_080 has three MI_CN_080_00_*_P2 names; each array still has seven exported slots. CN_050's level-2 and level-3 attack start calls AddMaterialPattern(1) after first setting pattern 0, and CN_050/CN_052 release logic reads the resulting controller pattern to choose bone arrays.",
       "evidence": [
-        "Source/Abrams/Private/GameShikigami.cpp:1730",
-        "Source/Abrams/Private/GameShikigami.cpp:1754"
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiMaterial.h:18",
+        "Source/Abrams/Private/GameShikigami.cpp:1734",
+        "Source/Abrams/Private/GameShikigami.cpp:1743",
+        "Source/Abrams/Private/GameShikigami.cpp:1801",
+        "Source/Abrams/Private/GameShikigami.cpp:1813",
+        "Source/Abrams/Private/CN_050_ActionController.cpp:373",
+        "Source/Abrams/Private/CN_050_ActionController.cpp:380",
+        "Source/Abrams/Private/CN_050_ActionController.cpp:1028",
+        "JJKCCDatatables/datatables/ShikigamiMaterialDataTable.json"
       ],
       "status": "verified"
     },
     "MaterialName_P3": {
-      "simple": "Material section names for pattern 2 (P3).",
-      "technical": "TArray<FName> selected by Pattern==2; all three exported rows leave it entirely NAME_None, so choosing this pattern hides the other named sections without showing any new material in this data set.",
+      "simple": "Parent-material names used by pattern 3 (index 2).",
+      "technical": "TArray<FName>; switch case 2 selects it in both table-consuming methods. Unlike the previous documentation, this array is not empty throughout the export: CN_052 contains seven MI_CN_050_00_*_P2 names (Head, Leg, LegOutline, Lip, Outline, Skin, Tooth), while CN_040 and CN_080 contain seven None entries each. Selecting pattern 2 hides P1/P2 and any other populated arrays before showing these names through the exact parent-name/material-index cache. AddMaterialPattern(2) shows only these names; CN_050's level-3 attack start calls it after AddMaterialPattern(1).",
       "evidence": [
-        "Source/Abrams/Private/GameShikigami.cpp:1731",
-        "Source/Abrams/Private/GameShikigami.cpp:1754"
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiMaterial.h:21",
+        "Source/Abrams/Private/GameShikigami.cpp:1735",
+        "Source/Abrams/Private/GameShikigami.cpp:1743",
+        "Source/Abrams/Private/GameShikigami.cpp:1802",
+        "Source/Abrams/Private/CN_050_ActionController.cpp:385",
+        "JJKCCDatatables/datatables/ShikigamiMaterialDataTable.json"
       ],
       "status": "verified"
     },
     "MaterialName_P4": {
-      "simple": "Material section names for pattern 3 (P4).",
-      "technical": "TArray<FName> selected by Pattern==3; all three exported rows are entirely NAME_None.",
+      "simple": "Parent-material names used by pattern 4 (index 3).",
+      "technical": "TArray<FName>; switch case 3 selects it. All three exported rows have seven None entries, so selecting pattern 3 hides the populated P1-P3 names but shows nothing new. This is not a failed lookup: SetMaterialPattern still writes MaterialPattern=3 after its row and bounds checks, and AddMaterialPattern(3) also stores 3 because the array pointer exists, even though every element is skipped.",
       "evidence": [
-        "Source/Abrams/Private/GameShikigami.cpp:1732",
-        "Source/Abrams/Private/GameShikigami.cpp:1754"
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiMaterial.h:24",
+        "Source/Abrams/Private/GameShikigami.cpp:1736",
+        "Source/Abrams/Private/GameShikigami.cpp:1765",
+        "Source/Abrams/Private/GameShikigami.cpp:1803",
+        "Source/Abrams/Private/GameShikigami.cpp:1816",
+        "JJKCCDatatables/datatables/ShikigamiMaterialDataTable.json"
       ],
       "status": "verified"
     },
     "MaterialName_P5": {
-      "simple": "Material section names for pattern 4 (P5).",
-      "technical": "TArray<FName> selected by Pattern==4; all three exported rows are entirely NAME_None. Patterns 5..7 are accepted by the retail bounds check (0..7) but have no corresponding arrays in this shikigami row struct (the character-material twin has P6..P8), so they only hide the named sections.",
+      "simple": "Parent-material names used by pattern 5 (index 4).",
+      "technical": "TArray<FName>; switch case 4 selects it. All three exported rows have seven None entries, so selecting pattern 4 hides populated earlier patterns and stores MaterialPattern=4 without showing a new name. AddMaterialPattern(4) likewise stores 4 because this array exists. The bounds check accepts int32 patterns 0..7 (compared as floats) but the row struct has only P1-P5: SetMaterialPattern(5..7) hides every populated array and still records the pattern, whereas AddMaterialPattern(5..7) finds no array, shows nothing, and leaves MaterialPattern unchanged. Any value outside 0..7 returns before toggling or storing.",
       "evidence": [
-        "Source/Abrams/Private/GameShikigami.cpp:1733",
-        "Source/Abrams/Private/GameShikigami.cpp:1719",
-        "Source/Abrams/Private/GameShikigami.cpp:1754"
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiMaterial.h:27",
+        "Source/Abrams/Private/GameShikigami.cpp:1716",
+        "Source/Abrams/Private/GameShikigami.cpp:1737",
+        "Source/Abrams/Private/GameShikigami.cpp:1742",
+        "Source/Abrams/Private/GameShikigami.cpp:1746",
+        "Source/Abrams/Private/GameShikigami.cpp:1765",
+        "Source/Abrams/Private/GameShikigami.cpp:1793",
+        "Source/Abrams/Private/GameShikigami.cpp:1805",
+        "Source/Abrams/Private/GameShikigami.cpp:1816",
+        "JJKCCDatatables/datatables/ShikigamiMaterialDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "ShikigamiMaterialDataTables is manager slot +0x6D0; registered at GameDataTableManager.cpp:411 and resolved at line 239.",
-    "The row names are material-section/parameter names looked up in the shikigami material controller's MaterialParameters cache (ShowMaterialSections, 0x12e65a0); they are not material asset paths.",
-    "The second consumer (GameShikigami.cpp:1787) is the slot-190 'set material pattern' interface path, which only shows the selected pattern's materials and stores MaterialPattern; the first consumer (1710) also hides all others.",
-    "Do not confuse this with CharacterMaterialDataTable or ShikigamiMaterialDataTable's character twin; the latter has eight P arrays while this struct has five."
+    "Export coverage: the supplied datatables directory contains exactly one ShikigamiMaterialDataTable.json, with no locale, numbered, or per-character shards. It declares RowStruct GameDataTableRow_ShikigamiMaterial and ImportKeyField Id, and has three rows (CN_040, CN_052, CN_080). Every row has ID plus exactly P1-P5, each as seven FName slots. Non-None counts are CN_040 1/2/0/0/0, CN_052 7/7/7/0/0, and CN_080 3/3/0/0/0 for P1-P5.",
+    "The runtime alias is ShikigamiMaterialDataTables at GameDataTableManager +0x6D0: the exact loader name is registered at GameDataTableManager.cpp:411 and resolved into that array at line 239 after all loads complete; AddLoadedDataTables skips null UDataTable results. Shikigami_FindRow scans registered tables in order and returns the first match. The owner's cached ShikigamiRow supplies Id_ShikigamiMaterial.",
+    "The FNames are parent-material identifiers, not material asset paths, material-parameter names, or physical section indices. UGameShikigamiMaterialController::Initialize creates dynamic material instances and keys MaterialParameters by Material->Parent->GetFName(), storing the mesh material index. The table names are looked up as exact FName keys (AddMaterialPattern passes bPartialMatch=false); ShowMaterialSections ignores None/unmatched names, acts only when the mesh is a USkinnedMeshComponent, calls ShowMaterialSection(MaterialIndex, INDEX_NONE, bShow, LODIndex) for every LOD, and marks the render state dirty.",
+    "Pattern is a zero-based selector with no physical unit; the int32 is accepted only when 0.0 <= Pattern <= 7.0. SetMaterialPattern sorts hidden entries before the single selected entry, so a name shared between arrays finishes shown when it is in the selected array; array position itself is not a material slot. The export has no cross-pattern duplicate names, so that precedence is a code behavior rather than an exercised data case. A successful SetMaterialPattern writes the uint32 controller field MaterialPattern (+0x128) even when no material name matched.",
+    "There are two distinct table readers. SetMaterialPattern (reconstructed retail 0x141497b80) resolves a null row, hides all other populated arrays, then shows the selected array. AddMaterialPattern (0x1497e80) resolves the same row and calls SetMaterialVisibility(Name, true, false) for each non-None selected name; it never explicitly hides other patterns. AGameShikigami::SetMaterialPattern is interface slot 127 (+0x3F8, 0x141497B70) and passes a null row. Interface slot 190 (+0x5F0) is SetBattleVoiceEnabled and does not read this table.",
+    "Indirect consumers route through that interface or the stored controller pattern: spawn calls the controller directly with 0; capture uses CharacterCapture.ShikigamiDefaultMaterialPattern (0 in all 190 exported capture rows, including six CN_080 shikigami captures); CP_110 mirrors the character's pattern to its exported CN_040 shikigami; sequencer tracks clamp 0..7, save the shikigami controller's current MaterialPattern, and optionally restore it on teardown. The generic MaterialPattern animation notify sets the owner pattern and restores the value returned by IGameActorInterface::GetMaterialPattern; AGameShikigami has no GetMaterialPattern override in the reconstructed source, so do not infer a shikigami-specific saved value from that path.",
+    "CN_050's attack uses the additive path: FCN_050_Attack_6::Start sets pattern 0 and, at owner cursed-energy levels 2 and 3, calls AddMaterialPattern(1) and/or (2); FCN_050_ReleaseAction::PlayReleaseEffect then reads MaterialController->MaterialPattern for CN_052/CN_052_10 to select the release bone set. This is an indirect use of the stored selection, not a second read of the DataTable arrays.",
+    "Cross-table relationship: ShikigamiDataTable has one export with 20 rows; 16 have Id_ShikigamiMaterial=None and the four others map onto all three material rows. CharacterShikigamiDataTable links CP_110 to CN_040, CP_120 to CN_052, CP_121 to CN_052_10 (same material row), and CP_160 to CN_080. All six non-None CN_080 material names also occur in CharacterMaterialDataTable, but that is a separate eight-array row struct, controller, and manager slot (+0x490); no name reuse makes the two tables the same runtime table.",
+    "Runtime mechanics here are verified from the reconstructed C++ and its cited retail RVAs, cross-checked against the supplied export. Retail Blueprint graphs and loaded/cooked UDataTable objects were not inspected, so no Blueprint-only consumer or unobserved retail behavior is asserted."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameShikigami.cpp:1696",
-      "detail": "UGameShikigamiMaterialController::SetMaterialPattern resolves the row from the shikigami's Id_ShikigamiMaterial and toggles section visibility for P1-P5 (retail 0x141497b80)."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:411",
+      "detail": "Registers the exact unsharded primary-asset name ShikigamiMaterialDataTable among the DataTable loaders."
     },
     {
-      "source": "Source/Abrams/Private/GameShikigami.cpp:1787",
-      "detail": "Interface slot 190 resolves the same row and shows the selected pattern's named materials without explicitly hiding others."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:239",
+      "detail": "After all loads complete, resolves that loader to a UDataTable and appends it to ShikigamiMaterialDataTables (+0x6D0), skipping a null result."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:1710",
+      "detail": "UGameShikigamiMaterialController::SetMaterialPattern finds the material row from the owner's cached ShikigamiRow.Id_ShikigamiMaterial; None or a missing row returns before any section change."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:1743",
+      "detail": "Builds eight pattern entries and sorts hidden entries before the selected entry, so non-selected populated arrays are hidden first and the selected array is shown last."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:1758",
+      "detail": "Looks up each non-None name in MaterialParameters and uses its cached MaterialIndex for ShowMaterialSections; unmatched names are ignored."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:1777",
+      "detail": "AddMaterialPattern is the second table reader: it resolves the same row and shows only the selected pattern's names, without hiding others."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:1770",
+      "detail": "AGameShikigami::SetMaterialPattern is interface slot 127 and forwards the requested pattern to the controller with a null row; slot 190 is unrelated voice logic."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigamiMaterialController.cpp:81",
+      "detail": "Initialize keys MaterialParameters by each dynamic material's parent FName, which is what the exported MaterialName_P* values address."
+    },
+    {
+      "source": "Source/Abrams/Private/GameActorMaterialController.cpp:148",
+      "detail": "ShowMaterialSections applies the cached material index to every LOD when the mesh is a USkinnedMeshComponent, then dirties the render state."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:1841",
+      "detail": "SpawnShikigami applies pattern 0 through the shikigami material controller immediately after actor setup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:492",
+      "detail": "Character capture applies CharacterCaptureRow.ShikigamiDefaultMaterialPattern; every exported capture row contains 0."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_050_ActionController.cpp:380",
+      "detail": "The CN_050 attack first sets pattern 0 and additively shows P2 at cursed-energy level 2 and P2 plus P3 at level 3."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_050_ActionController.cpp:1028",
+      "detail": "CN_052/CN_052_10 release logic reads the stored controller MaterialPattern (0, 1, or 2) to choose the release bone array."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_110_ActionController.cpp:840",
+      "detail": "Indirect consumer: CP_110 mirrors the character's material-pattern change to its shikigami, which the export maps to CN_040 and therefore this table."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSetMaterialPatternEvaluate.cpp:86",
+      "detail": "Cinematic evaluation clamps the pattern to 0..7, saves the shikigami controller's current MaterialPattern once, applies the value, and restores it on teardown when bResetParameter is set."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimNS_MaterialPattern.cpp:30",
+      "detail": "Generic interface-level notify sets an owner's pattern and restores the value from IGameActorInterface::GetMaterialPattern; the reconstructed shikigami class does not override that getter."
     },
     {
       "source": "Source/Abrams/Public/GameShikigamiMaterialController.h:12",
-      "detail": "Documents the row linkage and pattern indices; the controller caches material parameters by these names."
+      "detail": "Controller declaration documents the null-row lookup, the accepted 0..7 range, P1-P5-only schema, and the stored pattern."
     }
   ]
 }

@@ -1,71 +1,123 @@
 {
-  "description": "Decal actor catalog: decal IDs name a Blueprint decal actor, and a residency flag controls which decals are preloaded at boot.",
+  "description": "Decal row catalog: the exported DCL_* row ID is the lookup key, FileName selects a Decal primary-asset Blueprint class to spawn, and bResident opts that asset into the global boot Decal preload.",
   "fields": {
     "ID": {
-      "simple": "Decal row ID (e.g. DCL_00100).",
-      "technical": "FName row key looked up over DecalDataTables (+0x800) with FindRow<T> or the shared Status_FindDecalRow (0x141048AF0); NAME_None is rejected. Requesters include animation notifies (UGameAnimNotify_Decal.Id_Decal), effect rows, destructible reactioner SpawnDecalId and sequencer section DecalId. 51 exported rows.",
+      "simple": "Decal row ID / DataTable row key (for example, DCL_00100).",
+      "technical": "FName Id. The export writes ID and uses Id as ImportKeyField; all 51 rows have ID equal to their row key and Filename equal to ID + '_BP'. Runtime does not read Row->Id for these lookups: Status_FindDecalRow (0x141048AF0), the manager wrappers/FindDecalRowInline, and local inlined finders scan DecalDataTables (+0x800) and return the first row whose row key matches the requested FName. NAME_None is rejected by the shared helper when bCheckNone is true and always by the inline/local finders. DecalDataTables currently resolves the single DecalDataTable asset, but first match wins if more tables are added. Requesters include UGameAnimNotify_Decal.Id_Decal, FGameDataTableRow_Effect.Id_Decal (31 references; None entries are skipped and array index 2 gets mirrored relative scale), FGameDataTableRow_Damage.Id_GroundBoundDecal (7 references), UGameDestructibleReactioner.SpawnDecalId, UAbramsSequencerSpawnDecalSection.DecalId/sequence DecalReferenceParameters, and many action/trap controllers with hardcoded DCL_* IDs.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Decal.h:10",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1581",
+        "Source/Abrams/Public/GameDataTableManager.h:235",
+        "Source/Abrams/Public/GameDataTableManager.h:247",
         "Source/Abrams/Private/GameDataTableManager.cpp:258",
-        "Source/Abrams/Public/GameDataTableManager.h:44",
         "Source/Abrams/Private/GameAnimNotify_Decal.cpp:42",
-        "Source/AbramsSequencer/Private/AbramsSequencerSpawnDecalEvaluate.cpp:70"
+        "Source/Abrams/Private/GameEffect.cpp:1174",
+        "Source/Abrams/Private/GameDestructibleReactioner.cpp:144",
+        "Source/Abrams/Private/GameSequenceNameBuilder.cpp:359",
+        "Source/AbramsSequencer/Private/AbramsSequencerSpawnDecalEvaluate.cpp:71"
       ],
       "status": "verified"
     },
     "Filename": {
-      "simple": "Decal Blueprint asset name.",
-      "technical": "Serialized C++ property FName FileName. AGameRenderManager::SpawnDecal(row) passes it to SpawnDecal(FileName,...), which builds PrimaryAssetId(GamePrimaryAssetType_Decal, FileName), loads a UClass, spawns an AGameDecalActor deferred, attaches it to the render manager, assigns sort order and FinishSpawning at the requested transform. At boot, resident rows' names are turned into Decal primary-asset loaders. Export rows use <ID>_BP, although some cross-table rows reference asset names that differ from their own ID family.",
+      "simple": "Decal Blueprint asset name (DCL_*_BP) used as the Decal primary-asset ID.",
+      "technical": "FName FileName; the export spells the column Filename. All 51 rows are non-None, unique, and exactly <ID>_BP. AGameRenderManager::SpawnDecal(row) null-checks the row and forwards FileName with DecalType 0 (its trailing bool is ignored); the direct overload builds FPrimaryAssetId(GamePrimaryAssetType_Decal, FileName) and only uses an already-loaded UClass that is an AActor child and casts to AGameDecalActor, otherwise it returns null. Spawning is deferred at identity, then the actor is attached to the render manager, tracked under the 'Decal' or 'DestructibleDecal' managed-actor key, given a per-type sort order (existing value post-incremented; absent type starts at 200), set up, given a dynamic material instance, and FinishSpawning at the requested transform. Boot resident rows become Decal loaders, sequence decal references collect FileName for preload, and UGameDestructibleReactioner::SpawnBreakDecal passes FileName directly with type 1.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Decal.h:14",
         "Source/Abrams/Private/GameRenderManager.cpp:434",
+        "Source/Abrams/Private/GameRenderManager.cpp:440",
         "Source/Abrams/Private/GameRenderManager.cpp:444",
-        "Source/Abrams/Private/GameRenderManager.cpp:450",
-        "Source/Abrams/Private/GameRenderManager.cpp:278",
-        "Source/Abrams/Private/GameDestructibleReactioner.cpp:158"
+        "Source/Abrams/Private/GameRenderManager.cpp:448",
+        "Source/Abrams/Private/GameRenderManager.cpp:472",
+        "Source/Abrams/Private/GameRenderManager.cpp:479",
+        "Source/Abrams/Public/GameRenderManager.h:111",
+        "Source/Abrams/Private/GameDestructibleReactioner.cpp:158",
+        "Source/Abrams/Private/GamePhase_Boot.cpp:281",
+        "Source/Abrams/Private/GameSequenceNameBuilder.cpp:359",
+        "Config/DefaultGame.ini:22"
       ],
       "status": "verified"
     },
     "bResident": {
-      "simple": "Whether the decal Blueprint is preloaded at boot.",
-      "technical": "Bool; boot collects every FGameDataTableRow_Decal row (0x13c8420) and AGameRenderManager::BootInitialize creates Decal-type FGamePrimaryAssetLoaders only for rows with bResident=true. Non-resident decal assets are loaded on demand when their row is requested. Constructor default false. Three of the 51 exported rows are resident: DCL_01100, DCL_01200, DCL_80311.",
+      "simple": "Whether the row's decal asset joins the global boot preload.",
+      "technical": "bool bResident; constructor default false, and 3 of the 51 exported rows set it true (DCL_01100, DCL_01200, DCL_80311). After the table load, boot collects every decal row (0x13c8420; FGameDataTableArray::GetRows walks table order then row-name order) and AGameRenderManager::BootInitialize copies only true rows' FileName values into Decal-type FGamePrimaryAssetLoaders. Loader creation skips None names and deduplicates by name; the render manager's Tick waits for those loaders before BootState_44C becomes 2, which boot case 3 requires. bResident=false only excludes a row from this global boot loader set: SpawnDecal does not load on demand (it reads GetPrimaryAssetObject and fails if the asset is not loaded), while separate battle/sequence Decal loader caches are fed by CharacterDecalDataTable, MapDecalDataTable, and sequencer decal references.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Decal.h:18",
+        "Source/AbramsDataTable/Private/GameDataTableRow_Decal.cpp:3",
         "Source/Abrams/Private/GamePhase_Boot.cpp:235",
+        "Source/Abrams/Public/GameDataTableArray.h:21",
         "Source/Abrams/Private/GameRenderManager.cpp:274",
-        "Source/Abrams/Private/GameRenderManager.cpp:278",
-        "Source/AbramsDataTable/Private/GameDataTableRow_Decal.cpp:3"
+        "Source/Abrams/Private/GameRenderManager.cpp:281",
+        "Source/Abrams/Private/GameDataTableManager.cpp:82",
+        "Source/Abrams/Private/GameRenderManager.cpp:233",
+        "Source/Abrams/Private/GamePhase_Boot.cpp:275",
+        "Source/Abrams/Private/GameRenderManager.cpp:448",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:150",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:391",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:493"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "DecalDataTables is at +0x800 in AGameDataTableManager; the name 'DecalDataTable' is both a DataTable primary asset and the loader name. CharacterDecalDataTable (+0x500) and MapDecalDataTable (+0x3C0) are distinct tables that reference these IDs/filenames elsewhere.",
-    "The export key is 'Filename' while the C++ UPROPERTY is 'FileName'; they are the same field (case-insensitive generator match).",
-    "Spawning supports type 0 ('Decal', managed by the render manager for gameplay/animation/sequencer requests) and type 1 ('DestructibleDecal', used by UGameDestructibleReactioner::SpawnBreakDecal). DecalType is a caller-supplied argument, not a data-table field; Scale/socket/rotation parameters likewise come from callers.",
-    "No additional fields exist in the reconstructed row struct or the 51 exported rows."
+    "DecalDataTables is AGameDataTableManager +0x800; StartInitialLoading registers the DataTable primary asset 'DecalDataTable' and Tick resolves it into that array. CharacterDecalDataTables (+0x500) and MapDecalDataTables (+0x3C0) are separate row structs; their consumers append FileName_BP/Filename asset names into battle Decal loader caches and do not resolve DCL row keys or read bResident.",
+    "The export columns are ID and Filename; the native UPROPERTYs are Id and FileName. They are the same fields (case-insensitive catalog/export mapping).",
+    "DecalType is a caller argument, not a row field. The row overload forces 0, destructible SpawnBreakDecal passes 1, and any other value keeps the 'Decal' managed-actor key but is still used as the DecalSortOrders key. Scale, fade, location, socket, owner, and rotation inputs come from the caller/notify/section, not the table.",
+    "All 51 exported rows have unique non-None IDs and Filename == ID + '_BP'. Cross-checks: CharacterDecal/MapDecal file-name lists all resolve to those 51 FileName values; Effect Id_Decal has 31 references across 27 rows and Damage Id_GroundBoundDecal has 7, all resolving to exported row keys. The only export shard for DecalDataTable is DecalDataTable.json.",
+    "No additional fields exist in FGameDataTableRow_Decal or in the exported rows: Id, FileName, bResident only.",
+    "Evidence boundary: the shipped config declares Decal primary assets as Blueprint subclasses of /Game/Decals/GameDecalActor_BP with CookRule AlwaysCook, but no individual Blueprint asset, cooked package, or retail Blueprint dump was provided. Runtime statements above are from reconstructed C++ with retail RVA notes, not from executing retail or proving byte equivalence."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:431",
+      "detail": "Registers 'DecalDataTable' as a DataTable primary asset; Tick resolves the loaded table into DecalDataTables (+0x800), which the finders scan."
+    },
+    {
       "source": "Source/Abrams/Private/GamePhase_Boot.cpp:235",
-      "detail": "Boot collects all decal rows from the manager (retail 0x13c8420) and passes them to the render manager's BootInitialize."
+      "detail": "After the data tables finish loading, boot collects all decal rows (retail 0x13c8420; table order then row-name order) and passes them to Render->BootInitialize."
     },
     {
-      "source": "Source/Abrams/Private/GameRenderManager.cpp:241",
-      "detail": "BootInitialize filters bResident rows and creates persistent Decal asset loaders for their FileName assets."
+      "source": "Source/Abrams/Private/GameRenderManager.cpp:274",
+      "detail": "BootInitialize filters bResident and creates Decal primary-asset loaders from FileName; Tick waits for those loaders before boot can advance."
     },
     {
-      "source": "Source/Abrams/Private/GameAnimNotify_Decal.cpp:23",
-      "detail": "Animation notifies resolve Id_Decal, compute a transform from the mesh bone/owner and spawn the decal through the render manager (retail 0x14101C870)."
+      "source": "Source/Abrams/Private/GameAnimNotify_Decal.cpp:42",
+      "detail": "Animation notifies resolve Id_Decal to the first matching row, require an IGameActorInterface owner, compute a bone/socket or owner-relative transform, and spawn a type-0 decal."
     },
     {
-      "source": "Source/Abrams/Private/GameDestructibleReactioner.cpp:137",
-      "detail": "Breakable objects resolve SpawnDecalId and spawn a type-1 DestructibleDecal with optional swizzled SpawnDecalSize (retail 0x135c800)."
+      "source": "Source/Abrams/Private/GameEffect.cpp:1174",
+      "detail": "Effect Initialize iterates Id_Decal[], skips NAME_None, uses default size and manual fade, applies DecalScale, mirrors actor scale at array index 2, and honors bNotControlDecalEnabled."
     },
     {
-      "source": "Source/AbramsSequencer/Private/AbramsSequencerSpawnDecalEvaluate.cpp:34",
-      "detail": "Sequencer spawn-decal track resolves Section.DecalId once per setup and spawns at the bound decal actor's transform."
+      "source": "Source/Abrams/Private/GameCharacterAction_Blow.cpp:465",
+      "detail": "Damage rows' Id_GroundBoundDecal and Id_GroundBoundDecalScale are resolved through AGameEffect::SpawnDecal; the first path also requires bBoundEnabled == false."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDestructibleReactioner.cpp:144",
+      "detail": "SpawnBreakDecal resolves SpawnDecalId inline (None rejected), uses swizzled (Z,Y,X) SpawnDecalSize or the default-size flag, and calls the asset-name overload with type 1."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSpawnDecalEvaluate.cpp:70",
+      "detail": "The sequencer spawn-decal evaluate resolves Section.DecalId once per setup and spawns at the bound AAbramsSequencerDecalActor's transform."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSequenceNameBuilder.cpp:359",
+      "detail": "Sequence DecalReferenceParameters are resolved to decal rows and their FileName values collected for Decal primary-asset preload caches."
+    },
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:242",
+      "detail": "Character Id_CharacterDecal -> CharacterDecalDataTable.FileName_BP and Map Id_MapDecal -> MapDecalDataTable.FileName are appended to Decal name lists; these aliases bypass DecalDataTable row IDs and bResident."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:150",
+      "detail": "Map, character, and sequence Decal loader caches are built from those aliases and references (lines 150, 391, and 493); their completion gates battle readiness."
     },
     {
       "source": "Source/Abrams/Private/GameRenderManager.cpp:444",
-      "detail": "SpawnDecal resolves the row's FileName to a primary asset class and manages the spawned actor's lifetime, attachment and sort order."
+      "detail": "The asset-name overload builds the Decal primary asset ID, requires an already-loaded actor UClass, spawns deferred, tracks the actor in the managed-actor map, assigns sort order, and finishes spawning at the requested transform; phases later release type-0 decals."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_122_ActionController.cpp:2813",
+      "detail": "Action and trap controllers also pass hardcoded DCL_* keys through Status_FindDecalRow, FindDecalRowInline, or local inlined finders (examples include DCL_80100, DCL_01100, DCL_806xx, DCL_807xx, DCL_00100, and DCL_01220)."
     }
   ]
 }

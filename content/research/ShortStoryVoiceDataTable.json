@@ -1,48 +1,124 @@
 {
-  "description": "Maps short-story (sub-story) message IDs to the voice line spoken with each displayed message.",
+  "description": "Maps short-story (sub-story) message text IDs to the VoiceDataTable row used for the voice line played with each displayed message.",
   "fields": {
     "Id": {
       "simple": "Message/text ID that keys the voice mapping.",
-      "technical": "FName primary key. Show-message commands match this value against the displayed message ID; script preload walks all rows and matches it against the script message IDs in order. Export spells it ID.",
+      "technical": "FName native property and the export ImportKeyField; the JSON export spells the serialized property ID. Runtime does not call FindRow with this value on ShortStoryVoiceDataTable: GameScript_CollectRows flattens every typed row from DTM.ShortStoryVoiceDataTables (+0x780) in table order then row-name order, and ParseVoice takes the first row whose Id equals the current MessageId. AddLoadedDataTables receives only the ShortStoryVoiceDataTable loader, so this build has one source table; the supplied export has 580 unique keys and every key equals ID. MessageId is the sorted script-context message ID also passed to ParseMessage/ShowMessage, not the line/style/time FName arguments. For STDM_SS_ scripts GameScript_GetStoryTextId replaces STDM_SS_ with STDM_00 and appends 01 (STDM_SS_001 -> STDM_0000101), and GameTextManager finds all GameText IDs containing that key. All 580 exported voice-map IDs appear in all 11 ShortStoryDemoText locale exports (627 text IDs each); the other 47 text IDs have no row here. ParseVoice checks the DLC branch first, so a DLC-classified script uses DlcStoryDemoVoice tables even if its name contains STDM_SS_; only the non-DLC sub-story branch uses this table.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShortStoryVoice.h:11",
+        "Source/Abrams/Public/GameDataTableArray.h:21",
+        "Source/Abrams/Private/GameDataTableManager.cpp:146",
+        "Source/Abrams/Private/GameDataTableManager.cpp:250",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1011",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1019",
         "Source/Abrams/Private/GameScriptCommands.cpp:1029",
-        "Source/Abrams/Private/GameScriptCommands.cpp:1041"
+        "Source/Abrams/Private/GameScriptCommands.cpp:1040",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1041",
+        "Source/Abrams/Private/GameScriptRuntime.cpp:27",
+        "Source/Abrams/Private/GameScriptRuntime.cpp:42",
+        "Source/Abrams/Private/GameTextManager.cpp:645",
+        "JJKCCDatatables/datatables/ShortStoryVoiceDataTable.json",
+        "JJKCCDatatables/datatables/ShortStoryDemoTextDataTable_De.json",
+        "JJKCCDatatables/datatables/ShortStoryDemoTextDataTable_En.json",
+        "JJKCCDatatables/datatables/ShortStoryDemoTextDataTable_Es.json",
+        "JJKCCDatatables/datatables/ShortStoryDemoTextDataTable_Es_LA.json",
+        "JJKCCDatatables/datatables/ShortStoryDemoTextDataTable_Fr.json",
+        "JJKCCDatatables/datatables/ShortStoryDemoTextDataTable_It.json",
+        "JJKCCDatatables/datatables/ShortStoryDemoTextDataTable_Ja.json",
+        "JJKCCDatatables/datatables/ShortStoryDemoTextDataTable_Ko.json",
+        "JJKCCDatatables/datatables/ShortStoryDemoTextDataTable_Pt.json",
+        "JJKCCDatatables/datatables/ShortStoryDemoTextDataTable_Zh_Hans.json",
+        "JJKCCDatatables/datatables/ShortStoryDemoTextDataTable_Zh_Hant.json"
       ],
       "status": "verified"
     },
     "Id_Voice": {
       "simple": "VoiceDataTable row to play for that message.",
-      "technical": "FName joined to VoiceDataTable. The command parser resolves it to a Voice row and queues that row's CueSheetName/CueName with the message delay and voice slot; script preload resolves it to add the voice cue sheet to the load set. A missing Voice row leaves no queued voice or cue sheet.",
+      "technical": "FName native property, exported as Id_Voice. In the non-DLC STDM_SS_ branch the first row matching Id passes this value to GameScript_FindVoiceRow over DTM.VoiceDataTables (+0x740), which uses FindRow<FGameDataTableRow_Voice> in table order and returns the first typed match; bCheckNone is false. Only VoiceDataTable is loaded into that array. ParseVoice copies the resolved Voice row's CueSheetName and CueName into a queued voice entry, with delay from the command's TimeId and Slot as the zero-based voice-player line index (0-3 in the ShowMessage variants). TEXT_TIME_NONE suppresses the entry; a numeric TimeId is its Atof value, a named TimeId uses ShowMessageTimeDataMap, and an absent name yields 0.0 (float seconds in the DeltaTime-based playback path). A missing mapping row or unresolved Voice row queues no voice; the Part cue sheet is still loaded by the separate hard-coded sub-story preload, so it is wrong to say Id_Voice supplies that preload. All 580 exported Id_Voice values resolve in the supplied VoiceDataTable export; each resolved row has CueSheetName Part and a CueName equal to its ID. The native default is NAME_None, but the export contains no empty values. PlayVoice later returns -1 for a disabled system-voice gate, an unloaded sheet, or no usable player slot.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShortStoryVoice.h:15",
-        "Source/Abrams/Private/GameScriptCommands.cpp:1043"
+        "Source/AbramsDataTable/Public/GameDataTableRow_Voice.h:12",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Voice.h:16",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Voice.h:18",
+        "Source/Abrams/Private/GameDataTableManager.cpp:246",
+        "Source/Abrams/Private/GameScriptCommands.cpp:848",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1043",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1051",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1053",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1055",
+        "Source/Abrams/Private/GameScriptRuntime.cpp:42",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:256",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:258",
+        "Source/Abrams/Private/GameSoundManager.cpp:919",
+        "Source/Abrams/Private/GameSoundManager.cpp:927",
+        "JJKCCDatatables/datatables/ShortStoryVoiceDataTable.json",
+        "JJKCCDatatables/datatables/VoiceDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Loaded into DTM.ShortStoryVoiceDataTables (+0x780) from the DataTable primary asset ShortStoryVoiceDataTable.",
-    "The command parser selects this table when the script name contains STDM_SS_; DLC scripts and ordinary story demos use the other two tables instead. No direct consumer of the DTM array outside FGameScriptCommand_ShowMessageBase::ParseVoice was found in the available source.",
-    "GameScriptPlayer does not preload from this table: sub-story scripts hard-code the cue sheet name Part instead.",
-    "The export has 580 available rows; retail completeness and Blueprint-only references are not asserted. Sources are reconstructed retail C++."
+    "Loaded into DTM.ShortStoryVoiceDataTables (+0x780) from the single DataTable primary asset ShortStoryVoiceDataTable; AddLoadedDataTables filters null resolves, and this name has one loader (no shard array).",
+    "ParseVoice checks GameScript_IsDlcScript first (Script row + StoryDemo in-progress flag), so DLC scripts use DlcStoryDemoVoiceDataTable1/2 even if the name contains STDM_SS_. For other scripts, the STDM_SS_ substring selects this table; ordinary story demos use StoryDemoVoiceDataTable.",
+    "UGameScriptPlayer::UpdateLoad does not read this table or Id_Voice. For an STDM_SS_ script it directly adds cue sheet Part to the script load set; DLC and ordinary story scripts instead derive a sheet from the first matching row in their own voice-map tables, and gallery scripts use an empty hard-coded map.",
+    "Message IDs come from GameText IDs containing the derived script text ID. GameScript_GetStoryTextId maps STDM_SS_001 to STDM_0000101 by replacing STDM_SS_ with STDM_00 and appending 01; matching text IDs are sorted into the script context and advanced as ShowMessage commands run. The 580 mapped IDs are a subset of the 627 short-story text IDs in every supplied locale export; 47 have no voice mapping.",
+    "Lookup is deterministic first match: all typed rows are collected in DTM table order then row-name order, and FindByPredicate compares the native Id property. Only one ShortStoryVoiceDataTable asset and one VoiceDataTable asset are loaded in the reconstructed manager, so there is no observed cross-shard precedence here.",
+    "Export integrity: one asset, 580 rows, no empty keys or Id_Voice values, no key/ID mismatches, and every Id_Voice resolves in VoiceDataTable. Reused voice IDs are expected (for example VoPart_CP_030_22_00_010 appears on 13 message rows); all resolved cue sheets are Part in this export.",
+    "Failure/timing behavior is in ParseVoice and PlayVoice: TEXT_TIME_NONE skips voice queuing, missing mapping or Voice rows add no entry, delay is a float from the numeric/named TimeId (0.0 when unnamed and absent), Slot is the zero-based line index, and playback can still fail on a missing loaded sheet, disabled system voice, or unavailable player slot.",
+    "Behavioral statements are from reconstructed retail C++ with inline retail RVA annotations plus static exports. No retail Blueprint assets were available, so Blueprint-only references or overrides are not asserted; no editor launch, retail runtime test, network access, or retail-completeness claim was made."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:250",
-      "detail": "Resolves ShortStoryVoiceDataTable into DTM.ShortStoryVoiceDataTables."
+      "detail": "Resolves the ShortStoryVoiceDataTable primary asset into DTM.ShortStoryVoiceDataTables (+0x780); this is the only loader passed to AddLoadedDataTables for that member."
+    },
+    {
+      "source": "Source/Abrams/Public/GameDataTableArray.h:21",
+      "detail": "GetRows collects every typed row table-by-table and row-name-by-row-name; ParseVoice then uses FindByPredicate on Id, making the first matching row win."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptRuntime.cpp:27",
+      "detail": "Derives the short-story GameText key from an STDM_SS_ script name (STDM_SS_001 -> STDM_0000101)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:645",
+      "detail": "FindTextIdsContaining supplies the script message IDs whose containing text rows are sorted into the context consumed by ShowMessage and ParseVoice."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1019",
+      "detail": "ParseVoice checks the DLC classification first; only the non-DLC else branch can choose the short-story table."
     },
     {
       "source": "Source/Abrams/Private/GameScriptCommands.cpp:1029",
-      "detail": "Detects STDM_SS_ sub-story script names."
+      "detail": "Detects STDM_SS_ in the script name to select the sub-story branch after the DLC check."
     },
     {
       "source": "Source/Abrams/Private/GameScriptCommands.cpp:1040",
-      "detail": "Collects short-story voice rows for message parsing."
+      "detail": "Collects all FGameDataTableRow_ShortStoryVoice rows from DTM.ShortStoryVoiceDataTables (+0x780)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1041",
+      "detail": "Matches the current MessageId against each row's native Id property and takes the first hit."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1043",
+      "detail": "Resolves the matched row's Id_Voice through GameScript_FindVoiceRow in DTM.VoiceDataTables (+0x740)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1051",
+      "detail": "Copies the Voice row CueSheetName/CueName with GetMessageTime(TimeId) and the command Slot into the queued voice entry."
     },
     {
       "source": "Source/Abrams/Private/GameScriptPlayer.cpp:256",
-      "detail": "Sub-story preload uses the hard-coded Part cue sheet rather than this table."
+      "detail": "Sub-story script preload checks STDM_SS_ and hard-codes cue sheet Part instead of reading this table."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSoundManager.cpp:919",
+      "detail": "PlayVoice loads the queued cue sheet, selects or falls back to a voice-player slot, localizes the cue, and returns -1 on gate/sheet/slot failure."
+    },
+    {
+      "source": "JJKCCDatatables/datatables/ShortStoryVoiceDataTable.json",
+      "detail": "Static export checked in full: one asset with 580 rows, key/ID equality, no empty Id_Voice, and all voice IDs reused across message rows."
     }
   ]
 }

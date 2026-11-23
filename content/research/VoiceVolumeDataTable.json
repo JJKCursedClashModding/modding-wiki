@@ -3,66 +3,137 @@
   "fields": {
     "Id": {
       "simple": "Voice cue name that this volume override applies to.",
-      "technical": "FName key. AGameSoundManager looks it up with FName(VoiceRow.CueName) before applying the runtime \"_En\" localization suffix, so English variants share the base cue volume. The sequencer removes a trailing case-insensitive _En from a cue name before lookup. None IDs are rejected by the shared finder; a missing row defaults to multiplier 1.0. Export spells it ID.",
+      "technical": "FName row key. All three AGameSoundManager voice paths ultimately call SoundManager_FindVoiceVolumeRow(DTM+0x7A0, FName(CueName), true, true); PlayVoiceById first obtains that CueName from the VoiceDataTable row. Lookup uses the unsuffixed cue name and happens before GetLocalizedVoiceCueName conditionally appends \"_En\" (enabled for languages other than Ja/Ko/Zh_Hant/Zh_Hans), so base and <cue>_En playback share one override. The sequencer instead strips one trailing case-insensitive _En from the atom component's cue name before its own finder. Both finders reject None IDs (all sound-manager callers pass bCheckNone=true) and return the first table's matching row; an absent row falls back to multiplier 1.0. The export spells the field ID and contains no None or _En keys.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_VoiceVolume.h:11",
+        "Source/Abrams/Private/GameSoundManager.cpp:433",
+        "Source/Abrams/Private/GameSoundManager.cpp:435",
+        "Source/Abrams/Private/GameSoundManager.cpp:439",
         "Source/Abrams/Private/GameSoundManager.cpp:456",
+        "Source/Abrams/Private/GameSoundManager.cpp:459",
+        "Source/Abrams/Private/GameSoundManager.cpp:463",
+        "Source/Abrams/Private/GameSoundManager.cpp:465",
         "Source/Abrams/Private/GameSoundManager.cpp:491",
         "Source/Abrams/Private/GameSoundManager.cpp:949",
+        "Source/Abrams/Private/GameSoundManager.cpp:960",
+        "Source/Abrams/Private/GameSoundManager.cpp:967",
         "Source/Abrams/Private/GameSoundManager.cpp:1055",
-        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:253",
-        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:259"
+        "Source/Abrams/Private/GameManagerGraphics.cpp:286",
+        "Source/Abrams/Private/GameManagerGraphics.cpp:304",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:33",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:35",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:255",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:256",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:259",
+        "JJKCCDatatables/datatables/VoiceVolumeDataTable.json"
       ],
       "status": "verified"
     },
     "Volume": {
-      "simple": "Multiplier applied to the voice line volume.",
-      "technical": "float, constructor default 0.0f, but a missing row is treated as 1.0 by consumers. In PlaySystemVoice and both 2D/3D PlayVoice paths the value is multiplied with VoiceVolume, MasterVolume, VoiceVolumeA/B settings; for example PlayVoice uses ((VoiceVolume*MasterVolume)*(RowVolume*VoiceVolumeB)) regrouped by compiler /fp:fast. The sequencer GetCueVolume returns the raw row value (or 1.0) as its cue volume. Exported values are mostly 1.3-2.0.",
+      "simple": "Linear multiplier applied to the voice line volume.",
+      "technical": "float, constructor default 0.0f, but a null/None lookup is treated as 1.0f and every shipped exported row is 1.3-2.5. It is a linear volume multiplier, not dB and not a 0..1-clamped user setting: values above 1 boost the cue and the table path never clamps them. PlaySystemVoice applies RowVolume * VoiceVolumeB * VoiceVolumeA * (VoiceVolume * MasterVolume); PlayVoice and PlayVoice3DCue call SetVolume with ((VoiceVolume * MasterVolume) * VoiceVolumeA) * (RowVolume * VoiceVolumeB), whose source spelling is selected for the retail /fp:fast multiply tree. Sequencer SetVolume uses CategoryVolume * section Volume * CueVolume, where voice CategoryVolume is VoiceVolumeB * VoiceVolumeA * VoiceVolume * MasterVolume and CueVolume is this row's raw value (or 1.0). Exported values are 1.3-2.5, with two 2.5 rows and one 2.3 row; all others are 1.3-2.0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_VoiceVolume.h:15",
         "Source/AbramsDataTable/Private/GameDataTableRow_VoiceVolume.cpp:4",
+        "Source/Framework/Public/SoundManager.h:70",
+        "Source/Framework/Public/SoundManager.h:71",
+        "Source/Framework/Public/SoundManager.h:72",
+        "Source/Framework/Private/SoundManager.cpp:79",
+        "Source/Framework/Private/SoundManager.cpp:86",
+        "Source/Framework/Private/SoundManager.cpp:93",
         "Source/Abrams/Private/GameSoundManager.cpp:492",
         "Source/Abrams/Private/GameSoundManager.cpp:494",
+        "Source/Abrams/Private/GameSoundManager.cpp:495",
         "Source/Abrams/Private/GameSoundManager.cpp:950",
         "Source/Abrams/Private/GameSoundManager.cpp:953",
         "Source/Abrams/Private/GameSoundManager.cpp:1056",
         "Source/Abrams/Private/GameSoundManager.cpp:1058",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:193",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:194",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:195",
         "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:260",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:340",
         "JJKCCDatatables/datatables/VoiceVolumeDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Loaded as a DataTable primary asset named VoiceVolumeDataTable into DTM.VoiceVolumeDataTables (+0x7A0).",
-    "This table keys on the VoiceDataTable CueName, not VoiceDataTable.Id, and deliberately uses the unsuffixed cue name so localized variants inherit one override.",
-    "No row means 1.0f; a row with constructor default 0.0f would silence the cue, so exported rows should be checked rather than assuming absent equals zero.",
-    "The companion export contains 1,044 rows; retail completeness and Blueprint-only references are not asserted. Source is reconstructed retail C++ with retail RVAs recorded inline."
+    "Loaded from the VoiceVolumeDataTable primary-asset loader into DTM.VoiceVolumeDataTables (+0x7A0) after all table loads complete; the manager caches only non-null UDataTable pointers. Only one loader is registered for this table, so the export has no shard merge; both generic finders would still return the first table containing a matching row.",
+    "Keys use the cue-name namespace consumed from VoiceDataTable.CueName. In the actual export VoiceDataTable.Id also equals CueName for every row, so the two are currently identical, not competing keys; all 1,044 volume IDs match a Voice Id/CueName exactly and each also has a <cue>_En Voice row.",
+    "The sound-manager finder itself does not strip _En; it relies on callers passing the unsuffixed source CueName. The sequencer explicitly strips one trailing case-insensitive _En from the atom component's localized cue name before lookup.",
+    "A missing row, NAME_None, or an empty table list yields multiplier 1.0f. A present row retaining the constructor's 0.0f would silence the cue, but no exported row is 0 or a sentinel: all 1,044 values are positive and above 1.",
+    "The lookup runs only after playback gates: PlaySystemVoice requires bSystemVoiceEnabled; 2D PlayVoice also requires a loaded cue sheet; PlayVoice3DCue requires bVoicePlaybackEnabled, bSystemVoiceEnabled and a loaded cue sheet. Player slot indices and the -1 auto-select handle choose target players only and do not affect row selection.",
+    "The read-only export is a single 1,044-row asset with 1,044 unique two-field rows, no blank IDs and no _En keys. All behavior claims come from reconstructed retail C++ with retail RVAs recorded inline; no retail Blueprint reference graph was used and no Blueprint-only reference is asserted. Project AGENTS.md states that retail Blueprints contain no logic."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:252",
-      "detail": "Resolves VoiceVolumeDataTable into DTM.VoiceVolumeDataTables."
+      "detail": "Resolves the VoiceVolumeDataTable primary asset and caches it in VoiceVolumeDataTables (+0x7A0); helper at line 162 and non-null append at line 146."
+    },
+    {
+      "source": "Source/Abrams/Public/GameDataTableManager.h:163",
+      "detail": "Declares the cached FGameDataTableArray VoiceVolumeDataTables at +0x7A0."
     },
     {
       "source": "Source/Abrams/Private/GameSoundManager.cpp:456",
-      "detail": "Shared typed finder over VoiceVolume tables."
+      "detail": "Shared typed finder: rejects NAME_None when bCheckNone is true, scans tables in order and returns the first matching FGameDataTableRow_VoiceVolume row."
     },
     {
       "source": "Source/Abrams/Private/GameSoundManager.cpp:480",
-      "detail": "PlaySystemVoice applies the row multiplier to the system voice player."
+      "detail": "PlaySystemVoice looks up FName(CueName), defaults to 1.0 and applies the row multiplier before playback; gated by bSystemVoiceEnabled."
     },
     {
-      "source": "Source/Abrams/Private/GameSoundManager.cpp:920",
-      "detail": "2D PlayVoice applies the row multiplier."
+      "source": "Source/Abrams/Private/GameSoundManager.cpp:919",
+      "detail": "2D PlayVoice performs the same lookup after cue-sheet and system-voice gates and sets the player's volume with the four global factors plus the row multiplier."
     },
     {
-      "source": "Source/Abrams/Private/GameSoundManager.cpp:1030",
-      "detail": "3D PlayVoice applies the row multiplier."
+      "source": "Source/Abrams/Private/GameSoundManager.cpp:1027",
+      "detail": "PlayVoice3DCue, reached from PlayVoice3D at line 1021, repeats the lookup for 3D voice players under its additional bVoicePlaybackEnabled gate."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSoundManager.cpp:960",
+      "detail": "PlayVoiceById alias: resolves a VoiceDataTables row, then forwards VoiceRow.CueSheetName/CueName to 2D PlayVoice at line 967, which performs the volume lookup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameManagerGraphics.cpp:286",
+      "detail": "UpdateLanguageVoiceFlag sets bAppendEnVoiceSuffix at line 304 for languages other than Ja/Ko/Zh_Hant/Zh_Hans; the localization suffix is applied after the volume-row lookup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSoundVoicePlayer.cpp:245",
+      "detail": "System-voice queue cache copies only CueSheetName/CueName from VoiceDataTable rows; Tick replays those cached cue names to PlaySystemVoice at lines 283 and 302."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSequencerManager.cpp:1176",
+      "detail": "PlayNextQueuedVoice pops a queued Voice ID, resolves its VoiceDataTable row and calls PlayVoice at line 1196, reaching the same volume lookup."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:149",
+      "detail": "Sequencer alias path: PlayVoice3D (line 149) and PlayVoice (line 166) resolve a Voice ID through FindSoundRow, call the sound manager with the row's CueName, then apply the per-cue override again in SetVolume."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:183",
+      "detail": "SetVolume reads GetCueVolume from the atom's cue name and writes CategoryVolume * section Volume * CueVolume; category volume for voice is computed at line 340."
     },
     {
       "source": "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:251",
-      "detail": "Sequencer sound module reads per-cue volume with _En stripped."
+      "detail": "GetCueVolume strips a trailing case-insensitive _En, finds the row in VoiceVolumeDataTables (+0x7A0) through the row-struct-aware finder, and returns the raw value or 1.0."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoice_2DEvaluate.cpp:37",
+      "detail": "Sequencer 2D section evaluates a Voice ID and volume into SoundModule.PlayVoice; the 3D evaluator does the same at AbramsSequencerPlayVoice_3DEvaluate.cpp:71 and the unique-pair evaluator at line 554."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:2931",
+      "detail": "Gameplay voice cue forwarded directly to 3D PlayVoice with a character-index player slot; slot choice does not change the cue-name lookup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1173",
+      "detail": "Script voice entries call 2D PlayVoice with stored CueSheetName/CueName and a player slot, reaching the shared volume-row finder."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigamiActionController.cpp:570",
+      "detail": "Shikigami controller calls PlayVoice3DCue with the resolved Voice row's CueName and a slot of character index + 6, reaching the same 3D lookup."
     }
   ]
 }

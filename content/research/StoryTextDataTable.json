@@ -1,71 +1,98 @@
 {
-  "description": "Localized story-mode labels rather than dialogue: chapter titles (CHAP_*), story mission/demo titles and explanations (STMSN_*), short-story titles and demo labels (STR_*). StoryChapter/StoryDemo/ShortStory rows point at these ids.",
+  "description": "Localized story-facing UI strings rather than script dialogue: nine CHAP_* chapter titles, 115 STMSN_* mission/demo titles plus 115 matching *_EXPLANATION blurbs, 45 STR_STDM_SS_* short-story titles, and three STR_DEMO_LABEL_* credits labels. StoryChapter, StoryDemo, ShortStory, and short-story Item rows point at these ids; spoken story dialogue is carried by StoryDemoTextDataTable/ShortStoryDemoTextDataTable.",
   "fields": {
     "ID": {
-      "simple": "Story label id (row key), e.g. CHAP_0001, STMSN_01000M_EXPLANATION, STR_STDM_SS_001.",
-      "technical": "FName ID of FGameDataTableRow_GameText and the FindRow/row-name key. StoryChapter rows carry Id_StoryChapterTitle, StoryDemo rows Id_StoryMissionTitle, ShortStory rows Id_StoryText_Title; widgets set those ids on text blocks, script command ShowTitle passes both chapter and mission ids to the demo widget, and GameSystemDialogWidget injects them as MISSION_NAME text-id parameters. The table is slot 7 of the 14-table GameText array (StoryTextDataTable_<Language>); it also participates in FindTextIdsContaining during script loading, although story dialogue ids normally come from the STDM_ tables.",
+      "simple": "Localization key and DataTable row name; the same value is repeated in the ID column of every export.",
+      "technical": "FName ID in FGameDataTableRow_GameText (row +0x0). UDataTable::FindRow uses the row name, not a scan of the ID column, and all 11 exports have ID equal to their row name. Non-SYS_ ids are searched in AGameTextManager::TextDataTables, a 14-table array rebuilt on culture load with StoryTextDataTable_<Language> as the seventh entry (array index 6); FindTextRow returns the first matching row. No StoryText key overlaps a row of the other 13 GameText tables in the exports. Callers reach this table through chapter/mission/short-story/item text-id fields, widget SetTextIdOnly/SetTextRequest, GetText/GetGameText/GetGameTextById, and nested FGameTextRequestParameters; HasText tests row existence while HasGameTextContent additionally requires nonempty Text. NAME_None or an invalid text request clears text-block content instead of matching a row.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:11",
-        "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:18",
-        "Source/Abrams/Private/GameTextManager.cpp:57",
+        "Source/Abrams/Private/GameTextManager.cpp:487",
+        "Source/Abrams/Private/GameTextManager.cpp:548",
         "Source/Abrams/Private/GameTextManager.cpp:556",
-        "Source/Abrams/Private/GameTextManager.cpp:597",
-        "Source/Abrams/Private/GameStoryChapterSelectWidget.cpp:119",
-        "Source/Abrams/Private/GameScriptCommands.cpp:392",
-        "Source/Abrams/Private/GameStoryDemoWidget.cpp:223",
-        "Source/Abrams/Private/GameStoryCharaRelateShortStoryListItemWidget.cpp:100",
-        "Source/Abrams/Private/GameSystemDialogWidget.cpp:118",
-        "Source/Abrams/Private/GameScriptPlayer.cpp:205"
+        "Source/Abrams/Private/GameTextManager.cpp:589",
+        "Source/Abrams/Private/GameTextManager.cpp:645",
+        "Source/Abrams/Private/GameTextManager.cpp:673",
+        "Source/Abrams/Private/GameTextManager.cpp:679",
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:18",
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryDemo.h:18",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShortStory.h:15",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:52"
       ],
       "status": "verified"
     },
     "Text": {
-      "simple": "The localized chapter/mission label or explanatory blurb.",
-      "technical": "FString row text (+0x10), resolved via GetText/GetGameTextById when the widget applies the id or when a nested text-id parameter is formatted. Explanatory rows can be long multi-line paragraphs; text blocks apply the normal GameText_JoinLines behavior when bForceOneLine is set (no separator for Ja/Zh_Hant/Zh_Hans, space otherwise). Unresolved ids produce empty text. All 287 rows in every companion language export are nonempty; no GLO/DYN markup was observed in the En export for this group, but the generic formatter still runs.",
+      "simple": "The localized display string for that key: a title, explanatory blurb, or credits/demo label.",
+      "technical": "FString Text at row +0x10. A missing row gives an empty string, and HasGameTextContent is false for an empty value. GetGameText copies Text and passes it through the generic FormatText, which substitutes <GLO=...> tags from GlossaryParameters and <DYN=...> tags from request parameters; no GLO/DYN tags occur in any of the 11 StoryText exports, though callers do pass MISSION_NAME as a nested text-id parameter into surrounding SYS_DIALOG_MESSAGE_0301 messages. One En explanation row contains a literal newline; text blocks with bForceOneLine set apply GameText_JoinLines (CRLF/LF removed for Ja/Zh_Hant/Zh_Hans, replaced with a space otherwise). Every export has 287 unique keys with nonempty Text.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:15",
+        "Source/Abrams/Private/GameTextManager.cpp:228",
+        "Source/Abrams/Private/GameTextManager.cpp:661",
         "Source/Abrams/Private/GameTextManager.cpp:667",
+        "Source/Abrams/Private/GameTextManager.cpp:673",
         "Source/Abrams/Private/GameTextManager.cpp:681",
-        "Source/Abrams/Private/GameTextManager.cpp:683",
-        "Source/Abrams/Private/GameTextManager.cpp:742",
-        "Source/Abrams/Private/GameTextManager.cpp:241",
-        "Source/Abrams/Private/GameWidgetTextBlock.cpp:206",
-        "Source/Abrams/Private/GameWidgetTextBlock.cpp:72",
-        "Source/Abrams/Private/GameScriptCommands.cpp:392"
+        "Source/Abrams/Private/GameTextManager.cpp:724",
+        "Source/Abrams/Private/GameTextManager.cpp:810",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:206"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "FGameDataTableRow_GameText with 11 language variants, 287 identical ids each in the companion export (9 CHAP_, 230 STMSN_, 48 STR_). Loaded as slot 7; Config/DefaultGame.ini:35-45 cooks one variant per chunk.",
-    "Three cross-table joins are visible: StoryChapter.Id_StoryChapterTitle -> chapter-select/mission-select/ShowTitle; StoryDemo.Id_StoryMissionTitle -> mission title in archive, shop, mission list and dialog parameters; ShortStory.Id_StoryText_Title (STR_STDM_SS_*) -> short-story list button. CHAP_ ids are also used as data keys for chapter progress/lock checks in gameplay code (e.g. CHAP_0006/0007), but those uses do not fetch this table's Text.",
-    "Because FindTextIdsContaining scans all GameText tables by substring, this table can also supply ids to a script's MessageIdList if a script prefix happens to match an STMSN_/STR_/CHAP_ id; no explicit guard limits it to labels.",
-    "Reconstruction caveat: FindTextRow/FindTextIdsContaining and Tick are behaviour-certified not byte-identical (status/functions.json 0x14af290, 0x14b0100, 0x14c96f0; BEHAV BG03). Partial Content; no exhaustive retail/Blueprint consumer claim."
+    "Exports and loading: the 11 language variants (De, En, Es, Es_LA, Fr, It, Ja, Ko, Pt, Zh_Hans, Zh_Hant) each contain the same 287 keys in the same order and all Text values are nonempty: 9 CHAP_*, 115 STMSN_* titles, 115 matching STMSN_*_EXPLANATION rows, 45 STR_STDM_SS_*, and 3 STR_DEMO_LABEL_*. The row struct is /Script/Abrams.GameDataTableRow_GameText with only ID and Text. Config/DefaultGame.ini:35-45 assigns the language suffixes to chunks 1-11.",
+    "Lookup and precedence: StartLanguageLoading builds <Base>_<Language> asset names, and Tick installs only the selected language variant. The 14-table TextDataTables order is fixed and lookup stops at the first row match; no StoryText id collides with another GameText table in any exported language. FindTextIdsContaining instead collects matching IDs from all 14 tables by applying Id.Contains(Key). GameScript_GetStoryTextId derives STDM_* keys, and the observed matching dialogue resides in StoryDemoTextDataTable/ShortStoryDemoTextDataTable; no script key or exported source row demonstrates that this scan obtains dialogue from StoryTextDataTable. Do not infer dialogue use merely from the unguarded scan.",
+    "Verified data relationships: StoryChapter.Id_StoryChapterTitle -> CHAP_*; StoryDemo.Id_StoryMissionTitle -> STMSN_* title and StoryDemo.Id_StoryMissionDetail -> the paired *_EXPLANATION row; ShortStory.Id_StoryText_Title -> STR_STDM_SS_*; and all 45 ITM_SHORT_STORY_* rows in ItemDataTable use Id_ItemText with the same STR_STDM_SS_* id, which GameItem_GetNameTextCore leaves unchanged for ItemType ShortStory so item-name widgets resolve the StoryText row. All 9 chapter titles, 115 mission titles, 115 explanation ids, and 45 short-story title pointers resolve in the En export. The 3 STR_DEMO_LABEL_* rows have no C++ caller or exported table field reference found.",
+    "Indirect consumers trace through widget text blocks and nested requests: chapter/dlc chapter select, mission select and its explanation panel, character-select mission info, story-demo title cards, archive movie cards, character-correlation mission and short-story buttons, item descriptions, shop unlock requests, and system dialog MISSION_NAME parameters. Locked archive items and locked/new short-story entries substitute SYS_* labels instead of reading a StoryText row. ShowTitle additionally requires a matching demo, a chapter containing it, and a loaded thumbnail before setting the title ids.",
+    "Values and sentinels: this table has no numeric or unit fields, and its constructor supplies only default FName/FString values. ChapterIndex and MissionIndex are integer parameters on separate SYS_* labels in the demo-title widgets, not fields or units of StoryText rows. Passing EApplicationLanguage::Invalid to SetButtonTextId selects the current-language text-block path; it is not a missing-row sentinel. Retail Blueprint assets were not inspected, so which specific widget instances have bForceOneLine enabled and the final on-screen presentation are not independently verified.",
+    "Reconstruction caveat: FindTextRow/0x14af290 is behaviour-certified in BEHAV NA15 and Tick/0x14c96f0 in BEHAV BG03; FindTextIdsContaining/0x14b0100 is a fragmented match with a HOLD verdict and an unresolved call identity. These establish reconstructed behaviour, not byte-identical whole-function proofs. No exhaustive retail Blueprint-consumer claim is made."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:556",
+      "detail": "Builds the language-suffixed table name and installs StoryTextDataTable_<Language> as the seventh of 14 shared GameText tables; first matching row wins for non-SYS_ ids."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:645",
+      "detail": "FindTextIdsContaining scans IDs from all 14 GameText tables; observed script-derived STDM_* keys match StoryDemoText/ShortStoryDemoText, not these CHAP_/STMSN_/STR_ rows."
+    },
+    {
       "source": "Source/Abrams/Private/GameStoryChapterSelectWidget.cpp:119",
-      "detail": "Sets the chapter title text block from StoryChapter.Id_StoryChapterTitle."
+      "detail": "Sets the chapter-select title from StoryChapter.Id_StoryChapterTitle; the DLC variant does the same at GameStoryDlcChapterSelectWidget.cpp:121."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:291",
+      "detail": "Sets the mission-select chapter title from Id_StoryChapterTitle. The detail panel at lines 601-602 sets the mission title from Id_StoryMissionTitle and the explanation from Id_StoryMissionDetail."
     },
     {
       "source": "Source/Abrams/Private/GameScriptCommands.cpp:392",
-      "detail": "ShowTitle passes both Id_StoryChapterTitle and Id_StoryMissionTitle to UGameStoryDemoWidget::SetupTitle."
+      "detail": "ShowTitle requires a script-matched demo, a chapter containing it, and a thumbnail, then passes chapter and mission title ids to GameStoryDemoWidget::SetupTitle, which applies them at GameStoryDemoWidget.cpp:223."
     },
     {
       "source": "Source/Abrams/Private/GameCollectionArchiveMovieItemWidget.cpp:68",
-      "detail": "Sets the archive movie's title from StoryDemo.Id_StoryMissionTitle."
+      "detail": "Unlocked archive movie items show StoryDemo.Id_StoryMissionTitle; locked items use a SYS_* placeholder label instead."
     },
     {
       "source": "Source/Abrams/Private/GameStoryCharaRelateShortStoryListItemWidget.cpp:100",
-      "detail": "Sets the short-story list button text from ShortStory.Id_StoryText_Title."
+      "detail": "Unlocked short-story buttons show ShortStory.Id_StoryText_Title; locked/new entries use a SYS_* placeholder instead."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryCharaRelateMissionListItemWidget.cpp:52",
+      "detail": "Shows StoryDemo.Id_StoryMissionTitle on character-correlation mission list buttons when the data row is found."
     },
     {
       "source": "Source/Abrams/Private/GameSystemDialogWidget.cpp:118",
-      "detail": "Adds a nested MISSION_NAME text-id parameter from the chapter row for dialog messages."
+      "detail": "Adds Id_StoryChapterTitle as a nested MISSION_NAME text-id parameter to SYS_DIALOG_MESSAGE_0301; line 149 does the same with Id_StoryMissionTitle for mission lists."
     },
     {
-      "source": "Source/Abrams/Private/GameTextManager.cpp:556",
-      "detail": "Loads StoryTextDataTable_<Language> into the shared GameText table array."
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1338",
+      "detail": "Shop lineup unlock text resolves chapter names through Id_StoryChapterTitle; mission names use Id_StoryMissionTitle at lines 1361 and 1538, and line 1775 supplies it as MISSION_NAME to ITM_UNLOCK_MESSAGE_4020."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:165",
+      "detail": "GameItem_GetNameTextCore passes ItemDataTable.Id_ItemText through unchanged for ShortStory items, so the 45 ITM_SHORT_STORY_* rows resolve their STR_STDM_SS_* titles from this table."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetTextBlock.cpp:52",
+      "detail": "SetTextIdOnly builds the text request, caches the id for language refreshes, and clears content for invalid requests; SetText at line 206 applies conditional GameText_JoinLines formatting."
     }
   ]
 }

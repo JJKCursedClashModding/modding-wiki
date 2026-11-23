@@ -1,57 +1,79 @@
 {
-  "description": "Per-shikigami/per-attack numeric tuning vectors read through GetCharacterUniqueFloatValue by character-specific action logic.",
+  "description": "Per-shikigami and per-attack/per-effect numeric tuning vectors cached on AGameShikigami and read by shikigami-specific action and movement code through the shikigami implementation of GetCharacterUniqueFloatValue.",
   "fields": {
     "ID": {
       "simple": "Unique tuning row ID (e.g. CN_010, CN_010_AttackA_01).",
-      "technical": "FName row key. AGameShikigami::ApplyCharacterSetup resolves every ShikigamiDataTable.Id_ShikigamiUnique[i] over ShikigamiUniqueDataTables (+0x700) into the UniqueRows array; the array index (RowIndex) is then used by consumers. Shikigami_FindRow skips None IDs (the shared finder rejects None), but a missing non-None row is added as null and a later read would be unchecked. 36 exported rows.",
+      "technical": "FName Id row key (the export names the field ID and sets ImportKeyField to Id). AGameShikigami::ResolveRows, invoked by AGameShikigami::Setup in both its rows-only and full paths, clears UniqueRows and appends one ShikigamiUniqueDataTables (+0x700) lookup per ShikigamiDataTable.Id_ShikigamiUnique[i]; that array position is the RowIndex consumers pass to GetCharacterUniqueFloatValue. Shikigami_FindRow rejects None and silently returns nullptr for a missing row, and ResolveRows appends that nullptr rather than skipping it, so padding/missing IDs become null cache slots that the unchecked accessor would dereference. ShikigamiDataTable has eight ID slots per row: in the exports all 36 distinct non-None IDs resolve and all 36 exported unique rows are referenced, with None padding in the remaining slots.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiUnique.h:11",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Shikigami.h:85",
+        "Source/Abrams/Private/GameShikigami.cpp:798",
         "Source/Abrams/Private/GameShikigami.cpp:870",
         "Source/Abrams/Private/GameShikigami.cpp:874",
-"Source/AbramsDataTable/Public/GameDataTableRow_Shikigami.h:85",
+        "Source/Abrams/Private/GameShikigami.cpp:1094",
+        "Source/Abrams/Public/GameDataTableManager.h:153",
         "Source/Abrams/Private/GameDataTableManager.cpp:242"
       ],
       "status": "verified"
     },
     "FloatValue": {
       "simple": "Indexed floating-point tuning values.",
-      "technical": "TArray<float> (13 entries in every exported row). AGameShikigami::GetCharacterUniqueFloatValue(ValueIndex, RowIndex) returns UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds checks (interface slot 155, retail 0x141482C80). The meaning of an index is per-character: e.g. CP_180 reads index 3 as boost-dash gauge cost and index 4 as per-second gauge drain from row 0; CP_270 reads index 1 of row 0 as an attack cancellation energy cost. The generic character status controller also uses these rows for gauge recovery/rate calculations keyed by effect type.",
+      "technical": "TArray<float> (13 entries in every exported row; the struct itself does not fix the length). AGameShikigami::GetCharacterUniqueFloatValue(ValueIndex, RowIndex) returns UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds or null checks (the shikigami override of interface slot 155, retail 0x141482C80, distinct from AGameCharacter's 0x14126D6F0 override over CharacterUniqueDataTable). Index meaning is supplied by the consumer, not by the data: shikigami movement uses row slots 0-7 for approach speed, extra distance, max distance, tracking-time limit and two range pairs (GameShikigamiMovementController.cpp:706-714); CN_010 attack dashes use slots 8-9 as a speed multiplier and tween/turn time, while slot 9 of row 0 is instead an integer hit-count threshold (CN_010_Actions.cpp:470,603); CN_070 uses row 1 slots 0-2 / 3-5 / 6-8 for shot count, beam-scale numerator (divided by 3000) and max range by cursed-energy level, plus slots 9-10 for fire and inter-shot delays (CN_070_Actions.cpp:142-200); summon/release actions use slots 0-3 and 4-8 as fade-start thresholds, duration/end arguments and release timing. Values are consumed directly as world-space/timing quantities or scaled at the call site; 0.0 is a common neutral/empty value but is not a declared sentinel.",
       "evidence": [
-        "Source/Abrams/Private/GameShikigami.cpp:1253",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiUnique.h:15",
         "Source/Abrams/Public/GameShikigami.h:349",
-        "Source/Abrams/Private/CP_180_ActionController.cpp:510",
-        "Source/Abrams/Private/CP_180_ActionController.cpp:518",
-        "Source/Abrams/Private/CP_270_ActionController.cpp:153",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:657"
+        "Source/Abrams/Private/GameShikigami.cpp:1251",
+        "Source/Abrams/Private/GameShikigamiMovementController.cpp:704",
+        "Source/Abrams/Private/CN_010_Actions.cpp:470",
+        "Source/Abrams/Private/CN_010_Actions.cpp:603",
+        "Source/Abrams/Private/CN_070_Actions.cpp:142",
+        "Source/Abrams/Private/CN_070_Actions.cpp:189",
+        "Source/Abrams/Private/GameShikigamiAction.cpp:360",
+        "Source/Abrams/Private/GameShikigamiAction.cpp:1230"
       ],
       "status": "verified"
     }
   },
   "notes": [
     "ShikigamiUniqueDataTables is manager slot +0x700; the loader name is registered at GameDataTableManager.cpp:414 and resolved at line 242. ShikigamiVoiceGroupDataTables occupies the separate +0x6F0 slot.",
-    "There is no shared index-to-meaning map in the data: the same FloatValue slot has different meanings for different characters/actions. Consumers often annotate the index in comments; those annotations are the most specific evidence available.",
-    "The accessor is unchecked on both indices, so callers must supply a RowIndex present in Id_ShikigamiUnique and a ValueIndex within the array. Exported arrays are uniformly 13 floats.",
-    "Not to be confused with CharacterUniqueDataTable (per-character variants) or the character's own GetCharacterUniqueFloatValue path on AGameCharacter, which uses its own UniqueRows."
+    "There is no shared index-to-meaning map in the data: the same FloatValue slot has different meanings for different characters/actions (and even between rows of one character, e.g. CN_010 row 0 slot 9 is a hit count while attack rows use slot 9 as a dash duration). Consumers often annotate the index in comments; those annotations are the most specific evidence available.",
+    "The accessor is unchecked on both indices, so callers must supply a RowIndex present in Id_ShikigamiUnique and a ValueIndex within the array. Exported arrays are uniformly 13 floats. None padding and missing rows are still appended as nullptr, so a bad RowIndex can null-dereference as well as read out of bounds.",
+    "Not to be confused with CharacterUniqueDataTable (per-character variants) or the character's own GetCharacterUniqueFloatValue path on AGameCharacter, which uses its own UniqueRows filled from CharacterUniqueDataTables (+0x570). The CP_180, CP_270 and GameCharacterStatusController examples previously attached to this table are on that separate character/effect-row path, not this one.",
+    "Only AGameShikigami caches FGameDataTableRow_ShikigamiUnique; the single loader name ShikigamiUniqueDataTable feeds the manager slot, and shikigami action controllers reach the cache indirectly through IGameActorInterface slot 155 on their AGameShikigami owner.",
+    "All field and consumer semantics here come from reconstructed C++ with cited retail RVAs. Retail Blueprint graphs are unavailable, and the project guide states Blueprints contain no logic, so index descriptions document C++ use rather than retail Blueprint pin names."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:242",
+      "detail": "Resolves the single ShikigamiUniqueDataTable loader into ShikigamiUniqueDataTables (+0x700); the loader name is registered at line 414."
+    },
+    {
       "source": "Source/Abrams/Private/GameShikigami.cpp:870",
-      "detail": "ApplyCharacterSetup resolves the Shikigami row's Id_ShikigamiUnique list into the shikigami's UniqueRows (retail 0x1485870)."
+      "detail": "AGameShikigami::ResolveRows (called from Setup at lines 1094/1101) rebuilds the UniqueRows cache from ShikigamiDataTable.Id_ShikigamiUnique; None/missing IDs become nullptr entries."
     },
     {
-      "source": "Source/Abrams/Private/GameShikigami.cpp:1253",
-      "detail": "GetCharacterUniqueFloatValue(ValueIndex, RowIndex) performs the direct double-index array read (retail 0x141482C80)."
+      "source": "Source/Abrams/Private/GameShikigami.cpp:1251",
+      "detail": "AGameShikigami's interface-slot-155 override performs the direct double-index array read (retail 0x141482C80)."
     },
     {
-      "source": "Source/Abrams/Private/CP_180_ActionController.cpp:510",
-      "detail": "CP_180 boost dash reads row 0 index 3 for normal-dash gauge cost and index 4 for drain rate."
+      "source": "Source/Abrams/Private/GameShikigamiMovementController.cpp:704",
+      "detail": "StartAttackApproach consumes one row's slots 0-7 as approach/movement parameters; CN_010 attacks call it with their GetAttackRowIndex (1-5)."
     },
     {
-      "source": "Source/Abrams/Private/CP_270_ActionController.cpp:153",
-      "detail": "CP_270 cancellation logic reads row 0 index 1 as an energy cost per cancelled attack."
+      "source": "Source/Abrams/Private/CN_010_Actions.cpp:470",
+      "detail": "CN_010 attack dashes pass row slots 8-9 to StartAttackMove (speed multiplier and time); OnAttackHit uses row 0 slot 9 as an integer hit-count gate (line 603)."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:657",
-      "detail": "Generic status rate calculations add FloatValue entries (indexes 0,1,2,4,8-derived) to recovery/scaling rates."
+      "source": "Source/Abrams/Private/CN_070_Actions.cpp:142",
+      "detail": "CN_070 AttackA selects row 1 slots 0-2 / 3-5 / 6-8 by cursed-energy level (beam-scale numerator is divided by 3000) and uses slots 9-10 as fire and inter-shot delays; AttackB uses row 2 slots 0-2 (lines 473-475)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigamiAction.cpp:360",
+      "detail": "Summon fades use slots 0-3 of GetUniqueRowIndex/row 0 as thresholds and fade arguments; release actions use slots 4-8 of row 0 for resets and release gating (lines 1230-1257)."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_200_Actions.cpp:366",
+      "detail": "CN_200 shikigami summon reads row 0 slots 0-3 for shadow-rim/gradient-dissolve fade timing; CN_272 and CN_280 use the same pattern."
     }
   ]
 }

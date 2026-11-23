@@ -1,66 +1,110 @@
 {
-  "description": "Named gamepad vibration pulse presets (channel, strength and duration) requested by battle damage/events.",
+  "description": "Named gamepad vibration pulse presets referenced by damage rows; each row supplies a motor mask, amplitude and duration consumed by the unguarded player-side hit path.",
   "fields": {
     "ID": {
-      "simple": "Row key/name of the force-feedback preset.",
-      "technical": "FName row key; the battle system takes the manager's ForceFeedbackDataTables array (+0x7C0) and finds the first table containing this exact name. NAME_None is rejected before the lookup. Export rows include NormalAttack, NormalAttack_Blow, CursedEnergyAttack_1..3, TagCombo and Attacker_Small.",
+      "simple": "Row key/name of the force-feedback preset, e.g. NormalAttack or Attacker_Small.",
+      "technical": "Exported as ID; declared as FName Id (the export's ImportKeyField is Id). FStudioBattleSystem2E0::PlayForceFeedback(Id) takes the data-table manager, returns on NAME_None (exported as \"None\"), then scans DataTables->ForceFeedbackDataTables (+0x7C0) in order and accepts the first UDataTable::FindRow<FGameDataTableRow_ForceFeedback>(Id, FString(), false) hit; null tables or missing rows produce no pulse. The struct's Id member is not read by this lookup. The single master export has 11 rows, every key equal to its ID: NormalAttack, NormalAttack_Blow, NormalAttack_Down, CursedEnergyAttack_1..3, CursedEnergyAttack_Blow_1..3, TagCombo and Attacker_Small. All 11 are referenced from exported Damage rows: Attacker_Small is the only non-None attacker-side value and the other ten are receiver-side values.",
       "evidence": [
-        "Source/Abrams/Private/GameBattleDamage.cpp:63",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:11",
+        "Source/Abrams/Private/GameBattleDamage.cpp:65",
+        "Source/Abrams/Private/GameBattleDamage.cpp:69",
         "Source/Abrams/Private/GameBattleDamage.cpp:73",
-        "Source/Abrams/Private/GameDataTableManager.cpp:254",
-        "Source/Abrams/Private/GameDataTableManager.cpp:427"
+        "Source/Abrams/Private/GameBattleDamage.cpp:76",
+        "Source/Abrams/Public/GameDataTableManager.h:165",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Damage.h:237",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Damage.h:240",
+        "datatables/ForceFeedbackDataTable.json (Properties.ImportKeyField and Rows)"
       ],
       "status": "verified"
     },
     "ForceFeedbackChannel": {
       "simple": "Which rumble motors the pulse targets.",
-      "technical": "EGameForceFeedbackChannel enum (None=0, Left=1, Right=2, All=3, Invalid=255). Passed to AGameInputManager::PlayForceFeedbackPulse: Left clears the right-small/right-large flags, Right clears the left-small/left-large flags, and every other value leaves the default FForceFeedbackChannelDetails flags untouched. All exported retail rows use All; the struct constructor default is None.",
+      "technical": "EGameForceFeedbackChannel is a BlueprintType uint8 UENUM with None=0, Left=1, Right=2, All=3 and Invalid=255. The reconstructed row constructor defaults the member to None; all 11 exported rows use All. AGameInputManager::PlayForceFeedbackPulse fills an FForceFeedbackChannelDetails, whose engine constructor enables all four motors; Left clears bAffectsRightSmall/bAffectsRightLarge, Right clears bAffectsLeftSmall/bAffectsLeftLarge, and every other value (including None and Invalid) leaves all four enabled. There is no enum validation in the reconstructed consumer and no exported row exercises the Left, Right or Invalid arms.",
       "evidence": [
+        "Source/AbramsDataTable/Public/EGameForceFeedbackChannel.h:5",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:16",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:24",
         "Source/Abrams/Private/GameBattleDamage.cpp:78",
         "Source/Abrams/Private/GameInputManager.cpp:1085",
-        "Source/AbramsDataTable/Public/EGameForceFeedbackChannel.h:6",
-        "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:24"
+        "Source/Abrams/Private/GameInputManager.cpp:1087",
+        "Source/Abrams/Private/GameInputManager.cpp:1090",
+        "Source/Abrams/Private/GameInputManager.cpp:1094",
+        "UE 5.1 Engine/Source/Runtime/Engine/Classes/GameFramework/ForceFeedbackEffect.h:14",
+        "UE 5.1 Engine/Source/Runtime/Engine/Classes/GameFramework/ForceFeedbackEffect.h:33",
+        "datatables/ForceFeedbackDataTable.json (Rows.*.ForceFeedbackChannel)"
       ],
       "status": "verified"
     },
     "Power": {
       "simple": "Vibration amplitude of the pulse.",
-      "technical": "Float rumble strength; installed verbatim as both keys of a two-point FRichCurve at times 0 and Duration (a constant curve), with no interpolation or scaling in the consumer. Export values range 0.2 (TagCombo) to 1.0 (CursedEnergyAttack_3); constructor default 0.0.",
+      "technical": "float copied verbatim into both keys of a flat FRichCurve at times 0 and Duration in FForceFeedbackChannelDetails::Curve.EditorCurveData. The game code applies no scaling, player-character rate or clamping; UE 5.1 evaluates that curve and clamps each motor output against the current value and 1.0. Exported values are 0.2 (TagCombo), 0.3 (Attacker_Small), 0.5 (the three NormalAttack rows), 0.6 (CursedEnergyAttack_1 and its Blow row), 0.8 (CursedEnergyAttack_2 and its Blow row) and 1.0 (CursedEnergyAttack_3 and its Blow row). The reconstructed row constructor defaults Power to 0.0.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:19",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:24",
         "Source/Abrams/Private/GameBattleDamage.cpp:78",
+        "Source/Abrams/Private/GameInputManager.cpp:1104",
         "Source/Abrams/Private/GameInputManager.cpp:1102",
-        "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:24"
+        "UE 5.1 Engine/Source/Runtime/Engine/Private/Curves/CurveFloat.cpp:28",
+        "UE 5.1 Engine/Source/Runtime/Engine/Private/GameFramework/ForceFeedbackEffect.cpp:48",
+        "datatables/ForceFeedbackDataTable.json (Rows.*.Power)"
       ],
       "status": "verified"
     },
     "Duration": {
       "simple": "How long the vibration pulse lasts.",
-      "technical": "Float seconds used as the second key's time in the rumble FRichCurve (first key is at 0). Passed together with Power to FForceFeedbackParameters() default parameters and player index 0 by FStudioBattleSystem2E0::PlayForceFeedback. Export values are 0.25-0.8; constructor default 0.0.",
+      "technical": "float seconds used as the second Power-curve key's time (the first key is at 0); with the positive exported values, UE 5.1 takes the curve's maximum time as UForceFeedbackEffect::Duration. FStudioBattleSystem2E0::PlayForceFeedback forwards Duration and Power with player index 0, and PlayForceFeedbackPulse bakes them into the curve before calling AInputManager::PlayForceFeedback(Details, FForceFeedbackParameters(), 0). The engine base never reads that parameter object: it stops prior feedback for the player, replaces the transient effect's ChannelDetails with this one channel and calls ClientPlayForceFeedback with a fresh default FForceFeedbackParameters (non-looping, time dilation honored, no play-while-paused). Exported values are 0.25-0.8 seconds; the row constructor defaults Duration to 0.0.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:22",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:24",
         "Source/Abrams/Private/GameBattleDamage.cpp:78",
+        "Source/Abrams/Private/GameInputManager.cpp:1101",
         "Source/Abrams/Private/GameInputManager.cpp:1103",
-        "Source/Abrams/Private/GameInputManager.cpp:1102"
+        "Source/Abrams/Private/GameInputManager.cpp:1105",
+        "Source/Framework/Private/InputManager.cpp:445",
+        "Source/Framework/Private/InputManager.cpp:455",
+        "UE 5.1 Engine/Source/Runtime/Engine/Classes/GameFramework/ForceFeedbackEffect.h:44",
+        "UE 5.1 Engine/Source/Runtime/Engine/Classes/GameFramework/ForceFeedbackEffect.h:109",
+        "UE 5.1 Engine/Source/Runtime/Engine/Private/GameFramework/ForceFeedbackEffect.cpp:26",
+        "UE 5.1 Engine/Source/Runtime/Engine/Private/GameFramework/ForceFeedbackEffect.cpp:97",
+        "datatables/ForceFeedbackDataTable.json (Rows.*.Duration)"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Retail function provenance: lookup 0x141028150, pulse builder 0x1353500, engine PlayForceFeedback 0xe174f0. The C++ names of the helpers are reconstruction names; the offsets and array slot +0x7C0 are decomp evidence.",
-    "Only 11 exported rows were available; all set ForceFeedbackChannel=All. No export row exercises the Left/Right switch arms, and no other consumers were identified in the available source/Blueprint-less content, so per-event call sites for these IDs are not enumerated here.",
-    "The row's Id member is a serialized FName but the lookup uses the row map key (export Name/ID), not a scan of that member."
+    "Loading and cache path: StartInitialLoading (retail 0x130aa90) only registers ForceFeedbackDataTable as a DataTable-type primary asset in DataTableLoaders (GameDataTableManager.cpp:321, 427, 488); it does not resolve the table there. After every loader completes, Tick (0x13215c0) resolves each loader with AssetManager->GetPrimaryAssetObject<UDataTable>, drops nulls, and appends the loaded table to ForceFeedbackDataTables at +0x7C0 (GameDataTableManager.cpp:162-167, 170, 254; GameDataTableManager.h:165). Config/DefaultGame.ini:24 scans DataTable primary assets under /Game/DataTables. The battle consumer reads only this cached array and performs FindRow per request; no alias table, per-row cache or other table consumer was found in the source.",
+    "Damage-side conditions and precedence: ApplyCharacterDamage returns from its guarded branch before any force-feedback call (GameBattleDamage.cpp:502-607). In the unguarded branch, if Attacker->IsPlayerCharacter() is true it plays Id_ForceFeedback_Attacker (with hit marker and attacker camera shake); otherwise, in an else-if, if Receiver->IsPlayerCharacter() is true it plays Id_ForceFeedback_Receiver (GameBattleDamage.cpp:610-621). A player attacker therefore takes precedence, and no pulse is requested when neither side is a player. ApplyShikigamiDamage plays only the attacker's camera shake and never calls PlayForceFeedback (GameBattleDamage.cpp:829-873).",
+    "Data relationship and sentinel: FGameDataTableRow_Damage declares FName Id_ForceFeedback_Attacker and Id_ForceFeedback_Receiver (GameDataTableRow_Damage.h:237,240). Across all 60 exported Damage files (5 master shards plus 55 character-filtered shards, 2,399 rows), 49 attacker-side and 48 receiver-side IDs are the sentinel \"None\", which PlayForceFeedback rejects with Id.IsNone() before any table scan; every non-None reference resolves to one of the 11 ForceFeedback rows, with no dangling ID. The five master shards hold 1,201 row keys, and all 1,198 character-shard rows repeat the same force-feedback IDs for the same key. These are overlapping export rows, not event frequencies: Attacker_Small accounts for 2,350 attacker-side references; receiver-side references are NormalAttack 598, NormalAttack_Blow 507, CursedEnergyAttack_Blow_3 252, CursedEnergyAttack_Blow_1 248, CursedEnergyAttack_2 188, CursedEnergyAttack_1 178, CursedEnergyAttack_Blow_2 124, TagCombo 114, CursedEnergyAttack_3 94 and NormalAttack_Down 48.",
+    "Playback gates: AInputManager::PlayForceFeedback returns early when its bForceFeedbackEnabled member is false or when player 0 is outside PlayerStates/ForceFeedbackEffectArray (InputManager.cpp:445-450); battle always passes 0. That manager flag is true in the AInputManager constructor and is written to the negation of the debug menu's OnSetForceFeedbackDisabled argument (InputManager.cpp:30, DebugMenuWidgetNatives.cpp:748, InputManager.h:56-58). Separately, the settings path AGameManager::SetForceFeedbackEnabled calls SetPlayersForceFeedbackEnabled, which writes each APlayerController::bForceFeedbackEnabled and the saved setting, but does not write the manager's +0x2D9 flag (GameManagerGraphics.cpp:209-212, InputManager.cpp:459-467, GameSettings.h:25, GamePhase_Boot.cpp:315). UE's controller zeroes motor values when its own flag is false (PlayerController.cpp:4653-4656). The debug menu also writes GameDebugManager::ForceFeedbackDisabled, but no reader for that value was found in the available source, so it is not treated as a traced gate.",
+    "Pulse construction: PlayForceFeedbackPulse creates one channel detail whose two curve keys have the same Power value, so the exported pulses are flat rather than ramped; the engine derives effect duration from the maximum curve time. On playback the base manager stops any previous feedback for that player, clears the transient effect's ChannelDetails, adds just this detail, and calls ClientPlayForceFeedback with new default parameters (GameInputManager.cpp:1085-1105; InputManager.cpp:445-455; ForceFeedbackEffect.cpp:26-46, 48-71). The FForceFeedbackParameters object supplied by PlayForceFeedbackPulse is unused, so no game row controls looping, time-dilation handling or play-while-paused.",
+    "Row scope: FGameDataTableRow_ForceFeedback derives from FTableRowBase and declares exactly Id, ForceFeedbackChannel, Power and Duration, all BlueprintReadWrite/EditAnywhere. Its inline constructor initializes the enum to None and both floats to 0.0 (it does not explicitly initialize Id); the export metadata names GameDataTableRow_ForceFeedback as RowStruct and Id as ImportKeyField. No other serialized members or per-character overrides exist in this table.",
+    "Export coverage: ForceFeedbackDataTable exists only as datatables/ForceFeedbackDataTable.json; there are no datatables_by_character/*/ForceFeedbackDataTable.json shards. Its one DataTable object contains 11 rows, all with ForceFeedbackChannel=All, key=ID, Power between 0.2 and 1.0 and Duration between 0.25 and 0.8. No row uses None, Left, Right, Invalid, zero or a negative duration; the enum/default/sentinel branches documented above are code-derived, not row-derived.",
+    "Evidence strength: The runtime description is reconstructed C++ backed by static retail RVAs (lookup 0x141028150, pulse builder 0x1353500, base PlayForceFeedback 0xe174f0, row constructor 0x16c5ca0) plus the exported row data and UE 5.1 engine source. status/functions.json records 0x1353500 and 0xe174f0 as byte `match` rows and 0x16c5ca0 as a matched leaf; the battle lookup RVA is decomp-attributed but is not a standalone row in the generated scoreboard. No retail Blueprint graphs were available or inspected and no Blueprint-derived behavior is claimed. The merged project's Content tree does not include the retail DataTable package, so row values and metadata come from the JSON export, not an in-editor read."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:254",
-      "detail": "StartInitialLoading resolves the 'ForceFeedbackDataTable' primary asset and appends it to ForceFeedbackDataTables (+0x7C0); the same name is registered in the loader name list at line 427."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:321",
+      "detail": "StartInitialLoading registers the ForceFeedbackDataTable name at line 427; after all loaders complete, Tick resolves it and appends it to ForceFeedbackDataTables (+0x7C0) at line 254."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleDamage.cpp:63",
-      "detail": "FStudioBattleSystem2E0::PlayForceFeedback(Id) ignores NAME_None, iterates ForceFeedbackDataTables, finds the first exact row and forwards channel/power/duration plus player 0 to the input manager, then stops."
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:65",
+      "detail": "PlayForceFeedback skips NAME_None, first-match scans the cached +0x7C0 array with FindRow warnings disabled, and forwards the row's channel/power/duration plus player 0 to the input manager."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:616",
+      "detail": "Unguarded character damage plays the attacker ID when the attacker is a player, else the receiver ID when the receiver is a player at line 621; guarded hits and shikigami damage do not call it."
+    },
+    {
+      "source": "Source/AbramsDataTable/Public/GameDataTableRow_Damage.h:237",
+      "detail": "Damage rows supply the two FName IDs; all 60 exported Damage files reference either one of this table's 11 rows or the NAME_None sentinel."
     },
     {
       "source": "Source/Abrams/Private/GameInputManager.cpp:1085",
-      "detail": "PlayForceFeedbackPulse maps the channel enum to FForceFeedbackChannelDetails motor flags and builds a constant Power curve over Duration before calling engine PlayForceFeedback."
+      "detail": "PlayForceFeedbackPulse maps the channel enum to motor flags, builds a flat Power curve over Duration, and passes default FForceFeedbackParameters and player index 0 to the base manager."
+    },
+    {
+      "source": "Source/Framework/Private/InputManager.cpp:445",
+      "detail": "The base manager gates playback, stops prior feedback, replaces the player's transient effect channel details, and calls ClientPlayForceFeedback with fresh default parameters."
     }
   ]
 }

@@ -3,60 +3,87 @@
   "fields": {
     "ID": {
       "simple": "Costume row id used by ScriptCharacter rows.",
-      "technical": "FName row key (export ImportKeyField Id). GameStoryDemoImage_FindClothesRow resolves it inside ScriptCharacterClothesDataTables after selecting ScriptCharacter.Id_ScriptCharacterClothes[ClothesIndex]; exported ids are <character>_<costume> (e.g. CP_010_00).",
+      "technical": "FName row key (export ImportKeyField Id; native property Id, exported as ID). GameStoryDemoImage_FindClothesRow does not read this property: it scans ScriptCharacterDataTables for CharacterId, selects Character->Id_ScriptCharacterClothes[ClothesIndex] after IsValidIndex, then calls FindRow with that FName on ScriptCharacterClothesDataTables and returns the first match. Exported ids are <character>_<costume> (e.g. CP_010_00, CN_122_00), and all 27 rows have ID equal to their row key.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ScriptCharacterClothes.h:11",
-        "Source/Abrams/Private/GameStoryDemoImage.cpp:493",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ScriptCharacter.h:15",
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:478",
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:489",
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:494",
         "Source/Abrams/Private/GameStoryDemoImage.cpp:497"
       ],
       "status": "verified"
     },
     "ClothesFileName": {
       "simple": "Dynamic-load texture name for the costume overlay.",
-      "technical": "FName passed to FindDynamicLoadTexture and installed as the material's Character_Clothes texture parameter; NAME_None clears it (nullptr). Exported values follow T_UI_STDM_<id>.",
+      "technical": "FName passed to FindDynamicLoadTexture and installed as the material's Character_Clothes texture parameter; NAME_None, a cache miss, or a missing row clears it (nullptr). Exported values follow T_UI_STDM_<id> and all 27 are non-None. FindDynamicLoadTexture is a name-to-texture cache lookup rather than a load on demand: UGameScriptData::CharacterClothesList feeds WidgetTexture loaders whose loaded assets are inserted into AGameWidgetManager's DynamicLoadTextureMap. The row constructor supplies no default.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ScriptCharacterClothes.h:15",
+        "Source/AbramsDataTable/Private/GameDataTableRow_ScriptCharacterClothes.cpp:3",
+        "Source/Abrams/Public/GameScriptData.h:15",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:292",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:302",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:360",
+        "Source/Framework/Public/WidgetManager.h:96",
         "Source/Abrams/Private/GameStoryDemoImage.cpp:548",
         "Source/Abrams/Private/GameStoryDemoImage.cpp:549",
-        "Source/Abrams/Private/GameStoryDemoImage.cpp:553"
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:553",
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:136"
       ],
       "status": "verified"
     },
     "FacialFileName": {
       "simple": "Facial-expression texture names for the costume.",
-      "technical": "TArray<FName>; indexed by the uint8 Facial value evaluated by the story-demo character-parameter sequencer track, with an upper-bound check only (Facial >= Num gives NAME_None/nullptr). The selected texture is installed as Character_Facial. Exported rows have 12 slots, including None placeholders; the C++ treats the array as dynamic.",
+      "technical": "TArray<FName>; indexed by the uint8 Facial value evaluated from the story-demo character-parameter sequencer's FMovieSceneByteChannel, so it is a zero-based array index, not a count or signed index. SetCharacter first requires a non-null row, then checks Facial >= Num (yielding NAME_None/nullptr); uint8 cannot be negative. Missing rows, None entries and cache misses also yield nullptr. The selected texture is installed as Character_Facial through the widget-manager texture cache. Every exported row has 12 slots (indices 0-11, all used somewhere), including None placeholders; the C++ treats the array as dynamic and the empty row constructor provides no prefill or fixed length.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ScriptCharacterClothes.h:18",
+        "Source/AbramsDataTable/Private/GameDataTableRow_ScriptCharacterClothes.cpp:3",
+        "Source/AbramsSequencer/Public/AbramsSequencerStoryDemoCharacterParameterSection.h:16",
         "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoCharacterParameterEvaluate.cpp:93",
+        "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoCharacterParameterEvaluate.cpp:95",
         "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoCharacterParameterEvaluate.cpp:128",
+        "Source/Abrams/Public/GameScriptData.h:18",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:293",
+        "Source/Framework/Public/WidgetManager.h:96",
         "Source/Abrams/Private/GameStoryDemoImage.cpp:551",
         "Source/Abrams/Private/GameStoryDemoImage.cpp:552",
-        "Source/Abrams/Private/GameStoryDemoImage.cpp:554"
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:554",
+        "Source/Abrams/Private/GameStoryDemoImage.cpp:137"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The row struct constructor is empty: no C++ fallback textures or array prefill (Source/AbramsDataTable/Private/GameDataTableRow_ScriptCharacterClothes.cpp:3).",
-    "Single table in the exported asset set; no numbered shards or localization variants were found. Row counts and texture-name examples above are observations from the exported asset, not documentation-site guesses.",
-    "Evidence comes from the reconstructed C++ in Source/; status/ records byte matches for the GameStoryDemoImage owner TU, but this JSON does not claim a retail byte comparison for every individual helper."
+    "Exported asset set: one ScriptCharacterClothesDataTable asset with 27 keys, no numbered asset shards and no localization variants. The 14 datatables_by_character/<id>/ copies are exact per-character subsets of that asset (1-4 rows each) and add no new rows or fields; all 15 copies declare RowStruct GameDataTableRow_ScriptCharacterClothes and ImportKeyField Id, and every row has exactly ID, ClothesFileName and FacialFileName.",
+    "Data relationship: ScriptCharacterDataTable has 14 character rows whose Id_ScriptCharacterClothes arrays reference all 27 clothes row keys and also use None for unused costume slots. The 27 clothing names and 78 distinct non-None facial names are FName cache keys, not hard asset references; a name absent from the widget texture map resolves to nullptr.",
+    "Indirect loading: UGameScriptData::CharacterClothesList and CharacterFacialList are concatenated into WidgetTexture primary-asset loaders, and the loaded texture for each key is then added to DynamicLoadTextureMap. No UGameScriptData export is part of the supplied data set, so per-script preload-list membership could not be verified from data.",
+    "Defaults, sentinels and precedence: the row struct constructor is empty. NAME_None suppresses the texture lookup and sets a null material parameter; ClothesIndex is checked with IsValidIndex and a selected NAME_None then fails the clothes-row lookup, while Facial is a uint8 checked only against the array upper bound after a row is found. If multiple tables are registered, the first matching ScriptCharacter row and then the first matching clothes row win; the exports contain only one clothes table, so multi-table precedence is not empirically observable.",
+    "Evidence status: this description is reconstructed from C++ in Source/ plus static exports. status/functions.json marks the two relevant GameStoryDemoImage functions (0x166e880 row lookup and 0x1685ad0 SetCharacter) behavioural rather than byte-matched, while sequencer evaluator 0x179c360 is INV-matched. No retail Blueprint asset, retail runtime capture, or byte comparison for every individual helper was available."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameStoryDemoImage.cpp:478",
-      "detail": "GameStoryDemoImage_FindClothesRow joins ScriptCharacter -> ScriptCharacterClothes; returns null on a bad clothes index or missing row."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:470",
+      "detail": "Registers the primary-asset loader name ScriptCharacterClothesDataTable. Tick waits for all DataTable loaders to finish, resolves this loader through the asset manager (GameDataTableManager.cpp:172 and 297) and adds only the non-null UDataTable to ScriptCharacterClothesDataTables (GameDataTableManager.cpp:162 and 146)."
     },
     {
-      "source": "Source/Abrams/Private/GameStoryDemoImage.cpp:506",
-      "detail": "UGameStoryDemoImage::SetCharacter loads ClothesFileName/FacialFileName and binds them to the dynamic material."
+      "source": "Source/Abrams/Private/GameStoryDemoImage.cpp:478",
+      "detail": "GameStoryDemoImage_FindClothesRow scans ScriptCharacterDataTables in order for CharacterId, requires Id_ScriptCharacterClothes.IsValidIndex(ClothesIndex), takes that FName (including NAME_None), scans ScriptCharacterClothesDataTables in order and returns the first row found; otherwise it returns null."
     },
     {
       "source": "Source/AbramsSequencer/Private/AbramsSequencerStoryDemoCharacterParameterEvaluate.cpp:128",
-      "detail": "Sequencer track supplies CharacterId, ClothesIndex and the Facial array index on each evaluation."
+      "detail": "On each valid evaluation the sequencer supplies Section->CharacterId, Section->ClothesIndex (int32) and FacialValue (uint8 from the Facial byte channel) to SetCharacter; the widget slot is derived from all matching sections sorted by CharacterIndex."
     },
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:297",
-      "detail": "Tick loads the single ScriptCharacterClothesDataTable into the manager's ScriptCharacterClothesDataTables array."
+      "source": "Source/Abrams/Private/GameStoryDemoImage.cpp:506",
+      "detail": "SetCharacter returns early for a NAME_None CharacterId, an invalid one-based Slot (CharacterImages[Slot-1]), a null dynamic material, a near-zero UV scale, or an absent CanvasPanelSlot. Only after those conditions does it resolve both texture names from the clothes row and set Character_Clothes and Character_Facial on the dynamic material."
+    },
+    {
+      "source": "Source/Framework/Public/WidgetManager.h:96",
+      "detail": "FindDynamicLoadTexture is a DynamicLoadTextureMap lookup that returns nullptr on a miss; the ClothesFileName and FacialFileName FNames are cache keys, not texture paths loaded on demand."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptPlayer.cpp:292",
+      "detail": "For a loaded script, CharacterClothesList and CharacterFacialList feed WidgetTexture primary-asset loaders (line 302); after loading, each texture is inserted into the widget manager cache under its name (line 360)."
     }
   ]
 }

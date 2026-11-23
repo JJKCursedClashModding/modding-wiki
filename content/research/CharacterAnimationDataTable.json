@@ -1,73 +1,109 @@
 {
-  "description": "Per-row mapping from animation state keys to AnimMontage primary-asset names, used to install montages on character anim instances and to build capture maps.",
+  "description": "Per-row mapping from animation state names to AnimMontage primary-asset names. Rows are selected indirectly by CharacterAnimationSet, CharacterCapture, and SituationOverviewPose IDs; consumers file loaded montages under Key in character anim instances or turn Key -> FileName pairs into capture-loader maps.",
   "fields": {
     "Id": {
       "simple": "Animation group row key (character or specialized group such as facial parts).",
-      "technical": "Unreal DataTable row name (exported as ID). CharacterAnimationSet.Id_CharacterAnimation entries and several capture/pose rows use this name to find the row in CharacterAnimationDataTables. The export contains 1125 groups; targets include base character rows and suffixed groups such as CP_010_FACIAL and CP_010_ATTACKA.",
+      "technical": "FName row identity exported as ID. In all 1125 aggregate rows the ID string equals the DataTable row name, and no traced consumer reads the struct property itself. Callers instead pass a row name from CharacterAnimationSet.Id_CharacterAnimation, CharacterCapture.Id_CharacterAnimation, or SituationOverviewPose.Id_CharacterAnimation_Ally/_Enemy to a first-match FindRow over AGameDataTableManager.CharacterAnimationDataTables; None is skipped or returns no row. The 55 per-character export shards partition the same 1125 keys exactly. Names include base character rows such as CP_010 and suffixed groups such as CP_010_FACIAL and CP_010_ATTACKA.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterAnimation.h:11",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:96",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:758",
-        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1216"
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:95",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1216",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1232",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1402",
+        "Source/Abrams/Private/GameDataTableManager.cpp:205"
       ],
       "status": "verified"
     },
     "Key": {
       "simple": "Parallel list of animation state names that a montage gets bound to.",
-      "technical": "TArray<FName>, 35 entries in every exported row, with trailing None slots. Consumers iterate Key.Num() and pair Key[Index] with FileName[Index]; None keys are skipped. BattleBase passes the key to UGameCharacterAnimInstance::SetAnimationAsset(Key, Montage, bDuplicate), with Idle/Fall_01 flagged as duplicates; capture actors build a TMap<Key, FileName>, optionally filtered to idle/enter keys. No separate length check against FileName is performed, so arrays must be parallel.",
+      "technical": "TArray<FName>. Every exported row has 35 entries, with trailing None slots. Install loops iterate Key.Num() and pair Key[Index] with FileName[Index]; a None in either array is skipped. Battle spawning calls UGameAnimInstance::SetAnimationAsset(Key, Montage, bDuplicate), requesting a transient duplicate only for Idle and Fall_01; sequencer spawning passes false. Capture builds a TMap<Key, FileName>: every non-None pair for situation overview, only the CharacterCapture idle/enter keys otherwise. TMap::Add means a later duplicate Key overwrites an earlier mapping; the exported duplicate keys carry identical FileNames. There is no FileName.Num() comparison before GetData()[Index]/operator[] indexing, so ragged arrays would be unsafe.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterAnimation.h:15",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:742",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:764",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:766",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:768",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:775",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:665",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:667",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:671",
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1220",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1223",
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1224",
-        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:664"
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1236",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1239",
+        "Source/Abrams/Private/GameAnimInstance.cpp:14"
       ],
       "status": "verified"
     },
     "FileName": {
       "simple": "Parallel list of AnimMontage primary-asset names paired with Key.",
-      "technical": "TArray<FName> serialized as Filename in the export. BattleAsset collectors append non-None FileName entries to the AnimMontage preload name list; battle/sequencer code looks up StudioAnimMontageLoaders by FileName, resolves the loaded UAnimMontage and installs it at the matching Key. Capture code maps Key -> FileName and plays the montage at FileName[0] for situation-overview poses. None entries are skipped where the loop checks them, but FileName[0] is indexed directly in the pose playback path.",
+      "technical": "TArray<FName> serialized as Filename. Each value is an AnimMontage primary-asset name, not an object path: collectors append the whole FileName array (including None entries, with no Key check), and loader creation then drops None names and deduplicates by name. Install paths look up each non-None name in the relevant StudioAnimMontageLoaders cache (StudioAnimMontageLoaders_810 for battle, _7C0 for sequencer), resolve FPrimaryAssetId(AnimMontage, FileName) through AbramsAssetManager, and bind the loaded UAnimMontage at the paired Key; missing cache entries are fail-fast FindChecked lookups there. Capture maps store Key -> FileName and the per-slot AnimMontageLoaders map; idle/enter playback reads the map value, while situation-overview pose playback indexes FileName[0] directly without rechecking Key[0]. All exported rows have a non-None first FileName, but the data contains one non-None FileName with a None Key and one non-None Key with a None FileName; the checking consumers skip both kinds of pair, while preload still sees the non-None file.",
       "evidence": [
-        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:96",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterAnimation.h:18",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:98",
+        "Source/Abrams/Private/GameDataTableManager.cpp:87",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:767",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:773",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:669",
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1222",
-        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1405"
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1407",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1411",
+        "Config/DefaultGame.ini:16"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Key and FileName are positional pairs; all 1125 exported rows have 35 entries in each array, with trailing None placeholders. Consumers index both arrays by the same loop index without a bounds comparison beyond Key.Num().",
-    "No localization variants of this table were exported. The available Content is partial and the export does not prove every retail animation group.",
-    "Evidence is reconstructed C++; montage loaders are primary-asset loaders keyed by FileName, not direct object paths stored in the table.",
-    "The export label is Filename while the USTRUCT property and source consumers use FileName."
+    "The aggregate export has 1125 rows and 55 per-character CharacterAnimationDataTable shards partition it exactly, with no duplicate or missing row keys. Every row has exactly 35 Key and 35 Filename entries; trailing None is the unused sentinel. Two rows contain a duplicated non-None Key with the same FileName, and two rows contain one one-sided None pair. Consumers skip either-None pairs, but the preload collector appends FileName without checking Key, and no consumer compares the two array lengths.",
+    "Lookups use the DataTable row name, not the Id property; all exported Id values match their row keys. AGameDataTableManager populates CharacterAnimationDataTables from the single loader named CharacterAnimationDataTable, and each finder returns the first matching table/row, so any additional table would be resolved by array order.",
+    "FGameDataTableRow_CharacterAnimation has an empty constructor (GameDataTableRow_CharacterAnimation.cpp:3): no code-level defaults, units, or sentinel replacements are applied. Native empty FName is None, and all exported rows supply both arrays.",
+    "In the available exports, 904 non-None CharacterAnimationSet references resolve to 889 exported rows while 15 IDs are absent (for example CN_080_ATTACKD through CN_080_ATTACKL and CP_010_ATTACKA_AIR). All non-None CharacterCapture animation IDs resolve; one SituationOverviewPose enemy ID (CN_260_SITUATION_OVERVIEW_ENEMY_01) is absent. Missing rows are skipped by the traced consumers, so these are data/coverage gaps rather than proven runtime failures.",
+    "No localized CharacterAnimationDataTable export was found. The local Content checkout is partial (350 .uasset files) and contains neither this DataTable nor the referenced montages, so asset existence cannot be confirmed from the checkout. The export label is Filename while the native property and all consumers use FileName.",
+    "All behavior described here is from reconstructed C++ consumers carrying retail addresses in source comments plus the exported data. No retail Blueprint graph or retail runtime observation was available; status 'verified' means a consumer was traced in the reconstruction, not that retail execution was observed."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:205",
+      "detail": "After all DataTable loaders complete, resolves the single CharacterAnimationDataTable primary asset into CharacterAnimationDataTables; StartInitialLoading requests it by that exact name at line 353."
+    },
+    {
       "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:96",
-      "detail": "Finds an animation group and appends all FileName entries to the battle asset preload list."
+      "detail": "Shared collector: for each non-None CharacterAnimationSet.Id_CharacterAnimation it finds the animation row and appends the complete FileName array to the preload name list. None entries and duplicate names are filtered later when loaders are built."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:286",
-      "detail": "Resolves each character's animation set, then uses BattleAssets_AnimMontages_12BC030 to collect montage names for primary-asset loading."
+      "detail": "Battle preload resolves each slot character's Id_CharacterAnimationSet (no override here), collects FileName entries, and builds StudioAnimMontageLoaders_270 with AnimMontage primary-asset IDs."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:758",
-      "detail": "Installs each loaded montage on the spawned character's anim instance at the matching Key, flagging duplicate Idle/Fall_01 bindings."
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:747",
+      "detail": "SpawnBattleCharacter uses AnimationSetIdOverride when non-None, otherwise Character.Id_CharacterAnimationSet, then installs each paired FileName/Key with bDuplicate true only for Idle and Fall_01."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:577",
+      "detail": "Studio character preload uses the same collector with Character.Id_CharacterAnimationSet and builds StudioAnimMontageLoaders_7C0."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:660",
-      "detail": "Installs set-provided montages into studio characters spawned for sequencer scenes."
+      "detail": "Studio character spawn installs montages from CharacterAnimationDataTables at each non-None Key using FindChecked loader lookups and bDuplicate false."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1220",
-      "detail": "Builds a Key -> FileName map for captures, filtered to idle/enter keys for non-situation-overview captures."
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1129",
+      "detail": "Capture slot setup converts the character's Key -> FileName map values into the per-slot AnimMontage loader names, alongside shikigami and weapon animation names."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1405",
-      "detail": "Plays FileName[0] of the situation-overview pose's animation row as a montage."
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1216",
+      "detail": "GetCharacterAnimationMap selects a row via SituationOverviewPose.Id_CharacterAnimation_Ally/_Enemy for situation overview, or via CharacterCapture.Id_CharacterAnimation otherwise, then maps non-None pairs (all pairs, or only the capture row's idle/enter keys)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1407",
+      "detail": "Situation-overview idle playback finds FileName[0] in the slot's AnimMontageLoaders and plays the resolved montage at line 1411; no Key[0] check is performed. Non-situation idle/enter playback instead looks up the captured Key in the map at lines 1463-1494."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimInstance.cpp:14",
+      "detail": "SetAnimationAsset stores the loaded montage in the anim instance's AssetMap under Key with blend times; bDuplicate stores a transient duplicate instead of the shared asset."
     }
   ]
 }

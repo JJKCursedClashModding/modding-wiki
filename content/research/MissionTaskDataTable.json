@@ -1,128 +1,179 @@
 {
-  "description": "Parallel-array definition of battle log objectives (mission tasks), evaluated every tick into success/failure progress and shown in the HUD.",
+  "description": "Parallel-array mission objectives: each indexed slot pairs a battle-log value, target, passive classification and comparison threshold, producing per-index progress for the battle HUD and PvE completion counters; story objectives/rewards read the same rows by a shifted index, and the row can also ban binding-vow effects.",
   "fields": {
     "Id": {
-      "simple": "Mission task identifier.",
-      "technical": "FName import key/row name for FGameDataTableRow_MissionTask. Task ids are normally obtained from a MissionTaskLottery weighted pick (or PvESettings.MissionTaskIds) and resolved against MissionTaskDataTables (DTM+0x9E0). The member is not otherwise read as data by consumers.",
+      "simple": "Mission task row identifier.",
+      "technical": "FName import key / DataTable row name (export property `ID`); no runtime consumer reads the row's Id member as data. GameDataTableManager loads the named MissionTaskDataTable into `MissionTaskDataTables` (DTM+0x9E0). Arcade, story and PvE wave setup resolve the id from `MissionWave.Id_MissionTaskLottery` through `BattleArcade_PickLotteryTask` (weighted, None candidates dropped), and PvE caches the picked ids in `FGamePvESettings::MissionTaskIds`. The story-demo helper instead takes `MissionTaskLottery.Id_MissionTask[0]` without using its weight.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:16",
+        "Source/Abrams/Private/GameDataTableManager.cpp:288",
         "Source/Abrams/Public/GameDataTableManager.h:199",
-        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:154",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:494"
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:96",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:158",
+        "Source/Abrams/Private/GamePvESettings.cpp:674",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:494",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:571"
       ],
       "status": "observed"
     },
     "ValueType": {
-      "simple": "Battle-log value to measure for each indexed condition.",
-      "technical": "TArray<EGameBattleLogValueType>, default empty. Its Num() is the authoritative task count for the runtime loop; None entries are skipped by the story-state all-conditions evaluator, and FirstAttack entries are force-failed by FailFirstAttackTasks when a non-player team attacks. Each non-None value is passed to AGameBattleManager::EvaluateLog together with the same-index TargetType and PassiveType.",
+      "simple": "Battle-log value measured for each indexed task condition.",
+      "technical": "TArray<EGameBattleLogValueType>, default empty. `ValueType.Num()` is the authoritative condition count in `Tick`, `FailFirstAttackTasks` and `OnEvent13`; all exported rows have three slots and the third is always `None`. Slot i is passed with `TargetType[i]` and `PassiveType[i]` to `AGameBattleManager::EvaluateLog` (GM 0x1015A80 forwards to FStudioBattleSystem350 with bTotal=false). `None` and `Invalid` return false, so `None` slots are inert on every tick. Any pending `FirstAttack` slot is force-failed by `FailFirstAttackTasks` when the attacker team is not 0 (team A/Playable). Units follow the selected log value: hit/finish/combo entries are counts, HitPoint is raw HP, HitPointRate is 0..1, TimeLimit is elapsed seconds, MovedDistance is metres, and CursedEnergy_Level is aggregated by maximum rather than by sum.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:20",
-        "Source/Abrams/Private/GameBattleSystems_B.cpp:635",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:437",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:441",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:490",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:525",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:631",
         "Source/Abrams/Private/GameBattleSystems_B.cpp:660",
-        "Source/Abrams/Private/GameBattleStoryStates.cpp:274",
-        "Source/Abrams/Private/GameBattleSystems_B.cpp:437"
+        "Source/Abrams/Private/GameBattleManager.cpp:1591"
       ],
       "status": "verified"
     },
     "TargetType": {
-      "simple": "Whose battle log value is evaluated.",
-      "technical": "TArray<EGameBattleLogTargetType>, default empty. Ally collects the player's team characters, Myself only the player, Enemy the rival team; EvaluateLog returns false when no characters resolve. Values are consumed at the same index as ValueType and PassiveType.",
+      "simple": "Whose battle-log value is evaluated.",
+      "technical": "TArray<EGameBattleLogTargetType>, default empty. Read at the same index as ValueType, PassiveType, Value and ConditionType. `Ally` collects the focused player's team characters, `Myself` only the player's character index, and `Enemy` the rival team; `None`/`Invalid` produces no character list, so EvaluateLog returns false. Evaluation uses the per-round log blocks (bTotal=false) and returns false when the player pointer is invalid or no characters resolve.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:23",
-        "Source/Abrams/Private/GameBattleSystems_B.cpp:663",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:437",
         "Source/Abrams/Private/GameBattleSystems_B.cpp:453",
-        "Source/Abrams/Private/GameBattleSystems_B.cpp:466"
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:466",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:469",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:483",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:663"
       ],
       "status": "verified"
     },
     "PassiveType": {
       "simple": "Whether the logged value is sent or received.",
-      "technical": "TArray<EGameBattleLogPassiveType>, default empty. Passed with the same-index ValueType/TargetType to EvaluateLog, which sums the selected log entries with that passive classification. The exported rows commonly pair Receive with ForceGauge conditions and Send with hit-count conditions.",
+      "technical": "TArray<EGameBattleLogPassiveType>, default empty. Passed at the same index to EvaluateLog. Only `Receive` selects a character's `ReceiveValues` map; `Send`, `None` and `Invalid` all select `SendValues`, so `None` is not itself a skip. The selected entries are summed over resolved characters, except `CursedEnergy_Level` (maximum) and `HitPointRate` (mean). In the export, 77 rows pair a slot-0 `ForceGauge` condition with `Receive`; hit/combo finishers are mostly `Send`, although `Attack_Hit` and `CursedEnergyAttack_Finish` use `Receive`.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:26",
-        "Source/Abrams/Private/GameBattleSystems_B.cpp:663",
-        "Source/Abrams/Private/GameBattleSystems_B.cpp:480"
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:416",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:417",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:427",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:430",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:663"
       ],
       "status": "verified"
     },
     "Value": {
       "simple": "Threshold for each indexed task condition.",
-      "technical": "TArray<float>, default empty. Copied into FStudioMissionTaskProgress.Target. Success conditions compare the evaluated log value with >= or <= the target; failure conditions compute a decreasing/increasing Current from the target and fail at zero/crossing. On success Current is clamped to Target. The first entries are also formatted into HUD text as the VALUE parameter and story objective text.",
+      "technical": "TArray<float>, default empty. `Value[i]` is copied to `FStudioMissionTaskProgress.Target`. Success conditions set `Current` to the evaluated log value and clamp it to the target when satisfied; `Failure_GreaterThanEquals` uses `max(ceil(Target-Value), 0)` and `Failure_LessThanEquals` uses `max(Value-Target, 0)`, and both fail when that value reaches zero. The HUD reset passes the authored `Value[i]` as the detail text's `VALUE` parameter, while live progress text formats runtime `Current`/`Target` as `VALUE`/`MAX_VALUE` (cast to int at reset, float thereafter). Story objective text uses `Value[i-1]` for objective index >0, and the interval wave-info widget uses `Value[0]` only. Exported thresholds are in the selected log value's units and range from 0 to 300.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:29",
-        "Source/Abrams/Private/GameBattleSystems_B.cpp:673",
         "Source/Abrams/Private/GameBattleSystems_B.cpp:676",
-        "Source/Abrams/Private/GameBattleSystems_B.cpp:693",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:678",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:695",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:703",
         "Source/Abrams/Private/GameBattleMissionTaskListWidget.cpp:86",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:617"
+        "Source/Abrams/Private/GameBattleMissionTaskWidget.cpp:75",
+        "Source/Abrams/Private/GameBattleMissionTaskWidget.cpp:95",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:617",
+        "Source/Abrams/Private/GameVsEnemyIntervalWaveInfoWidget.cpp:143"
       ],
       "status": "verified"
     },
     "ConditionType": {
       "simple": "Comparison rule that decides success or failure.",
-      "technical": "TArray<EGameBattleLogConditionType>, default empty. Success_GreaterThanEquals/Success_LessThanEquals set State=1 immediately when the log value crosses Value[i]; Failure_GreaterThanEquals/Failure_LessThanEquals set State=-1 when a written condition is reached, otherwise remain pending. Pending failure conditions are treated as successful on event 13 when the battle result is Win_TeamA.",
+      "technical": "TArray<EGameBattleLogConditionType>, default empty. Read at the same index in `Tick` and `OnEvent13`. `Success_GreaterThanEquals`/`Success_LessThanEquals` set State=1 when the evaluated value crosses `Value[i]`; `Failure_GreaterThanEquals`/`Failure_LessThanEquals` set State=-1 when their computed `Current` reaches zero. `None`/`Invalid` leave the condition pending. Pending failure conditions are converted to successes only by event 13 when `BattleResult == Win_TeamA`. Success notifications increment `CompletedCount`, call `OnPvETaskCleared(1)` and play the HUD success animation; failures play only the HUD failure animation. The export uses only `Success_GreaterThanEquals` and `Failure_GreaterThanEquals`; slot 2 in every row is `None`.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:32",
         "Source/Abrams/Private/GameBattleSystems_B.cpp:673",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:675",
         "Source/Abrams/Private/GameBattleSystems_B.cpp:684",
-        "Source/Abrams/Private/GameBattleSystems_B.cpp:742",
-        "Source/Abrams/Private/GameBattleStoryStates.cpp:283"
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:693",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:701",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:713",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:733",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:745",
+        "Source/Abrams/Private/GameManagerTails.cpp:344"
       ],
       "status": "verified"
     },
     "Id_BattleText_TaskDetail": {
-      "simple": "Per-condition HUD/objective text id.",
-      "technical": "TArray<FName>, default empty. The battle mission-task list widget iterates this array in parallel with Value and TaskProgress; None hides the widget. Story objective helpers use Index-1 (index 0 is reserved for a generic objective), validate IsValidIndex and non-None, and write the text id plus Value[Index-1] as a VALUE parameter.",
+      "simple": "Per-condition HUD and story-objective text id.",
+      "technical": "TArray<FName>, default empty. The battle mission-task list loops over this array (capped by the number of child task widgets) and uses the same index for `Value[i]` and `TaskProgress[i]`; `None` hides that widget. This array, not ValueType.Num(), therefore controls how many HUD slots are considered. Story objective helpers require objective index >0, validate `Index-1` in this array and reject None; index 0 is a generic mission-clear objective that does not read the row. The story reward helper applies the same `Index-1` gate. Completed story progress is persisted by task index into `FGameUserStoryMissionInfo::TaskFlags`, not by this FName.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:35",
         "Source/Abrams/Private/GameBattleMissionTaskListWidget.cpp:82",
         "Source/Abrams/Private/GameBattleMissionTaskListWidget.cpp:85",
+        "Source/Abrams/Private/GameBattleMissionTaskListWidget.cpp:87",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:586",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:612"
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:598",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:615",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1248",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:417"
       ],
       "status": "verified"
     },
     "ExcludeBindingVowsEffectType": {
       "simple": "Binding-vow effect types disallowed by this task.",
-      "technical": "TArray<EGameBindingVowsEffectType>, default empty fixed-width arrays in the export. In PvE interval setup, each candidate vow's effect rows are collected and a candidate is removed if any EffectType is contained in this array; the same filtering is also done from MissionOrder.ExcludeBindingVowsEffectType.",
+      "technical": "TArray<EGameBindingVowsEffectType>, default empty. This is not part of the condition-indexed evaluation. During interval-PvE setup, each candidate vow's effect rows are collected and the candidate is removed if any `EffectType` is contained in this array; `MissionOrder.ExcludeBindingVowsEffectType` is applied to the same candidate list before the task exclusions. `None` never matches an effect. Unlike the three-slot condition arrays, all 151 exported rows carry exactly eight slots here (1184 `None` entries), with 20 rows containing real exclusions; the C++ default is an empty array and the enum defines `Invalid = 255` as its out-of-range sentinel.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:38",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:659",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:647",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:650",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:657",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:665"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset contains 151 rows with FGameDataTableRow_MissionTask; the manager loads MissionTaskDataTable into MissionTaskDataTables (DTM+0x9E0).",
-    "All condition arrays are parallel and ValueType.Num() drives the runtime loop. The reconstructed code does not check that TargetType, PassiveType, Value, ConditionType or Id_BattleText_TaskDetail have the same length, so rows must be authored consistently.",
-    "Task state is cached in FStudioBattleMissionTaskSystem::TaskProgress keyed by the array index; aliases from the data row through AGameBattleManager::GetMissionTask, HUD widget and story objective helpers are documented in usages.",
-    "Consumers are reconstructed from retail functions such as 0x1055FE0; consult status/functions.json before treating any of them as byte-matched. Partial Content and uninspected Blueprint uses limit completeness."
+    "The catalog and export contain one MissionTaskDataTable variant with 151 unique rows. Every row has three entries in ValueType, TargetType, PassiveType, Value, ConditionType and Id_BattleText_TaskDetail: slot 0 is active in all 151, slot 1 is active in 86, and slot 2 is None in all 151; ExcludeBindingVowsEffectType always has eight entries.",
+    "Array precedence differs by consumer: runtime condition evaluation and FirstAttack/failure completion use ValueType.Num(); the HUD iterates Id_BattleText_TaskDetail.Num() and the child widget count; story objective/reward indices n>0 map to array index n-1; the interval wave-info widget uses index 0 only. The condition arrays are not length-checked against each other, and the HUD/story text paths read Value[i] after validating only the text-id index, so hand-authored rows must keep them aligned. No exported row is malformed.",
+    "Sentinels: FName `None` hides a HUD task and marks a story objective absent; ValueType `None`/`Invalid` and TargetType `None`/`Invalid` make EvaluateLog return false; PassiveType `None` still reads the Send map; ConditionType `None`/`Invalid` leave State=0. FStudioMissionTaskProgress starts at {Current=0, Target=0, State=0}, uses State 1 for success and -1 for failure, and is cleared by OnPrepareBattle (CompletedCount resets only when RetryCount<=0). A non-player (non-zero) attacker team fails pending FirstAttack tasks, and pending failure comparisons become successes only on Win_TeamA.",
+    "Success changes feed back into progression: CompletedCount is copied to ResultSnapshot.Value438, PvE reward calculations compare it with MissionTaskIds.Num(), and on a story win each TaskProgress entry with State>0 sets the matching valid TaskFlags index to 1.",
+    "Lookup chain: the manager resolves ids from MissionWave.Id_MissionTaskLottery through a weighted pick (Arcade, Story and PvE) or, for story demos, lottery element 0; 150 of 151 exported task ids are referenced by MissionTaskLotteryDataTable, with PVE_TASK_010 unreferenced in the available exports. The picked row is selected by RetryCount from the Tasks array and cached as FStudioBattleMissionTaskSystem::MissionTask, exposed via AGameBattleManager::GetMissionTask; progress is exposed via GetMissionTaskProgress.",
+    "All 25 distinct BTL_MISSION_TASK_MESSAGE_* ids used by the rows exist in every one of the 11 BattleTextDataTable locale shards, and BTL_MISSION_TASK_LABEL_0001 (the progress label) exists in all of them too.",
+    "Core task evaluation (0x1055FE0, 0x105F400), HUD reset (0x14E09F0), demo objective helpers (0x1310B70, 0x130A4B0) and lottery pick (0x1302490) are recorded as byte-matched in status/functions.json. Setup paths such as 0x13A1E40/0x13A3B70/0x13A70D0 and interval vow filtering 0x1303F60 are only behavioural, and HUD progress formatter 0x14F8310 carries a HOLD verdict; no retail Blueprint graphs or live game capture were available, so widget bindings and any BP/data-asset wiring remain unverified."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:650",
-      "detail": "FStudioBattleMissionTaskSystem::Tick evaluates every indexed condition and writes progress state."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:288",
+      "detail": "Loads MissionTaskDataTable via its named primary-asset loader into `MissionTaskDataTables` at DTM+0x9E0; all row lookups walk that table array."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:629",
-      "detail": "FailFirstAttackTasks force-fails FirstAttack tasks when the attacking team is not the player."
+      "source": "Source/Abrams/Private/GamePhase_BattleArcade.cpp:96",
+      "detail": "BattleArcade_PickLotteryTask removes None task ids from MissionTaskLottery.Id_MissionTask, sums Weights, and makes a weighted FRand pick; the chosen id is resolved against MissionTaskDataTables at line 158 with null kept."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:657",
+      "detail": "GamePvE_MakeMissionTasks fills `FGamePvESettings::MissionTaskIds` one-per-wave from the same lottery picker; PvE Solo/Tag later resolve those ids at GamePhase_BattlePvESolo.cpp:494 and GamePhase_BattlePvETag.cpp:69."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:193",
+      "detail": "Story battle setup resolves lottery-picked task rows, hands them to SetupStoryMission, and at line 417 copies successful TaskProgress indices into the user's story TaskFlags."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:653",
+      "detail": "Tick evaluates each ValueType-indexed condition through EvaluateLog with bTotal=false, creates/updates the index-keyed TaskProgress entry, and notifies HUD/counters; FailFirstAttackTasks (line 631) and OnEvent13 (line 733) mutate the same cache."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1404",
+      "detail": "Aliases the cached current row and its progress map as GetMissionTask / GetMissionTaskProgress for the HUD and phase code."
     },
     {
       "source": "Source/Abrams/Private/GameBattleMissionTaskListWidget.cpp:80",
-      "detail": "Renders per-condition task text, target and current progress from the row and cached TaskProgress."
+      "detail": "HUD reset uses the current row's Id_BattleText_TaskDetail and Value for each child widget, overlays State/Current/Target from the cache, hides None rows, and ticks live progress from the same cache."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:268",
-      "detail": "Checks all non-None row conditions through EvaluateLog for story-state completion."
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:554",
+      "detail": "Story_GetDemoMissionTask walks StoryDemo -> StoryMission -> StoryMissionWave -> MissionWave -> lottery element 0; the helpers at lines 580-619 use TextDetail[Index-1] for objective presence/completion/text and line 1238 gates reward items on the same shifted id."
     },
     {
-      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:580",
-      "detail": "Story demo objective presence, completion and text formatting read task detail ids and values."
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:604",
+      "detail": "IntervalPvE_PickBindingVows filters candidate binding vows using MissionOrder exclusions first (line 650) and then each selected task row's ExcludeBindingVowsEffectType (line 665)."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:659",
-      "detail": "Filters binding-vow candidates against ExcludeBindingVowsEffectType."
+      "source": "Source/Abrams/Private/GameVsEnemyIntervalWaveInfoWidget.cpp:139",
+      "detail": "Displays only element 0 of Id_BattleText_TaskDetail and Value as the interval wave's task line, requiring both arrays to be non-empty and the text id non-None."
+    },
+    {
+      "source": "Source/Abrams/Private/GameManagerTails.cpp:344",
+      "detail": "OnPvETaskCleared increments PvE solo/tag task-clear user records for each notified success, feeding the task-clear achievements."
     }
   ]
 }

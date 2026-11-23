@@ -3,74 +3,88 @@
   "fields": {
     "Id": {
       "simple": "Result-score row id.",
-      "technical": "FName import key/row name for FGameDataTableRow_ResultScore. AGameBattleManager::EvaluateResultBonuses collects all rows in ResultScoreDataTables (DTM+0x360); no consumer reads the member as data.",
+      "technical": "FName import key/row name for FGameDataTableRow_ResultScore; the export declares ImportKeyField = Id and emits row names under the key ID. AGameBattleManager enumerates ResultScore rows from ResultScoreDataTables (DTM+0x360) through FGameDataTableArray::GetRows, which calls GetRowNames and FindRow. No reconstructed consumer reads Row->Id as data, so it identifies and orders rows rather than supplying a bonus value.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:12",
+        "Source/Abrams/Public/GameDataTableArray.h:21",
+        "Source/Abrams/Public/GameDataTableArray.h:26",
         "Source/Abrams/Public/GameDataTableManager.h:95",
         "Source/Abrams/Private/GameBattleManager.cpp:780",
+        "Source/Abrams/Private/GameBattleManager.cpp:820",
         "Source/Abrams/Private/GameBattleManager.cpp:829"
       ],
       "status": "observed"
     },
     "ResultScore": {
       "simple": "Which result bonus this row defines.",
-      "technical": "EGameResultScore, default None. Stored as the bonus entry Type and used in EvaluateResultBonuses' switch: win/overwhelming-win depend on winner and remaining stock, good-fight compares rival stock to a threshold ratio, log-driven bonuses query total battle-log values, and special cases include first attack/kill, runner, kill streak and no-operation. Rows whose enum has no case add nothing. A Runner-only cleanup later keeps just the farthest mover.",
+      "technical": "EGameResultScore, default None (Invalid=255 is the enum sentinel and is absent from the export). EvaluateResultBonuses copies the enum into FStudioBattleBonusEntry.Type and switches on it: Win needs the winner team with stock below its maximum; OverwhelmingWin adds an infinite-or-positive remaining-time guard and requires full stock; GoodFight is for a character whose team is not the winner and whose rival has finite stock with rival stock <= rival maximum * Threshold. Most remaining cases test total battle-log values, while MaximumOutput uses a fixed >3 check, and first attack/kill, Finisher's FocusActor match, Runner, KillStreak, round-log Involvement and NoOperation have their own branches. Unhandled enum values add no entry. In a final pass, Runner entries are removed for every character except the farthest positive-distance mover.",
       "evidence": [
+        "Source/AbramsDataTable/Public/EGameResultScore.h:7",
+        "Source/AbramsDataTable/Public/EGameResultScore.h:42",
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:16",
         "Source/Abrams/Private/GameBattleManager.cpp:832",
         "Source/Abrams/Private/GameBattleManager.cpp:884",
         "Source/Abrams/Private/GameBattleManager.cpp:886",
         "Source/Abrams/Private/GameBattleManager.cpp:896",
-        "Source/Abrams/Private/GameBattleManager.cpp:1101"
+        "Source/Abrams/Private/GameBattleManager.cpp:906",
+        "Source/Abrams/Private/GameBattleManager.cpp:1031",
+        "Source/Abrams/Private/GameBattleManager.cpp:1075"
       ],
       "status": "verified"
     },
     "Threshold": {
       "simple": "Default threshold for the bonus condition.",
-      "technical": "float, default 0.0f. Used when BattleMode is not 2, 5, 6 or 9. It is compared against rival-stock ratio for GoodFight, elapsed TimeLimit for FastFinish, consecutive log value differences for KillStreak, log ValueA4 for Involvement, and minimum log values for LongShot/ReturnToHell/NoOperation. Exported rows use varied units (0.5, 60, 3000, etc.) chosen by the bonus case.",
+      "technical": "float, default 0.0f. Used when BattleMode is not 2, 5, 6 or 9. GoodFight compares the rival's total stock against rival maximum * Threshold (and skips unlimited stock); FastFinish requires a found total TimeLimit value <= Threshold; KillStreak requires adjacent total log-entry values differing by <= Threshold; LongShot, ReturnToHell and NoOperation require a found total log value >= Threshold; Involvement uses the round-log AttackTarget.ValueA4 smallest-banked-target-time value, whose missing-block sentinel is FLT_MAX, and requires <= Threshold. Exported rows use case-specific values (0.5, 60 seconds, 3000, 10, 0.2, 3 and 30). All five Threshold columns are identical on every shipped row, so the mode switch currently changes which column is read rather than the numeric threshold.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:19",
         "Source/Abrams/Private/GameBattleManager.cpp:834",
+        "Source/Abrams/Private/GameBattleManager.cpp:842",
+        "Source/Abrams/Private/GameBattleManager.cpp:877",
         "Source/Abrams/Private/GameBattleManager.cpp:906",
-        "Source/Abrams/Private/GameBattleManager.cpp:983",
-        "Source/Abrams/Private/GameBattleManager.cpp:992",
-        "Source/Abrams/Private/GameBattleManager.cpp:1002"
+        "Source/Abrams/Private/GameBattleManager.cpp:960",
+        "Source/Abrams/Private/GameBattleManager.cpp:980",
+        "Source/Abrams/Private/GameBattleManager.cpp:1000",
+        "Source/Abrams/Public/GameBattleSystems_B.h:84",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:400",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:513"
       ],
       "status": "verified"
     },
     "Threshold_Story": {
       "simple": "Threshold override for Story battle mode.",
-      "technical": "float, default 0.0f. Selected when BattleMode == 2; other modes use Threshold or the PvE/Arcade variants. The same comparison logic then consumes it as the mode-specific threshold.",
+      "technical": "float, default 0.0f. Selected when BattleMode == 2 (Story) while building each bonus entry; the shared condition switch then consumes it as Threshold. It equals the default Threshold on all 34 exported rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:22",
-        "Source/Abrams/Private/GameBattleManager.cpp:837",
+        "Source/Abrams/Private/GameBattleManager.cpp:835",
         "Source/Abrams/Private/GameBattleManager.cpp:838"
       ],
       "status": "verified"
     },
     "Threshold_PvE_Normal": {
-      "simple": "Threshold override for normal PvE missions.",
-      "technical": "float, default 0.0f. Selected for BattleMode 5 or 6 when Game->PvESettings.MissionKind != 2.",
+      "simple": "Threshold override for PvE missions whose MissionKind is not 2.",
+      "technical": "float, default 0.0f. Selected for BattleMode 5 or 6 when Game->PvESettings.MissionKind != 2; the code tests only inequality with 2, so the field name is conventional. It equals the default Threshold on all 34 exported rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:25",
         "Source/Abrams/Private/GameBattleManager.cpp:840",
-        "Source/Abrams/Private/GameBattleManager.cpp:842"
+        "Source/Abrams/Private/GameBattleManager.cpp:842",
+        "Source/Abrams/Public/GamePvESettings.h:11"
       ],
       "status": "verified"
     },
     "Threshold_PvE_Survival": {
       "simple": "Threshold override for PvE survival missions.",
-      "technical": "float, default 0.0f. Selected for BattleMode 5 or 6 when Game->PvESettings.MissionKind == 2.",
+      "technical": "float, default 0.0f. Selected for BattleMode 5 or 6 when Game->PvESettings.MissionKind == 2; otherwise Threshold_PvE_Normal is used. It equals the default Threshold on all 34 exported rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:28",
         "Source/Abrams/Private/GameBattleManager.cpp:840",
-        "Source/Abrams/Private/GameBattleManager.cpp:842"
+        "Source/Abrams/Private/GameBattleManager.cpp:842",
+        "Source/Abrams/Public/GamePvESettings.h:12"
       ],
       "status": "verified"
     },
     "Threshold_Arcade": {
       "simple": "Threshold override for Arcade battle mode.",
-      "technical": "float, default 0.0f. Selected when BattleMode == 9.",
+      "technical": "float, default 0.0f. Selected when BattleMode == 9 (Arcade) while building each bonus entry; the shared condition switch then consumes it as Threshold. It equals the default Threshold on all 34 exported rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:31",
         "Source/Abrams/Private/GameBattleManager.cpp:844",
@@ -80,55 +94,86 @@
     },
     "UpperLimit": {
       "simple": "Maximum counted quantity for scaled bonuses.",
-      "technical": "int32, default 0. In the Scaled helper the battle-log value is truncated to int32; when UpperLimit > 0 the count is clamped with FMath::Min(Count, UpperLimit) before multiplying by Score. An UpperLimit of 0 means no cap. It does not affect flat/boolean bonuses.",
+      "technical": "int32, default 0. In the Scaled branches (Defeat, Assist, LevelUp, LinkCombo, SpecialTagCombo, Debuff and JustGuard) a found total log value must be >0; it is truncated to int32, clamped with FMath::Min(Count, UpperLimit) when UpperLimit > 0, then multiplied by Score. A zero or negative limit leaves the count uncapped. Damage instead replaces Entry.Value with the truncated total Attack_Damage value and ignores both UpperLimit and Score; flat/boolean branches ignore UpperLimit. Exported caps are 4 (LevelUp), 10 (LinkCombo), 2 (SpecialTagCombo) and 5 each (Debuff, JustGuard); all other rows use 0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:34",
         "Source/Abrams/Private/GameBattleManager.cpp:849",
         "Source/Abrams/Private/GameBattleManager.cpp:855",
-        "Source/Abrams/Private/GameBattleManager.cpp:857",
-        "Source/Abrams/Private/GameBattleManager.cpp:859"
+        "Source/Abrams/Private/GameBattleManager.cpp:917",
+        "Source/Abrams/Private/GameBattleManager.cpp:919",
+        "Source/Abrams/Private/GameBattleManager.cpp:926",
+        "Source/Abrams/Private/GameBattleManager.cpp:978",
+        "Source/Abrams/Private/GameBattleManager.cpp:1006"
       ],
       "status": "verified"
     },
     "Score": {
-      "simple": "Points awarded for this result bonus.",
-      "technical": "int32, default 0. Initialises Entry.Value; scaled bonuses replace it with Count * Score, while boolean/condition bonuses add the initial value as-is. The value also appears in result snapshots, ranking-record bonus checks and bonus-rank evaluation via GetBonusScoreRank.",
+      "simple": "Points (positive or negative) contributed by this result bonus.",
+      "technical": "int32, default 0. Initialises Entry.Value: Scaled branches replace it with the capped count * Score, Damage replaces it with the truncated total log value, and every other branch that adds an entry keeps the initial value. The player's entry values are summed into ResultSnapshot.Value43C and, after the mission score-rate multiplier, select a rank from mode-specific RESULT_SCORE_* rows in GlobalThresholdDataTable; GetBonusScoreRank separately sums the same values times Rate. Ranking-record bonus checks test entry Type rather than Value. Exported Scores range from -100 (NoOperation) to 350 (OverwhelmingWin).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:37",
+        "Source/Abrams/Private/GameBattleManager.cpp:715",
         "Source/Abrams/Private/GameBattleManager.cpp:833",
         "Source/Abrams/Private/GameBattleManager.cpp:859",
-        "Source/Abrams/Private/GameBattleManager.cpp:1077",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:738"
+        "Source/Abrams/Private/GameBattleManager.cpp:922",
+        "Source/Abrams/Private/GameBattleManager.cpp:1075",
+        "Source/Abrams/Private/GameBattleManager.cpp:1362",
+        "Source/Abrams/Private/GameBattleManager.cpp:1380",
+        "Source/Abrams/Private/GameResultWidget.cpp:547"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset has 34 rows with FGameDataTableRow_ResultScore; the manager loads ResultScoreDataTable into ResultScoreDataTables (DTM+0x360).",
-    "Threshold variants are selected by BattleMode with explicit mode numbers (2 Story, 5/6 PvE, 9 Arcade) recorded in the reconstructed source; other modes use the default Threshold.",
-    "Bonuses are evaluated per character, with bonus entries keyed by character index. The ResultScore enum drives the concrete condition; the same enum is later used by ranking-record and bonus-rank code.",
-    "Evaluator 0x1049fa0 / 0x1015b50 and related helpers are reconstructed; consult status/functions.json for byte status. Content is partial and Blueprint uses were not exhaustively inspected."
+    "The single exported asset ResultScoreDataTable contains 34 rows named RESULT_SCORE_01 through RESULT_SCORE_34, one for each non-sentinel EGameResultScore value. The manager loads that primary asset into ResultScoreDataTables (DTM+0x360); FGameDataTableArray::GetRows enumerates rows across all tables in table order and then row-name order.",
+    "Threshold variants are selected by BattleMode (2 Story, 5/6 PvE with MissionKind deciding Normal versus Survival, 9 Arcade). All five Threshold columns are identical on every shipped row, so the mode choice selects a column but does not change any exported numeric value.",
+    "Bonus entries are keyed by the character interface index byte, not by row Id; index 0xFF characters are skipped. Entries feed ResultSnapshot.BonusEntries and Value43C, the GlobalThreshold result rank, ranking-record membership checks, the result UI's per-character totals and labels, the PvE mission-wave bonus rank, and a sequencer unique-pair voice condition.",
+    "Behavioral descriptions come from reconstructed C++ plus the shipped export, not from byte-equivalent retail proof: status/functions.json marks row collector 0x1049fa0 as MATCH but evaluator 0x104cff0 as DIFF. Retail Blueprint graphs or assets were not used as evidence in this review, and no Blueprint-only logic is assumed."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameBattleManager.cpp:819",
-      "detail": "EvaluateResultBonuses collects all result-score rows and evaluates them per character."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:184",
+      "detail": "After all primary asset loads complete, the manager resolves ResultScoreDataTable and adds it to ResultScoreDataTables (DTM+0x360)."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleManager.cpp:834",
-      "detail": "Selects the mode-specific threshold variant."
+      "source": "Source/Abrams/Public/GameDataTableArray.h:21",
+      "detail": "GetRows enumerates every ResultScore row in table order then row-name order; this is the reconstructed 0x1049fa0 collector."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleManager.cpp:850",
-      "detail": "Scaled helper caps log counts with UpperLimit and multiplies by Score."
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:809",
+      "detail": "EvaluateResultBonuses clears the output map, iterates eligible characters and rows, chooses the mode threshold, adds entries, and finally prunes non-farthest Runner entries."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleManager.cpp:1077",
-      "detail": "Ranking-record evaluation tests bonus entries produced from these rows."
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:884",
+      "detail": "The ResultScore enum dispatches to stock, battle-log, fixed-value and special-case conditions; unhandled values add no entry."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1075",
+      "detail": "EvaluateRankingRecords tests player bonus Type membership for OverwhelmingBattle, Finisher and Runner rather than reading bonus values."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1362",
+      "detail": "The player's bonus values are summed into ResultSnapshot.Value43C, multiplied by the mission score rate for the result rank, and their types feed ranking-record evaluation."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:715",
+      "detail": "GetBonusScoreRank sums bonus values and applies Rate before looking up the mode-specific result-score rank."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:738",
-      "detail": "PvE result passes accumulated bonuses to GetBonusScoreRank with the mission score-rate multiplier."
+      "detail": "The PvE result state reads cached snapshot bonuses and raises MissionWaveRank if the rate-adjusted bonus rank is higher."
+    },
+    {
+      "source": "Source/Abrams/Private/GameResultWidget.cpp:647",
+      "detail": "The result screen sums per-character bonus values for player entries and passes the player's entries to the detail list."
+    },
+    {
+      "source": "Source/Abrams/Private/GameResultScoreListItemWidget.cpp:16",
+      "detail": "Each displayed bonus maps its entry Type to a localised label (Type 11 uses a character-specific label) and formats its Value as the score."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:281",
+      "detail": "An indirect snapshot-cache consumer checks for bonus Type 2 (OverwhelmingWin) to gate a unique-pair voice condition."
     }
   ]
 }

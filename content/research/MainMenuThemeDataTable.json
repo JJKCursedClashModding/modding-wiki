@@ -1,191 +1,253 @@
 {
-  "description": "Defines selectable main-menu themes: their label, BGM, thumbnail assets, per-screen background movies, and the save-data progress flags that unlock them.",
+  "description": "Defines selectable main-menu themes: their label and BGM IDs, thumbnail texture names, per-screen background movie names, and the save-data progress flags that unlock them.",
   "fields": {
     "Id": {
       "simple": "Theme row identifier.",
-      "technical": "FName row key. FindThemeRow uses StudioName_17D8 or the saved StudioMainMenuThemeIndex_38E to select an ID, scans MainMenuThemeDataTables for the row, validates its unlock state, and falls back to the first row in the first non-empty table. On selection, OnMainMenuThemeSelected stores the row's index in the collected row list (0xFF for NAME_None) into the save header. The theme list widget compares IDs to avoid rebuilding an unchanged list.",
+      "technical": "FName row key and DataTable import key (exported as ID). PreparePhase reads the uint8 save-header index StudioMainMenuThemeIndex_38E: 0xFF leaves ThemeId NAME_None, otherwise it takes the ID at that position in the table/row-name-ordered row list, using row 0 when the index is out of range. FindThemeRow uses StudioName_17D8 only when the supplied ID is NAME_None; that name is set at startup/debug boot by DTM_PickTitleRowName from the unlocked rows. FindThemeRow scans MainMenuThemeDataTables and returns the row only if GameMainMenuWidget_IsThemeUnlocked passes; a missing or locked ID falls back to the first row of the first non-empty table without rechecking the fallback's flags. OnMainMenuThemeSelected writes the row's position in the collected rows to the save header (0xFF for NAME_None; an unknown non-None ID returns without a write), and the list refresh compares row IDs to skip rebuilding an unchanged list.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:11",
+        "Source/Abrams/Public/GameDataTableArray.h:21",
+        "Source/Abrams/Private/GameDataTableManager.cpp:507",
+        "Source/Abrams/Private/GameDataTableManager.cpp:526",
+        "Source/Abrams/Private/GamePhase_Startup.cpp:177",
         "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:76",
-        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:119",
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:122",
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:126",
         "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:515",
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:533",
+        "Source/Abrams/Private/GameMainMenuThemeListView.cpp:38",
         "Source/Abrams/Private/GameMainMenuThemeWidget.cpp:54"
       ],
       "status": "verified"
     },
     "Id_Text": {
       "simple": "Localized label shown for the theme.",
-      "technical": "FName passed to MainMenuThemeText->SetTextIdOnly when a theme-list item receives focus. The row-less 'random' entry instead uses SYS_COMMON_LABEL_0042.",
+      "technical": "FName text ID passed to MainMenuThemeText->SetTextIdOnly when a theme-list item receives focus; GameWidgetTextBlock sends SYS_-prefixed IDs to GameTextManager, which resolves them from SystemTextDataTable. The exported IDs are SYS_MAIN_MENU_THEME_LABEL_0101/0102/0103 (English 'Default', 'Hidden Inventory/Premature Death', 'The Shibuya Incident' in the SystemTextDataTable export). The row-less random entry instead uses SYS_COMMON_LABEL_0042.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:15",
         "Source/Abrams/Private/GameMainMenuThemeWidget.cpp:125",
-        "Source/Abrams/Private/GameMainMenuThemeWidget.cpp:131"
+        "Source/Abrams/Private/GameMainMenuThemeWidget.cpp:131",
+        "Source/Abrams/Private/GameMainMenuThemeWidget.cpp:135",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:52",
+        "Source/Abrams/Private/GameTextManager.cpp:624"
       ],
       "status": "verified"
     },
     "Id_Bgm": {
       "simple": "BGM cue ID for the theme.",
-      "technical": "FName passed to PlayBgm during main-menu phase preparation and again whenever a new theme is selected. The fade-in time comes from MainMenuTop_BgmFadeTime, not from the row.",
+      "technical": "FName passed to PlayBgm in main-menu phase state 0 and again after a new theme is selected: PlayBgm(Id_Bgm, 0.0f start time, MainMenuTop_BgmFadeTime = 0.5f, bLoop = true). PlayBgm returns early when BGM is disabled or the cue is already current, fades out the previous cue over the same duration and loads the new cue; the fade comes from the phase constant, not from the row. The three exported IDs (BGM_MENU, BGM_BATTLE_DLC_01, BGM_DEMO_10) are also rows in BgmDataTable.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:18",
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:29",
         "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:130",
-        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:536"
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:536",
+        "Source/Abrams/Private/GameSoundManager.cpp:392"
       ],
       "status": "verified"
     },
     "ThumbnailTextureName": {
       "simple": "Large theme thumbnail texture name.",
-      "technical": "FName used by the theme list entry when the viewport width is at or above HighResolutionThreshold; the texture is resolved with FindDynamicLoadTexture. Main-menu phase startup also prefetches it (and SmallThumbnailTextureName) through GamePrimaryAssetType_WidgetTexture for every theme row.",
+      "technical": "FName selected by ApplyResolution when the width in pixels (current screen-resolution X on list set/rebuild, callback width on resolution changes) is at or above HighResolutionThreshold (3840), then resolved with FindDynamicLoadTexture for the thumbnail brush. Main-menu phase state 0 creates WidgetTexture loaders for this and SmallThumbnailTextureName for every collected theme row (alongside banner textures); state 1 adds the loaded textures to the widget manager's dynamic texture map.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:21",
+        "Source/Abrams/Private/GameMainMenuThemeListItemWidget.cpp:18",
         "Source/Abrams/Private/GameMainMenuThemeListItemWidget.cpp:51",
-        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:157"
+        "Source/Abrams/Private/GameMainMenuThemeListItemWidget.cpp:52",
+        "Source/Abrams/Private/GameMainMenuThemeListItemWidget.cpp:80",
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:157",
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:190"
       ],
       "status": "verified"
     },
     "SmallThumbnailTextureName": {
       "simple": "Small theme thumbnail texture name.",
-      "technical": "FName selected by the theme list entry below HighResolutionThreshold; otherwise the large texture is used. It is also included in the startup WidgetTexture prefetch list.",
+      "technical": "FName selected by ApplyResolution when the width in pixels is below HighResolutionThreshold (3840); at or above the threshold the large ThumbnailTextureName is used instead. It is also included in the startup WidgetTexture prefetch for every theme row and inserted into the dynamic texture map once loading completes.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:24",
         "Source/Abrams/Private/GameMainMenuThemeListItemWidget.cpp:51",
-        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:158"
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:158",
+        "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:190"
       ],
       "status": "verified"
     },
     "VsPlayerMovieFileName": {
       "simple": "Background movie base name for the Vs Player screen.",
-      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::VsPlayer; the main menu appends '.usm' and loads it through the movie widget. The theme list item's focused preview also plays this field with '.usm' appended, regardless of the currently highlighted menu.",
+      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::VsPlayer; main-menu load step 0 appends '.usm' and passes it to MovieWidget->SetMovieFile. The focused theme-list item also plays this same field with '.usm' appended (after its fade delay, only while the owner list is focused on that entry), regardless of the currently highlighted menu. Like all eight movie strings it defaults to the empty FString in the reconstructed row constructor.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:27",
+        "Source/AbramsDataTable/Private/GameDataTableRow_MainMenuTheme.cpp:5",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:703",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:767",
+        "Source/Abrams/Private/GameMainMenuWidget.cpp:770",
         "Source/Abrams/Private/GameMainMenuThemeListItemWidget.cpp:179"
       ],
       "status": "verified"
     },
     "VsEnemyMovieFileName": {
       "simple": "Background movie base name for the Vs Enemy screen.",
-      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::VsEnemy; '.usm' is appended before SetMovieFile.",
+      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::VsEnemy; main-menu load step 0 appends '.usm' before MovieWidget->SetMovieFile. An empty string is the row constructor default and prevents SetMovieFile at that step, leaving the load step at 0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:30",
+        "Source/AbramsDataTable/Private/GameDataTableRow_MainMenuTheme.cpp:6",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:704",
+        "Source/Abrams/Private/GameMainMenuWidget.cpp:767",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:770"
       ],
       "status": "verified"
     },
     "LobbyMovieFileName": {
       "simple": "Background movie base name for the Lobby screen.",
-      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::Lobby; '.usm' is appended before SetMovieFile.",
+      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::Lobby; main-menu load step 0 appends '.usm' before MovieWidget->SetMovieFile. An empty string is the row constructor default and prevents SetMovieFile at that step, leaving the load step at 0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:33",
+        "Source/AbramsDataTable/Private/GameDataTableRow_MainMenuTheme.cpp:7",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:705",
+        "Source/Abrams/Private/GameMainMenuWidget.cpp:767",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:770"
       ],
       "status": "verified"
     },
     "StoryMovieFileName": {
       "simple": "Background movie base name for the Story screen.",
-      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::Story; '.usm' is appended before SetMovieFile.",
+      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::Story; main-menu load step 0 appends '.usm' before MovieWidget->SetMovieFile. An empty string is the row constructor default and prevents SetMovieFile at that step, leaving the load step at 0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:36",
+        "Source/AbramsDataTable/Private/GameDataTableRow_MainMenuTheme.cpp:8",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:706",
+        "Source/Abrams/Private/GameMainMenuWidget.cpp:767",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:770"
       ],
       "status": "verified"
     },
     "ArcadeMovieFileName": {
       "simple": "Background movie base name for the Arcade screen.",
-      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::Arcade; '.usm' is appended before SetMovieFile.",
+      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::Arcade; main-menu load step 0 appends '.usm' before MovieWidget->SetMovieFile. An empty string is the row constructor default and prevents SetMovieFile at that step, leaving the load step at 0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:39",
+        "Source/AbramsDataTable/Private/GameDataTableRow_MainMenuTheme.cpp:9",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:710",
+        "Source/Abrams/Private/GameMainMenuWidget.cpp:767",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:770"
       ],
       "status": "verified"
     },
     "FreeBattleMovieFileName": {
       "simple": "Background movie base name for the Free Battle screen.",
-      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::FreeBattle; '.usm' is appended before SetMovieFile.",
+      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::FreeBattle; main-menu load step 0 appends '.usm' before MovieWidget->SetMovieFile. An empty string is the row constructor default and prevents SetMovieFile at that step, leaving the load step at 0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:42",
+        "Source/AbramsDataTable/Private/GameDataTableRow_MainMenuTheme.cpp:10",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:707",
+        "Source/Abrams/Private/GameMainMenuWidget.cpp:767",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:770"
       ],
       "status": "verified"
     },
     "ShopMovieFileName": {
       "simple": "Background movie base name for the Shop screen.",
-      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::Shop; '.usm' is appended before SetMovieFile.",
+      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::Shop; main-menu load step 0 appends '.usm' before MovieWidget->SetMovieFile. An empty string is the row constructor default and prevents SetMovieFile at that step, leaving the load step at 0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:45",
+        "Source/AbramsDataTable/Private/GameDataTableRow_MainMenuTheme.cpp:11",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:708",
+        "Source/Abrams/Private/GameMainMenuWidget.cpp:767",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:770"
       ],
       "status": "verified"
     },
     "CollectionMovieFileName": {
       "simple": "Background movie base name for the Collection/Gallery screen.",
-      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::Collection; '.usm' is appended before SetMovieFile.",
+      "technical": "FString selected by GetCursorMovieFileName for EGameMainMenuType::Collection; main-menu load step 0 appends '.usm' before MovieWidget->SetMovieFile. An empty string is the row constructor default and prevents SetMovieFile at that step, leaving the load step at 0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:48",
+        "Source/AbramsDataTable/Private/GameDataTableRow_MainMenuTheme.cpp:12",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:709",
+        "Source/Abrams/Private/GameMainMenuWidget.cpp:767",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:770"
       ],
       "status": "verified"
     },
     "UserProgressFlag": {
       "simple": "List of save-data progress bits that unlock the theme.",
-      "technical": "TArray<int32>, with -1 meaning no gate. GameMainMenuWidget_IsThemeUnlocked keeps all non -1 flags and treats a theme as unlocked when the list is empty or any flag's bit is set in GameManager::UserInfo.UserProgressFlagWords (word = Flag >> 2, bit = Flag & 3, words >=128 rejected). It controls theme-list visibility, HasSelectableThemes (needs at least two unlocked rows), and the random-theme pool. Exported themes use [-1,-1], [6,-1], and [7,-1].",
+      "technical": "TArray<int32>. GameMainMenuWidget_IsThemeUnlocked (the same predicate used by DTM_PickTitleRowName) drops -1 entries, treats an empty result as unlocked, and otherwise requires any flag's bit in GameManager::UserInfo.UserProgressFlagWords: word = uint32(Flag) >> 2, bit = uint32(Flag) & 3, with word >= 128 rejected (so other negative values cannot unlock). Exported rows use [-1,-1], [6,-1] and [7,-1]; flags 6 and 7 are the DLC07 and DLC08 entitlement bits set/cleared by GM_DiffDlcEntitlements. The gate controls which rows are added to the theme list, HasSelectableThemes (>=2 unlocked rows, excluding the trailing random entry), and the startup random pool; FindThemeRow's fallback ignores the gate.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MainMenuTheme.h:51",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:649",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:652",
         "Source/Abrams/Private/GameMainMenuWidget.cpp:668",
+        "Source/Abrams/Private/GameMainMenuWidget.cpp:678",
+        "Source/Abrams/Private/GameMainMenuWidget.cpp:694",
         "Source/Abrams/Private/GameDataTableManager.cpp:531",
-        "Source/Abrams/Private/GameMainMenuThemeWidget.cpp:25"
+        "Source/Abrams/Private/GameDataTableManager.cpp:550",
+        "Source/Abrams/Private/GameMainMenuThemeWidget.cpp:25",
+        "Source/Abrams/Private/GameDlcEntitlementTable.h:79",
+        "Source/Abrams/Private/GameDlcEntitlementTable.h:111",
+        "Source/Abrams/Private/GameManager.cpp:497"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The export contains three themes (MAIN_MENU_THEME_01..03): a default theme and two DLC variants with parallel movie names ending _DLC01/_DLC02. Only this snapshot is available; no other localization or platform variant is assumed.",
-    "Multiple MainMenuThemeDataTable shards are supported. GetFirstMainMenuThemeRow uses the first row of the first non-empty table as a fallback; FindThemeRow and the random picker prefer a matching/unlocked row.",
-    "Movie names are stored without the '.usm' extension; every movie consumer appends it. Empty names skip movie loading in the main menu's UpdateMainMenuLoad.",
-    "The theme-list item shows a fixed random-theme entry with no row when ThemeId is None; that entry uses separate hard-coded thumbnails and the generic label."
+    "The sole export has three themes (MAIN_MENU_THEME_01..03): a default row plus rows gated by progress flags 6 and 7. Their movie base names end in _DLC01/_DLC02; flags 6 and 7 are the DLC07 and DLC08 entitlement bits in GameDlcEntitlementTable. The exported BGM IDs and text IDs also occur in BgmDataTable and SystemTextDataTable.",
+    "The manager stores MainMenuThemeDataTables as a TArray and its row/fallback helpers walk every table, but StartInitialLoading registers only one loader keyed MainMenuThemeDataTable (duplicate loader names are discarded); the export contains one asset, so no additional shards or localization/platform variants were observed.",
+    "Movie names are stored without '.usm'. The main-menu background loader appends it and does not call SetMovieFile for an empty name, leaving MovieLoadStep at 0; the focused list-item thumbnail preview appends '.usm' without an empty-name check once the movie widget is idle.",
+    "The trailing theme-list entry has no row: it uses the widget's RandomImage/SmallRandomImage members (bound outside this table), SYS_COMMON_LABEL_0042 and NAME_None. Selecting it writes 0xFF to the save header; FindThemeRow(NAME_None) then resolves the startup StudioName_17D8 pick rather than drawing a fresh random theme at selection time.",
+    "The saved theme index is a uint8 position in the table/row-name-ordered row list (default 0); an out-of-range value selects row 0, and an unknown non-None selection returns before saving. Changing table contents or order can therefore change which theme a saved index means.",
+    "The reconstructed row constructor initializes only the eight movie FStrings to TEXT(\"\"); FName fields default to NAME_None and UserProgressFlag to an empty TArray. All exported rows supply explicit values for every field.",
+    "Retail UMG widget trees (WBP_MainMenu/WBP_MainMenuTheme) and their bound text/image/movie widgets are Blueprint assets, and no retail Blueprint, asset registry, .usm files or CRI cue sheets were available; widget wiring and media-asset existence are inferred from reconstructed C++ plus exported IDs rather than observed in retail assets."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:313",
-      "detail": "Loads MainMenuThemeDataTable into MainMenuThemeDataTables."
+      "detail": "Registers the MainMenuThemeDataTable loader and resolves its loaded UDataTable into MainMenuThemeDataTables."
     },
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:507",
-      "detail": "Returns the first theme row from the first non-empty table as the fallback."
+      "detail": "Fallback helper returns the first row of the first non-empty table."
     },
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:526",
-      "detail": "Picks a random unlocked theme row name for the row-less/random theme entry."
+      "detail": "Startup/debug-boot picker filters unlocked rows and returns a row ID for GameManager::StudioName_17D8, falling back to the first row when none are unlocked."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:76",
-      "detail": "Resolves the saved or default theme ID, checks unlock state, plays BGM, and prefetches all theme/banner textures."
+      "detail": "FindThemeRow resolves the saved-index/StudioName row and checks its unlock gate; PreparePhase state 0 uses the resulting row for BGM and texture prefetch."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_MainMenuTop.cpp:515",
+      "detail": "Theme selection writes the row index to the save header, replays the BGM and calls ApplyMainMenuTheme."
     },
     {
       "source": "Source/Abrams/Private/GameMainMenuThemeWidget.cpp:19",
-      "detail": "Rebuilds the selectable theme list from unlocked rows."
+      "detail": "Builds list items from unlocked rows, appends one row-less random entry, and skips rebuilding when the row IDs are unchanged."
     },
     {
       "source": "Source/Abrams/Private/GameMainMenuThemeWidget.cpp:125",
-      "detail": "Shows the focused theme's localized label."
+      "detail": "Shows the focused theme's text ID, or the generic random label for the row-less entry."
+    },
+    {
+      "source": "Source/Abrams/Private/GameMainMenuWidget.cpp:649",
+      "detail": "Shared unlock predicate interpreting UserProgressFlag against the save's progress words."
+    },
+    {
+      "source": "Source/Abrams/Private/GameMainMenuWidget.cpp:692",
+      "detail": "HasSelectableThemes requires at least two unlocked rows, not counting the trailing random entry."
     },
     {
       "source": "Source/Abrams/Private/GameMainMenuWidget.cpp:698",
-      "detail": "Selects the appropriate background movie base name for the current menu."
+      "detail": "Selects the background movie base name for the current CursorMenu from CurrentThemeRow."
     },
     {
       "source": "Source/Abrams/Private/GameMainMenuWidget.cpp:758",
-      "detail": "Loads '<movie name>.usm' through the background movie widget."
+      "detail": "Asynchronous movie load steps append '.usm', call SetMovieFile/OpenMovie and report readiness; an empty name leaves step 0."
+    },
+    {
+      "source": "Source/Abrams/Private/GameMainMenuThemeListItemWidget.cpp:40",
+      "detail": "Chooses the large or small thumbnail FName by width and resolves it through FindDynamicLoadTexture."
+    },
+    {
+      "source": "Source/Abrams/Private/GameMainMenuThemeListItemWidget.cpp:179",
+      "detail": "Focused list-item preview uses VsPlayerMovieFileName + '.usm' regardless of the highlighted main-menu screen."
     }
   ]
 }

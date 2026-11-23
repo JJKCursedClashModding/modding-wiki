@@ -1,85 +1,174 @@
 {
-  "description": "Per-character Arcade configuration: which mission-character entry a playable character uses in Arcade battles, the ordered list of Arcade mission sets shown as roots on the Arcade root-select screen, and the clear-flag masks that gate each root.",
+  "description": "Per-character Arcade configuration: maps a playable character to the MissionCharacter row used for the player slots in Arcade battles, and supplies the ordered Arcade mission-set roots, unlock masks, and root-clear flags consumed by the Arcade root-select screen.",
   "fields": {
     "ID": {
-      "simple": "Row key, normally the character ID (CP_xxx / CN_xxx).",
-      "technical": "FName primary key of the row in the exported table (ImportKeyField=Id in the asset). The root-select screen and battle setup look the row up by the playable character's own ID, so the retail rows are keyed by character rather than by the mission character ID in Id_MissionCharacter.",
+      "simple": "Row key; in every exported row it equals the playable character ID (CP_* in this export).",
+      "technical": "FName declared as Id; the supplied export writes the key as ID and records ImportKeyField=Id. UDataTable::FindRow uses the row key. Root-select Setup receives the selected character ID from the menu sequence and looks this table up directly by that ID, while the clear-condition helper and Arcade battle setup first resolve Character.Id_CharacterArcade and look up by that alias. All 27 exported keys equal the corresponding Character row's Id_CharacterArcade; the other 21 exported Character rows have None there and no row in this table. The native Id member itself has no direct value reader in the traced C++ consumers.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterArcade.h:11",
+        "JJKCCDatatables/datatables/CharacterArcadeDataTable.json",
+        "JJKCCDatatables/datatables/CharacterDataTable.json",
+        "Source/Abrams/Private/GameMenuSequence.cpp:1232",
         "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:193",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:124",
         "Source/Abrams/Private/GamePhase_BattleArcade.cpp:180"
       ],
       "status": "verified"
     },
     "Id_MissionCharacter": {
-      "simple": "Mission-character row used to build this character's Arcade battle entry.",
-      "technical": "FName joined to MissionCharacterDataTable (DTM +0x9C0). GamePhase_BattleArcade takes the Character row's Id_CharacterArcade, finds this row, then resolves Id_MissionCharacter; the returned MissionCharacter row supplies variation/material pattern, AI level, operation, cursed-energy/tension levels and other overrides for player slots 0 and 1. The chain is used without null checks.",
+      "simple": "Mission-character row used to configure this character's Arcade battle entry.",
+      "technical": "FName (default None) joined to MissionCharacterDataTable (DTM +0x9C0). In GamePhase_BattleArcade::SetupBattleCharacterEntries, player slots 0 and 1 follow Character.Id_CharacterArcade -> this row -> Id_MissionCharacter with no null tests; the MissionCharacter row supplies override IDs/rates and setup scalars such as AILevel, Operation, cursed energy/tension, unique mode and status overrides. Those player slots take VariationIndex/MaterialPattern from the GameManager battle slot (Game->GetBattleCharacterSlot), not from this row; enemy slots 2+ instead take variation/material from the current wave's Id_MissionCharacter_Enemy rows. All 27 exported values are unique ARCADE_CP_* IDs and resolve in the supplied MissionCharacterDataTable.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterArcade.h:15",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterArcade.cpp:3",
+        "JJKCCDatatables/datatables/CharacterArcadeDataTable.json",
+        "JJKCCDatatables/datatables/MissionCharacterDataTable.json",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:175",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:180",
         "Source/Abrams/Private/GamePhase_BattleArcade.cpp:181",
-        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:211"
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:205",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:215",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:224",
+        "Source/Abrams/Private/GameManager.cpp:811"
       ],
       "status": "verified"
     },
     "Id_ArcadeMissionSet": {
-      "simple": "Ordered list of Arcade mission sets available as roots for this character.",
-      "technical": "TArray<FName> of ArcadeMissionSetDataTable row IDs (DTM +0x970). The root-select widget allocates one list item per array element, then for each non-None entry that passes its clear gate resolves the set via FindArcadeRow<FGameDataTableRow_ArcadeMissionSet> and stores it on UGameArcadeRootSelectListItemData together with the array index as RootIndex. None entries are skipped, so the array is a sparse, index-significant slot list rather than a compact list.",
+      "simple": "Ordered Arcade mission-set slots offered as selectable roots for this character.",
+      "technical": "TArray<FName> (default empty) of ArcadeMissionSetDataTable row IDs (DTM +0x970). InitializeWidget sizes the candidate list-item objects from the first arcade row's array length. Setup looks up the selected character's row, iterates these slots, skips NAME_None entries and closed roots, resolves each surviving set with FindArcadeRow<FGameDataTableRow_ArcadeMissionSet>, and stores it on UGameArcadeRootSelectListItemData together with the original array Index as RootIndex. Displayed items are compacted, so RootIndex is the source slot index, not necessarily the visible list position. Deciding an item copies MissionSet.Id to RootSelection.RootId and RootIndex to RootSelection.RootIndex; the index also drives the recorded clear bit. Every exported row has six populated A..F slots and all 162 references resolve in the supplied ArcadeMissionSetDataTable.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterArcade.h:18",
+        "JJKCCDatatables/datatables/CharacterArcadeDataTable.json",
+        "JJKCCDatatables/datatables/ArcadeMissionSetDataTable.json",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:140",
         "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:162",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:193",
         "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:199",
         "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:201",
-        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:239"
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:206",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:239",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:243",
+        "Source/Abrams/Private/GameArcadeRootSelectListItemWidget.cpp:23",
+        "Source/Abrams/Private/GameMenuSequence.cpp:1265",
+        "Source/Abrams/Private/GameManagerTails.cpp:959"
       ],
       "status": "verified"
     },
     "ClearFlagConditions": {
-      "simple": "Per-root bit masks that decide whether an Arcade root is released.",
-      "technical": "TArray<uint32>, index-aligned with Id_ArcadeMissionSet. IsArcadeRootOpen rejects an index outside the array, then tests (Mask & studioArcadeClearBits) == Mask, where the clear bits are the byte-sized OR of all FStudioArcadeClearFlags.Clear values in UserInfo.StudioArcadeClearFlags_C48 (the OR is 32-bit but the check truncates to uint8). Non-zero masks also mark the root 'special': when the matching progress word (flag = 160 + root index, four flags per word) is unset it is set, bNewlyReleased is raised and the user's progress words are updated. Zero-mask roots are always open unless explicitly cleared/special handling applies.",
+      "simple": "Per-root bit masks that decide whether an Arcade root is released; mask zero means always open.",
+      "technical": "TArray<uint32> (default empty), index-aligned with Id_ArcadeMissionSet. IsArcadeRootOpen resolves the Character row from the setup character ID, then the CharacterArcade row by Character.Id_CharacterArcade, rejects an index outside this array, and requires Mask == (uint8(OR of every UserInfo.StudioArcadeClearFlags_C48 entry's Clear byte) & Mask). Only the Clear byte is used; NoContinueClear/HardClear and the map key's identity do not enter the union, and the use is truncated to uint8 so only clear bits 0..7 can satisfy a mask. A zero mask always passes. All exported rows use [0,0,0,0,15,31], requiring clear bits 0..3 for root E and 0..4 for root F. Separately, Setup derives the displayed bCleared flag from clear bit Index, sets bSpecial when this mask is nonzero, and for special roots with a valid mask sets the distinct persistent progress flag 160+Index in UserProgressFlagWords on first display (word = Flag>>2, bit = Flag&3, 128 words, four flags per word), raising bNewlyReleased/bHasNewlyReleasedRoot and writing the word in place. On a winning final mission, RecordArcadeClear sets clear bit RootIndex in the winning character's Clear byte; that bit is what these masks later test. No traced code closes or special-cases a zero-mask root.",
       "evidence": [
-        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:106",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterArcade.h:21",
+        "JJKCCDatatables/datatables/CharacterArcadeDataTable.json",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:65",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:103",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:117",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:124",
         "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:126",
         "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:131",
         "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:132",
-        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:213",
-        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:216"
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:196",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:211",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:216",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:219",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:223",
+        "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:227",
+        "Source/Abrams/Public/GameUserInfoTypes.h:57",
+        "Source/Abrams/Public/GameManager.h:229",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:579",
+        "Source/Abrams/Private/GameManagerTails.cpp:963"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Exported rows: 27; each has Id_MissionCharacter, six Id_ArcadeMissionSet slots and six ClearFlagConditions entries. The retail values observed are 0, 15 and 31 for the mask slots.",
-    "The table is registered as the 'CharacterArcadeDataTable' primary asset and loaded into AGameDataTableManager::CharacterArcadeDataTables (DTM +0x5A0) by the boot load/tick sequence; there is a single retail table, not a numbered shard set.",
-    "Id_ArcadeMissionSet and ClearFlagConditions are consumed in parallel; the widgets assume aligned lengths even though only the clear check and the setup loop index the arrays.",
-    "Source comments cite reconstructed retail RVAs (e.g. 0x1312580, 0x14b13a0); these are reconstruction evidence, not proof of byte-identical rebuild of every function.",
-    "Content is partial: no claim is made about additional retail rows, DataTable rows used only from Blueprint, or uncooked localization variants."
+    "Exported coverage: one CharacterArcadeDataTable variant with 27 rows; every row has six Id_ArcadeMissionSet slots and six ClearFlagConditions masks. All mission-character and mission-set IDs resolve in the supplied exports, every row key equals its Character.Id_CharacterArcade alias, and no numbered CharacterArcade shards or localized variants are present in the supplied exports. The manager creates one primary-asset loader for the exact name CharacterArcadeDataTable (Config/DefaultGame.ini scans DataTable assets under /Game/DataTables); absence from unexamined retail pak assets cannot be proven from that alone.",
+    "The two arrays are parallel slots, not a compact list. A short ClearFlagConditions array closes the corresponding set slot because IsArcadeRootOpen rejects an invalid mask index; extra masks are ignored. NAME_None set slots are skipped and surviving items are compacted, but the original index is retained as RootIndex. The candidate item pool is sized from the first arcade row, so a later row with more set slots would be truncated by Setup's IsValidIndex(Used) break.",
+    "Root UI state uses three distinct values: bCleared is clear bit Index from the OR of all user clear-map Clear bytes, bSpecial is simply a nonzero mask, and bNewlyReleased is a separate persistent progress flag 160+Index that is set on first display of a special root. Because the clear-bits union spans every StudioArcadeClearFlags_C48 entry, clears recorded for one character contribute to the gate for all characters.",
+    "Setup's row lookup uses the selected character ID, whereas IsArcadeRootOpen and Arcade battle setup use Character.Id_CharacterArcade. They coincide for all exported rows but are separate lookups; a future alias change could make the set list and its masks come from different rows.",
+    "Source comments cite reconstructed retail RVAs (for example 0x1312580, 0x14b13a0 and 0x13a1e40); these are reconstruction evidence, not proof of a byte-identical rebuild of every function. No retail Blueprint graphs, retail save file, or captured retail UI were available here, so Blueprint-only consumers and unexamined content variants cannot be excluded.",
+    "No unit-bearing scalars are stored here: all numeric values are bit indices/masks. Defaults come from the empty row constructor and FName/TArray default construction; the supplied export populates all fields on all rows."
   ],
   "usages": [
     {
+      "source": "Config/DefaultGame.ini:24",
+      "detail": "Configures DataTables under /Game/DataTables as scanned primary assets; the manager requests the asset named CharacterArcadeDataTable."
+    },
+    {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:219",
-      "detail": "Boot tick resolves the CharacterArcadeDataTable primary asset loader into AGameDataTableManager::CharacterArcadeDataTables."
+      "detail": "Boot tick resolves that single primary-asset loader into AGameDataTableManager::CharacterArcadeDataTables (DTM +0x5A0) after all loaders complete."
     },
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:367",
-      "detail": "Registers the table name 'CharacterArcadeDataTable' with the DataTable primary-asset loaders."
+      "detail": "Adds the exact name CharacterArcadeDataTable to the primary-asset loader name list in StartInitialLoading."
+    },
+    {
+      "source": "Source/Abrams/Private/GameMenuSequence.cpp:1232",
+      "detail": "Passes the selected character's slot ID into UGameArcadeRootSelectWidget::Setup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:117",
+      "detail": "IsArcadeRootOpen first resolves the Character row from the setup character ID; a missing Character row closes the root."
     },
     {
       "source": "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:124",
-      "detail": "IsArcadeRootOpen finds the row via Character::Id_CharacterArcade and gates a root by ClearFlagConditions[Index]."
+      "detail": "The clear gate resolves CharacterArcade by Character.Id_CharacterArcade, the alias also used by battle setup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:132",
+      "detail": "Tests (ClearFlagConditions[Index] & clear bits) == ClearFlagConditions[Index] after checking the index and truncating clear bits to uint8."
     },
     {
       "source": "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:140",
-      "detail": "FindFirstCharacterArcadeRow takes the first row of the first table to size the root-select item list."
+      "detail": "FindFirstCharacterArcadeRow takes the first populated row in the first table."
     },
     {
-      "source": "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:193",
-      "detail": "Setup resolves the character's row by character ID."
+      "source": "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:162",
+      "detail": "InitializeWidget allocates one candidate list item per Id_ArcadeMissionSet element of that first row."
     },
     {
       "source": "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:199",
-      "detail": "Setup iterates Id_ArcadeMissionSet, resolves ArcadeMissionSet rows and assigns cleared/special/new flags per root."
+      "detail": "Setup iterates the selected character's Id_ArcadeMissionSet; NAME_None and closed roots are skipped before the item slot is used."
+    },
+    {
+      "source": "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:211",
+      "detail": "Sets bCleared from clear bit Index independently of the unlock mask."
+    },
+    {
+      "source": "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:216",
+      "detail": "Sets bSpecial from a nonzero ClearFlagConditions entry."
+    },
+    {
+      "source": "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:219",
+      "detail": "Sets the separate progress flag 160+Index for a newly displayed special root and marks it newly released."
+    },
+    {
+      "source": "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:239",
+      "detail": "Resolves the ArcadeMissionSet row for the displayed item (DTM +0x970)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameArcadeRootSelectListItemWidget.cpp:23",
+      "detail": "On Decide, copies the item's RootIndex and MissionSet.Id to the root-select widget's decision state."
+    },
+    {
+      "source": "Source/Abrams/Private/GameMenuSequence.cpp:1265",
+      "detail": "Copies the decided root ID, original RootIndex and difficulty into RootSelection, later stored on GameManager::ArcadeRun."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattleArcade.cpp:180",
-      "detail": "Arcade battle setup walks Character -> CharacterArcade to select the mission-character entry for player slots."
+      "detail": "Arcade battle setup walks Character.Id_CharacterArcade -> this table for player slots 0 and 1."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleArcade.cpp:181",
+      "detail": "Resolves Id_MissionCharacter into MissionCharacterDataTable for those slots; no null checks are made on this chain."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:579",
+      "detail": "A winning final mission passes RootSelection.RootIndex to RecordArcadeClear for the winning character."
+    },
+    {
+      "source": "Source/Abrams/Private/GameManagerTails.cpp:963",
+      "detail": "RecordArcadeClear sets clear bit RootIndex, which is the bit later tested against ClearFlagConditions."
     }
   ]
 }

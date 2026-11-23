@@ -1,85 +1,130 @@
 {
-  "description": "Risk-qualified weighted pools that choose the next non-survival PvE mission and its candidates.",
+  "description": "Risk-qualified weighted pools that choose the next non-survival PvE mission from a row's candidate missions; each row defines both a pool weight and parallel candidate/weight arrays.",
   "fields": {
     "Id": {
       "simple": "Mission lottery row id.",
-      "technical": "FName import key/row name for FGameDataTableRow_PvEMissionLottery. GamePvE_PickMission stores the selected row's Id in its LotteryId output, and on later picks removes the row with that same Id so the same lottery is not repeated consecutively.",
+      "technical": "Native FName; export metadata sets ImportKeyField=Id and the dump writes the key as ID, with all 223 exported row names unique and matching ID. GamePvE_PickMission does not find a lottery row by this member: it enumerates the loaded rows, then copies the chosen row's Id into the FName& LotteryId argument, which callers pass as FGamePvESettings::PickedLotteryId. FGamePvESettings::Reset initializes that cached id to NAME_None, and the settings copy assignment carries it; on a later non-survival pick a non-None value removes the lottery row whose Id matches before the pool is weighted.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionLottery.h:11",
-        "Source/Abrams/Public/GameDataTableManager.h:186",
+        "Source/Abrams/Public/GamePvESettings.h:26",
+        "Source/Abrams/Private/GamePvESettings.cpp:132",
         "Source/Abrams/Private/GamePvESettings.cpp:537",
-        "Source/Abrams/Private/GamePvESettings.cpp:548"
+        "Source/Abrams/Private/GamePvESettings.cpp:546",
+        "JJKCCDatatables/datatables/PvEMissionLotteryDataTable.json"
       ],
       "status": "verified"
     },
     "Id_GlobalThreshold": {
       "simple": "Risk band selecting which lottery pools are eligible.",
-      "technical": "FName, default None. The picker iterates all PvEMissionLottery rows backwards, resolves each Id_GlobalThreshold in GlobalThresholdDataTables (DTM+0x300) and removes rows whose threshold is missing or whose inclusive [Min, Max] does not contain RiskValue. Only surviving rows participate in the lottery.",
+      "technical": "Native FName with no explicit constructor initializer (NAME_None). After the early extra-mission cutoff, GamePvE_PickMission walks the lottery rows from the end and asks each UDataTable in GlobalThresholdDataTables (DTM+0x300), in array order, for a FGameDataTableRow_GlobalThreshold named this Id; the first table containing the row wins. A row is removed when no threshold row exists or when the cast int32 RiskValue is outside the inclusive [Min, Max] floats (InRange_FloatFloat with both endpoints included). All 223 exported rows use one of the 15 PVE_MISSION_A_01..PVE_MISSION_E_03 names; those rows resolve in GlobalThresholdDataTable and form contiguous integer bands from 0 to 50000. PVE_MISSION_X_0_99999 exists in that asset but is not referenced here; a risk outside 0..50000 therefore leaves no eligible row and the picker falls back to PVE_X_00 without updating LotteryId.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionLottery.h:15",
+        "Source/AbramsDataTable/Public/GameDataTableRow_GlobalThreshold.h:15",
+        "Source/Abrams/Public/GameDataTableManager.h:89",
+        "Source/Abrams/Private/GameDataTableManager.cpp:178",
         "Source/Abrams/Private/GamePvESettings.cpp:521",
-        "Source/Abrams/Private/GamePvESettings.cpp:526",
-        "Source/Abrams/Private/GamePvESettings.cpp:534"
+        "Source/Abrams/Private/GamePvESettings.cpp:527",
+        "Source/Abrams/Private/GamePvESettings.cpp:530",
+        "JJKCCDatatables/datatables/GlobalThresholdDataTable.json"
       ],
       "status": "verified"
     },
     "Weights": {
       "simple": "Relative weight of choosing this lottery pool.",
-      "technical": "float, constructor default 0.0f. After threshold and repeat filtering, one Weights entry per surviving row is passed to GamePvE_PickWeightedIndex (StoryFRand() over the sum, subtract-and-pick, last index if overrun). The chosen row's Id becomes the next LotteryId. This is distinct from MissionWeights, which selects a mission inside the chosen row.",
+      "technical": "float, constructor default 0.0f; all 223 exported rows instead set 1000.0. The value is a dimensionless relative weight, not a percent or normalized probability. After threshold filtering and exclusion of the row whose Id equals a non-None LotteryId, one Weights value per surviving row is passed in row order to GamePvE_PickWeightedIndex. That helper returns INDEX_NONE for an empty list; otherwise it sums the floats, rolls StoryFRand()*sum (StoryFRand is approximately [0,1)), returns the first index where the remaining roll is less than that weight after subtracting earlier weights, and returns the last index if no weight wins. With an all-zero sum the roll is zero and the last index is returned, so a zero-weight row is not inherently unpickable. When no row survives, GamePvE_PickMission returns PVE_X_00 and leaves LotteryId unchanged; otherwise it writes the selected row's Id to LotteryId before choosing a mission.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionLottery.h:18",
-        "Source/Abrams/Private/GamePvESettings.cpp:492",
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionLottery.h:26",
+        "Source/Abrams/Private/GamePvESettings.cpp:494",
+        "Source/Abrams/Private/GamePvESettings.cpp:499",
         "Source/Abrams/Private/GamePvESettings.cpp:542",
-        "Source/Abrams/Private/GamePvESettings.cpp:543"
+        "Source/Abrams/Private/GamePvESettings.cpp:543",
+        "Source/Abrams/Private/GamePvESettings.cpp:546",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:182"
       ],
       "status": "verified"
     },
     "Id_PvEMission": {
       "simple": "Candidate PvE mission ids inside the pool.",
-      "technical": "TArray<FName>, default empty. The picker builds a parallel weight list, skipping None ids, then chooses an index from those weights. The reconstructed code returns Lottery->Id_PvEMission[Pick] directly rather than indexing a filtered id list, so a None or otherwise skipped earlier slot can shift the returned mission; exported rows pad with None.",
+      "technical": "Native TArray<FName>, default empty. The selector walks these source indices, skips None, and builds a compressed weight list; after choosing a compressed index it returns Lottery->Id_PvEMission[Pick] directly rather than indexing a separate filtered id list. That reconstructed quirk would shift the result (possibly to a None slot) if a row ever placed None before a later non-None candidate. All 223 exported rows have 12 slots, with 2..12 non-None ids followed only by trailing None padding, so no supplied row triggers the shift; all 996 non-None ids are unique within and across rows and resolve in PvEMissionDataTable. If a row has no non-None candidate, the weighted helper returns INDEX_NONE and the picker returns the PVE_X_00 fallback.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionLottery.h:21",
         "Source/Abrams/Private/GamePvESettings.cpp:549",
-        "Source/Abrams/Private/GamePvESettings.cpp:551",
+        "Source/Abrams/Private/GamePvESettings.cpp:552",
         "Source/Abrams/Private/GamePvESettings.cpp:560",
-        "Source/Abrams/Private/GamePvESettings.cpp:562"
+        "Source/Abrams/Private/GamePvESettings.cpp:563",
+        "JJKCCDatatables/datatables/PvEMissionLotteryDataTable.json",
+        "JJKCCDatatables/datatables/PvEMissionDataTable.json"
       ],
       "status": "verified"
     },
     "MissionWeights": {
       "simple": "Relative weight of each candidate mission.",
-      "technical": "TArray<float>, default empty. For each non-None candidate the same-index MissionWeights value is used; if that mission id was already played it is multiplied by 0.01. The resulting weights are passed to GamePvE_PickWeightedIndex; exported rows use 1000.0 for enabled slots and 0.0 for disabled ones.",
+      "technical": "Native TArray<float>, default empty; it must stay parallel to Id_PvEMission. For each non-None candidate at source index i the picker reads MissionWeights[i] with no length check, then multiplies by 0.01f once for every PreviousMissions entry equal to that id (repeated prior ids compound the penalty). The surviving values form a compressed parallel list for GamePvE_PickWeightedIndex; zero weights are still added and can be selected when no weight is positive. The export has 12 floats in every row, with 1000.0 at the 996 non-None ids and 0.0 at every None slot and no other values. The pick index is compressed but the returned id is direct-indexed, as documented under Id_PvEMission.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionLottery.h:24",
+        "Source/Abrams/Private/GamePvESettings.cpp:548",
         "Source/Abrams/Private/GamePvESettings.cpp:553",
-        "Source/Abrams/Private/GamePvESettings.cpp:555",
-        "Source/Abrams/Private/GamePvESettings.cpp:560"
+        "Source/Abrams/Private/GamePvESettings.cpp:556",
+        "Source/Abrams/Private/GamePvESettings.cpp:558",
+        "Source/Abrams/Private/GamePvESettings.cpp:560",
+        "JJKCCDatatables/datatables/PvEMissionLotteryDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset has 223 rows with FGameDataTableRow_PvEMissionLottery; the manager loads PvEMissionLotteryDataTable into PvEMissionLotteryDataTables (DTM+0x910).",
-    "This table applies only to non-survival mode (GameMode != 2); survival mode instead constructs PVE_SURVIVAL_MISSION_%02d ids and verifies them against PvEMissionDataTable.",
-    "The direct indexing quirk after skipping None candidates is explicitly recorded in the reconstructed source; it is a behaviour of this consumer, not an assumption about the data's intent.",
-    "Picker 0x1306610 is reconstructed; consult status/functions.json for byte status. Content is partial and Blueprint uses were not exhaustively inspected."
+    "Export coverage: the sole supplied PvEMissionLotteryDataTable asset has 223 rows with RowStruct GameDataTableRow_PvEMissionLottery and ImportKeyField=Id; no numbered or localized shards were supplied. Every row uses 15 risk-band threshold ids and 12-slot parallel id/weight arrays; all non-None candidate ids exist in PvEMissionDataTable.",
+    "Loader/cache trace: StartInitialLoading registers the PvEMissionLotteryDataTable loader, manager Tick resolves it into PvEMissionLotteryDataTables (DTM+0x910); thresholds come from GlobalThresholdDataTables (DTM+0x300). The returned mission id is subsequently resolved through PvEMissionDataTables (DTM+0x900) by GamePvE_FindMissionRow / GamePvE_GetMissionMapId and is used by wave and task picking. PickedLotteryId is cached in FGamePvESettings (Reset to NAME_None, copied with settings), not read from this table's asset metadata.",
+    "Caller conditions and precedence: GameMode==2 skips this table entirely and builds PVE_SURVIVAL_MISSION_%02d ids; status/verdicts.json confirms the retail format has no stray quotes (the nearby source comment is stale), and PVE_SURVIVAL_MISSION_01 is returned only if that generated id is missing. Otherwise, three or more already-played missions return PVE_EXTRA_MISSION_01 before any table access. Risk filtering runs before previous-lottery exclusion; if either leaves zero rows the picker returns PVE_X_00 and does not overwrite the cached LotteryId.",
+    "RiskValue is supplied by the caller: the offline interval and loopback beacon mock use the integer mean of FGamePvESettings::RiskValueArray, while the online host uses GamePvE_RiskSumModulo (the mean of SOS users' RiskValue, or all users when no SOS user exists). The picker compares that int32 as a float against the threshold rows' float bounds.",
+    "Evidence strength: GamePvE_PickMission 0x1306610 is marked behavioural in status/functions.json (BEHAV-certified, not byte-matched); the risk-class helper 0x1305fa0 and mission finder 0x12fb320 are also behavioural. Field names and runtime comments come from the local C++ reconstruction, while row counts, values and foreign-key relationships are observations from the supplied cooked-data exports. No retail Blueprint bytecode was inspected, and the source/content snapshot is partial, so additional retail-only wiring is not asserted.",
+    "The direct source-index return after skipping None ids is a property of the reconstructed consumer. It is visible in the supplied source; the exported rows' None padding is trailing only, so the quirk is a data-editing hazard rather than a demonstrated shift in the shipped export."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GamePvESettings.cpp:507",
-      "detail": "GamePvE_PickMission filters lottery rows by risk threshold and previous lottery id."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:275",
+      "detail": "Resolves the PvEMissionLotteryDataTable loader into PvEMissionLotteryDataTables (DTM+0x910) after all table loads complete."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:509",
+      "detail": "GamePvE_PickMission is the only traced direct consumer: survival bypass, extra-mission cutoff, risk filtering, previous-lottery exclusion, and both weighted picks."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:527",
+      "detail": "Resolves Id_GlobalThreshold in GlobalThresholdDataTables in table order and applies the inclusive Min/Max risk test."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:537",
+      "detail": "Removes the row whose Id equals the cached non-None LotteryId so the same pool is not picked twice consecutively."
     },
     {
       "source": "Source/Abrams/Private/GamePvESettings.cpp:542",
-      "detail": "Selects a lottery row by Weights and updates the repeat-exclusion id."
+      "detail": "Builds the row-level Weights list and writes the chosen row's Id back to the FName& LotteryId output."
     },
     {
-      "source": "Source/Abrams/Private/GamePvESettings.cpp:549",
-      "detail": "Builds per-mission weights with MissionWeights and a 0.01 repeat penalty."
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:553",
+      "detail": "Builds compressed candidate weights from parallel MissionWeights, skipping None ids and applying 0.01f per matching previously played mission."
     },
     {
-      "source": "Source/Abrams/Private/GamePvESettings.cpp:562",
-      "detail": "Returns the picked mission id from the row's id array."
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:563",
+      "detail": "Returns the picked mission from the original Id_PvEMission array using the compressed pick index; PVE_X_00 is returned when the pick list is empty."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:969",
+      "detail": "Offline interval computes the mean RiskValueArray and calls the picker with PvESettings.PvEMissionIds and PickedLotteryId; the result feeds map, wave, and task selection."
+    },
+    {
+      "source": "Source/Abrams/Private/GameOnlineBeaconHost.cpp:727",
+      "detail": "Online host computes GamePvE_RiskSumModulo and runs the same picker on host-side PvESettings, updating the interval status."
+    },
+    {
+      "source": "Source/Abrams/Private/GameOnlineBeaconMock.cpp:495",
+      "detail": "Loopback beacon mock uses the mean RiskValueArray and the same picker before propagating the online interval status."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:211",
+      "detail": "Downstream cache: the picked mission id is resolved in PvEMissionDataTables by GamePvE_GetMissionMapId; mission finder 0x12fb320 filters that same table by row type."
     }
   ]
 }

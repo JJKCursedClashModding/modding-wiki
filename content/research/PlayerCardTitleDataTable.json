@@ -1,80 +1,137 @@
 {
-  "description": "Defines the player-card title choices, mapping each title row to its inventory item and localized label.",
+  "description": "Defines the player-card title choices: each row joins a title row ID to an Item row that gates ownership and to an ItemText key used for the localized display label.",
   "fields": {
     "Id": {
-      "simple": "Title row identifier.",
-      "technical": "FName key saved as FGamePlayerCardParameter::TitleId and packed into leaderboard cards as a numeric string. Validate() resets an unknown ID to '10'; ResetUnownedIds also resets to '10' when the corresponding owned/unlocked Title item is missing. Customize tiles and the player-card widget use this ID for row lookup and selection.",
+      "simple": "Title row key (exported as ID).",
+      "technical": "FName. The save/online customization struct stores it as TitleId, and FGamePlayerCardParameter::InitializeFromSave copies it into FGamePlayerCardParameter::TitleId; the customization constructor defaults it to '10'. Every exported key is a decimal string (10-7030). Validate() replaces an unknown or None ID with '10', and PlayerCard_ResetUnownedIds() uses the owned-title test to do the same. The leaderboard packer converts the ID with FCString::Atoi into uint16 TitleNumber; the unpacker rebuilds it with FString::FromInt and falls back to '10' if no row exists. Lookups scan PlayerCardTitleDataTables and take the first matching row; the player-card and customize widgets use this ID for lookup and selection.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardTitle.h:11",
+        "Source/Abrams/Private/GameUserCustomizePlayerCardInfo.cpp:4",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:107",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:120",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:122",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:154",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:299",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:304",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:322",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:324",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:633",
-        "Source/Abrams/Private/GamePlayerCardWidget.cpp:33"
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:672",
+        "Source/Abrams/Public/GameOnlineLeaderboardRecord.h:16",
+        "Source/Abrams/Private/GamePlayerCardWidget.cpp:31",
+        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:132"
       ],
       "status": "verified"
     },
     "Id_Item": {
-      "simple": "Inventory item that owns/unlocks this title.",
-      "technical": "FName. PlayerCard_GetOwnedTitleRows drops rows with a non-None Id_Item unless that item ID is owned and unlocked; None is kept. The field maps a title to its Item row for new-item flags, and title-text helpers use it to find a 'twin' row with the same item when the row's own label is missing.",
+      "simple": "Item row ID whose ownership and unlock state gates this title.",
+      "technical": "FName. PlayerCard_FindTitleItem resolves it against ItemDataTables by Item row ID; the exported title items carry this ID and have VariableId 'None', unlike emblem/plate item links. The customize tile widget checks the linked item's stock bNew flag and clears it through the resolved Item row. PlayerCard_GetOwnedTitleRows keeps rows with Id_Item == None and removes other rows unless a Title item with that ID has positive stock and GameItem_IsRowUnlocked passes (a negative UserProgressFlag is always unlocked; otherwise the progress word bit must be set). With bSort it stably sorts the surviving rows by that Item row's SortingOrder. The title-text twin fallback searches all title rows for another row with the same non-None Id_Item and a different Id; the supplied export has no such pair.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardTitle.h:15",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:277",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:281",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:288",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:290",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:294",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:396",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:403",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:416",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:527",
+        "Source/Abrams/Private/GameItemOwnership.cpp:162",
+        "Source/Abrams/Private/GameItemOwnership.cpp:206",
         "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:125",
-        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:164"
+        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:158",
+        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:164",
+        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:304"
       ],
       "status": "verified"
     },
     "Id_ItemText": {
-      "simple": "Localized label key for the title.",
-      "technical": "FName passed to GameItem_GetNameTextCore with EGameItemType::Title. Rows with no resolved text are excluded from customize tiles; tile labels fall back to SYS_CUSTOMIZE_PLAYERCARD_LABEL_0011 when the key is None. PlayerCard_MakeTitleTextRequest additionally substitutes the label of another row with the same Id_Item when the plain key has no text content and bUseTwin is true.",
+      "simple": "GameText key for the localized title label.",
+      "technical": "FName. GameItem_GetNameTextCore is called with EGameItemType::Title, which does no Title-specific ID rewrite, and HasGameTextContent checks whether the current-language GameText row for that key has non-empty text. All 227 export keys are present and non-empty in each of the 11 ItemTextDataTable language shards. The customize tile filter keeps rows whose key is None or resolves to text and drops only non-None keys with no text; None-key tiles use SYS_CUSTOMIZE_PLAYERCARD_LABEL_0011. PlayerCard_MakeTitleTextRequest checks the plain key first and, only when it has no text while Id_Item is non-None and bUseTwin is true, substitutes the Id_ItemText of the first other row across all title rows with the same Id_Item and a different Id; otherwise it uses this row's key.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardTitle.h:18",
-        "Source/Abrams/Private/GamePlayerCardParameter.cpp:515",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:517",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:518",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:519",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:521",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:527",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:535",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:537",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:165",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:204",
+        "Source/Abrams/Private/GameTextManager.cpp:552",
+        "Source/Abrams/Private/GameTextManager.cpp:673",
+        "Source/Abrams/Private/GameTextManager.cpp:679",
         "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:103",
         "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:116",
-        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:160"
+        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:124",
+        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:160",
+        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:162"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The export contains 227 rows with one unique Item and text ID per row, unlike the nickname table which has many text variants per item.",
-    "Title rows are sorted by the SortingOrder of their linked Item row when the owned-title list is requested sorted.",
-    "PlayerCard_GetOwnedTitleRows starts from all title rows, removes those without owned/unlocked Id_Item values, and is the basis for both ownership validation and the customize tile list.",
-    "Only the supplied retail export and partial Content are available; no claim is made about all Blueprint or editor-tool uses."
+    "The export has one 227-row variant. Every row key and ID is numeric (10-7030); each Id_Item and Id_ItemText is unique and follows ITM_TITLE_<four-digit ID>. All 227 Id_Item values resolve in ItemDataTable to EGameItemType::Title rows with SortingOrder and the same Id_ItemText; their VariableId is 'None'.",
+    "Because no two exported title rows share an Id_Item, the title-text twin fallback is inert for the supplied data. The nickname table instead has 2,940 rows over 982 items with up to three text variants per item.",
+    "PlayerCard_GetOwnedTitleRows starts from every row in the table array, removes rows with an owned-item check failure except Id_Item == None, and optionally stable-sorts by the linked Item row's SortingOrder (first table hit). No shipped row uses a None Id_Item, so the sort comparator's unguarded Item lookup is not exercised by the export.",
+    "The tile list additionally removes rows with a non-None Id_ItemText that has no current-language text, deduplicates by resolved text within each Id_Item, and can show the selected row's Id on a same-item tile when that selected row is not represented in the unique displayed rows.",
+    "'10' is the constructor default and the repeated fallback for invalid, unknown, unowned, or unrecoverable leaderboard IDs. The leaderboard field is a uint16; all shipped IDs fit it and are decimal, so the Atoi/FromInt round trip is exact.",
+    "Runtime statements are traced in the local reconstruction, whose comments record retail RVAs. No retail Blueprint graphs or editor-only tools were available, so this does not claim exhaustive Blueprint or editor-tool coverage."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:299",
-      "detail": "Loads PlayerCardTitleDataTable into PlayerCardTitleDataTables."
+      "detail": "After all primary asset loaders complete, Tick resolves the PlayerCardTitleDataTable asset and appends it to PlayerCardTitleDataTables (+0xA90); the loader name is registered at :472."
+    },
+    {
+      "source": "Source/Abrams/Public/GameDataTableArray.h:21",
+      "detail": "GetRows enumerates all rows of every loaded table; it backs PlayerCard_GetAllTitleRows, the owned-title list, and the sorted customize list."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:115",
+      "detail": "Validate() checks TitleId with bCheckNone=true across the title-table array and resets a missing or None row to '10'."
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:273",
-      "detail": "Builds the owned title row list filtered by linked Item ownership and optionally sorted by Item SortingOrder."
+      "detail": "PlayerCard_GetOwnedTitleRows filters all rows by owned/unlocked Title items and optionally stable-sorts by the linked Item SortingOrder."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:299",
+      "detail": "PlayerCard_IsTitleOwned scans that owned-row list by Id; ResetUnownedIds (:322) and tile selection use it to accept or reset a title."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:396",
+      "detail": "PlayerCard_FindTitleItem resolves a title row's Id_Item to the Item row used for new-flag state."
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:515",
-      "detail": "Builds the displayed title text request with twin-row fallback."
+      "detail": "PlayerCard_MakeTitleTextRequest builds the localized label request and, under its no-text/non-None-item/bUseTwin conditions, uses another row with the same Id_Item."
     },
     {
       "source": "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:110",
-      "detail": "Builds title selection tiles, dropping rows without labels and deduplicating by resolved text per Id_Item."
+      "detail": "Builds title selection tiles from owned rows, filters untranslated non-None keys, deduplicates by text per item, applies the fallback label, new flags, and selected-row substitution."
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardWidget.cpp:31",
-      "detail": "Resolves the saved title row into the player-card text request."
+      "detail": "Resolves the saved TitleId row into a text request for the player card; the widget substitutes '10' for an invalid ID before the call (:111)."
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:622",
-      "detail": "Rebuilds leaderboard card title ID from the packed numeric value."
+      "detail": "Leaderboard unpack converts uint16 TitleNumber to a decimal FName and validates the row, otherwise uses '10'."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:654",
+      "detail": "Leaderboard pack converts the save card's TitleId with Atoi into the packed uint16 TitleNumber."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSaveDataManager.cpp:334",
+      "detail": "TitleId is written as a fixed-width FName in the save at +0xC and read back at :481."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemOwnership.cpp:162",
+      "detail": "Owned Title items come from StudioItemStocks entries with positive Count whose Item row type is Title; unlock state is tested at :206."
     }
   ]
 }

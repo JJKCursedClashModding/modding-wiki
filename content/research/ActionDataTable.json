@@ -1,57 +1,66 @@
 {
-  "description": "Per-character action index that binds a character to its movement sub-tables and selects the AttackSet row for each normal, cursed-energy, super and extra attack action.",
+  "description": "Per-character action index (plus ten mission/studio override rows) that binds a character to movement sub-tables and supplies the AttackSet IDs used by normal, cursed-energy, super and extra actions and by the command-list UI.",
   "fields": {
     "Id": {
-      "simple": "Character ID used as the row key.",
-      "technical": "Unreal DataTable row name (exported as ID). CharacterDataTable.Id_Action selects it through ResolveDataRows, with StudioBattleCharacterOverrides.ActionIdOverride taking priority; the row is required. GameCommandListWidget also resolves it directly from the character row.",
+      "simple": "Row key, normally a CP_xxx/CN_xxx character ID; ten *_ST_* mission/studio override variants also exist.",
+      "technical": "FName in FGameDataTableRow_Action; the export labels the import key ID and its ImportKeyField is Id. AGameCharacter::ResolveDataRows selects ActionDataTables with GameCharacter_Override(Overrides.ActionIdOverride, CharacterDataTable.Id_Action) and fails when no row is found. MissionCharacterDataTable.Id_Action supplies that override in Story/Arcade/PvE setups; GameCommandListWidget instead resolves directly from CharacterDataTable.Id_Action.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:526",
+        "Source/Abrams/Private/GamePvESettings.cpp:235",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:126",
+        "Source/Abrams/Private/GameDataTableManager.cpp:221",
         "Source/Abrams/Private/GameCommandListWidget.cpp:387"
       ],
       "status": "verified"
     },
     "Id_ActionMove": {
       "simple": "Movement tuning row key.",
-      "technical": "FName into ActionMoveDataTables. ResolveDataRows requires this row and stores it as AGameCharacter.ActionMoveRow; shikigami setup resolves its own ActionMove row when the shikigami row provides an id. No studio override is applied here.",
+      "technical": "FName into ActionMoveDataTables; required by ResolveDataRows and cached as AGameCharacter.ActionMoveRow (+0x3F0), which GetCurrentActionMoveRow uses only when the action controller has no override row. No studio override is applied. Shikigami movement resolves FGameDataTableRow_Shikigami.Id_ActionMove from ShikigamiDataTable, not this field.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:533",
-        "Source/Abrams/Private/GameShikigami.cpp:845"
+        "Source/Abrams/Public/GameCharacter.h:239",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Shikigami.h:55"
       ],
       "status": "verified"
     },
     "Id_ActionJump": {
       "simple": "Jump tuning row key.",
-      "technical": "FName into ActionJumpDataTables; required by ResolveDataRows. Shikigami setup resolves its own jump row when the shikigami row supplies an id.",
+      "technical": "FName into ActionJumpDataTables; required by ResolveDataRows and cached as AGameCharacter.ActionJumpRow (+0x3F8). No studio override is applied. Shikigami setup uses its own row struct's Id_ActionJump, not this field.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:537",
-        "Source/Abrams/Private/GameShikigami.cpp:854"
+        "Source/Abrams/Public/GameCharacter.h:240",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Shikigami.h:58"
       ],
       "status": "verified"
     },
     "Id_ActionDash": {
       "simple": "Dash tuning row key.",
-      "technical": "FName into ActionDashDataTables. StudioBattleCharacterOverrides.ActionDashIdOverride (including the PvE settings copy) supersedes it; ResolveDataRows fails if neither resolves a row.",
+      "technical": "FName into ActionDashDataTables. FStudioBattleCharacterOverrides.ActionDashIdOverride, copied from MissionCharacterDataTable.Id_ActionDash by GameMissionCharacter_CopyOverrideIds in Story/Arcade/PvE setups, supersedes it when non-None; ResolveDataRows fails if neither resolves a row. Shikigami setup uses its own row struct's Id_ActionDash, not this field.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:541",
         "Source/Abrams/Private/GamePvESettings.cpp:236",
-        "Source/Abrams/Private/GameShikigami.cpp:863"
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:126",
+        "Source/Abrams/Public/StudioBattleCharacterEntry.h:29"
       ],
       "status": "verified"
     },
     "Id_ActionStep": {
       "simple": "Step/dodge tuning row key.",
-      "technical": "FName into ActionStepDataTables. StudioBattleCharacterOverrides.ActionStepIdOverride, also copied by PvE settings, takes priority over this row value.",
+      "technical": "FName into ActionStepDataTables. FStudioBattleCharacterOverrides.ActionStepIdOverride, copied from MissionCharacterDataTable.Id_ActionStep by GameMissionCharacter_CopyOverrideIds in Story/Arcade/PvE setups, supersedes it when non-None; ResolveDataRows fails if neither resolves a row.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:546",
-        "Source/Abrams/Private/GamePvESettings.cpp:237"
+        "Source/Abrams/Private/GamePvESettings.cpp:237",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:126",
+        "Source/Abrams/Public/StudioBattleCharacterEntry.h:30"
       ],
       "status": "verified"
     },
     "Id_ActionBreakFall": {
       "simple": "Break-fall tuning row key.",
-      "technical": "FName into ActionBreakFallDataTables; required by ResolveDataRows. No override path was observed for this id.",
+      "technical": "FName into ActionBreakFallDataTables; required by ResolveDataRows and cached as AGameCharacter.ActionBreakFallRow (+0x410). No override path was observed; all exported rows point to CP_010.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacter.cpp:551"
+        "Source/Abrams/Private/GameCharacter.cpp:551",
+        "Source/Abrams/Public/GameCharacter.h:243"
       ],
       "status": "verified"
     },
@@ -74,7 +83,7 @@
     },
     "Id_AttackSet_Normal_1_Auto": {
       "simple": "auto-combo variant of first grounded normal attack",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Auto-combo action class (which applies the auto-combo damage rate).",
+      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Auto-combo action class; in the reconstruction the generic normal _Auto classes switch the set ID but do not themselves override GetActionDamageRate. All 57 exported rows set this field to None.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:77"
       ],
@@ -82,7 +91,7 @@
     },
     "Id_AttackSet_Normal_Air_1_Auto": {
       "simple": "auto-combo variant of first airborne normal attack",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Auto-combo action class (which applies the auto-combo damage rate).",
+      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Auto-combo action class; in the reconstruction the generic normal _Auto classes switch the set ID but do not themselves override GetActionDamageRate. All 57 exported rows set this field to None.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:267"
       ],
@@ -106,25 +115,28 @@
     },
     "Id_AttackSet_Normal_1_1_Solo": {
       "simple": "solo grounded 1_1 follow-up",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Chosen only when UnknownSlot146() is true (solo side, no other active same-team attacker, or positive Adapt_TagCombo buff); otherwise the paired non-solo id is used.",
+      "technical": "FName AttackSetDataTables key. Generic ground 1_1 actions choose it when UnknownSlot146() is true, otherwise the paired non-solo id is used. CP_051 instead forces this field when its passive buff is absent, and CP_121/CP_130 airborne 1_1 overrides select this ground field.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:30",
-        "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:96"
+        "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:96",
+        "Source/Abrams/Private/CP_051_ActionController.cpp:1554",
+        "Source/Abrams/Private/CP_121_ActionController.cpp:1032"
       ],
       "status": "verified"
     },
     "Id_AttackSet_Normal_Air_1_1_Solo": {
       "simple": "solo airborne 1_1 follow-up",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Chosen only when UnknownSlot146() is true (solo side, no other active same-team attacker, or positive Adapt_TagCombo buff); otherwise the paired non-solo id is used.",
+      "technical": "FName AttackSetDataTables key. Generic airborne 1_1 actions (including CP_120/CP_270 overrides) choose it when UnknownSlot146() is true; otherwise the paired non-solo id is used.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:30",
-        "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:286"
+        "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:286",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:399"
       ],
       "status": "verified"
     },
     "Id_AttackSet_Normal_1_1_Auto": {
       "simple": "auto-combo grounded 1_1 follow-up",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Auto-combo action class (which applies the auto-combo damage rate).",
+      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Auto-combo action class; in the reconstruction the generic normal _Auto classes switch the set ID but do not themselves override GetActionDamageRate. All 57 exported rows set this field to None.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:116"
       ],
@@ -132,7 +144,7 @@
     },
     "Id_AttackSet_Normal_Air_1_1_Auto": {
       "simple": "auto-combo airborne 1_1 follow-up",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Auto-combo action class (which applies the auto-combo damage rate).",
+      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Auto-combo action class; in the reconstruction the generic normal _Auto classes switch the set ID but do not themselves override GetActionDamageRate. All 57 exported rows set this field to None.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:306"
       ],
@@ -140,7 +152,7 @@
     },
     "Id_AttackSet_Normal_1_1_Solo_Auto": {
       "simple": "solo auto-combo grounded 1_1 follow-up",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Auto-combo action class (which applies the auto-combo damage rate). Chosen only when UnknownSlot146() is true (solo side, no other active same-team attacker, or positive Adapt_TagCombo buff); otherwise the paired non-solo id is used.",
+      "technical": "FName AttackSetDataTables key. The generic auto 1_1 action chooses it when UnknownSlot146() is true; otherwise the paired non-solo id is used. All 57 exported rows set this field to None.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:30",
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:116"
@@ -149,7 +161,7 @@
     },
     "Id_AttackSet_Normal_Air_1_1_Solo_Auto": {
       "simple": "solo auto-combo airborne 1_1 follow-up",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Auto-combo action class (which applies the auto-combo damage rate). Chosen only when UnknownSlot146() is true (solo side, no other active same-team attacker, or positive Adapt_TagCombo buff); otherwise the paired non-solo id is used.",
+      "technical": "FName AttackSetDataTables key. The generic airborne auto 1_1 action chooses it when UnknownSlot146() is true; otherwise the paired non-solo id is used. All 57 exported rows set this field to None.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:30",
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:306"
@@ -174,7 +186,7 @@
     },
     "Id_AttackSet_Normal_2_Auto": {
       "simple": "auto-combo second grounded normal attack",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Auto-combo action class (which applies the auto-combo damage rate).",
+      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Auto-combo action class; in the reconstruction the generic normal _Auto classes switch the set ID but do not themselves override GetActionDamageRate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:147"
       ],
@@ -182,7 +194,7 @@
     },
     "Id_AttackSet_Normal_Air_2_Auto": {
       "simple": "auto-combo second airborne normal attack",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Auto-combo action class (which applies the auto-combo damage rate).",
+      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Auto-combo action class; in the reconstruction the generic normal _Auto classes switch the set ID but do not themselves override GetActionDamageRate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:337"
       ],
@@ -206,7 +218,7 @@
     },
     "Id_AttackSet_Normal_2_1_Auto": {
       "simple": "auto-combo grounded 2_1 follow-up",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Auto-combo action class (which applies the auto-combo damage rate).",
+      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Auto-combo action class; in the reconstruction the generic normal _Auto classes switch the set ID but do not themselves override GetActionDamageRate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:177"
       ],
@@ -214,7 +226,7 @@
     },
     "Id_AttackSet_Normal_Air_2_1_Auto": {
       "simple": "auto-combo airborne 2_1 follow-up",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Auto-combo action class (which applies the auto-combo damage rate).",
+      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Auto-combo action class; in the reconstruction the generic normal _Auto classes switch the set ID but do not themselves override GetActionDamageRate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:366"
       ],
@@ -238,7 +250,7 @@
     },
     "Id_AttackSet_Normal_3_Auto": {
       "simple": "auto-combo third grounded normal attack",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Auto-combo action class (which applies the auto-combo damage rate).",
+      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Auto-combo action class; in the reconstruction the generic normal _Auto classes switch the set ID but do not themselves override GetActionDamageRate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:207"
       ],
@@ -246,7 +258,7 @@
     },
     "Id_AttackSet_Normal_Air_3_Auto": {
       "simple": "auto-combo third airborne normal attack",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Auto-combo action class (which applies the auto-combo damage rate).",
+      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Auto-combo action class; in the reconstruction the generic normal _Auto classes switch the set ID but do not themselves override GetActionDamageRate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:396"
       ],
@@ -270,7 +282,7 @@
     },
     "Id_AttackSet_Normal_3_1_Auto": {
       "simple": "auto-combo grounded 3_1 follow-up",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Auto-combo action class (which applies the auto-combo damage rate).",
+      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Auto-combo action class; in the reconstruction the generic normal _Auto classes switch the set ID but do not themselves override GetActionDamageRate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:237"
       ],
@@ -278,75 +290,82 @@
     },
     "Id_AttackSet_Normal_Air_3_1_Auto": {
       "simple": "auto-combo airborne 3_1 follow-up",
-      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Auto-combo action class (which applies the auto-combo damage rate).",
+      "technical": "FName AttackSetDataTables key. The corresponding action class passes it to Action_FindAttackSetRow(..., bCheckNone=true) from GetAttackSetRow; the resolved AttackSet supplies the actual per-hit Attack rows. Airborne variant used by the air attack action. Auto-combo action class; in the reconstruction the generic normal _Auto classes switch the set ID but do not themselves override GetActionDamageRate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:426"
       ],
       "status": "verified"
     },
     "Id_AttackSet_CursedEnergy_1": {
-      "simple": "first cursed-energy attack set by level",
-      "technical": "TArray<FName> with four entries in the export. Cursed-energy actions use index = CursedEnergyLevel - 1, or 3 when IsFinishTarget is true, check IsValidIndex, then look up that entry in AttackSetDataTables; None/invalid yields no set. Auto variants use the auto-combo damage rate; Air variants are for airborne actions.",
+      "simple": "First grounded cursed-energy attack set, selected by level (index 3 is the finish-target set).",
+      "technical": "TArray<FName>; all 57 exported rows serialize exactly four entries. The generic finder maps controller cursed-energy level 1..3 to indices 0..2 and forces index 3 when the target is a finish target (not a level-4 case); it checks IsValidIndex and looks up the chosen FName in AttackSetDataTables with bCheckNone=true. None or an out-of-range index yields no set. Five rows populate index 3. The command-list UI also copies the first four entries for characters without a hardcoded exception.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:29",
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:40",
-        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:196"
+        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:196",
+        "Source/Abrams/Private/GameCommandListWidget.cpp:607"
       ],
       "status": "verified"
     },
     "Id_AttackSet_CursedEnergy_1_Auto": {
-      "simple": "auto first cursed-energy attack set by level",
-      "technical": "TArray<FName> with four entries in the export. Cursed-energy actions use index = CursedEnergyLevel - 1, or 3 when IsFinishTarget is true, check IsValidIndex, then look up that entry in AttackSetDataTables; None/invalid yields no set. Auto variants use the auto-combo damage rate; Air variants are for airborne actions.",
+      "simple": "Auto-combo variant of the first grounded cursed-energy set, selected by level/finish index.",
+      "technical": "TArray<FName>; all 57 exported rows serialize exactly four entries. The generic finder maps controller cursed-energy level 1..3 to indices 0..2 and forces index 3 when the target is a finish target (not a level-4 case); it checks IsValidIndex and looks up the chosen FName in AttackSetDataTables with bCheckNone=true. None or an out-of-range index yields no set. The generic _Auto action returns GetAutoComboDamageRate (CharacterRow.DamageRate_AutoCombo * Rates.Scale4C); character overrides such as CP_070 index this array directly.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:29",
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:40",
-        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:208"
+        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:208",
+        "Source/Abrams/Private/GameCharacter.cpp:3001",
+        "Source/Abrams/Private/CP_070_ActionController.cpp:471"
       ],
       "status": "verified"
     },
     "Id_AttackSet_CursedEnergy_2": {
-      "simple": "second cursed-energy attack set by level",
-      "technical": "TArray<FName> with four entries in the export. Cursed-energy actions use index = CursedEnergyLevel - 1, or 3 when IsFinishTarget is true, check IsValidIndex, then look up that entry in AttackSetDataTables; None/invalid yields no set. Auto variants use the auto-combo damage rate; Air variants are for airborne actions.",
+      "simple": "Second grounded cursed-energy attack set, selected by level (index 3 is the finish-target set).",
+      "technical": "TArray<FName>; all 57 exported rows serialize exactly four entries. The generic finder maps controller cursed-energy level 1..3 to indices 0..2 and forces index 3 when the target is a finish target (not a level-4 case); it checks IsValidIndex and looks up the chosen FName in AttackSetDataTables with bCheckNone=true. None or an out-of-range index yields no set. Five rows populate index 3. The command-list UI also copies the first four entries for characters without a hardcoded exception.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:29",
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:40",
-        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:214"
+        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:214",
+        "Source/Abrams/Private/GameCommandListWidget.cpp:654"
       ],
       "status": "verified"
     },
     "Id_AttackSet_CursedEnergy_2_Auto": {
-      "simple": "auto second cursed-energy attack set by level",
-      "technical": "TArray<FName> with four entries in the export. Cursed-energy actions use index = CursedEnergyLevel - 1, or 3 when IsFinishTarget is true, check IsValidIndex, then look up that entry in AttackSetDataTables; None/invalid yields no set. Auto variants use the auto-combo damage rate; Air variants are for airborne actions.",
+      "simple": "Auto-combo variant of the second grounded cursed-energy set, selected by level/finish index.",
+      "technical": "TArray<FName>; all 57 exported rows serialize exactly four entries. The generic finder maps controller cursed-energy level 1..3 to indices 0..2 and forces index 3 when the target is a finish target (not a level-4 case); it checks IsValidIndex and looks up the chosen FName in AttackSetDataTables with bCheckNone=true. None or an out-of-range index yields no set. The generic _Auto action returns GetAutoComboDamageRate; character overrides such as CP_050 and CP_200 bounds-check and index this array directly.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:29",
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:40",
-        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:226"
+        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:226",
+        "Source/Abrams/Private/CP_050_ActionController.cpp:1686"
       ],
       "status": "verified"
     },
     "Id_AttackSet_CursedEnergy_Air_1": {
-      "simple": "airborne first cursed-energy attack set by level",
-      "technical": "TArray<FName> with four entries in the export. Cursed-energy actions use index = CursedEnergyLevel - 1, or 3 when IsFinishTarget is true, check IsValidIndex, then look up that entry in AttackSetDataTables; None/invalid yields no set. Auto variants use the auto-combo damage rate; Air variants are for airborne actions.",
+      "simple": "First airborne cursed-energy set, selected by level/finish index.",
+      "technical": "TArray<FName>; all 57 exported rows serialize exactly four entries. The generic finder maps controller cursed-energy level 1..3 to indices 0..2 and forces index 3 when the target is a finish target (not a level-4 case); it checks IsValidIndex and looks up the chosen FName in AttackSetDataTables with bCheckNone=true. None or an out-of-range index yields no set. Used by generic airborne cursed-energy actions; CP_170 also selects this array from a character-specific override.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:29",
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:40",
-        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:232"
+        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:232",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:418"
       ],
       "status": "verified"
     },
     "Id_AttackSet_CursedEnergy_Air_1_Auto": {
-      "simple": "airborne auto first cursed-energy attack set by level",
-      "technical": "TArray<FName> with four entries in the export. Cursed-energy actions use index = CursedEnergyLevel - 1, or 3 when IsFinishTarget is true, check IsValidIndex, then look up that entry in AttackSetDataTables; None/invalid yields no set. Auto variants use the auto-combo damage rate; Air variants are for airborne actions.",
+      "simple": "Auto-combo first airborne cursed-energy set, selected by level/finish index.",
+      "technical": "TArray<FName>; all 57 exported rows serialize exactly four entries. The generic finder maps controller cursed-energy level 1..3 to indices 0..2 and forces index 3 when the target is a finish target (not a level-4 case); it checks IsValidIndex and looks up the chosen FName in AttackSetDataTables with bCheckNone=true. None or an out-of-range index yields no set. The generic airborne _Auto action reads this array and returns GetAutoComboDamageRate; CP_070's reconstructed airborne auto override instead reads Id_AttackSet_CursedEnergy_1_Auto.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:29",
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:40",
-        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:244"
+        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:244",
+        "Source/Abrams/Private/CP_070_ActionController.cpp:484"
       ],
       "status": "verified"
     },
     "Id_AttackSet_CursedEnergy_Air_2": {
-      "simple": "airborne second cursed-energy attack set by level",
-      "technical": "TArray<FName> with four entries in the export. Cursed-energy actions use index = CursedEnergyLevel - 1, or 3 when IsFinishTarget is true, check IsValidIndex, then look up that entry in AttackSetDataTables; None/invalid yields no set. Auto variants use the auto-combo damage rate; Air variants are for airborne actions.",
+      "simple": "Second airborne cursed-energy set, selected by level/finish index.",
+      "technical": "TArray<FName>; all 57 exported rows serialize exactly four entries. The generic finder maps controller cursed-energy level 1..3 to indices 0..2 and forces index 3 when the target is a finish target (not a level-4 case); it checks IsValidIndex and looks up the chosen FName in AttackSetDataTables with bCheckNone=true. None or an out-of-range index yields no set. Used by the generic second airborne cursed-energy action class.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:29",
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:40",
@@ -355,8 +374,8 @@
       "status": "verified"
     },
     "Id_AttackSet_CursedEnergy_Air_2_Auto": {
-      "simple": "airborne auto second cursed-energy attack set by level",
-      "technical": "TArray<FName> with four entries in the export. Cursed-energy actions use index = CursedEnergyLevel - 1, or 3 when IsFinishTarget is true, check IsValidIndex, then look up that entry in AttackSetDataTables; None/invalid yields no set. Auto variants use the auto-combo damage rate; Air variants are for airborne actions.",
+      "simple": "Auto-combo second airborne cursed-energy set, selected by level/finish index.",
+      "technical": "TArray<FName>; all 57 exported rows serialize exactly four entries. The generic finder maps controller cursed-energy level 1..3 to indices 0..2 and forces index 3 when the target is a finish target (not a level-4 case); it checks IsValidIndex and looks up the chosen FName in AttackSetDataTables with bCheckNone=true. None or an out-of-range index yields no set. The generic airborne _Auto action reads this array and returns GetAutoComboDamageRate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:29",
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:40",
@@ -366,74 +385,88 @@
     },
     "Id_AttackSet_SuperCursedEnergy": {
       "simple": "Grounded super attack set.",
-      "technical": "FName into AttackSetDataTables. The SuperCursedEnergyAttack action resolves it in GetAttackSetRow; character controllers and AI conditions also read it directly, including an IsNone test that gates super-attack AI behavior.",
+      "technical": "FName into AttackSetDataTables. The generic SuperCursedEnergyAttack action resolves it through GetAttackSetRow; many CN/CP controllers, AI IsNone gates and the command-list UI read it directly. CP_140/CP_170 airborne overrides read this grounded field rather than Id_AttackSet_SuperCursedEnergy_Air.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:309",
         "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:447",
-        "Source/Abrams/Private/CP_140_ActionController.cpp:461"
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:999",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:461",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:1259",
+        "Source/Abrams/Private/GameCommandListWidget.cpp:667"
       ],
       "status": "verified"
     },
     "Id_AttackSet_SuperCursedEnergy_Air": {
       "simple": "Airborne super attack set.",
-      "technical": "FName into AttackSetDataTables used by the SuperCursedEnergyAttackAir action class. The export has no solo/level-index variant for this slot.",
+      "technical": "FName into AttackSetDataTables used by the generic SuperCursedEnergyAttackAir action. The export has no solo/level-index variant for this slot; CP_140/CP_170 airborne overrides instead read the grounded field.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:317"
+        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:317",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:461"
       ],
       "status": "verified"
     },
     "Id_ExtraAttack_1": {
       "simple": "First character-specific extra attack set.",
-      "technical": "FName into AttackSetDataTables resolved by character-specific ExtraAttack_1 action classes (CN_041/CN_122/CN_230/CN_250/CP_020/CP_051/CP_070/CP_110/CP_170/CP_200 and others). None yields no set from the finder.",
+      "technical": "FName into AttackSetDataTables resolved by character-specific ExtraAttack_1 actions in reconstructed CN_122, CN_230, CN_240, CN_250, CP_020, CP_050, CP_051, CP_070, CP_110, CP_170, CP_200, CP_230 and CP_270 (ground branch); CP_270 uses Id_ExtraAttack_2 for its air branch. None yields no set. The command-list extra-attack entries instead take Id_ExtraAttack_2 for both displayed slots.",
       "evidence": [
         "Source/Abrams/Private/CN_230_ActionController.cpp:363",
-        "Source/Abrams/Private/CP_020_ActionController.cpp:553"
+        "Source/Abrams/Private/CN_240_ActionController.cpp:1317",
+        "Source/Abrams/Private/CP_020_ActionController.cpp:553",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1073",
+        "Source/Abrams/Private/GameCommandListWidget.cpp:682"
       ],
       "status": "verified"
     },
     "Id_ExtraAttack_2": {
-      "simple": "Second character-specific extra attack set.",
-      "technical": "FName into AttackSetDataTables resolved only by characters with a second extra attack (examples CN_230, CP_020, CP_050). None yields no set.",
+      "simple": "Second character-specific extra attack set; also reused by the command-list UI.",
+      "technical": "FName into AttackSetDataTables resolved by CN_230, CP_020, CP_050 and CP_270 (air branch) actions; GameCommandListWidget copies it into both ExtraAttack_CP_050 and ExtraAttack_CP_170 display parameters. None yields no set.",
       "evidence": [
         "Source/Abrams/Private/CN_230_ActionController.cpp:408",
         "Source/Abrams/Private/CP_020_ActionController.cpp:560",
-        "Source/Abrams/Private/CP_050_ActionController.cpp:2172"
+        "Source/Abrams/Private/CP_050_ActionController.cpp:2172",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1073",
+        "Source/Abrams/Private/GameCommandListWidget.cpp:682",
+        "Source/Abrams/Private/GameCommandListWidget.cpp:696"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "One exported table with 57 rows; no numbered shards or localization variants for this group.",
-    "Auto suffixed ids belong to auto-combo action classes, which override GetActionDamageRate with the owner auto-combo rate.",
-    "Solo suffixed ids are chosen by UnknownSlot146(): solo side, no other active same-team attacker, or a positive Adapt_TagCombo buff.",
-    "Cursed-energy arrays are indexed by cursed-energy level (1..4), with index 3 forced for a finish target; exported arrays have four entries and may contain None.",
-    "None ids are passed to Action_FindAttackSetRow with bCheckNone=true, which treats None as no row. Not every character supplies every extra/super attack.",
-    "Evidence is reconstructed C++; no retail byte-match claim is made. Available Content is partial, so unobserved Blueprint or retail uses are not excluded."
+    "One exported table with 57 rows and 46 fields (38 FName scalars including Id and eight TArray<FName> fields); no numbered shards or localization variants for this group. Ten rows are *_ST_* mission/studio override variants referenced by MissionCharacterDataTable.",
+    "FGameDataTableRow_Action is an ABRAMSDATATABLE_API USTRUCT(BlueprintType) with all 46 fields BlueprintReadWrite/EditAnywhere. Its reconstructed constructor is empty and the header has no member initializers, so declared defaults are NAME_None / empty arrays; the shipped export instead serializes every field on all 57 rows, with all eight arrays exactly four entries long.",
+    "Override precedence is only for ActionIdOverride, ActionDashIdOverride and ActionStepIdOverride, and only a non-None override wins (GameCharacter_Override). Move, jump, break-fall and all AttackSet IDs have no studio override path; GameCommandListWidget also bypasses overrides by reading CharacterDataTable.Id_Action directly.",
+    "Cursed-energy array indices are 0..2 for levels 1..3 and 3 for a finish target, not level 4; five rows populate the finish index in each non-auto array. Several character overrides use alternate index sources or arrays (CP_220 charge-variant index, CP_070 airborne auto reads the ground CE1 array), so field names are not exclusive to one action class.",
+    "The command-list UI copies the first four cursed-energy entries unchecked except for hardcoded CP_030/CP_040/CP_060/CP_130/CP_230/CP_240 cases, then passes Id_AttackSet_SuperCursedEnergy and Id_ExtraAttack_2 directly to attack widgets.",
+    "UnknownSlot146 is a reconstructed, unproven name: its body returns SoloSide, otherwise true when no same-side character with CanHitAsAttacker is present or the Adapt_TagCombo stack is positive. Generic 1_1 actions use it, but CP_051 forces the solo ground field when its passive is absent and CP_121/CP_130 airborne overrides select the ground solo field.",
+    "Most normal _Auto fields are None in all 57 rows (1_Auto, Air_1_Auto, 1_1_Auto/Air_1_1_Auto and their Solo variants, 2_1_Auto/Air_2_1_Auto); populated cases are CP_090/CP_190 (2_Auto), CP_100/CP_230 (3_Auto) and CP_121/CP_220 (3_1_Auto). A None ID yields no set rather than falling back to the non-auto ID. No GetActionDamageRate override was found for generic normal _Auto classes; CE _Auto classes do return the owner auto-combo rate.",
+    "Action_FindAttackSetRow returns the first matching row in the manager's single AttackSetDataTables array or nullptr (None is rejected when bCheckNone=true); a null AttackSet with no Attack row makes FGameCharacterAction_AttackBase::Start abort. Some character actions cache the resolved row in HeldAttackSetRow for later chain hits.",
+    "Cross-table check against the read-only exports: every non-None movement ID resolves in the corresponding ActionMove/Jump/Dash/Step/BreakFall tables. 26 referenced AttackSet IDs (for example CP_010_ATTACKA_AIR and CN_090_ATTACKH_1) are absent from the available AttackSetDataTable export, so their shipped presence is not evidenced here.",
+    "Shipped evidence is the exported DataTable name/class/RowStruct/ImportKeyField and all row values; behavioral statements are from reconstructed C++ with retail RVAs in comments, not byte-match certificates. Available Content is partial, so unobserved Blueprint or retail-only uses are not excluded."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameCharacter.cpp:526",
-      "detail": "Resolves the Action row from CharacterDataTable.Id_Action (or its override), then resolves the five movement sub-row ids."
+      "detail": "Resolves the Action row from CharacterDataTable.Id_Action or a non-None MissionCharacter-derived override, then resolves the five required movement sub-rows; a miss fails character setup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:221",
+      "detail": "Loads the single shipped ActionDataTable into ActionDataTables, the array used by all Action-row lookups."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterAction_Attack.cpp:859",
       "detail": "Generic attack base uses Id_AttackSet_Normal_1 when no specialized action overrides it."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:77",
-      "detail": "Auto-combo normal attack actions select their _Auto attack set ids."
-    },
-    {
       "source": "Source/Abrams/Private/GameCharacterAction_NormalAttack.cpp:96",
-      "detail": "1_1 normal follow-up actions choose the solo or non-solo attack set via UnknownSlot146()."
+      "detail": "1_1 normal follow-up actions choose the solo or non-solo attack set via UnknownSlot146(); CP_051 uses its passive instead."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:40",
-      "detail": "Cursed-energy actions index their four-entry arrays by level or finish-target index."
+      "detail": "Cursed-energy actions index their four-entry arrays by controller level or finish-target index and look up the chosen ID in AttackSetDataTables."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:309",
-      "detail": "Super attack actions resolve the grounded and airborne super attack set ids."
+      "detail": "Super attack actions resolve the grounded ID; character-specific airborne overrides sometimes read that ground field too."
     },
     {
       "source": "Source/Abrams/Private/CN_230_ActionController.cpp:363",
@@ -444,8 +477,16 @@
       "detail": "Character-specific extra attack action resolves Id_ExtraAttack_2."
     },
     {
-      "source": "Source/Abrams/Private/GameCommandListWidget.cpp:387",
-      "detail": "Command-list setup reads the Action row directly for the selected character."
+      "source": "Source/Abrams/Private/CP_270_ActionController.cpp:1073",
+      "detail": "One extra-attack action selects Id_ExtraAttack_1 on the ground and Id_ExtraAttack_2 in the air."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCommandListWidget.cpp:607",
+      "detail": "Command-list setup reads the Action row directly, copying four cursed-energy IDs and passing super/extra-2 IDs to display widgets."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:447",
+      "detail": "AI conditions test the grounded super attack ID with IsNone before allowing super-attack behavior."
     }
   ]
 }

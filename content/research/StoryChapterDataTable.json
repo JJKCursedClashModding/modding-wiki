@@ -1,25 +1,33 @@
 {
-  "description": "Story chapter catalogue: ordering, presentation assets, DLC unlock flag, voice ids and the ordered list of demos belonging to each chapter.",
+  "description": "Story chapter catalogue: 1-based ordering, localized title and presentation assets, DLC progress-flag unlock, chapter BGM/background-movie/voice routing, and the ordered demo lists used for progress and resume.",
   "fields": {
     "ID": {
-      "simple": "Chapter id (CHAP_xxxx).",
-      "technical": "FName row key in StoryChapterDataTables (DTM +0x8B0). Used as the progress-flag map key, in FindRow lookups by id, and returned by Story_GetChapterIdByIndex. Exported ids CHAP_0001..CHAP_0009.",
+      "simple": "Chapter row id (CHAP_0001..CHAP_0009 in the export).",
+      "technical": "FName row key in StoryChapterDataTables (DTM +0x8B0), loaded from the single StoryChapterDataTable primary asset. Consumers use it to re-find the chapter row before reading the first UserProgressFlag, as the key of transient BGM/voice/release/movie maps, and as the result of index- and demo-to-chapter reverse lookups. The nine exported ids are unique and equal their row names.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:11",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:822",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1107",
-        "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:290"
+        "Source/Abrams/Private/GameDataTableManager.cpp:269",
+        "Source/Abrams/Public/GameDataTableArray.h:14",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:150",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:533",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1597",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:363",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:973",
+        "Source/Abrams/Private/GameStoryWidget.cpp:475"
       ],
       "status": "verified"
     },
     "ChapterIndex": {
-      "simple": "1-based chapter number.",
-      "technical": "int32 (row +0x10), default 0 in the row constructor. Story_GetChapterIdByIndex scans for a match; Story_PickRoomPlacement picks the row with ChapterIndex == 6 as the checkpoint chapter; the chapter-select widgets pass it as the INDEX text parameter. Exported values are 1..9.",
+      "simple": "Exported 1-based chapter number.",
+      "technical": "int32 (row +0x10), default 0 in the constructor. Story_GetChapterIdByIndex scans table/row order for an exact match; Story_GetResumeDemo uses that index, Story_GetDemoChapterIndex returns this value (or -1 when no chapter lists the demo), and collection/chapter-select UIs insert it as the raw INDEX text parameter. Story_PickRoomPlacement uses the row with value 6 as its checkpoint. Exported values are 1..9; the field itself is an unclamped int32.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:15",
         "Source/AbramsDataTable/Private/GameDataTableRow_StoryChapter.cpp:3",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:220",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:1105",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:230",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1135",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1599",
+        "Source/Abrams/Private/GameCollectionArchiveMovieItemWidget.cpp:74",
         "Source/Abrams/Private/GameStoryChapterSelectWidget.cpp:117",
         "Source/Abrams/Private/GameStoryDlcChapterSelectWidget.cpp:120"
       ],
@@ -27,7 +35,7 @@
     },
     "Id_StoryChapterTitle": {
       "simple": "Localized-text id for the chapter name.",
-      "technical": "FName (row +0x14) passed straight to SetTextIdOnly / GameTextParameterMap_AddTextId in chapter select, mission select, character-select mission info, the system dialog and the shop sale-item description; no fallback text is produced by these consumers.",
+      "technical": "FName (row +0x14). Chapter select, mission select, character-select mission info, script ShowTitle and system dialogs pass it directly as a text id (the system dialog supplies it as the MISSION_NAME parameter). The shop sale-item description returns it as the chapter name and substitutes ERROR only when no chapter row is found. All nine exported ids are keys in every exported StoryTextDataTable locale.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:18",
         "Source/Abrams/Private/GameStoryChapterSelectWidget.cpp:119",
@@ -35,100 +43,123 @@
         "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:291",
         "Source/Abrams/Private/GameStoryCharacterSelectMissionInfoWidget.cpp:77",
         "Source/Abrams/Private/GameSystemDialogWidget.cpp:118",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1338"
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1338",
+        "Source/Abrams/Private/GameScriptCommands.cpp:392",
+        "Source/Abrams/Private/GameStoryDemoWidget.cpp:225"
       ],
       "status": "verified"
     },
     "ThumbnailFileName": {
       "simple": "Full-size chapter thumbnail texture name.",
-      "technical": "FName; UGameStoryMissionSelectWidget creates WidgetTexture primary-asset loaders from ChapterRow->ThumbnailFileName for the chapter panel when its loaders are empty.",
+      "technical": "FName (row +0x1C). UGameStoryMissionSelectWidget creates WidgetTexture primary-asset loaders from it when a chapter panel has no loaders; the panel resolves that loader into ThumbnailTexture, and SetupChapter installs that texture as the chapter image's ReplacementTexture material parameter. All exported rows set a non-None name.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:21",
         "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:228",
-        "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:229"
+        "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:229",
+        "Source/Abrams/Private/GameStoryMissionSelectContentPanelWidget.cpp:109",
+        "Source/Abrams/Private/GameStoryMissionSelectContentPanelWidget.cpp:111",
+        "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:295"
       ],
       "status": "verified"
     },
     "SmallThumbnailFileName": {
       "simple": "Small chapter thumbnail texture name.",
-      "technical": "FName (row +0x24); used as the WidgetTexture loader key for chapter-select content and DLC chapter-select content, and by UGameStoryWidget's thumbnail loader setup. The loaded texture is placed in the ReplacementTexture material parameter.",
+      "technical": "FName (row +0x24). UGameStoryWidget creates WidgetTexture loaders for chapter-select and DLC chapter-select cards from it. The cards look up the loader by this key, place the loaded texture in the ReplacementTexture material parameter and set bIsMovie from the texture type. All exported rows use a non-None name ending in _576x324.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:24",
-        "Source/Abrams/Private/GameStoryChapterSelectContentWidget.cpp:175",
-        "Source/Abrams/Private/GameStoryDlcChapterSelectContentWidget.cpp:265",
         "Source/Abrams/Private/GameStoryWidget.cpp:193",
-        "Source/Abrams/Private/GameStoryWidget.cpp:229"
+        "Source/Abrams/Private/GameStoryWidget.cpp:229",
+        "Source/Abrams/Private/GameStoryChapterSelectContentWidget.cpp:175",
+        "Source/Abrams/Private/GameStoryChapterSelectContentWidget.cpp:180",
+        "Source/Abrams/Private/GameStoryChapterSelectContentWidget.cpp:181",
+        "Source/Abrams/Private/GameStoryDlcChapterSelectContentWidget.cpp:265",
+        "Source/Abrams/Private/GameStoryDlcChapterSelectContentWidget.cpp:270",
+        "Source/Abrams/Private/GameStoryDlcChapterSelectContentWidget.cpp:271"
       ],
       "status": "verified"
     },
     "BackgroundMovieFileName": {
-      "simple": "Background movie name for the chapter menu.",
-      "technical": "FName. UGameStoryWidget collects every non-None value into a map from Chapter.Id to <value>.usm and assigns it to Background->ChapterMovieFiles when changing the DLC background. Only two exported chapters set it.",
+      "simple": "Background movie name for the DLC chapter menu.",
+      "technical": "FName. PrimeDlcBackground rebuilds ChapterMovieFiles as Chapter.Id -> \"<value>.usm\" for every non-None name; SetDlcBackgroundChapter switches only to chapters present in that map and the background widget passes the mapped string to SetMovieFile. Only CHAP_0008 (StoryTop_DLC01) and CHAP_0009 (StoryTop_DLC02) set it; the other seven exported chapters are None and get no map entry.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:27",
+        "Source/Abrams/Private/GameStoryWidget.cpp:444",
         "Source/Abrams/Private/GameStoryWidget.cpp:471",
         "Source/Abrams/Private/GameStoryWidget.cpp:473",
-        "Source/Abrams/Private/GameStoryWidget.cpp:475"
+        "Source/Abrams/Private/GameStoryWidget.cpp:475",
+        "Source/Abrams/Private/GameStoryDlcChapterBackgroundWidget.cpp:102"
       ],
       "status": "verified"
     },
     "Id_Bgm": {
       "simple": "Chapter-select BGM id.",
-      "technical": "FName. MainMenuStory prepare resolves non-None values through BgmDataTables, stores the Bgm row id in ChapterBgmIds keyed by Chapter.Id and primes resume positions; chapters with None are skipped.",
+      "technical": "FName. MainMenuStory::PreparePhase resolves non-None ids against every BgmDataTable, stores Bgm->Id in ChapterBgmIds keyed by Chapter.Id and seeds BgmResumes with start time 0; None chapters are skipped. PlayChapterBgm consumes those transient maps and returns when the chapter has no entry. Only CHAP_0008/CHAP_0009 set BGM_BATTLE_DLC_01/BGM_BATTLE_DLC_02; other main-menu-story modes use BGM_STORY.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:30",
-        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:352",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:355",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:361",
-        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:363"
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:363",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:364",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:869",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:891",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:893"
       ],
       "status": "verified"
     },
     "UserProgressFlag": {
-      "simple": "DLC/user-progress flag controlling chapter lock and store routing.",
-      "technical": "TArray<int32> (row +0x40), exported with one entry. -1 means no flag: MissionSelect_HasProgressFlag / Story_GetChapterFirstUserProgressFlag report no progress flag, so the chapter is treated as base story. A set flag is decoded as word = flag >> 2, bit = flag & 3 against UserProgressFlagWords[128]; MainMenuStory_IsChapterLocked checks that bit, and the DLC result flow maps the same flag to a store page. Story_GetProgressFlagChapters keeps chapters whose first flag is not -1.",
+      "simple": "First element is the chapter's DLC/user-progress flag; -1 means base story.",
+      "technical": "TArray<int32> (row +0x40); all chapter consumers read only element 0, treating a missing row/empty array as -1. -1 means no DLC flag: MissionSelect_HasProgressFlag returns false, Story_GetChapterFirstUserProgressFlag returns -1, MainMenuStory_IsChapterLocked returns false, and Story_GetProgressFlagChapters_1302FC0 keeps those base-story rows. A set flag is decoded as word = uint32(flag) >> 2 and bit = uint32(flag) & 3 against UserProgressFlagWords[128]; word >= 128 is locked, otherwise an unset bit is locked. Exports use -1 for CHAP_0001..CHAP_0007, 6 for CHAP_0008 and 7 for CHAP_0009, decoding to word 1 / bits 2 and 3; the reconstructed entitlement map associates 6 with DLC07 and 7 with DLC08, and the DLC purchase flow matches the same value to a store page.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:33",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:525",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:530",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:534",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:823",
         "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:40",
         "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:44",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:147",
-        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:151",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:155",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:161",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1376",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:823"
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1380",
+        "Source/Abrams/Private/GameDlcEntitlementTable.h:78",
+        "Source/Abrams/Private/GameDlcEntitlementTable.h:110"
       ],
       "status": "verified"
     },
     "Id_PlayVoice_OnOpenMissionSelect": {
-      "simple": "PlayVoice row used on mission-select entry.",
-      "technical": "FName (row +0x50). BuildChapterVoicePicks resolves it to a PlayVoice row; RollChapterVoicePicks uses its Id_Voice and Weights_VoiceLottery arrays to roll a weighted PickIndex, with None names and paired weights removed first (PickIndex = -1 if either list ends empty).",
+      "simple": "PlayVoice row used to roll the mission-select voice pick index.",
+      "technical": "FName (row +0x50). BuildChapterVoicePicks resolves it to the OpenVoice row; RollChapterVoicePicks copies Id_Voice and Weights_VoiceLottery, removes None names and the same-index weights, and rolls a cumulative weighted PickIndex with the last entry as fallback. It does not play this row's PlayVoiceType directly; the index is reused with the OnSelectMission voice type and passed to character select. Exported values are 300 for CHAP_0001..CHAP_0007 and CHAP_0009, and 301 for CHAP_0008; rows 300/301 contain one/two non-None voices with equal positive weights.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:36",
-        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:959",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:896",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:907",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:908",
-        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:919",
-        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:941"
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:909",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:941",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:959",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1201",
+        "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:350"
       ],
       "status": "verified"
     },
     "Id_PlayVoice_OnSelectMission": {
       "simple": "PlayVoice row used when a mission is chosen.",
-      "technical": "FName (row +0x58). Story_GetChapterSelectVoiceType_1307CA0 resolves it to a PlayVoice row and returns PlayVoiceType, or 0xFF when the chapter/row is missing. UGameStoryMissionSelectWidget::OnMissionDecided plays that voice type with the rolled PickIndex when not 0xFF.",
+      "technical": "FName (row +0x58). Story_GetChapterSelectVoiceType_1307CA0 finds the PlayVoice row and returns its PlayVoiceType as uint8, or 0xFF when the chapter/row is missing; UGameStoryMissionSelectWidget::OnMissionDecided plays that type with the chapter's rolled PickIndex when it is not 0xFF. The export uses 310 for all chapters except CHAP_0008, which uses the DLC1 variant 311.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:39",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:1219",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:1224",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:1226",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1229",
         "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:347",
         "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:350"
       ],
       "status": "verified"
     },
     "Id_PlayVoice_StartDialog": {
-      "simple": "PlayVoice row whose Id is sent to the story character-select phase.",
-      "technical": "FName (row +0x60). BuildChapterVoicePicks stores the found PlayVoice row as SelectVoice; after a mission decision MainMenuStory copies SelectVoice->Id into GameManager.StudioStoryRequestName_CEC along with the chapter's PickIndex.",
+      "simple": "PlayVoice row whose key is sent to the story character-select phase.",
+      "technical": "FName (row +0x60). BuildChapterVoicePicks resolves it to SelectVoice. On the character-select transition MainMenuStory copies SelectVoice->Id (the PlayVoice table row key, not one of that row's Id_Voice entries) into StudioStoryRequestName_CEC and copies the chapter's rolled PickIndex into StudioStoryRequestInt48_CF4. The export uses 330 for CHAP_0001..CHAP_0007 and CHAP_0009, and the DLC1 variant 331 for CHAP_0008.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:42",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:967",
@@ -140,64 +171,120 @@
     },
     "Id_StoryDemo": {
       "simple": "Ordered StoryDemo ids in this chapter.",
-      "technical": "TArray<FName> (row +0x68), 20 slots in the export. Consumers iterate it for progress percentages, chapter lock/unstarted tests, resume-demo selection, available demo lists, room-condition selection and reverse lookup of a demo's chapter. Id suffix \"M\" marks main demos; CHAP_0007 is specially treated as all-main. Some helpers use GetData()[0] without a length check.",
+      "technical": "TArray<FName> (row +0x68) with 20 exported slots; None slots are padding. The exported lists are chapter-ordered and partition all 115 StoryDemo rows exactly once. Consumers use membership for demo-to-chapter reverse lookup and progress-flag tests, iterate non-None entries for cleared percentage (0..100 truncated; 100 when empty) and objective counts (objective 0 = demo state >=2, objectives 1..2 need a task detail id and task flag >=1), available/resume-demo selection, room-condition selection, chapter lock/unstarted tests and ShowTitle lookup. Main-demo tests use the demo row id ending in M case-insensitively; CHAP_0007 entries are treated as main in several availability/clear checks. Story_GetChapterFirstDemo returns Id_StoryDemo.GetData()[0] without a length check; all exported rows are non-empty.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:45",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:243",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:546",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:627",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:868",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:956",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:884",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:991",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1061",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:1067",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:1119",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:1123",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:1597",
-        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:412"
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:175",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:203",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:250",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:412",
+        "Source/Abrams/Private/GameScriptCommands.cpp:384"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Chapter 6 has special semantics in Story_PickRoomPlacement_13097C0: if any main demo there (or any demo in CHAP_0007) is uncleared, the last cleared demo's room condition is used; otherwise the saved placement may be kept or a uniform condition picked (Source/Abrams/Private/StoryLaunchHelpers.cpp:230-290).",
-    "Row constructor sets only ChapterIndex to 0; FName and array members default empty (Source/AbramsDataTable/Private/GameDataTableRow_StoryChapter.cpp:3).",
-    "Nine exported rows; no numbered shards or locale variants were found. Some DLC-specific behavior in this area depends on the reconstructed GameDlcEntitlementTable and on partially available Content; no exhaustive retail/BP claim is made."
+    "Checkpoint placement uses ChapterIndex 6, which is CHAP_0006 in the export. If that chapter has a pending main demo (state < 2), Story_PickRoomPlacement falls back to the last cleared demo's non-None Id_StoryRoomCondition over all chapters, starting from ROOM_COND_0000; with bPickWhenAllCleared=false it instead returns the saved StudioStoryRoomPlacementId_D18, and with true it picks uniformly from all non-None demo conditions. The chosen condition then supplies a weighted placement. The code's extra CHAP_0007 branch is not reached with these exports because the selected checkpoint row is CHAP_0006 (Source/Abrams/Private/StoryLaunchHelpers.cpp:211-323).",
+    "The row constructor sets only ChapterIndex to 0; Id and the other FName members default to NAME_None, and both TArray members default to empty (Source/AbramsDataTable/Private/GameDataTableRow_StoryChapter.cpp:3).",
+    "The manager resolves one StoryChapterDataTable primary asset into one StoryChapterDataTables array; FGameDataTableArray::GetRows re-enumerates row names and calls FindRow on each pass. No numbered shard, alias array, duplicate loader or persistent row cache appears in the reconstructed manager. Transient per-phase maps (BGM, voice picks, release missions, movie files) are keyed by Chapter.Id (Source/Abrams/Private/GameDataTableManager.cpp:269, Source/Abrams/Public/GameDataTableArray.h:14).",
+    "Story_GetProgressFlagChapters_1302FC0 is misleadingly named: its matched RemoveAll predicate drops rows whose first flag is not -1 and retains the -1 (base-story) rows. Shop completion/objective unlock cases consume those base-story rows; DLC chapter lists instead use MissionSelect_HasProgressFlag (Source/Abrams/Private/StoryLaunchHelpers.cpp:811-825, Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:543-581, Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1243-1257).",
+    "Export relationships checked: nine unique chapter rows and no locale variants or shards; all nine title ids occur in every exported StoryTextDataTable locale; all 115 non-None Id_StoryDemo entries resolve to StoryDemo rows with no duplicates; the two BGM ids resolve in BgmDataTable; the six distinct PlayVoice ids resolve in PlayVoiceDataTable; and flags 6/7 match DLC07/DLC08 in the reconstructed entitlement map.",
+    "Behavioral statements here are from statically analysed reconstructed C++ plus exported data. No retail Blueprint evidence was inspected, and the exports do not prove that referenced texture/movie assets exist or contain the expected content."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:622",
-      "detail": "Story_IsDemoInProgressFlagChapter: finds the first chapter containing a demo and checks its first UserProgressFlag."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:269",
+      "detail": "Resolves the StoryChapterDataTable primary asset and appends it to StoryChapterDataTables; the name is also registered at line 442."
+    },
+    {
+      "source": "Source/Abrams/Public/GameDataTableArray.h:14",
+      "detail": "GetRows collects rows from every table in row-name order; StoryFindRowOutOfLine scans the same array and can reject NAME_None when bCheckNone is set (StoryLaunchHelpers.cpp:118-131)."
     },
     {
       "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:815",
-      "detail": "Collects chapters with a set progress flag; used for DLC chapter lists and resume logic."
+      "detail": "Story_GetProgressFlagChapters_1302FC0 retains chapters whose first UserProgressFlag is -1 (base story); shop completion and objective unlock cases consume this collection."
     },
     {
-      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:864",
-      "detail": "Computes cleared percentage and objective counts over a chapter's demos."
-    },
-    {
-      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:983",
-      "detail": "Finds the first uncleared main demo of a chapter by Id suffix."
+      "source": "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:40",
+      "detail": "MissionSelect_HasProgressFlag reports true only when the re-found chapter row's first flag exists and is not -1; it partitions chapter pagination and DLC chapter lists."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:147",
-      "detail": "Chapter lock test using UserProgressFlag bits."
+      "detail": "MainMenuStory_IsChapterLocked decodes that flag into a UserProgressFlagWords word/bit; an absent/-1 flag is unlocked, word >= 128 is locked, and an unset bit is locked."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:864",
+      "detail": "Computes a truncated 0..100 cleared percentage (100 for an empty list) and cleared/total objective counts over a chapter's non-None demos."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:983",
+      "detail": "Finds the first uncleared demo whose row id ends in M; used for resume selection and first-pending-demo scans."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:211",
+      "detail": "Story_PickRoomPlacement selects ChapterIndex 6 and derives room conditions from its pending main demos, all chapter demo lists and the saved placement."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:537",
+      "detail": "Story_GetChapterIdForDemo and MainMenuStory_GetDemoChapterId reverse-map a demo membership to the first chapter row; Story_GetDemoChapterIndex returns the corresponding ChapterIndex or -1."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:241",
+      "detail": "Available demo lists skip locked chapters and demos whose state is nonzero or whose non-None child demos are not cleared; credits and post-battle phases aggregate these lists for every chapter."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:352",
-      "detail": "Collects chapter BGM rows and their resume positions."
+      "detail": "Collects chapter BGM rows and zero-initialised resume positions into ChapterBgmIds/BgmResumes; PlayChapterBgm consumes those maps."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:945",
-      "detail": "Builds chapter voice picks from the Open/StartDialog PlayVoice rows."
+      "detail": "Builds chapter voice picks from the Open/StartDialog PlayVoice rows and rolls PickIndex from the OpenVoice weights."
     },
     {
-      "source": "Source/Abrams/Private/GameStoryWidget.cpp:471",
-      "detail": "Builds the chapter background movie (.usm) map."
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:1219",
+      "detail": "Resolves Id_PlayVoice_OnSelectMission to a PlayVoiceType (0xFF on a miss) for OnMissionDecided's system voice."
     },
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:269",
-      "detail": "Loads StoryChapterDataTable into StoryChapterDataTables."
+      "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1200",
+      "detail": "Sends Id_PlayVoice_StartDialog's PlayVoice row key and the chapter's PickIndex to GameManager for StoryCharacterSelect."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1376",
+      "detail": "DLC purchase flow matches the chapter's first progress flag to the reconstructed entitlement map and opens that store page."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:217",
+      "detail": "Creates WidgetTexture loaders from the chapter's full-size thumbnail; the panel resolves the loader and the chapter image uses ReplacementTexture."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryWidget.cpp:216",
+      "detail": "Creates WidgetTexture loaders from SmallThumbnailFileName for normal and DLC chapter-select cards."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryWidget.cpp:458",
+      "detail": "Builds the DLC background .usm map from non-None BackgroundMovieFileName values, keyed by Chapter.Id."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:382",
+      "detail": "ShowTitle reverse-maps the current demo to its chapter and passes the chapter title and ChapterIndex to StoryDemoWidget."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCollectionArchiveMovieItemWidget.cpp:71",
+      "detail": "Collection archive movie items reverse-map their demo to a chapter and render ChapterIndex as INDEX."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1332",
+      "detail": "Chapter names in shop sale-item descriptions come from Id_StoryChapterTitle, with ERROR only for a missing row."
     }
   ]
 }

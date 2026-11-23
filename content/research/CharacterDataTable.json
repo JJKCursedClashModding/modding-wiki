@@ -1,25 +1,28 @@
 {
-  "description": "Master per-character record: display names, group classifications, ordered variation list and the IDs that join to every other character subsystem table (animation, effect, sound, UI, battle parameters, capture, arcade, etc.), plus a few direct gameplay scalars.",
+  "description": "Master per-character record: display names, group classifications, ordered variation list and the IDs that join to every other character subsystem table (animation, effect, sound, UI, battle parameters, capture, arcade, etc.), plus a few direct gameplay scalars. The export is one 48-row DataTable (ImportKeyField=Id) and is the hub for most other Character* tables; names are referenced through GameText IDs rather than stored locally.",
   "fields": {
     "ID": {
       "simple": "Character ID (CP_xxx / CN_xxx) used as the row key and across the game.",
-      "technical": "FName primary key (ImportKeyField=Id in the export). DTM_FindCharacterRow / GameCharacter_FindVariationRow style lookups resolve every other table's character ID back here; AGameCharacter::ResolveDataRows stores the matching row pointer as CharacterRow (+0x3A0). Values such as CP_000 and CP_010 also appear as the first/last entries of other tables. The row key is not read as a value by most consumers, which instead use their own slot ID.",
+      "technical": "FName primary key (imported as Id; the export writes it as ID). DTM_FindCharacterRow(Tables, Id, ...) in DTM +0x3E0 is the shared finder used by UI, battle and capture code to resolve a slot or cross-table ID back to a Character row; bCheckNone=true makes NAME_None return null. AGameCharacter::ResolveDataRows stores the resolved row pointer as CharacterRow (+0x3A0). Row->Id is also read directly as a value (PvE ally lottery, battle records, transformed-entry slots, sequence names), so it is not only a passive key. CP_000 is a shared ID in CharacterSelectDataTable but has no row in this export; CP_010 is the first exported Character row and the first row of several linked tables.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:482",
         "Source/Abrams/Private/GameArcadeRootSelectWidget.cpp:117",
-        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:179"
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:179",
+        "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:46",
+        "Source/Abrams/Private/GameBattleState_10.cpp:730"
       ],
       "status": "verified"
     },
     "Id_GlossaryText_Name": {
       "simple": "GameText ID of the character's normal display name.",
-      "technical": "FName text key (e.g. GLS_NAME_CP_010) passed to IGameWidgetTextSettingInterface::SetTextIdOnly or GameTextManager::GetText/GetGameTextById across select, lobby, shop, customize, ranking and story UI. The customize character view keeps a TMap<CharacterId, NameTextId> from Row->Id to this value. No per-row localization is stored here; the text manager resolves the current language.",
+      "technical": "FName text key (e.g. GLS_NAME_CP_010) passed to IGameWidgetTextSettingInterface::SetTextIdOnly or GameTextManager::GetText/GetGameTextById across select, lobby, shop, customize, ranking and story UI. The customize character view keeps a TMap<CharacterId, NameTextId> from Row->Id to this value, and AGameCharacter::ApplyCharacterSetup caches the resolved current-language text as DisplayName (+0x430) when the setup does not supply one. No per-row localization is stored here; the text manager resolves the current language.",
       "evidence": [
         "Source/Abrams/Private/GameCommandListWidget.cpp:398",
         "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:215",
         "Source/Abrams/Private/GameOnlineManager.cpp:2752",
         "Source/Abrams/Private/GameLobbyWidget.cpp:116",
-        "Source/Abrams/Private/GameVisualLobbyCharacterSelectTopWidget.cpp:63"
+        "Source/Abrams/Private/GameVisualLobbyCharacterSelectTopWidget.cpp:63",
+        "Source/Abrams/Private/GameCharacter.cpp:896"
       ],
       "status": "verified"
     },
@@ -46,13 +49,15 @@
     },
     "CharacterGroup": {
       "simple": "Broad faction/character-type classification.",
-      "technical": "EGameCharacterGroup (uint8: None, JujutsuSorcerers, CursedSpirits, CurseUsers, CursedWombDeathPaintings, CursedObjects, Invalid). Cast to uint8 and passed to AGameManager::OnBattleWon on battle victory; also gates character-specific action-controller behavior (CN_240), command-list contents and the text ID returned by Story_GetUniqueWordsTextId. Default construction sets None.",
+      "technical": "EGameCharacterGroup (uint8: None, JujutsuSorcerers, CursedSpirits, CurseUsers, CursedWombDeathPaintings, CursedObjects, Invalid=255). Cast to uint8 and passed to AGameManager::OnBattleWon on battle victory; also gates command-list text category, Story_GetUniqueWordsTextId and CN_240's damage-rate hook (CN_240_ATTACKI_01_01 deals damage only to CursedSpirits receivers). Default construction sets None; 17/48 exported rows are None.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameCharacterGroup.h:5",
         "Source/AbramsDataTable/Private/GameDataTableRow_Character.cpp:4",
         "Source/Abrams/Private/GameBattleStoryStates.cpp:331",
         "Source/Abrams/Private/GameCommandListWidget.cpp:505",
-        "Source/Abrams/Private/GameStoryCharaRelateTargetListItemWidget.cpp:82"
+        "Source/Abrams/Private/GameStoryCharaRelateTargetListItemWidget.cpp:82",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:458",
+        "Source/Abrams/Private/GameBattleState_10.cpp:735"
       ],
       "status": "verified"
     },
@@ -69,7 +74,7 @@
     },
     "Id_CharacterVariation": {
       "simple": "Ordered list of costume/variation row IDs, indexed by the character's variation index.",
-      "technical": "TArray<FName>, row +0x30. ResolveDataRows resolves Id_CharacterVariation[InVariationIndex] without a bounds check during battle setup; the same indexed access drives character capture, preload, material controller, item ownership/thumbnail checks, result screens, visual lobby and sequencer. Many UI paths do bounds-check and fall back to element 0 or NAME_None; some (e.g. customize costume view) index unguarded. None entries are used as empty costume slots, and availability is checked via the variation's Id_Item.",
+      "technical": "TArray<FName>, row +0x30, with 30 entries in every exported row, indexed by the 0-based variation index. ResolveDataRows resolves Id_CharacterVariation[InVariationIndex] without a bounds check during battle setup; the same indexed access drives character capture, preload, material controller, item ownership/thumbnail checks, result screens, visual lobby and sequencer. UI paths differ: visual-lobby variation selection checks IsValidIndex; the sequencer rounds the index down to a multiple of five and falls back to element 0; customize costume setup indexes Row->Id_CharacterVariation[Index] unguarded. None entries are empty costume slots, and availability is checked via the variation's Id_Item.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:495",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:74",
@@ -77,18 +82,20 @@
         "Source/Abrams/Private/GameCharacterMaterialController.cpp:89",
         "Source/Abrams/Private/GameItemOwnership.cpp:100",
         "Source/Abrams/Private/GameVisualLobbyCharacterSelectVariationWidget.cpp:141",
-        "Source/AbramsSequencer/Private/AbramsSequencerEvaluateAnimationBase.cpp:75"
+        "Source/AbramsSequencer/Private/AbramsSequencerEvaluateAnimationBase.cpp:75",
+        "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:899"
       ],
       "status": "verified"
     },
     "Id_CharacterAnimationSet": {
       "simple": "CharacterAnimationSetDataTable row that owns the character's animation montage list.",
-      "technical": "FName joined to CharacterAnimationSetDataTables (DTM +0x4B0). Battle preload and level sequencer resolve it; the animation set's Id_CharacterAnimation entries are expanded into montage FileName lists. Mission-character overrides can replace it through StudioBattleCharacterOverrides::AnimationSetIdOverride (GamePvESettings copies the character value as the default), so this field is the default rather than an unconditional choice.",
+      "technical": "FName joined to CharacterAnimationSetDataTables (DTM +0x4B0). Battle preload and level sequencer resolve it; the animation set's Id_CharacterAnimation entries are expanded into montage FileName lists. StudioBattleCharacterOverrides::AnimationSetIdOverride can replace it: GameMissionCharacter_CopyOverrideIds copies the MissionCharacter row's AnimationSet ID into that override, and GameCharacter_Override uses this Character row's value only when the override is None.",
       "evidence": [
         "Source/Abrams/Private/GamePhase_BattlePreload.cpp:282",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:254",
         "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:576",
-        "Source/Abrams/Private/GamePvESettings.cpp:233"
+        "Source/Abrams/Private/GamePvESettings.cpp:233",
+        "Source/Abrams/Private/GamePvESettings.cpp:223"
       ],
       "status": "verified"
     },
@@ -104,12 +111,13 @@
     },
     "Id_CharacterEffect": {
       "simple": "CharacterEffectDataTable row for this character's visual effects.",
-      "technical": "FName joined to CharacterEffectDataTables (DTM +0x4D0). ResolveDataRows resolves it into AGameCharacter::EffectRow (+0x3C8), which status/aura/blow code reads for colors, effect IDs and effect transforms. Battle preload also expands it into a FileName_BP asset list. None skips preload; a missing row leaves the cached pointer null (GameCharacter uses an optional finder).",
+      "technical": "FName joined to CharacterEffectDataTables (DTM +0x4D0). ResolveDataRows resolves it into AGameCharacter::EffectRow (+0x3C8), which status/aura/blow code reads for colors, effect IDs and effect transforms. Battle preload also expands it into a FileName_BP asset list. None skips preload; a missing row leaves the cached pointer null (GameCharacter uses an optional finder). In the export 47 rows name a row and CN_210 is None.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:557",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:132",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:136",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:478"
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:478",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:133"
       ],
       "status": "verified"
     },
@@ -157,7 +165,7 @@
     },
     "LinkComboCursedEnergyExpRate": {
       "simple": "Per-character multiplier on cursed-energy experience gained from link combos.",
-      "technical": "float, default 0.0 (row +0x8C). The status controller computes a truncated global gain (Global::LinkCombo_CursedEnergyExp_Add * 0.01 * level difference), applies buff/equipment/binding-vow modifiers, then multiplies by this field before adding to the character's cursed-energy gauge.",
+      "technical": "float, constructor default 0.0 (row +0x8C). AddLinkComboCursedEnergy first computes a truncated base gain from Global::LinkCombo_CursedEnergyExp_Add * 0.01 * (next CursedEnergy level threshold - current threshold), applies a buff-derived Rate from LinkComboCursedEnergyExpIncreaseItem states, then multiplies by this field before adding equipment and binding-vow CursedEnergyExpWhenLinkCombo sums. Exported values are 1.0 (35 rows) or 0.0 (13 rows).",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_Character.cpp:7",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:4288"
@@ -176,7 +184,7 @@
     },
     "AutoAttackDash_Distance": {
       "simple": "Distance threshold for auto-attack dash and its air warp (centimetres).",
-      "technical": "float, default 0.0 (row +0x94). Auto-attack dash returns when 2D target distance is at least this value; AutoAttackDashAirBegin warps to the secondary target with TargetDistance = 0 when closer than the threshold, else the threshold itself. Also checked by the air-dash warp short-stop logic; used as a world-space distance with Unreal centimetre units.",
+      "technical": "float, default 0.0 (row +0x94). Auto-attack dash returns when 2D target distance is at least this value; AutoAttackDashAirBegin warps to the secondary target with TargetDistance = 0 when closer than the threshold, else the threshold itself. Also checked by the air-dash warp short-stop logic; used as a world-space distance in Unreal centimetres. Exported values are 50 cm in 44 rows, 500 in 3 and 800 in 1.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_Character.cpp:9",
         "Source/Abrams/Private/GameCharacterAction.cpp:340",
@@ -188,11 +196,12 @@
     },
     "Id_Action": {
       "simple": "ActionDataTable row that defines the character's action set.",
-      "technical": "FName joined to ActionDataTables. ResolveDataRows resolves it with GameCharacter_Override(Overrides.ActionIdOverride, Row->Id_Action), so mission-character overrides can replace it; Setup copies the character value into StudioBattleCharacterOverrides::ActionIdOverride by default. Command-list UI also resolves the same row for display.",
+      "technical": "FName joined to ActionDataTables. ResolveDataRows resolves GameCharacter_Override(Overrides.ActionIdOverride, Row->Id_Action). In battle setup that override is filled from the MissionCharacter row by GameMissionCharacter_CopyOverrideIds (story/Arcade/PvE paths); this Character row is the fallback only when the override is None. Command-list UI also resolves this row's Id_Action directly for display/categorization.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:527",
         "Source/Abrams/Private/GameCommandListWidget.cpp:387",
-        "Source/Abrams/Private/GamePvESettings.cpp:235"
+        "Source/Abrams/Private/GamePvESettings.cpp:235",
+        "Source/Abrams/Private/GamePvESettings.cpp:223"
       ],
       "status": "verified"
     },
@@ -271,7 +280,7 @@
     },
     "StoryCharaGraphPlacementIndex": {
       "simple": "Sort order for this character's icon on the story character graph.",
-      "technical": "int32, default 0. GameStoryCharaGraphWidget sorts icon widgets with RowA->StoryCharaGraphPlacementIndex < RowB->StoryCharaGraphPlacementIndex; lower indices appear first.",
+      "technical": "int32, default 0. GameStoryCharaGraphWidget sorts icon widgets with RowA->StoryCharaGraphPlacementIndex < RowB->StoryCharaGraphPlacementIndex; lower values appear first. In the export this ranges from -1 to 15, with -1 on 32 rows; the reconstructed C++ only uses it as a sort key (no hide/exclusion branch was found).",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_Character.cpp:16",
         "Source/Abrams/Private/GameStoryCharaGraphWidget.cpp:575"
@@ -280,22 +289,24 @@
     },
     "Id_CharacterBaseParameter": {
       "simple": "CharacterBaseParameterDataTable row with base combat stats.",
-      "technical": "FName joined to CharacterBaseParameterDataTables (DTM +0x3F0). ResolveDataRows resolves it into BaseParameterRow, applying Overrides.BaseParameterIdOverride when present; PvE/command-list/VS-enemy widgets read the same row directly for display and growth. GamePvESettings copies the value as the default override.",
+      "technical": "FName joined to CharacterBaseParameterDataTables (DTM +0x3F0). ResolveDataRows resolves it into BaseParameterRow with Overrides.BaseParameterIdOverride; GameMissionCharacter_CopyOverrideIds fills that override from the MissionCharacter row, while this row's ID is the fallback when the override is None. PvE/command-list/VS-enemy widgets read the Character row's ID directly for display and growth.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:490",
         "Source/Abrams/Private/GameCommandListWidget.cpp:417",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:693",
-        "Source/Abrams/Private/GamePvESettings.cpp:230"
+        "Source/Abrams/Private/GamePvESettings.cpp:230",
+        "Source/Abrams/Private/GamePvESettings.cpp:223"
       ],
       "status": "verified"
     },
     "Id_CharacterCursedEnergy": {
       "simple": "CharacterCursedEnergyDataTable row defining cursed-energy gauge behavior.",
-      "technical": "FName joined to CharacterCursedEnergyDataTables. ResolveDataRows resolves it into CursedEnergyRow with Overrides.CursedEnergyIdOverride; command-list/interval widgets and GamePvESettings also read/copy it.",
+      "technical": "FName joined to CharacterCursedEnergyDataTables (DTM +0x410). ResolveDataRows resolves it into CursedEnergyRow with Overrides.CursedEnergyIdOverride; GameMissionCharacter_CopyOverrideIds fills that override from the MissionCharacter row, so this row's ID is the fallback when the override is None. Command-list and interval widgets read the Character row's ID directly.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:501",
         "Source/Abrams/Private/GameCommandListWidget.cpp:425",
-        "Source/Abrams/Private/GamePvESettings.cpp:231"
+        "Source/Abrams/Private/GamePvESettings.cpp:231",
+        "Source/Abrams/Private/GamePvESettings.cpp:223"
       ],
       "status": "verified"
     },
@@ -334,12 +345,13 @@
     },
     "Id_CharacterSpecialAttack": {
       "simple": "CharacterSpecialAttackDataTable row defining the character's special moves/domain expansion.",
-      "technical": "FName (row +0xE8). ResolveDataRows resolves it into SpecialAttackRow with Overrides.SpecialAttackIdOverride; battle preload uses the row's Id_DomainExpansion to preload domain assets, and GamePvESettings copies the value into the override struct by default.",
+      "technical": "FName (row +0xE8). ResolveDataRows resolves it into SpecialAttackRow with Overrides.SpecialAttackIdOverride; GameMissionCharacter_CopyOverrideIds fills that override from the MissionCharacter row, so this row's ID is the fallback when the override is None (GamePvESettings does not seed the override from this field). Battle preload uses the resolved row's Id_DomainExpansion to preload domain assets.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:507",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:346",
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:267",
-        "Source/Abrams/Private/GamePvESettings.cpp:232"
+        "Source/Abrams/Private/GamePvESettings.cpp:232",
+        "Source/Abrams/Private/GamePvESettings.cpp:223"
       ],
       "status": "verified"
     },
@@ -354,11 +366,12 @@
     },
     "Id_CharacterChat": {
       "simple": "CharacterChatDataTable row supplying symbol-chat text and voice IDs.",
-      "technical": "FName (row +0xF8). ResolveDataRows caches it as ChatRow (+0x3E0); chat message/result/customize widgets also look it up directly. None or a missing row leaves no chat messages for that character.",
+      "technical": "FName (row +0xF8). ResolveDataRows caches it as ChatRow (+0x3E0) and treats a resolvable row as mandatory for character setup; the only exported None (CN_210) also lacks Action/UI/AnimationSet IDs. Chat message, customize chat select/tile/profile and interval-PvE widgets look it up directly; when the ID or row is absent, no character chat lines are found.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:522",
         "Source/Abrams/Private/GameChatMessageWidget.cpp:331",
-        "Source/Abrams/Private/GameCustomizeChatWidget.cpp:269"
+        "Source/Abrams/Private/GameCustomizeChatWidget.cpp:269",
+        "Source/Abrams/Private/GameCustomizeChatSelectWidget.cpp:276"
       ],
       "status": "verified"
     },
@@ -395,7 +408,7 @@
     },
     "FootIKLimit": {
       "simple": "Per-character foot-IK reach/limit values passed to bone controllers.",
-      "technical": "TArray<double> (row +0x118), copied into AGameCharacter's bone-controller setup by CreateBoneController(..., Row->FootIKLimit). Base InitFootIK101 uses element [0] as the Limit for left/right ankle IK; character-specific controllers index additional elements (e.g. CN_140 uses [1] for other limbs). Some controllers/shikigami use the same array type. No default values are set in the row constructor; exported rows commonly start with 10-30 and trailing zeros.",
+      "technical": "TArray<double> (row +0x118), copied into AGameCharacter's bone-controller setup by CreateBoneController(..., Row->FootIKLimit). Base InitFootIK101 uses element [0] as the Limit for left/right ankle IK; CN_140's controller uses [1] for hand IK. All 48 exported arrays have four entries: [0] is 30 in 31 rows, 50 in 6, 15/5/10 in 9 rows and 0 in 2; [1] is 50 only on CN_140. The row constructor does not initialize this array.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:769",
         "Source/Abrams/Private/GameCharacter.cpp:982",
@@ -407,7 +420,7 @@
     },
     "CullingBoundingBoxScale": {
       "simple": "Scale applied to the character's mesh bounds for camera-inside/culling tests.",
-      "technical": "FVector (row +0x128) returned by AGameCharacter::GetCullingBoundingBoxScale (interface slot 90); null row returns ones. GameCharacterManager multiplies MeshBounds.BoxExtent component-wise by this scale when testing whether the camera lies inside the character's bounding box, affecting placement/culling decisions. Exported values include 0.75 and 1.0 per axis.",
+      "technical": "FVector (row +0x128) returned by AGameCharacter::GetCullingBoundingBoxScale; a null CharacterRow returns FVector::OneVector. GameCharacterManager multiplies MeshBounds.BoxExtent component-wise by this scale when testing whether the camera lies inside the character's bounding box, affecting placement/culling decisions. Exported values are (1,1,1) in 47 rows and (0.75,0.75,0.75) on CN_240.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2372",
         "Source/Abrams/Private/GameCharacter.cpp:2378",
@@ -418,7 +431,7 @@
     },
     "OverrideJustGuard_HitSlow_Attacker": {
       "simple": "Optional hit-slow (time dilation) rate applied to the attacker on a just-guard.",
-      "technical": "float, constructor default 0.0, exposed through AGameCharacter::GetOverrideJustGuardHitSlowAttacker (interface default -1). In GameBattleDamage a negative value falls back to Global::JustGuard_HitSlow_Attacker; otherwise this value is passed to TimeManager::RequestTimeDilation as the slowdown rate for non-projectile just-guards. Zero would therefore override the global rate with zero, not fall back.",
+      "technical": "float, constructor default 0.0, exposed through AGameCharacter::GetOverrideJustGuardHitSlowAttacker (the base actor-interface default is -1). In GameBattleDamage a negative value falls back to Global::JustGuard_HitSlow_Attacker; otherwise this value is passed to TimeManager::RequestTimeDilation as the slowdown rate for non-projectile just-guards. Zero would therefore override the global rate with zero, not fall back. In the export 47/48 rows use -1.0 (fall back); CN_240 uses 0.005.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_Character.cpp:17",
         "Source/Abrams/Private/GameCharacter.cpp:2474",
@@ -429,7 +442,7 @@
     },
     "OverrideJustGuard_HitSlow_Time_Attacker": {
       "simple": "Optional duration of the attacker's just-guard hit-slow.",
-      "technical": "float, constructor default 0.0, exposed through AGameCharacter::GetOverrideJustGuardHitSlowTimeAttacker (interface default -1). GameBattleDamage uses it in place of Global::JustGuard_HitSlow_Time_Attacker when non-negative when requesting attacker time dilation; only applies to non-projectile damage and is paired with the rate override above.",
+      "technical": "float, constructor default 0.0, exposed through AGameCharacter::GetOverrideJustGuardHitSlowTimeAttacker (the base actor-interface default is -1). GameBattleDamage uses it in place of Global::JustGuard_HitSlow_Time_Attacker when non-negative when requesting attacker time dilation; only applies to non-projectile damage and is paired with the rate override above. In the export 47/48 rows use -1.0 (fall back); CN_240 uses 2.0.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_Character.cpp:18",
         "Source/Abrams/Private/GameCharacter.cpp:2480",
@@ -451,11 +464,12 @@
     }
   },
   "notes": [
-    "Export contains 48 Character rows; each row carries the full cross-table ID set, and many IDs are None for characters that lack a given subsystem (e.g. no select row, no command list, no shikigami).",
-    "Character rows are the central join: game code resolves them by character ID (DTM_FindCharacterRow, DTM +0x3E0), then fans out to CharacterBaseParameter (+0x3F0), CharacterVariation (+0x400), CharacterCursedEnergy (+0x410), CharacterSpecialAttack (+0x420), CharacterCaptureSet (+0x430), CharacterCapture (+0x440), CharacterSelect (+0x450), CharacterCamera (+0x460), CharacterUI (+0x470), CharacterImage (via variation), CharacterMaterial, CharacterAnimationSet (+0x4B0), CharacterTrap (+0x4C0), CharacterEffect (+0x4D0), CharacterWeapon (+0x4E0), CharacterShikigami (+0x4F0), CharacterDecal (+0x500), CharacterChat (+0x550), CharacterUnique (+0x570), CharacterArcade (+0x5A0).",
-    "StudioBattleCharacterOverrides can replace BaseParameter, CursedEnergy, SpecialAttack, Action and AnimationSet IDs; GamePvESettings seeds those overrides from the Character row, so the row values are defaults in battle/mission contexts.",
-    "Row constructor defaults: enum fields None, all scalar rates/angles/distances 0.0, StoryCharaGraphPlacementIndex 0; pointer/array fields are left empty by default.",
+    "Export contains one CharacterDataTable shard with 48 rows (CP_xxx/CN_xxx); all 42 exported fields are present on every row. Arrays have fixed lengths in this export: Id_CharacterVariation 30, Id_CharacterTrap 2, Id_CharacterShikigami 1, Id_CharacterUnique 9, FootIKLimit 4. None is used for absent links (e.g. 46 no transformation, 21 no select/arcade, 37 no decal, 17 no command list).",
+    "Character rows are the central join: game code resolves them by character ID (DTM_FindCharacterRow, DTM +0x3E0), then fans out to CharacterBaseParameter (+0x3F0), CharacterVariation (+0x400), CharacterCursedEnergy (+0x410), CharacterSpecialAttack (+0x420), CharacterCaptureSet (+0x430), CharacterCapture (+0x440), CharacterSelect (+0x450), CharacterCamera (+0x460), CharacterUI (+0x470), CharacterImage (via variation, +0x480), CharacterMaterial (+0x490), CharacterAnimationSet (+0x4B0), CharacterTrap (+0x4C0), CharacterEffect (+0x4D0), CharacterWeapon (+0x4E0), CharacterShikigami (+0x4F0), CharacterDecal (+0x500), CharacterChat (+0x550), CharacterUnique (+0x570), CharacterArcade (+0x5A0).",
+    "StudioBattleCharacterOverrides can replace BaseParameter, CursedEnergy, SpecialAttack, AnimationSet, Action, ActionDash and ActionStep IDs. GameMissionCharacter_CopyOverrideIds fills these from the MissionCharacter row in story/Arcade/PvE setup; GameCharacter_Override falls back to the Character row (or the Action row for dash/step) only when the override is None, so Character row values are defaults, not unconditional choices.",
+    "Constructor explicitly sets only the enum/rate/index fields (groups None; ActionControllerType, AIType and AutoAttackDash_NextActionType None; scalar rates/angles/distances 0.0; StoryCharaGraphPlacementIndex 0). It does not explicitly initialize the FName, FVector, TArray or Id_Item members; the exported DataTable supplies their values.",
     "There are no per-locale CharacterDataTable variants in the export; localized names are referenced via Id_GlossaryText_* text IDs.",
+    "Every non-None ID in the exported Character rows resolves to a row in the corresponding exported linked table/shard; None/missing rows are handled differently by consumers (optional caches vs mandatory setup failure).",
     "Evidence is reconstructed C++ with cited retail RVAs; some consumers index arrays without bounds checks, which is a retail behavior, not a documentation blank. No claim is made about byte-identical matching, Blueprint-only uses or retail rows absent from the partial Content export."
   ],
   "usages": [
@@ -469,7 +483,7 @@
     },
     {
       "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:66",
-      "detail": "BattleAssets_FindCharacter and the collectors expand traps, effects, shikigami, decals and images into preload lists."
+      "detail": "BattleAssets_FindCharacter plus collectors expand traps, effects, shikigami, decals and variation-derived images/sprites into battle preload lists."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:257",
@@ -490,6 +504,26 @@
     {
       "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:1518",
       "detail": "PvE ally lottery weights characters by PvEAllyWeights."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:223",
+      "detail": "GameMissionCharacter_CopyOverrideIds seeds battle overrides from the MissionCharacter row; Character-row IDs are fallbacks only when the override is None."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemOwnership.cpp:95",
+      "detail": "GameCharacter_GetSelectableRows is the central selectable-row filter using Id_CharacterSelect and Id_Item."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:896",
+      "detail": "Character row's glossary name is cached as AGameCharacter::DisplayName when the setup does not supply one."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:767",
+      "detail": "Bone-controller setup receives auto-aim angles and FootIKLimit directly from the Character row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryCharaGraphWidget.cpp:575",
+      "detail": "Story character-graph icons are sorted by this row's StoryCharaGraphPlacementIndex."
     }
   ]
 }

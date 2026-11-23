@@ -1,20 +1,22 @@
 {
-  "description": "Per-hit collision-shape and offset animation parameters, selected by DamageDataTable.Id_CollisionModify and applied by the attack component collision-parameter block.",
+  "description": "Collision-shape, relative-offset and attack-lifetime parameters used when an attack component is armed; selected through the damage row's Id_CollisionModify and applied by FGameCollisionParameter.",
   "fields": {
     "Id": {
       "simple": "Row identifier used by damage rows to select this modification.",
-      "technical": "FName key in CollisionModifyDataTable. FGameCollisionParameter::Setup skips the lookup when DamageRow->Id_CollisionModify is None, otherwise scans CollisionModifyDataTables in order and takes the first UDataTable::FindRow match; the export labels this key ID, while the Unreal property is Id (case-insensitive generator match).",
+      "technical": "FName row key. FGameCollisionParameter::Setup skips the lookup when DamageRow->Id_CollisionModify is None; otherwise it scans CollisionModifyDataTables in load order and uses the first UDataTable::FindRow match. The table Properties use ImportKeyField Id and the native UPROPERTY is Id; the exporter spells the per-row key ID, and it matches the row-map key in all 63 exported rows.",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:37",
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:38",
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:43",
-        "Source/AbramsDataTable/Public/GameDataTableRow_CollisionModify.h:11"
+        "Source/AbramsDataTable/Public/GameDataTableRow_CollisionModify.h:11",
+        "Source/Abrams/Private/GameCollisionParameterInterface.cpp:40",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CollisionModify.h:12"
       ],
       "status": "verified"
     },
     "Size": {
       "simple": "Target collision extents (or radius/height inputs for spheres and capsules).",
-      "technical": "FVector target size. TickSize returns early when this is exactly zero. For boxes it lerps cached OriginalSize to Size component-wise and sets box extent; for spheres it averages X/Y/Z of both vectors and sets sphere radius; for capsules it averages X/Y for radius and uses Z as half-height. Units are Unreal world units; exported examples include (90,90,200) and (70,70,200).",
+      "technical": "FVector target size. A zero vector is a no-animation sentinel: TickSize returns before any wait/timer work and leaves the shape unchanged. For boxes it lerps cached OriginalSize to Size component-wise and sets box extent; for spheres it averages X/Y/Z of both vectors and sets sphere radius; for capsules it averages X/Y for radius and uses Z as half-height. Units are Unreal world units (centimetres); exported examples include (90,90,200) and (70,70,200).",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:230",
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:247",
@@ -26,7 +28,7 @@
     },
     "Size_Time": {
       "simple": "Duration over which the collision size reaches Size.",
-      "technical": "Seconds. CollisionParameter_Alpha yields 1 when Time<=0, otherwise clamps Elapsed/Time to [0,1]; SizeElapsed advances by DeltaTime multiplied by owner CustomTimeDilation after alpha is computed. Zero/negative therefore applies the target size immediately on the first tick; default 0.",
+      "technical": "Seconds, consulted only when a modification row exists and Size is nonzero. CollisionParameter_Alpha yields 1 when Time<=0, otherwise clamps Elapsed/Time to [0,1]; SizeElapsed advances by DeltaTime multiplied by the owner's CustomTimeDilation after alpha is computed. Zero/negative therefore applies the target size on the first animating tick (after any wait); default 0.",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:178",
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:218",
@@ -49,19 +51,20 @@
     },
     "Location": {
       "simple": "Target relative offset applied to the collision component.",
-      "technical": "FVector offset in Unreal world units before rotation. TickLocation returns when exactly zero; otherwise it rotates Location * Alpha by the cached extra frame (Rotation130 composed with either the component relative rotation, or identity when bLocation_AbsoluteRotation is true) and adds OriginalLocation.",
+      "technical": "FVector offset in Unreal world units (centimetres) before rotation. A zero vector is a no-offset sentinel: TickLocation returns without touching relative location. Otherwise it rotates Location * Alpha by FQuat(Base) * Rotation130, where Base is the component relative rotation or FRotator::ZeroRotator when bLocation_AbsoluteRotation is true, and then calls SetRelativeLocation(Offset + OriginalLocation).",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:285",
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:296",
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:298",
         "Source/Abrams/Public/GameCollisionParameterInterface.h:43",
-        "Source/AbramsDataTable/Public/GameDataTableRow_CollisionModify.h:24"
+        "Source/AbramsDataTable/Public/GameDataTableRow_CollisionModify.h:24",
+        "Source/Abrams/Private/GameCollisionParameterInterface.cpp:297"
       ],
       "status": "verified"
     },
     "Location_Time": {
       "simple": "Duration over which the collision offset reaches Location.",
-      "technical": "Seconds. Same CollisionParameter_Alpha rule as Size_Time: non-positive duration gives alpha 1 immediately; positive duration ramps Elapsed/Time. LocationElapsed advances by scaled DeltaTime after alpha computation; default 0.",
+      "technical": "Seconds, consulted only when a modification row exists and Location is nonzero. Same CollisionParameter_Alpha rule as Size_Time: non-positive duration gives alpha 1 immediately; positive duration ramps Elapsed/Time. LocationElapsed advances by scaled DeltaTime after alpha computation; default 0.",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:218",
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:294",
@@ -92,44 +95,72 @@
       "status": "verified"
     },
     "Life_Time": {
-      "simple": "Lifetime after which collision is disabled and the OnHit delegate fires.",
-      "technical": "Seconds, copied at Setup with `Life_Time != 0 ? Life_Time : -1`, so exported/default 0 means unlimited (-1, no countdown). Positive values count down by scaled DeltaTime; at <=0 collision is set to NoCollision, OnHit is broadcast and cleared. Negative source values remain negative/unlimited.",
+      "simple": "Lifetime after which the component's collision is queued off and a bound OnHit delegate is fired.",
+      "technical": "Seconds. Setup stores Life_Time != 0 ? Life_Time : -1, so the header/export default 0 means unlimited (-1, no countdown), as do negative values. Only a positive internal LifeTime counts down by owner-scaled DeltaTime; when that countdown crosses zero, FGameCollisionParameter queues NoCollision through AGameCollisionManager::RequestCollisionEnabled (applied later in ACollisionManager::Tick), zeroes LifeTime, and broadcasts/clears OnHit only if bound. The verified binding is AGameEffect::OnAttackHit, which clears the source's attack-active flag for non-type-1 effects; no character-attack OnHit binding was found in Source.",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:74",
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:182",
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:190",
         "Source/Abrams/Public/GameCollisionParameterInterface.h:50",
-        "Source/AbramsDataTable/Public/GameDataTableRow_CollisionModify.h:36"
+        "Source/AbramsDataTable/Public/GameDataTableRow_CollisionModify.h:36",
+        "Source/Abrams/Private/GameCollisionParameterInterface.cpp:191",
+        "Source/Framework/Private/CollisionManager.cpp:226",
+        "Source/Abrams/Private/GameEffect.cpp:1012",
+        "Source/Abrams/Private/GameEffect.cpp:1104"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Single retail table name CollisionModifyDataTable; AGameDataTableManager::Tick resolves exactly that primary asset into CollisionModifyDataTables (Source/Abrams/Private/GameDataTableManager.cpp:243, Source/Abrams/Public/GameDataTableManager.h:154).",
-    "The row is cached by pointer in FGameCollisionParameter::CollisionModifyRow when the damage row is armed and cleared by Reset (Source/Abrams/Private/GameCollisionParameterInterface.cpp:37,52,74,85).",
+    "Single retail asset name CollisionModifyDataTable: AGameDataTableManager::Tick resolves that one primary-asset loader into CollisionModifyDataTables (array +0x710) via AddLoadedDataTables, which skips null tables; Setup nevertheless scans the array in load order and takes the first matching row. (Source/Abrams/Private/GameDataTableManager.cpp:146,243; Source/Abrams/Public/GameDataTableManager.h:154)",
+    "The row is cached by pointer in FGameCollisionParameter::CollisionModifyRow when a damage row is armed; Setup replaces it (nullptr for None or a missing ID) and Reset clears it, so ticks do not repeat the table lookup. (Source/Abrams/Private/GameCollisionParameterInterface.cpp:37,52,74,85)",
+    "Indirect lookup chain verified: the attack-collision anim notify resolves its Id_Damage through IGameActorInterface::ResolveAttackDamageId (CP_270 remaps first-hit IDs while its projection-sorcery stack count is positive), then Status_FindDamageRow scans DamageDataTable1-5 in order; the resulting damage row's Id_CollisionModify selects this table. Effect Initialize resolves EffectRow->Id_Damage through the same damage finder and also binds OnHit; CN_050/CP_130 action controllers and trap controllers call Setup from their own resolved damage rows. (Source/Abrams/Private/GameAnimNS_AttackCollision.cpp:78,103; Source/Abrams/Private/CP_270_ActionController.cpp:1438; Source/Abrams/Private/GameCharacterStatusController.cpp:3237; Source/Abrams/Private/GameEffect.cpp:1085,1103,1104)",
+    "Export relationship: one global 63-row CollisionModifyDataTable plus 20 by-character CollisionModify exports that are exact row subsets (no differing values). Across every global and by-character export shard, 184 damage rows have a non-None Id_CollisionModify; they resolve to 55 distinct IDs, all present in the table, with no duplicate row keys or key/ID mismatches. Eight exported rows (CP_010_ATTACKD_02, CP_050_ATTACKG_01_02, CP_050_ATTACKG_01_03, CP_140_ATTACKD_01_02, CP_180_ATTACKF_01_01, CP_180_ATTACKF_01_02, CP_180_ATTACKF_01_03, CP_200_ATTACKG_1_1) have no exported damage-row reference.",
+    "Tick reachability: AddModifiable calls ModSlot4 to snapshot OriginalSize/OriginalLocation (and BootRotation into Rotation130 on character-attack components), TickModifier forwards to FGameCollisionParameter::Tick, and RemoveModifiable restores the snapshot via ModSlot5. The ACollisionManager tick runs modifiers before applying queued collision-enabled changes. Visible parameter-bearing classes are the character/effect capsule and sphere attack components; TickSize retains a box branch, but no box subclass carrying the parameter block was found in Source. (Source/Framework/Private/CollisionManager.cpp:50,59,220,226; Source/Abrams/Private/GameCapsuleComponent_CharacterAttack.cpp:22,30; Source/Abrams/Private/GameCapsuleComponent_EffectAttack.cpp:15,23)",
+    "Rotation130 nuance: bLocation_AbsoluteRotation replaces the component-relative-rotation base with identity but does not clear Rotation130; character-attack components cache AGameCharacterManager::BootRotation there, while effect-attack components leave it identity. Exported bLocation_AbsoluteRotation is true in 62 of 63 rows; only CP_140_ATTACKD_01_01 is false despite the native default false.",
     "All visible consumers are static C++ reconstruction. The available Content is partial, so direct Blueprint or other table consumers cannot be excluded; no uncooked asset guesses are used as semantic evidence.",
     "Exported values confirm the serialized schema and representative values but do not by themselves establish meaning."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameCollisionParameterInterface.cpp:29",
-      "detail": "FGameCollisionParameter::Setup takes a Damage row, resolves its Id_CollisionModify into a cached CollisionModify row, and seeds wait/lifetime state."
+      "detail": "FGameCollisionParameter::Setup resolves Id_CollisionModify into a cached row (None or a miss leaves it null) and seeds wait/lifetime state."
     },
     {
       "source": "Source/Abrams/Private/GameCollisionParameterInterface.cpp:228",
-      "detail": "TickSize animates box extent, sphere radius, or capsule radius/half-height toward Size using Size_WaitTime/Size_Time."
+      "detail": "TickSize ignores zero Size, then animates box extent, sphere radius, or capsule radius/half-height toward Size using Size_WaitTime/Size_Time."
     },
     {
       "source": "Source/Abrams/Private/GameCollisionParameterInterface.cpp:283",
-      "detail": "TickLocation animates a relative component offset toward Location using Location_WaitTime/Location_Time and the rotation flag."
+      "detail": "TickLocation ignores zero Location, then animates a relative component offset using Location_WaitTime/Location_Time, OriginalLocation and the Rotation130 frame."
     },
     {
       "source": "Source/Abrams/Private/GameCollisionParameterInterface.cpp:172",
-      "detail": "Tick applies all timing with owner CustomTimeDilation and expires collision after Life_Time."
+      "detail": "Tick applies all timing with owner CustomTimeDilation; after a positive LifeTime expires it queues NoCollision and conditionally broadcasts/clears OnHit."
     },
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:243",
-      "detail": "Manager load/registry path for the sole CollisionModifyDataTable asset."
+      "detail": "Manager load path for the sole CollisionModifyDataTable asset; the array is scanned in load order by Setup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimNS_AttackCollision.cpp:78",
+      "detail": "Attack anim notify resolves the possibly remapped Id_Damage through the five damage shards before Setup reads Id_CollisionModify."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_270_ActionController.cpp:1438",
+      "detail": "Indirect alias source: ResolveAttackDamageId remaps first-hit damage IDs by projection-sorcery stack count before damage-row and collision-modification lookup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameEffect.cpp:1085",
+      "detail": "Effect Initialize arms attack components from EffectRow->Id_Damage via Status_FindDamageRow and binds the only verified OnHit subscriber."
+    },
+    {
+      "source": "Source/Framework/Private/CollisionManager.cpp:220",
+      "detail": "Collision manager tick drives component TickModifier calls and applies queued NoCollision requests after those modifier ticks."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCapsuleComponent_CharacterAttack.cpp:22",
+      "detail": "ModSlot4/ModSlot5 snapshot and restore OriginalSize, OriginalLocation and BootRotation used by Size/Location animation."
     }
   ]
 }

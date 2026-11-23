@@ -1,52 +1,152 @@
 {
-  "description": "Per-character sound bundle: cue sheets to preload, footstep type, and the voice-group set / voice-group ID lists used for battle and system lines.",
+  "description": "Per-character/variation sound bundle: cue sheets to preload, the footstep family, candidate CharacterVoiceGroupSet rows for battle voices, and system/menu VoiceGroup IDs.",
   "fields": {
     "Id": {
-      "simple": "Row key / character-sound ID.",
-      "technical": "FName primary key. Characters resolve it from CharacterVariation.Id_CharacterSound (with an optional setup override), shikigami from Shikigami.Id_CharacterSound, sequencer NPCs from their model name, and UGameSoundVoicePlayer from a supplied variation ID. Finders walk DTM.CharacterSoundDataTables in order and return the first typed row. Export spells it ID.",
-      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:12", "Source/Abrams/Private/GameCharacter.cpp:513", "Source/Abrams/Private/GameShikigami.cpp:877", "Source/Abrams/Private/GameSoundVoicePlayer.cpp:96", "Source/AbramsSequencer/Private/AbramsSequencerActorReferenceModule.cpp:356"],
+      "simple": "Row key / character-sound ID (native `Id`, exported as `ID`).",
+      "technical": "FName FindRow key; the single export has 56 unique keys and its IDs all equal their row keys. AGameCharacter::ResolveDataRows selects CharacterVariation.Id_CharacterVariation[InVariationIndex] without an index check, then uses Overrides.SoundIdOverride when non-None, otherwise Variation.Id_CharacterSound; mission-character setup can copy MissionCharacter.Id_CharacterSound into that override. The result is cached at AGameCharacter+0x3D0 and a miss fails the whole character setup. AGameShikigami resolves Shikigami.Id_CharacterSound through the shared finder (with None rejected) and caches a possibly null row at +0x350. Sequencer NPCs use the skinned-model name as the key, while UGameSoundVoicePlayer first resolves a supplied CharacterVariation ID and then uses that variation's Id_CharacterSound. Every finder walks DTM.CharacterSoundDataTables (+0x510) and returns the first typed row.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:12",
+        "Source/Abrams/Private/GameCharacter.cpp:461",
+        "Source/Abrams/Private/GameCharacter.cpp:494",
+        "Source/Abrams/Private/GameCharacter.cpp:513",
+        "Source/Abrams/Private/GamePvESettings.cpp:223",
+        "Source/Abrams/Private/GameShikigami.cpp:798",
+        "Source/Abrams/Private/GameShikigami.cpp:877",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:79",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:95",
+        "Source/AbramsSequencer/Private/AbramsSequencerActorReferenceModule.cpp:354"
+      ],
       "status": "verified"
     },
     "CueSheetName": {
-      "simple": "Cue sheets belonging to this character/variation that must be resident.",
-      "technical": "TArray<FName> indexed in parallel with other per-character audio lookups but consumed mainly as a preload list: battle-asset collection appends every entry after the CharacterVariation join, and the situation-overview widget collects non-None entries for LoadCueSheets/UnloadCueSheets and a loaded-sheet readiness check. Exported rows commonly have a character sheet plus a None placeholder, which consumers do not always filter (BattleAssets_DoCueSheets appends verbatim; the overview filters None).",
-      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:16", "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:334", "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:424", "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:426", "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:447", "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:498"],
+      "simple": "Cue-sheet asset names to load for this character/variation before its audio is needed.",
+      "technical": "TArray<FName>; it is a preload list, not an index into the other voice arrays. BattleAssets_CueSheets_12BC230 finds the row from CharacterVariation.Id_CharacterSound and appends every entry verbatim; battle preload, IntervalPvE and LevelSequencer feed such lists to LoadCueSheets. The situation-overview widget filters None before LoadCueSheets, UnloadCueSheets and AreCueSheetsLoaded; the sound manager also ignores None and de-duplicates names, so an unfiltered placeholder does not create a load. All 56 exported rows have two entries: 46 are [named sheet, None], 8 pair a second (often another character's) sheet, and 2 are [None, None]. These collectors use the base variation's Id_CharacterSound and do not apply the battle SoundIdOverride.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:16",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:321",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:332",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:508",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:415",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:580",
+        "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:424",
+        "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:447",
+        "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:490",
+        "Source/Abrams/Private/GameSoundManager.cpp:181",
+        "Source/Abrams/Private/GameSoundManager.cpp:196",
+        "Source/Abrams/Private/GameSoundManager.cpp:255"
+      ],
       "status": "verified"
     },
     "FootstepType": {
       "simple": "Which family of footstep sounds the actor uses.",
-      "technical": "EGameFootstepType (None default; ShoesMan, ShoesWoman, BareFoot, Zori, Gorilla, Totality, Invalid). AGameCharacter::GetFootstepType and AGameShikigami::GetFootstepType return it as uint8; sequencer NPC lookup returns the row value directly. Footstep anim notifies convert it with GameAnimNotify_TypeIndex (enum value - 1) to index MapGround.Id_SoundEffect_Footstep, so None maps to -1 and selects nothing. The exported 56 rows use ShoesMan, ShoesWoman and Zori.",
-      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:19", "Source/AbramsDataTable/Private/GameDataTableRow_CharacterSound.cpp:4", "Source/Abrams/Private/GameCharacter.cpp:2897", "Source/Abrams/Private/GameShikigami.cpp:1867", "Source/AbramsSequencer/Private/AbramsSequencerActorReferenceModule.cpp:357", "Source/Abrams/Private/GameAnimNotify_Footstep.cpp:53", "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:5"],
+      "technical": "EGameFootstepType (uint8): None=0, ShoesMan=1, ShoesWoman=2, BareFoot=3, Zori=4, Gorilla=5, Totality=6, Invalid=255; the row constructor defaults it to None. AGameCharacter::GetFootstepType returns the cached row value with no null guard; AGameShikigami::GetFootstepType returns 0 if its cached row is null; sequencer NPCs read the row directly by model-name key and return 0 when no row is found. The footstep notify needs a MapGround row, converts the value with GameAnimNotify_TypeIndex (value - 1), and indexes GroundRow.Id_SoundEffect_Footstep only when 0 <= Index < Num: values 1-6 select indices 0-5, None gives -1 and Invalid gives 254, both selecting nothing. All 56 exported rows populate this field: 19 ShoesMan, 14 BareFoot, 7 ShoesWoman, 6 Zori, 4 Gorilla, 4 Totality and 2 None; Invalid is unused. Each of the eight MapGround rows supplies six valid SoundEffect IDs.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:19",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterSound.cpp:4",
+        "Source/AbramsDataTable/Public/EGameFootstepType.h:6",
+        "Source/Abrams/Private/GameCharacter.cpp:2897",
+        "Source/Abrams/Private/GameShikigami.cpp:1861",
+        "Source/AbramsSequencer/Private/AbramsSequencerActorReferenceModule.cpp:342",
+        "Source/Abrams/Private/GameAnimNotify_Footstep.cpp:46",
+        "Source/Abrams/Private/GameAnimNotify_Footstep.cpp:53",
+        "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:5",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MapGround.h:19"
+      ],
       "status": "verified"
     },
     "Id_CharacterVoiceGroupSet": {
-      "simple": "Candidate CharacterVoiceGroupSet IDs for normal, alternate and low-HP voice sets.",
-      "technical": "TArray<FName> returned by ActionController slot 90. AGameCharacter::FindCharacterVoiceGroupSetRow selects index by Mode: mode 1 uses the saved NormalAttackVoiceIndex, mode 2 uses CursedEnergyAttackVoiceIndex, and a low-HP check forces Mode 3 (array index 3 when Mode is used directly). None IDs and out-of-range indices resolve to no row. Exported rows use four entries such as CP_010, CP_010_TYPEA, CP_010_TYPEB, CP_010_PINCH.",
-      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:22", "Source/Abrams/Private/GameCharacterActionController.cpp:2903", "Source/Abrams/Private/GameCharacter.cpp:3449", "Source/Abrams/Private/GameCharacter.cpp:3452", "Source/Abrams/Private/GameCharacter.cpp:3462", "Source/Abrams/Private/GameCharacterActionController.cpp:3152"],
+      "simple": "Candidate CharacterVoiceGroupSet IDs selected by battle-voice mode (normal, alternates and low HP).",
+      "technical": "TArray<FName>; all 56 exported rows have four entries (three rows are all None), commonly default/TypeA/TypeB/PINCH. ActionController slot 90 normally returns this array by value from the cached SoundRow. AGameCharacter::FindCharacterVoiceGroupSetRow(Mode) uses Mode 0 and 3 directly as indices, but Mode 1 substitutes NormalAttackVoiceIndex and Mode 2 CursedEnergyAttackVoiceIndex; those setup values come from UserCustomizeVoiceInfo and default to 0. Out-of-range or None entries resolve to no row, and the first matching CharacterVoiceGroupSetDataTables row wins. In PlayVoice, kinds 1/3/4 choose Mode 1, kind 2 takes the attack action's mode, kinds 5/10 choose Mode 2, others use Mode 0; when the applicable HP check passes (max HP <= 0 or HP/max <= 0.3) Mode becomes 3. Kind 1 disables that check, kind 4 checks only Index 2, and kind 5 checks only Indexes 2, 5 and 6. CP_051 is an alias: while its passive is active, its controller overrides slot 90 with hardcoded CP_051_2 / CP_051_TYPEA_2 / CP_051_TYPEB_2 / CP_051_PINCH_2 instead of this field.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:22",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:2901",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3132",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3160",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3168",
+        "Source/Abrams/Private/GameCharacter.cpp:916",
+        "Source/Abrams/Private/GameCharacter.cpp:3449",
+        "Source/Abrams/Private/CP_051_ActionController.cpp:49",
+        "Source/Abrams/Private/CP_051_ActionController.cpp:853"
+      ],
       "status": "verified"
     },
     "Id_VoiceGroup": {
       "simple": "VoiceGroup IDs for system/menu/result lines, indexed by request kind.",
-      "technical": "TArray<FName>. UGameSoundVoicePlayer::PlayCharacterVoice takes a GroupKind, computes GameAnimNotify_TypeIndex(GroupKind) = GroupKind - 1, reads Id_VoiceGroup[that index] without a bounds check, then resolves a VoiceGroup row and picks a random non-None entry from its Id_Voice. Callers use values such as 1 (character select), 3 (result/menu), 4-5 (lobby), 13-15 (rank/result) and 17 (rematch). None IDs stop the lookup because bCheckNone=true.",
-      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:25", "Source/Abrams/Private/GameSoundVoicePlayer.cpp:101", "Source/Abrams/Private/GameSoundVoicePlayer.cpp:103", "Source/Abrams/Public/GameSoundVoicePlayer.h:29", "Source/Abrams/Private/GameMenuSequence.cpp:1112", "Source/Abrams/Private/GamePhase_BattleVisualLobby.cpp:392", "Source/Abrams/Private/GameResultWidget.cpp:1506"],
+      "technical": "TArray<FName>; every exported row has exactly 20 entries, matching EGameCharacterSoundVoiceGroupType values 1-20 positionally. UGameSoundVoicePlayer::PlayCharacterVoice resolves the supplied CharacterVariation ID, finds this row through that variation's Id_CharacterSound, computes GroupKind - 1 with GameAnimNotify_TypeIndex, and reads Sound->Id_VoiceGroup[GroupIndex] without a bounds check: GroupKind 0 gives -1 and values above 20 read past the end. A None ID stops the VoiceGroup lookup (bCheckNone=true). A VoiceGroup's Id_Voice entries are weighted 1.0 when non-None and 0.0 when None; the weighted lottery therefore picks uniformly among its non-None voices and returns nothing if all are None. All exported VoiceGroups referenced here have one non-None voice plus four None entries, and 21 sound rows have all 20 IDs set to None. The enum order is select/reselect, ready, two lobby lines, S/A/B-or-lower rank, four win-streak tiers, result item, two rank changes and five rematch outcomes. Traced requests use 1, 3, 4, 5, 6-15 and 16-20 via character select/menu, lobby, result widgets and the rematch-outcome mapping.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:25",
+        "Source/AbramsDataTable/Public/EGameCharacterSoundVoiceGroupType.h:6",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:28",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:79",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:101",
+        "Source/Abrams/Public/GameSoundVoicePlayer.h:30",
+        "Source/Abrams/Private/GameMenuSequence.cpp:1112",
+        "Source/Abrams/Private/GameResultRankWidget.cpp:44",
+        "Source/Abrams/Private/GameResultWidget.cpp:1506",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2628"
+      ],
       "status": "verified"
     }
   },
   "notes": [
-    "Loaded as a 'DataTable' primary asset named CharacterSoundDataTable into DTM.CharacterSoundDataTables (+0x510). Character setup resolves the row from the selected variation and caches it at AGameCharacter+0x3D0; a failed resolution fails the whole row setup.",
-    "This row is a hub, not a leaf: Id_CharacterVoiceGroupSet joins to CharacterVoiceGroupSetDataTable, Id_VoiceGroup joins to VoiceGroupDataTable, FootstepType joins indirectly through MapGround.Id_SoundEffect_Footstep to SoundEffectDataTable, and CueSheetName names loadable CRI sheets.",
-    "The exported 56 rows are the available content only; no completeness claim is made for retail or Blueprint references.",
-    "Source files are reconstructions of the retail binary (retail RVAs are recorded inline); no editor or network processing was used for this documentation."
+    "Loaded as a 'DataTable' primary asset named CharacterSoundDataTable into DTM.CharacterSoundDataTables (+0x510). Character setup resolves the row from the selected variation plus a possible SoundIdOverride and caches it at AGameCharacter+0x3D0; a failed resolution fails that setup. Shikigami resolution is non-fatal and may leave a null cached row.",
+    "This row is a hub, not a leaf: Id_CharacterVoiceGroupSet joins to CharacterVoiceGroupSetDataTable, Id_VoiceGroup joins to VoiceGroupDataTable and then VoiceDataTable, FootstepType joins indirectly through MapGround.Id_SoundEffect_Footstep to SoundEffectDataTable, and CueSheetName names loadable CRI sheets.",
+    "The base-variation cue-sheet preload path does not use SoundIdOverride, while live character setup and action voices do. CP_051 can additionally replace the voice-set ID array while its passive is active.",
+    "The export contains one CharacterSoundDataTable with 56 rows and no duplicate keys; 53 of its IDs are referenced by CharacterVariation rows (three rows are not directly referenced there). All non-None joins to CharacterVariation, CharacterVoiceGroupSet and VoiceGroup resolve in the supplied exports. These are available-content observations, not a completeness claim for retail or Blueprint references.",
+    "Runtime descriptions are based on reconstructed C++ with inline retail RVAs. The project guide attributes gameplay logic to C++. Blueprint asset wiring remains unverified."
   ],
   "usages": [
-    {"source": "Source/Abrams/Private/GameDataTableManager.cpp:211", "detail": "Resolves CharacterSoundDataTable into DTM.CharacterSoundDataTables."},
-    {"source": "Source/Abrams/Private/GameShikigami.cpp:816", "detail": "Shared typed row finder over CharacterSound tables."},
-    {"source": "Source/Abrams/Private/GameCharacter.cpp:513", "detail": "Resolves and caches the character's sound row during setup."},
-    {"source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:332", "detail": "Collects CueSheetName entries for battle preloading."},
-    {"source": "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:418", "detail": "Collects and loads cue sheets for the situation-overview characters."},
-    {"source": "Source/Abrams/Private/GameCharacter.cpp:2897", "detail": "Exposes FootstepType to animation notifies and sequencer helpers."},
-    {"source": "Source/Abrams/Private/GameCharacterActionController.cpp:2903", "detail": "Exposes Id_CharacterVoiceGroupSet to the action voice system."},
-    {"source": "Source/Abrams/Private/GameSoundVoicePlayer.cpp:96", "detail": "Resolves Id_VoiceGroup and queues a random voice from it."},
-    {"source": "Source/AbramsSequencer/Private/AbramsSequencerActorReferenceModule.cpp:356", "detail": "Looks up footstep type by NPC model name."}
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:211",
+      "detail": "Resolves the loaded CharacterSoundDataTable into DTM.CharacterSoundDataTables."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:513",
+      "detail": "Resolves and caches the character's sound row during setup; a miss fails setup."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:234",
+      "detail": "Copies MissionCharacter.Id_CharacterSound into the character setup's SoundIdOverride."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:816",
+      "detail": "Shared typed first-match finder over CharacterSound tables."
+    },
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:332",
+      "detail": "Collects every CueSheetName entry for battle preloading."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:418",
+      "detail": "Finds ally sound rows and filters None cue sheets for load, unload and readiness checks."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:2897",
+      "detail": "Exposes FootstepType through the actor interface."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimNotify_Footstep.cpp:53",
+      "detail": "Converts the footstep type to a bounds-checked index into MapGround footstep sounds."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:2903",
+      "detail": "Returns Id_CharacterVoiceGroupSet from the cached sound row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:3449",
+      "detail": "Selects and resolves a CharacterVoiceGroupSet row by mode and index."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_051_ActionController.cpp:853",
+      "detail": "Overrides slot 90 with hardcoded passive-specific voice-set IDs."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSoundVoicePlayer.cpp:96",
+      "detail": "Resolves Id_VoiceGroup and queues a voice from the selected VoiceGroup."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerActorReferenceModule.cpp:356",
+      "detail": "Looks up footstep type by sequencer NPC model name."
+    }
   ]
 }

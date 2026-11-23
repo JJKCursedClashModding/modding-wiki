@@ -142,7 +142,7 @@
     },
     "Chase_CursedEnergyGaugeRecoverRate_End": {
       "simple": "Cursed-energy recovery rate at the end of a chase.",
-      "technical": "float, constructor default 0.0f; exported DEFAULT value 1.2. UGameCharacterStatusController::GetCursedEnergyRecoverRate interpolates Start -> End with Alpha when ChaseElapsedTime >= Chase_Time (or in the escape branch with Escape_Time). The reconstructed branch computes Alpha as 1.0f when Chase_Time_Max > 0, otherwise elapsed / Chase_Time_Max.",
+      "technical": "float, constructor default 0.0f; exported DEFAULT value 1.2. UGameCharacterStatusController::GetCursedEnergyRecoverRate interpolates Start -> End with Alpha when ChaseElapsedTime >= Chase_Time; if that branch did not run, the escape branch uses Escape_Time and the same formula with the escape Start/End rates. The reconstructed code forms Alpha from the corresponding max time: 1.0f when it is > 0, otherwise elapsed / max. With the shipped positive maxima, the branch's End rate is selected once its threshold is met.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:861"
       ],
@@ -169,8 +169,9 @@
     },
     "Chase_Forward_Angle": {
       "simple": "Forward cone half-angle used to detect chasing.",
-      "technical": "float, constructor default 0.0f; exported DEFAULT value 45.0 degrees. FGameCharacterAction::IsChaseDirection (slot 77) returns angle(facing, camera forward) <= this value; FGameCharacterAction_DashBase::GetChaseEscapeRate also uses it as the denominator when interpolating the chase dash-gauge cost.",
+      "technical": "float, constructor default 0.0f; exported DEFAULT value 45.0 degrees. After the valid-target/CanChaseOrEscape and optional stick-deadzone gates, FGameCharacterAction::IsChaseDirection (slot 77) returns angle(facing, camera forward) <= this value; FGameCharacterAction_DashBase::GetChaseEscapeRate also uses it as the denominator when interpolating the chase dash-gauge cost.",
       "evidence": [
+        "Source/Abrams/Private/GameCharacterAction.cpp:805",
         "Source/Abrams/Private/GameCharacterAction.cpp:820",
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:134",
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:136",
@@ -316,8 +317,9 @@
     },
     "Escape_Back_Angle": {
       "simple": "Rear cone half-angle used to detect escaping.",
-      "technical": "float, constructor default 0.0f; exported DEFAULT value 45.0 degrees. FGameCharacterAction::IsEscapeDirection returns 180 - angle(facing, camera forward) <= this value. Dash gauge interpolation uses BackAngle / Escape_Back_Angle * (1-EscapeRate) + EscapeRate when in the rear cone; otherwise the multiplier stays 1.",
+      "technical": "float, constructor default 0.0f; exported DEFAULT value 45.0 degrees. After the same valid-target/CanChaseOrEscape and optional stick-deadzone gates, FGameCharacterAction::IsEscapeDirection returns 180 - angle(facing, camera forward) <= this value. Dash gauge interpolation uses BackAngle / Escape_Back_Angle * (1-EscapeRate) + EscapeRate when in the rear cone; without a valid target GetChaseEscapeRate returns 1.",
       "evidence": [
+        "Source/Abrams/Private/GameCharacterAction.cpp:829",
         "Source/Abrams/Private/GameCharacterAction.cpp:844",
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:141",
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:143",
@@ -370,11 +372,13 @@
     },
     "FixedPhrase_CoolTime": {
       "simple": "Fixed-phrase cooldown (no traced consumer).",
-      "technical": "float, constructor default 0.0f; exported DEFAULT value 1.2 seconds. No reconstructed C++ site reads this member by name or by the identified row offset. The nearby VisualLobby_FixedPhrase_DisplayTime does arm UGameCommonChatListWidget::ChatCooldownTimer_568 after sending a text or stamp, while the header notes that another writer for that timer is not transcribed; a link to this field is plausible but unsupported here.",
+      "technical": "float, constructor default 0.0f; exported DEFAULT value 1.2 seconds. No reconstructed C++ site reads this member by name, and no cited source attributes a global-row offset read to it. The two transcribed writers of UGameCommonChatListWidget::ChatCooldownTimer_568 (fixed-phrase and stamp sends) both assign VisualLobby_FixedPhrase_DisplayTime; the header's NEED-PROBE comment saying that writer is not transcribed is stale. Any connection between this field and that cooldown remains unproven.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Global.h:220",
         "Source/AbramsDataTable/Private/GameDataTableRow_Global.cpp:71",
-        "Source/Abrams/Public/GameCommonChatListWidget.h:28"
+        "Source/Abrams/Public/GameCommonChatListWidget.h:28",
+        "Source/Abrams/Private/GameCommonChatListWidget.cpp:154",
+        "Source/Abrams/Private/GameCommonChatListWidget.cpp:169"
       ],
       "status": "unresolved"
     },
@@ -521,10 +525,12 @@
       "status": "verified"
     },
     "LargeCharacterDamageGravity": {
-      "simple": "Launch gravity for defeated large characters.",
-      "technical": "float, constructor default 0.0f; exported DEFAULT value 60.0. In ApplyDamageReactionSpeed, receiver action slot 146 overrides Request.DamageGravity with this value regardless of the damage row's own gravity.",
+      "simple": "Launch gravity override for large-character damage reactions.",
+      "technical": "float, constructor default 0.0f; exported DEFAULT value 60.0. In ApplyDamageReactionSpeed, a receiver with action slot 146 == 1 has Request.DamageGravity overwritten with this value regardless of the damage row's own gravity; defeated status only gates the separate hit-direction pitch correction.",
       "evidence": [
-        "Source/Abrams/Private/GameBattleDamage.cpp:92"
+        "Source/Abrams/Private/GameBattleDamage.cpp:88",
+        "Source/Abrams/Private/GameBattleDamage.cpp:92",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Global.h:69"
       ],
       "status": "verified"
     },
@@ -580,7 +586,7 @@
     },
     "LinkCombo_CursedEnergyExp_Add": {
       "simple": "Cursed-energy gauge gain per link-combo level step.",
-      "technical": "float, constructor default 0.0f; exported DEFAULT value 15.0. AddLinkComboCursedEnergy computes trunc(this * 0.01f * (Threshold(Level+1) - Threshold(Level))) with the level clamped to 0..3, then multiplies by the LinkComboCursedEnergyExpIncreaseItem buff rate and the character row's LinkComboCursedEnergyExpRate, adds equipment and binding-vow link-combo effects, and applies the result to the gauge.",
+      "technical": "float, constructor default 0.0f; exported DEFAULT value 15.0. AddLinkComboCursedEnergy computes trunc(this * 0.01f * (Threshold(Level+1) - Threshold(Level))) with the level upper-clamped to 3 (FMath::Min), then multiplies by the LinkComboCursedEnergyExpIncreaseItem buff rate and the character row's LinkComboCursedEnergyExpRate, adds equipment and binding-vow link-combo effects, and applies the result to the gauge.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:4278",
         "Source/Abrams/Public/GameCharacterStatusController.h:337"
@@ -704,7 +710,7 @@
     },
     "TimeLimit": {
       "simple": "Default battle time limits in seconds, ordered from primary to alternate choice.",
-      "technical": "TArray<float>; constructor leaves it empty; exported DEFAULT values [300.0, 180.0]. Index 0 is the fallback for base, free, mission-battle, lobby-rule and main-menu host settings when an explicit request time is <= 0; the VsEnemy interval widget also uses index 0 when its local TimeLimit is zero and the array is non-empty. Index 1 is used only when Num() >= 2 as a second Visual Lobby match-rule option. The free-battle rule list adds every entry, then an infinite option. Most battle-phase getters index [0] without a length check.",
+      "technical": "TArray<float>; constructor leaves it empty; exported DEFAULT values [300.0, 180.0] seconds. Base, free and mission-battle getters use index 0 only when their explicit request or wave time is <= 0; the main-menu Visual Lobby host path instead writes index 0 unconditionally. The Visual Lobby rule widget always offers index 0 as its default option and offers index 1 only when Num() >= 2, then adds an infinite option; the free-battle rule list adds every array entry, then an infinite option. The VsEnemy interval widget substitutes index 0 only when its local TimeLimit is zero and Num() > 0. Most battle-phase getters and the main-menu assignment index [0] without a length check.",
       "evidence": [
         "Source/Abrams/Private/GamePhase_BattleBase.cpp:668",
         "Source/Abrams/Private/GamePhase_BattleFree.cpp:266",
@@ -786,6 +792,7 @@
   },
   "notes": [
     "The retail export contains one row named DEFAULT; its ImportKeyField is Id. AGameDataTableManager::StartInitialLoading requests GlobalDataTable by that asset name, Tick resolves it into GlobalDataTables (+0x2E0), and AGameBattleManager::FirstGlobalRow returns the first row of the first non-empty table. No traced consumer selects a row by the Id member.",
+    "FirstGlobalRow returns nullptr when no loaded table yields a row; the reconstructed consumers shown here dereference the result without a null check, so no missing-row fallback is established.",
     "The file does not assert retail source-level names for reconstructed members; comments in the source preserve retail RVAs and byte offsets (for example FirstGlobalRow 0x10174f0, row +0x2C JumpFall_Speed_Max and +0x15C ShopLotteryPrice). These are static evidence from locally reconstructed code.",
     "Constructor defaults in GameDataTableRow_Global.cpp are mostly 0.0f/0; the DEFAULT export supplies the shipped tuning values quoted in this page. Values are seconds for timers, degrees for angles, and speed magnitudes for fall caps unless stated otherwise.",
     "Reconstructed C++ and the supplied export are the only evidence used here. Partial Content, Blueprint and uncooked consumers cannot be ruled out."
@@ -858,6 +865,14 @@
     {
       "source": "Source/Abrams/Private/GameWarpLocation.cpp:394",
       "detail": "Wall-bound speed and slow rates size the push-out when a target capsule is wider than the trace distance."
+    },
+    {
+      "source": "Source/Abrams/Private/GameChatListWidget.cpp:137",
+      "detail": "Battle-result chat sends restart ChatTimeout from BattleResult_Chat_CoolTime."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Dash.cpp:102",
+      "detail": "Chase/escape rates and angle thresholds scale dash-gauge consumption; GetChaseEscapeRate returns 1 without a valid target."
     }
   ]
 }

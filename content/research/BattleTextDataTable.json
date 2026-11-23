@@ -1,17 +1,23 @@
 {
-  "description": "Localized in-battle UI strings: HUD and marker labels, button guides, result/evaluation labels, overlay text and mission-task progress text, stored as generic GameText rows.",
+  "description": "Localized battle and battle-related UI text (HUD/marker labels, button guides, finish/overlay banners, result/evaluation and ranking labels, mission task/order text, item-buff and binding-vow effect descriptions), stored as FGameDataTableRow_GameText rows in one language-specific DataTable per shipped language.",
   "fields": {
     "ID": {
-      "simple": "Battle UI text id (row key), e.g. BTL_HUD_LABEL_0001.",
-      "technical": "FName ID in FGameDataTableRow_GameText, stored next to the row name and used as the lookup key in the ordered 14-table GameText array. The localized asset is BattleTextDataTable_<EApplicationLanguage name>, loaded via primary asset id DataTable. Consumers set these ids on IGameWidgetTextSettingInterface text blocks or pass them to GetText; maps such as GBattleResultLabel11Map map ranks/results/characters to literal BTL_RESULT_LABEL_* ids. No prefix-based dispatch exists: any non-SYS_ id is searched from slot 1 (Glossary) onward, with BattleText at slot 2.",
+      "simple": "Battle text id (row key), e.g. BTL_HUD_LABEL_0001.",
+      "technical": "FName ID declared in FGameDataTableRow_GameText and serialized next to the UDataTable row name; in all 11 exported shards ID equals the row key (728 rows each). Runtime lookup does NOT read this field: GetText/HasText call FindTextRow, which walks the loaded GameText tables and calls UDataTable::FindRow<RowType>(TextId, ...), i.e. it matches the row-name key. Row->ID is used when the glossary parameter cache is built and by FindTextIdsContaining. Language loading creates primary assets of type DataTable named <Base>_<EApplicationLanguage name>; for this family that is BattleTextDataTable_<Language>. Tick installs the non-null translated tables in fixed order (Glossary first, BattleText second, 14 total), so BattleText is zero-based index 1 only when all earlier loads succeed; null tables are skipped and indices shift. A case-insensitive SYS_ prefix routes ids to SystemTextDataTables; every other id, including all BTL_ ids, is searched from the start of the GameText array and the first row found wins. Widget setters on IGameWidgetTextSettingInterface build FGameTextRequest and resolve it through GetText; literal ids also come from aliases such as GBattleResultLabel11Map (bonus type 1..34, character-specific type 11 with fallback), GBattleResultLabel03Map (result key), GGameRankingRecordLabels (ranking enum -> BTL_RANKING_LABEL_*) and data-table FName fields such as Id_BattleText/Id_BattleText_OrderDetail. Request.Language selects the column for SYS_ rows; ordinary BTL_ rows come from the currently loaded language tables.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:11",
         "Source/Abrams/Private/GameTextManager.cpp:52",
         "Source/Abrams/Private/GameTextManager.cpp:551",
+        "Source/Abrams/Private/GameTextManager.cpp:573",
         "Source/Abrams/Private/GameTextManager.cpp:597",
-        "Source/Abrams/Public/AbramsGameTables.h:146",
+        "Source/Abrams/Private/GameTextManager.cpp:607",
+        "Source/Abrams/Private/GameTextManager.cpp:624",
+        "Source/Abrams/Private/GameTextManager.cpp:651",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:72",
+        "Source/Abrams/Public/AbramsGameTables.h:143",
+        "Source/Abrams/Private/GameResultScoreListItemWidget.cpp:16",
+        "Source/Abrams/Private/GameRankingWidgetBase.cpp:50",
         "Source/Abrams/Private/GameBattleCharacterStatusWidget.cpp:307",
-        "Source/Abrams/Private/GameResultScoreListItemWidget.cpp:25",
         "Source/Abrams/Private/GameBattleTimeLimitWidget.cpp:31",
         "Source/Abrams/Private/GameBattleCursedEnergyLevelWidget.cpp:40"
       ],
@@ -19,53 +25,82 @@
     },
     "Text": {
       "simple": "The localized label/format string shown in the battle UI.",
-      "technical": "FString row text (+0x10), copied out of the table by GetGameText and passed through AGameTextManager::FormatText. This group uses markup heavily in the export: <DYN=HIT_POINT>/<DYN=HIT_POINT_MAX>, <DYN=VALUE>/<DYN=MAX_VALUE> and <GLO=...> placeholders are replaced from the request parameter map and from the glossary map built from GlossaryTextDataTable_<Language>; [ABS], [RATE_TO_PCT], [FULL_WIDTH], [HALF_WIDTH], [DECIMAL_PLACE_n] are recognized modifier tokens. Missing rows or empty strings yield empty text. Text blocks with bForceOneLine collapse newlines (no separator for Ja/Zh_Hant/Zh_Hans, otherwise a space). Three En rows in the companion export are empty, and HasGameTextContent checks for that case.",
+      "technical": "FString Text (row +0x10 in the reconstructed retail layout), copied by value out of the found row by GetGameText and passed through AGameTextManager::FormatText. A missing row or an empty Text yields an empty string; HasGameTextContent checks the non-empty case. Across all 11 exported shards the markup uses only GLO and DYN tags, with ABS, RATE_TO_PCT and FULL_WIDTH modifiers; HALF_WIDTH and DECIMAL_PLACE_1..4 are recognized by FormatText but are not observed in this table's exports. GLO keys resolve from the glossary parameter cache built from GlossaryTextDataTable_<Language> row ID/Text; DYN keys resolve from the caller's FGameTextParameterMap (for example HIT_POINT/HIT_POINT_MAX, MINUTES/SECONDS with SECONDS padded to two digits, 1-based PLAYER_INDEX, and VALUE/MAX_VALUE). RATE_TO_PCT converts a 0..1 float rate to a floored percentage; FULL_WIDTH converts digits for Ja/Ko/Zh_Hant/Zh_Hans and half-width otherwise. An unresolved tag is left in the string because replacement only happens when the parameter is found. Text blocks with bForceOneLine collapse newlines to nothing for Ja/Zh_Hant/Zh_Hans and to a space otherwise. The same three binding-vow message IDs are empty in the De/En/Es/Es_LA/Fr/It/Ja/Pt exports and populated in Ko/Zh_Hans/Zh_Hant.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:15",
         "Source/Abrams/Private/GameTextManager.cpp:667",
+        "Source/Abrams/Private/GameTextManager.cpp:675",
         "Source/Abrams/Private/GameTextManager.cpp:681",
         "Source/Abrams/Private/GameTextManager.cpp:683",
         "Source/Abrams/Private/GameTextManager.cpp:742",
         "Source/Abrams/Private/GameTextManager.cpp:753",
         "Source/Abrams/Private/GameTextManager.cpp:756",
+        "Source/Abrams/Private/GameTextManager.cpp:786",
         "Source/Abrams/Private/GameTextManager.cpp:794",
         "Source/Abrams/Private/GameTextManager.cpp:241",
-        "Source/Abrams/Private/GameTextManager.cpp:675",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:206",
+        "Source/Abrams/Private/GameBattleTimeLimitWidget.cpp:100",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:271",
         "Source/Abrams/Private/GameBattlePracticeTaskListWidget.cpp:93"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "FGameDataTableRow_GameText is used for all 11 exported language variants; their row sets are identical (728 ids each in the companion export). Loaded as slot 2 of the GameText table array; Config/DefaultGame.ini:35-45 puts each TextDataTable_<Lang> variant in its own always-cooked chunk.",
-    "Observed consumer families: BTL_HUD_LABEL_* for HP/time/cursed-energy/combo/adapt icons; BTL_MARKER_LABEL_0001 for player-index markers; BTL_OVERLAY_LABEL_* for win/lose overlays; BTL_MISSION_TASK_LABEL_0001 with DYN=VALUE/MAX_VALUE parameters; BTL_RESULT_LABEL_* literal maps for result screens. GameBattleCursedEnergyLevelWidget formats ids dynamically as BTL_HUD_LABEL_01%02d from the energy level.",
-    "Glossary values can be nested in battle text via <GLO=...>; the glossary map is rebuilt from GlossaryTextDataTable_<Language> in the same Tick before OnCultureTextLoaded broadcasts (GameTextManager.cpp:571-577). DYN values come from the caller's FGameTextParameterMap, not from the table.",
-    "Reconstruction caveat: byte-matched GetGameText/FormatText vs behaviour-certified FindTextRow/Tick (status/functions.json 0x14af290, 0x14af510, 0x14c4870, 0x14c96f0; BG03 record). Content is partial; additional Blueprint-only uses cannot be ruled out or claimed."
+    "All 11 exported shards (De, En, Es, Es_LA, Fr, It, Ja, Ko, Pt, Zh_Hans, Zh_Hant) use FGameDataTableRow_GameText and share the same 728 row keys; every row's ID matches its key. In the fixed 14-table loader list BattleTextDataTable_<Language> is the second entry after GlossaryTextDataTable_<Language> (zero-based index 1 only when all earlier loads succeed; AddTextDataTables skips null tables). Config/DefaultGame.ini:35-45 assigns language chunks by the substring TextDataTable_<Lang> under /Game/DataTables (En=1, Ja=2, Fr=3, Es=4, De=5, It=6, Ko=7, Zh_Hant=8, Zh_Hans=9, Pt=10, Es_LA=11, all AlwaysCook); this broad filter covers every TextDataTable family, not only this one. EApplicationLanguage also names Ar/Ind/Pl/Ru/Th, for which no table exports are present.",
+    "Exported families and traced relationships: HUD labels (44 rows, HP/time/cursed-energy/combo/adapt), marker label (1, 1-based player index), overlay labels (19, time-over/special/mission-kind finish precedence), mission-task (25) and mission-order (14) text referenced by MissionTask.Id_BattleText_TaskDetail / MissionOrder.Id_BattleText_OrderName and Id_BattleText_OrderDetail, result/evaluation labels (81) referenced by result maps and replay team info, ranking labels (51) referenced by GGameRankingRecordLabels, item-buff descriptions (223) referenced by EquipmentItemEffect.Id_BattleText plus the literal BTL_ITEM_BUFF_MESSAGE_1000 request, binding-vow effect descriptions (269) referenced by BindingVowsEffect.Id_BattleText, and BTL_POST_EFFECT_LABEL_0001 (1). BTL_HUD_LABEL_01%02d is generated only for cursed-energy levels 1..3 (0101..0103); other levels clear the text block. Every literal BTL_ id found in the reconstructed C++ exists in the En export, and no BTL_ id appears in the other 13 exported GameText families.",
+    "<GLO=...> resolves through AGameTextManager::GlossaryParameters, populated from GlossaryTextDataTable_<Language>.Text keyed by Row->ID in Tick before OnCultureTextLoaded broadcasts; it is a parameter cache, not a lookup back into the table. The reconstructed Tick empties a local copy of the map rather than the member, so stale keys may survive a language switch; that is an observed implementation detail. DYN values come from callers; FormatText additionally injects GLS_GAME_WORDS_3000/3004 for FRIEND_WORD/FREND_LIST_WORD in Zh_Hant/Zh_Hans. Widget text blocks cache TextId and TextParameters and re-resolve through GetText on localization; raw-text or invalid requests bypass/clear the id rather than reading this table.",
+    "Precedence: FindTextRow returns the first matching row while walking the ordered GameText tables, so adding a colliding id to GlossaryTextDataTable_<Language> or another earlier table would shadow BattleTextDataTable_<Language>. No duplicate BTL_ keys were found across the exported 14-table set. SYS_ ids are a separate SystemTextDataTables path and never use this table.",
+    "Reconstruction caveat: status/functions.json records GetText (0x14afde0), GetGameText (0x14af510), GetGameTextById (0x14af690) and FormatText (0x14c4870) as matched; GameText FindTextRow (0x14af290, NA15) and AGameTextManager::Tick (0x14c96f0, BG03) are behaviour-certified rather than byte-identical. Member/helper names are reconstructed. All behavior above is traced in C++ and checked against the exports; no retail Blueprint execution evidence was used, and retail asset references outside the partial content set were not enumerated."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameBattleCharacterStatusWidget.cpp:307",
-      "detail": "Sets the HP text block to BTL_HUD_LABEL_0001 with HIT_POINT/HIT_POINT_MAX parameters."
+      "detail": "Sets HPText to BTL_HUD_LABEL_0001 with integer HIT_POINT and HIT_POINT_MAX: non-positive HP becomes 0, otherwise the value is clamped to the maximum and floored. The same widget uses BTL_MARKER_LABEL_0001 with PLAYER_INDEX = PlayerIndex + 1."
     },
     {
       "source": "Source/Abrams/Private/GameBattleTimeLimitWidget.cpp:31",
-      "detail": "Uses BTL_HUD_LABEL_0301 for the remaining-time label and BTL_HUD_LABEL_0302 when time expires."
+      "detail": "Uses BTL_HUD_LABEL_0301 for the remaining-time template <DYN=MINUTES>:<DYN=SECONDS>; MINUTES is Seconds/60 and SECONDS is Seconds%60 padded to two digits. BTL_HUD_LABEL_0302 is the infinite-time label used on reset, not a time-expiry label (line 54)."
     },
     {
       "source": "Source/Abrams/Private/GameBattleButtonGuideRootWidget.cpp:73",
-      "detail": "Selects BTL_HUD_LABEL_061x/062x/063x guide ids by gauge/button state."
+      "detail": "Assigns paired input-guide/attack-type ids for combo (0610/0611), extraction (0660/0661), tag combo (0620/0621) and cursed-energy technique (0630/0631 or 0632, and 0640/0641 when enabled); gauge type and physical-energy flags select the alternatives."
     },
     {
       "source": "Source/Abrams/Private/GameBattleOverlayWidget.cpp:94",
-      "detail": "Picks BTL_OVERLAY_LABEL_* ids for win/lose/result overlays and level-sequence overlays."
+      "detail": "PlayFinish picks BTL_OVERLAY_LABEL_0005 for a time-over draw, 0007/0006 for the no-next-wave special case, then win/lose pairs 0003/0004, 0008/0009, 0011/0013, 0012/0013, 0014/0013, 0015/0013 and 0017/0013 by FinishKind 0..6."
     },
     {
-      "source": "Source/Abrams/Public/AbramsGameTables.h:146",
-      "detail": "GBattleResultLabel11Map maps result rank indices 1..34 to BTL_RESULT_LABEL_11xx ids; used by GameResultScoreListItemWidget.cpp:25-36."
+      "source": "Source/Abrams/Public/AbramsGameTables.h:143",
+      "detail": "GBattleResultLabel11Map maps score bonus Type 1..34 to literal BTL_RESULT_LABEL_11xx ids; Type 11 first checks GCharacterBattleResultLabelMap by character id and falls back to key 11, while Type 0 and 0xFF return NAME_None. GBattleResultLabel03Map maps mission result keys 1..4 to BTL_RESULT_LABEL_0301..0304."
     },
     {
-      "source": "Source/Abrams/Private/GameBattlePracticeTaskListWidget.cpp:93",
-      "detail": "Builds VALUE/MAX_VALUE int parameters for the BTL_MISSION_TASK_LABEL_0001 formatting template."
+      "source": "Source/Abrams/Private/GameBattlePracticeTaskListWidget.cpp:96",
+      "detail": "Builds integer VALUE/MAX_VALUE parameters from tutorial progress and target (cast from float) and sets BTL_MISSION_TASK_LABEL_0001, whose export is <DYN=VALUE>/<DYN=MAX_VALUE>; GameBattleMissionTaskWidget.cpp:97 uses the same id."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleCursedEnergyLevelWidget.cpp:40",
+      "detail": "Formats BTL_HUD_LABEL_01%02d from the cursed-energy level, but only for levels 1..3; the exported rows are 0101/0102/0103 and all other levels clear the block."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetTextBlock.cpp:58",
+      "detail": "Indirect consumer: SetTextIdOnly/WithParameters build a request, call AGameTextManager::GetText, cache TextId and TextParameters, and StudioLocalization2 re-resolves the cached id and parameters on a language change. Rich-text blocks use the same interface (GameWidgetRichTextBlock.cpp:53)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameRankingWidgetBase.cpp:50",
+      "detail": "Maps EGameRankingRecord keys through GGameRankingRecordLabels to BTL_RANKING_LABEL_* ids; unknown keys fall back to SYS_RANKING_LABEL_0021."
+    },
+    {
+      "source": "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:164",
+      "detail": "Uses BindingVowsEffect.Id_BattleText with float VALUE/VALUE2 parameters from the debuff and buff effect rows to show the BTL_BINDING_VOWS_* descriptions."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:271",
+      "detail": "Uses EquipmentItemEffect.Id_BattleText with a float VALUE from the effect (or its BuffDebuff row) to build the BTL_ITEM_BUFF_MESSAGE_* request; Extras items use the literal BTL_ITEM_BUFF_MESSAGE_1000 request."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryCharacterSelectMissionInfoWidget.cpp:81",
+      "detail": "Uses BTL_MISSION_ORDER_MESSAGE_0003 with no order, 0001 for Event orders and MissionOrder.Id_BattleText_OrderDetail otherwise; battle mission widgets also use Id_BattleText_OrderName."
     }
   ]
 }

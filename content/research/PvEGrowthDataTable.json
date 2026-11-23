@@ -1,151 +1,260 @@
 {
-  "description": "Ordered PvE growth levels: experience gates plus stat, equipment-slot and heal-point unlocks.",
+  "description": "Ordered PvE progression rows that map cumulative per-character experience to maximum-HP and combat-rate multipliers, cumulative equipment-slot unlocks, and heal-point allowances.",
   "fields": {
     "Id": {
-      "simple": "Growth level row id.",
-      "technical": "FName import key/row name for FGameDataTableRow_PvEGrowth. Exported ids are the level numbers as strings, but consumers select rows by iterating PvEGrowthDataTables in order and comparing ExperienceThreshold, so the id is not read as data.",
+      "simple": "Growth-level row key (export keys 1 through 35).",
+      "technical": "FName; the native property is Id and the export serializes it as ID, with ImportKeyField Id. No traced C++ consumer reads the value: GamePvE_GetGrowthRow selects by ExperienceThreshold from the ordered rows returned by PvEGrowthDataTables.GetRows, and VsEnemy widgets derive a displayed level from row index + 1. The export keys happen to match those positions, but the key is not a lookup target in the traced paths.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:11",
-        "Source/Abrams/Public/GameDataTableManager.h:189",
+        "Source/Abrams/Public/GameDataTableArray.h:21",
+        "Source/Abrams/Private/GameDataTableManager.cpp:278",
+        "Source/Abrams/Private/GameDataTableManager.cpp:451",
         "Source/Abrams/Private/GamePvESettings.cpp:311"
       ],
       "status": "observed"
     },
     "ExperienceThreshold": {
-      "simple": "Experience needed to reach this growth level.",
-      "technical": "int32, default 0. GamePvE_GetGrowthRow walks rows in order and returns the last row whose ExperienceThreshold <= Experience, so the table must be sorted ascending. Player-card level helpers count rows whose threshold is <= the character's experience, and VsEnemy growth widgets use the difference between adjacent thresholds as NecessaryExperience and the threshold itself as a release check.",
+      "simple": "Cumulative per-character PvE experience required to reach this growth level.",
+      "technical": "int32, constructor default 0; exported values are 0..423150 and strictly increasing. GamePvE_GetGrowthRow walks the rows returned by DTM.PvEGrowthDataTables.GetRows, returns the last row with ExperienceThreshold <= Experience, and breaks at the first larger threshold, so the returned sequence must be ascending (nothing validates it). GamePvE_GetLevelFromExperience counts satisfied rows, giving 1 at the level-1 threshold of 0; most UI displays use that count directly, while aggregate level helpers subtract 1 per character. VsEnemy growth UI uses adjacent-row differences as incremental NecessaryExperience, marks Row->ExperienceThreshold <= Experience as released, and sums unsatisfied deltas against ExperiencePool. Extra missions force each GrowthInfoArray experience to at least Rows[24]->ExperienceThreshold through IntervalPvE_GetGrowthExperience(24); that is zero-based array index 24 (the 25th row, 82150 in this export), despite the parameter name Level.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:15",
+        "Source/Abrams/Public/GameDataTableArray.h:19",
         "Source/Abrams/Private/GamePvESettings.cpp:308",
         "Source/Abrams/Private/GamePvESettings.cpp:314",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:462",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:476",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:480",
-        "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:53"
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:248",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:251",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:981",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:991",
+        "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:53",
+        "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:83",
+        "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:89"
       ],
       "status": "verified"
     },
     "HitPointMaxRate": {
-      "simple": "Growth multiplier for maximum hit points.",
-      "technical": "float, row ctor default 0.0f. GamePvE_CalcHitPoint starts with this rate when a growth row exists, multiplies by the ally parameter (when supplied), then adds equipment/vow terms and floors the final HP at 1.0. It is not added to StatusSetup.Rates in the battle-entry code; HP is computed directly.",
+      "simple": "Growth factor for maximum hit points.",
+      "technical": "float, constructor default 0.0f; exported values 0.60..1.50. GamePvE_CalcHitPoint starts Rate at 1.0, replaces it with this field only when a growth row resolves (so no row leaves 1.0), multiplies by an optional ally-parameter HP rate and vow multiplicative effects, adds equipment and vow additive terms (ally equipment/vow use a maximum rule), and returns max(..., 1.0). Solo/Tag battle setup and interval/character-settings HP displays pass the resolved row directly into that helper, producing HitPointOverride and the displayed maximum; this field is not written into StatusSetup.Rates.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:18",
         "Source/Abrams/Private/GamePvESettings.cpp:333",
-        "Source/Abrams/Private/GamePvESettings.cpp:339",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:572"
+        "Source/Abrams/Private/GamePvESettings.cpp:340",
+        "Source/Abrams/Private/GamePvESettings.cpp:369",
+        "Source/Abrams/Private/GamePvESettings.cpp:391",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:573",
+        "Source/Abrams/Private/GamePhase_BattlePvETag.cpp:149",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:708",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:717",
+        "Source/Abrams/Private/GameVsEnemyCharacterSettingsWidget.cpp:113"
       ],
       "status": "verified"
     },
     "CursedEnergyExpAddRate": {
-      "simple": "Growth multiplier for cursed-energy experience gain.",
-      "technical": "float, row ctor default 0.0f. In PvE battle setup for player/partner slots, (rate - 1.0f) is added to StatusSetup.Rates.CursedEnergyExp on top of any ally-parameter contribution; Tag mode does the same. Growth UI widgets also compare adjacent rows to flag an increase.",
+      "simple": "Growth factor for cursed-energy experience gain.",
+      "technical": "float, constructor default 0.0f; exported values 0.8..1.45. For Solo player/partner slots and Tag members, battle setup adds (rate - 1.0f) to StatusSetup.Rates.CursedEnergyExp on top of any ally-parameter contribution, so exported values below 1 reduce the rate. The final status getter starts at 1.0, folds in Setup.Rates.CursedEnergyExp plus equipment/vow terms, and clamps at 0; the character getter multiplies that by team/stock/level and Scale60 factors before DamageRow->CursedEnergyExp_Add_Attacker. Growth UI flags a level change when adjacent rows differ.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:21",
         "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:563",
         "Source/Abrams/Private/GamePhase_BattlePvETag.cpp:139",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3069",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3073",
+        "Source/Abrams/Private/GameCharacter.cpp:2629",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2963",
         "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:55"
       ],
       "status": "verified"
     },
     "CursedEnergyRecoverRate": {
-      "simple": "Growth multiplier for cursed-energy recovery.",
-      "technical": "float, row ctor default 0.0f. Added as (rate - 1.0f) to StatusSetup.Rates.CursedEnergyRecover for player/partner entries; downstream recovery queries multiply the status/action rates.",
+      "simple": "Growth factor for cursed-energy recovery.",
+      "technical": "float, constructor default 0.0f; exported values 0.8..1.35. Battle setup adds (rate - 1.0f) to StatusSetup.Rates.CursedEnergyRecover alongside any ally-parameter contribution. The final status getter adds that setup rate to a 1.0 base (minus 1.0) plus equipment/vow effects and clamps at 0; the owner getter multiplies battle-team and action-controller rates, and the recovery tick multiplies by the energy row's Recover_Speed, a Solo-side factor and DeltaTime. Growth UI flags adjacent-row changes.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:24",
         "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:564",
         "Source/Abrams/Private/GamePhase_BattlePvETag.cpp:140",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:853"
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:905",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:912",
+        "Source/Abrams/Private/GameCharacter.cpp:3037",
+        "Source/Abrams/Private/GameCharacter.cpp:3040",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3453",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3454",
+        "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:56"
       ],
       "status": "verified"
     },
     "GuardDurabilityMaxRate": {
-      "simple": "Growth multiplier for maximum guard durability.",
-      "technical": "float, row ctor default 0.0f. Added as (rate - 1.0f) to StatusSetup.Rates.GuardDurabilityMax for player/partner entries; the resulting rate is combined with the battle-team value in AGameCharacter::GetGuardDurabilityMaxRate.",
+      "simple": "Growth factor for maximum guard durability.",
+      "technical": "float, constructor default 0.0f; exported values 0.8..1.35. Added as (rate - 1.0f) to StatusSetup.Rates.GuardDurabilityMax for Solo/Tag player entries. The status getter then adds equipment/vow effects and clamps at 0; the character getter multiplies it by the battle-team rate, and that result scales GuardDurabilityBase for current/maximum durability. Growth UI flags adjacent-row changes.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:27",
         "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:565",
         "Source/Abrams/Private/GamePhase_BattlePvETag.cpp:141",
-        "Source/Abrams/Private/GameCharacter.cpp:1471"
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1064",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1070",
+        "Source/Abrams/Private/GameCharacter.cpp:1471",
+        "Source/Abrams/Private/GameCharacter.cpp:1474",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1030",
+        "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:57"
       ],
       "status": "verified"
     },
     "DashGaugeMaxRate": {
-      "simple": "Growth multiplier for maximum dash gauge.",
-      "technical": "float, row ctor default 0.0f. Added as (rate - 1.0f) to StatusSetup.Rates.DashGaugeMax for player/partner entries; dash gauge is clamped to Owner->GetDashGaugeMaxRate() times the dash-gauge base.",
+      "simple": "Growth factor for maximum dash gauge.",
+      "technical": "float, constructor default 0.0f; exported values 0.7..1.4. Added as (rate - 1.0f) to StatusSetup.Rates.DashGaugeMax for Solo/Tag player entries. The status getter adds equipment/vow effects, the character getter multiplies the result by the battle-team rate, and SetDashGauge/GetDashGaugeMax use that owner rate times DashGaugeMaxValue as the cap. Growth UI flags adjacent-row changes.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:30",
         "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:566",
         "Source/Abrams/Private/GamePhase_BattlePvETag.cpp:142",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:3098"
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:822",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:826",
+        "Source/Abrams/Private/GameCharacter.cpp:1464",
+        "Source/Abrams/Private/GameCharacter.cpp:1467",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3098",
+        "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:58"
       ],
       "status": "verified"
     },
     "DamageRate": {
-      "simple": "Growth multiplier for sent attack damage.",
-      "technical": "float, row ctor default 0.0f. Added as (rate - 1.0f) to StatusSetup.Rates.SendAttackDamage for player/partner entries; the character damage accessor multiplies this rate with team/action/status factors.",
+      "simple": "Growth factor for sent attack damage.",
+      "technical": "float, constructor default 0.0f; exported values 0.7..1.55. Added as (rate - 1.0f) to StatusSetup.Rates.SendAttackDamage for Solo/Tag player entries. The status getter subtracts the 1.0 base, adds equipment/vow terms and floors the result at 0.01; the character damage accessor multiplies team, action, status and Scale48 factors. Growth UI flags adjacent-row changes.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:33",
         "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:567",
         "Source/Abrams/Private/GamePhase_BattlePvETag.cpp:143",
-        "Source/Abrams/Private/GameCharacter.cpp:3445"
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2518",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2544",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2546",
+        "Source/Abrams/Private/GameCharacter.cpp:3442",
+        "Source/Abrams/Private/GameCharacter.cpp:3445",
+        "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:59"
       ],
       "status": "verified"
     },
     "EquipmentSlotNumber": {
-      "simple": "Number of equipment slots unlocked at this growth level.",
-      "technical": "int32, default 0. The VsEnemy equipment-settings widget assigns the current row's value as SlotCount and uses the difference from the previous row to add newly unlocked slots; growth UI compares adjacent rows to flag the increase.",
+      "simple": "Cumulative number of equipment slots available at this growth level.",
+      "technical": "int32, constructor default 0; exported values 0..3. The VsEnemy equipment widget iterates rows in returned order and assigns SlotCount from the last row whose ExperienceThreshold is <= the current experience (0 if none); it pads CharacterEquipments with None names to that count. For later rows it adds row index + 1 as an unlock level once for each positive increase over the previous row. No battle-entry consumer of this field was found; growth list/dialog/level-up widgets compare adjacent rows to flag changes.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:36",
         "Source/Abrams/Private/GameVsEnemyEquipmentSettingsWidget.cpp:161",
+        "Source/Abrams/Private/GameVsEnemyEquipmentSettingsWidget.cpp:169",
         "Source/Abrams/Private/GameVsEnemyEquipmentSettingsWidget.cpp:171",
         "Source/Abrams/Private/GameVsEnemyEquipmentSettingsWidget.cpp:175",
-        "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:60"
+        "Source/Abrams/Private/GameVsEnemyEquipmentSettingsWidget.cpp:181",
+        "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:60",
+        "Source/Abrams/Private/GameVsEnemyGrowthDialogWidget.cpp:118",
+        "Source/Abrams/Private/GameVsEnemyGrowthLevelUpWidget.cpp:105"
       ],
       "status": "verified"
     },
     "HealPointNumber": {
-      "simple": "Number of heal points available at this growth level.",
-      "technical": "int32, default 0. Interval PvE initializes PvESettings.HealPointNumbers[CharacterIndex] from the growth row (or 0 when no row); those values are displayed as character info Value30, decremented when heals are used and augmented by battle results. Growth UI shows the delta between adjacent levels as COUNT in its change text.",
+      "simple": "Cumulative heal-point allowance at this growth level.",
+      "technical": "int32, constructor default 0; exported values 0..4. On interval start/re-entry only when PvE.PvEMissionIds is empty, IntervalPvE resolves the growth row for each GrowthInfoArray[i].Experience and writes this field (or 0 when no row) into PvESettings.HealPointNumbers[i], adding the element if needed; an in-progress interval is not reset. The value feeds interval character Info.Value30, is decremented by ConsumeHealPoints, and receives GamePvE_CalcResultHealPoint gains on wins (that helper returns 0 for extra missions). The growth list uses row - previous row for UpHealPointNumber/COUNT; dialog and level-up widgets use target - current.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:39",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:992",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:995",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:526",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:732",
-        "Source/Abrams/Private/GameVsEnemyGrowthDialogWidget.cpp:125"
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:988",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:991",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:992",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:995",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:306",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:836",
+        "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:61",
+        "Source/Abrams/Private/GameVsEnemyGrowthDialogWidget.cpp:125",
+        "Source/Abrams/Private/GameVsEnemyGrowthLevelUpWidget.cpp:112"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset has 35 rows with FGameDataTableRow_PvEGrowth; the manager loads PvEGrowthDataTable into PvEGrowthDataTables (DTM+0x940). No localization variants or numbered shards were supplied.",
-    "Row order is significant: GamePvE_GetGrowthRow returns the last row whose ExperienceThreshold is <= the supplied experience and assumes ascending thresholds.",
-    "Several UI widgets index GetRows<PvEGrowth>() by level-1 and compare adjacent rows; those are VsEnemy menu widgets, not battle logic, but they are substantive consumers of this table.",
-    "Selection/calculation helpers are reconstructed with retail RVAs in comments (for example 0x1305350 and 0x13054c0); status/functions.json should be consulted for byte status. Content is partial."
+    "One exported PvEGrowthDataTable asset has 35 rows (keys 1..35, no repeats), RowStruct GameDataTableRow_PvEGrowth and ImportKeyField Id; no localized or numbered shards exist in the export or catalog. The exact asset name is registered and resolved by AGameDataTableManager into PvEGrowthDataTables at DTM+0x940. FGameDataTableArray::GetRows returns rows in table order then row-name order; only one table is involved here.",
+    "The header constructor sets all nine non-Id fields to 0; Id has the implicit FName default NAME_None. Every export row explicitly serializes all fields. Shipped values are strictly increasing thresholds 0..423150 and nondecreasing rates/unlocks (HP 0.60..1.50, CE experience 0.8..1.45, CE recovery 0.8..1.35, guard 0.8..1.35, dash 0.7..1.4, damage 0.7..1.55, equipment 0..3, heal points 0..4); no negative/-1 sentinel or None key appears.",
+    "The returned row sequence is assumed ascending by GamePvE_GetGrowthRow (which breaks at the first threshold above Experience) and by UI level arithmetic; there is no validation. Displayed level is row index + 1 rather than Id, and GamePvE_GetLevelFromExperience is a count (1 at experience 0 in this export). Extra-mission code floors experience at Rows[24] (the 25th row, 82150 in this export), an index-based behavior whose designer intent is not evidenced.",
+    "The lookup chain uses saved per-character experience: UserInfo.PvE.PvECharacterExperiences (GM+0x890) is copied to FGameUserPvEGrowthInfo.Experience in PvESettings.GrowthInfoArray by menu/online selection, including online beacon copies; offline VsEnemy widgets keep a separate working CharacterExperiences map. Growth-row pointers are not cached by these paths: consumers call GetRows or GamePvE_GetGrowthRow against the manager array. Heal points are cached separately in PvESettings.HealPointNumbers.",
+    "Battle code reads only HitPointMaxRate directly (through CalcHitPoint) and the five rate fields; EquipmentSlotNumber and HealPointNumber have no battle-entry consumer in the reconstructed source. In battle-entry setup an ally PvE parameter contributes only to the Solo partner slot (Index == 1) for HP/rates; Tag passes none, while interval HP preview can separately supply one when bAlly is true. Equipment, vow, team and action factors are applied downstream and are not stored in this table.",
+    "Behavioral text is reconstructed C++ with retail RVAs in comments, not a blanket byte-match claim: status/functions.json currently marks GamePvE_GetGrowthRow (0x1305350) match and GamePvE_CalcHitPoint (0x13054c0) behavioural, while UI consumers have mixed statuses. No retail Blueprint graphs, uncooked assets, or live-runtime observations were available, so Blueprint-only consumers and designer intent are not asserted."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:278",
+      "detail": "Resolves the exact PvEGrowthDataTable loader into the PvEGrowthDataTables cache at DTM+0x940."
+    },
+    {
+      "source": "Source/Abrams/Public/GameDataTableArray.h:21",
+      "detail": "GetRows exposes every row pointer in table order then row-name order; this is the common lookup layer for the helpers and UI consumers."
+    },
+    {
       "source": "Source/Abrams/Private/GamePvESettings.cpp:308",
-      "detail": "GamePvE_GetGrowthRow maps accumulated experience to the last satisfied growth row."
+      "detail": "GamePvE_GetGrowthRow selects the last row whose cumulative ExperienceThreshold is satisfied; it does not use Id."
     },
     {
       "source": "Source/Abrams/Private/GamePvESettings.cpp:333",
-      "detail": "GamePvE_CalcHitPoint uses Growth->HitPointMaxRate in maximum-HP calculation."
+      "detail": "GamePvE_CalcHitPoint combines HitPointMaxRate with ally, equipment and vow terms and floors the result at 1.0."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:559",
-      "detail": "Applies growth rate fields to player/partner battle setup."
+      "detail": "Solo battle setup resolves a growth row per slot from GrowthInfoArray[Index].Experience and applies the five rate fields; the ally parameter is added only for the partner slot."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:992",
-      "detail": "Copies HealPointNumber into per-character PvE settings."
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:573",
+      "detail": "Passes the same growth row into HitPointOverride calculation for the player/partner setup."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvETag.cpp:135",
+      "detail": "Tag battle setup resolves a growth row per member and applies the same five rates without an ally parameter."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:248",
+      "detail": "Reads the row pointers directly for interval experience and growth-dependent HP/UI work."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:981",
+      "detail": "Extra missions floor each character's stored experience at Rows[24]->ExperienceThreshold (82150 in the export)."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:991",
+      "detail": "At interval start with no missions played, initializes HealPointNumbers from each resolved growth row's HealPointNumber."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:698",
+      "detail": "Recalculates interval maximum/current HP with the resolved growth row and ally parameter."
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:462",
-      "detail": "Counts satisfied ExperienceThreshold rows for aggregate PvE level display."
+      "detail": "GamePvE_GetTotalLevel sums satisfied-row counts minus one for every selectable character."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:476",
+      "detail": "GamePvE_GetLevelFromExperience returns the raw count of satisfied thresholds used by level text, unlock checks and growth UI."
+    },
+    {
+      "source": "Source/Abrams/Private/GameMenuSequence.cpp:1771",
+      "detail": "Copies saved PvECharacterExperiences into GrowthInfoArray, the per-character experience input used by battle and interval growth lookups."
     },
     {
       "source": "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:46",
-      "detail": "Growth menu compares adjacent rows to display unlock deltas."
+      "detail": "Builds one list item per row, with index+1 as level, adjacent-threshold differences, and change flags for every growth field."
+    },
+    {
+      "source": "Source/Abrams/Private/GameVsEnemyGrowthWidget.cpp:214",
+      "detail": "Checks the selected row's ExperienceThreshold against accumulated experience before committing an upgrade."
+    },
+    {
+      "source": "Source/Abrams/Private/GameVsEnemyEquipmentSettingsWidget.cpp:161",
+      "detail": "Uses the last satisfied row's cumulative EquipmentSlotNumber to size the equipment list and future row deltas to show unlock levels."
+    },
+    {
+      "source": "Source/Abrams/Private/GameVsEnemyGrowthDialogWidget.cpp:103",
+      "detail": "Compares current and target rows for the confirmation dialog, including target-current heal-point COUNT."
+    },
+    {
+      "source": "Source/Abrams/Private/GameVsEnemyGrowthLevelUpWidget.cpp:93",
+      "detail": "Compares before/after rows for the level-up window and displays the heal-point delta."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:620",
+      "detail": "Item-unlock progress for character/any-character growth thresholds uses the same satisfied-threshold level count."
     }
   ]
 }

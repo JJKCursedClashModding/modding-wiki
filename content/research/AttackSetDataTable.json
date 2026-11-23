@@ -3,7 +3,7 @@
   "fields": {
     "Id": {
       "simple": "Attack-set row key.",
-      "technical": "FName row key; export label ID. Action objects select a set ID from the owning character's action row (many Id_AttackSet_* fields, sometimes variant-specific such as the CN_041 Solo flag) and call Action_FindAttackSetRow over AttackSetDataTables, which returns the first row holding the ID; bCheckNone is commonly true. Some controllers cache the pointer (for example HeldAttackSetRow), and the command-list widget resolves a set by an explicitly supplied ID. This is a single unsharded table.",
+      "technical": "FName row key/export label (exported as ID). Action objects select a set ID from the owning character's action row--scalar Id_AttackSet_* fields, level-selected arrays such as Id_AttackSet_CursedEnergy_*, or hard-coded fallbacks--and call Action_FindAttackSetRow, which rejects None when bCheckNone is true and returns the first matching DataTable row. All 731 exported row keys match their Id value. Character controllers may cache the chosen row (HeldAttackSetRow/StartedAttackSet), and some branch on AttackSetRow->Id itself. The command-list widget resolves an explicitly supplied ID with its own first-match helper. This is a single unsharded table.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:856",
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:859",
@@ -12,25 +12,31 @@
         "Source/Abrams/Private/CP_160_ActionController.cpp:1527",
         "Source/Abrams/Private/GameCommandListActionWidget.cpp:532",
         "Source/Abrams/Public/CN_230_Actions.h:36",
-        "Source/AbramsDataTable/Public/GameDataTableRow_AttackSet.h:11"
+        "Source/AbramsDataTable/Public/GameDataTableRow_AttackSet.h:11",
+        "Source/Abrams/Private/GameDataTableManager.cpp:614",
+        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:40",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:660",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:1131",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:1382"
       ],
       "status": "verified"
     },
     "AttackRangeType": {
       "simple": "Whether this attack chain is short-range or long-range.",
-      "technical": "EGameAttackRangeType (None, Short, Long, Invalid=255). On attack start with StartCount <= 0, Short records battle-log value 0x3F and calls OnCharacterShortRangeAttack; Long records 0x40 and calls OnCharacterLongRangeAttack. Other values do nothing. This classification is separate from any per-attack range and is emitted once per chain start.",
+      "technical": "EGameAttackRangeType (uint8: None=0, Short=1, Long=2, Invalid=255). After the indexed Attack row resolves, Start with StartCount <= 0 switches on the set value: Short adds battle-log 0x3F and calls OnCharacterShortRangeAttack; Long adds 0x40 and calls OnCharacterLongRangeAttack. None and Invalid do nothing. This is set-level tracking, not an Attack-row field, and the calls occur only after a successful AttackRow lookup.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameAttackRangeType.h:6",
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:212",
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:214",
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:218",
-        "Source/AbramsDataTable/Public/GameDataTableRow_AttackSet.h:15"
+        "Source/AbramsDataTable/Public/GameDataTableRow_AttackSet.h:15",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:203"
       ],
       "status": "verified"
     },
     "bCursedEnergyAttack": {
       "simple": "Marks this chain as a cursed-energy attack for mission/stat tracking.",
-      "technical": "bool checked once on chain start (StartCount <= 0). When true it adds battle-log value 9, additionally 0xE for cursed-energy-attack-1 actions or 0x13 for cursed-energy-attack-2 actions, calls OnCharacterCursedEnergyAttack, and calls OnCharacterCursedEnergyAttackLevelMax when the current cursed-energy level is at least 3. It does not itself choose the Attack row's CursedEnergyCalcType.",
+      "technical": "bool checked once on chain start (StartCount <= 0, after AttackRow resolution). When true it adds battle-log 9, additionally 0xE for action classes whose IsCursedEnergyAttack1() is true or 0x13 for those whose IsCursedEnergyAttack2() is true, calls OnCharacterCursedEnergyAttack, and calls OnCharacterCursedEnergyAttackLevelMax when GetCursedEnergyLevelClamped() >= 3. Those two action-class predicates are virtual overrides, not fields of this table. The flag does not choose the Attack row's CursedEnergyCalcType or CursedEnergy_Add.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:258",
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:259",
@@ -38,25 +44,29 @@
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:264",
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:266",
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:269",
-        "Source/AbramsDataTable/Public/GameDataTableRow_AttackSet.h:18"
+        "Source/AbramsDataTable/Public/GameDataTableRow_AttackSet.h:18",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:203",
+        "Source/Abrams/Public/GameCharacterAction_CursedEnergyAttack.h:48"
       ],
       "status": "verified"
     },
     "bRecoverCursedEnergyDisabled": {
       "simple": "Suppresses cursed-energy recovery during this attack chain.",
-      "technical": "bool. FGameCharacterAction_AttackBase::GetCursedEnergyRecoverRate and GetCursedEnergyRecoveryWaitRate each return 0.0f while the cached AttackSetRow has this flag true, otherwise 1.0f (both are active slot overrides). Null AttackSetRow also yields 1.0f.",
+      "technical": "bool. FGameCharacterAction_AttackBase::GetCursedEnergyRecoverRate and GetCursedEnergyRecoveryWaitRate each return 0.0f while the cached AttackSetRow has this flag true, otherwise 1.0f; a null row also yields 1.0f. UGameCharacterActionController multiplies the rate returned by each active layer action, so one such attack set zeroes the controller-level rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:722",
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:723",
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:731",
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:732",
-        "Source/AbramsDataTable/Public/GameDataTableRow_AttackSet.h:21"
+        "Source/AbramsDataTable/Public/GameDataTableRow_AttackSet.h:21",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:2178",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:2192"
       ],
       "status": "verified"
     },
     "Inherit_Inertia_Rate": {
       "simple": "XY inertia multiplier carried into the attack start.",
-      "technical": "float passed as RateXY to UGameActorMovementController::ScaleInertia on chain start. If the active XY inertia interpolation FloatInterp228 is active, its current value is multiplied by this rate and a new interpolation is restarted over the remaining duration with the same ease. No effect when that interpolation is inactive; Z uses Inherit_Inertia_RateZ instead.",
+      "technical": "float unitless multiplier passed as RateXY to UGameActorMovementController::ScaleInertia on chain start. If the active XY inertia interpolation FloatInterp228 is active, its current value is multiplied by this rate and a new interpolation is restarted over the remaining duration with the same ease. No effect when that interpolation is inactive; Z uses Inherit_Inertia_RateZ instead.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:257",
         "Source/Abrams/Private/GameActorMovementController.cpp:189",
@@ -67,7 +77,7 @@
     },
     "Inherit_Inertia_RateZ": {
       "simple": "Vertical inertia multiplier carried into the attack start.",
-      "technical": "float. On chain start it first scales the active jump-inertia carry interpolation (UGameCharacterMovementController::ScaleJumpInertiaCarry multiplies its current value) and is then passed as RateZ to ScaleInertia, which rescales the active FloatInterp258. Both rescalings preserve remaining time and ease type; inactive interpolations are untouched.",
+      "technical": "float unitless multiplier. On chain start it first scales the active jump-inertia carry interpolation (UGameCharacterMovementController::ScaleJumpInertiaCarry multiplies its current value) and is then passed as RateZ to ScaleInertia, which rescales the active FloatInterp258. Both rescalings preserve remaining time and ease type; inactive interpolations are untouched.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:255",
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:256",
@@ -81,7 +91,7 @@
     },
     "Id_Attack": {
       "simple": "Ordered list of AttackDataTable row IDs comprising the chain steps.",
-      "technical": "TArray<FName>. FGameCharacterAction_AttackBase::GetAttackRow(SetRow, Index) bounds-checks Index against Num(), skips None, then scans AttackDataTables in order for the first matching Attack row; Start passes GetActionStartCount() as Index. Other consumers read [0] directly (CP_160 condition helper) or iterate all IDs to sum cursed-energy costs (command-list widget, skipping None and near-zero CursedEnergy_Add). Export rows contain 12 slots; trailing None entries are valid and simply yield null rows. Cross-table join: AttackSetDataTable -> AttackDataTable.",
+      "technical": "TArray<FName>. The base virtual GetAttackRow(SetRow, Index) rejects a null set or negative/out-of-range Index, skips NAME_None, and scans the five AttackDataTables in registration order for the first matching row; Start supplies GetActionStartCount() as Index, and GetNextCursedEnergyAdd uses the current count (or count+1 after a same-type action). Character-specific GetAttackRow overrides can remap that index or bypass the array with a hard-coded Attack ID under state conditions (for example CP_090, CP_110, CP_190 and CP_200); CP_160's condition helper reads Id_Attack[0] directly. The command-list widget iterates the array but does not sum: it returns the first non-None, resolvable Attack row whose |CursedEnergy_Add| > 1e-8, scaled by -0.01 and formatted as integer/tenths; a missing set returns '-1' and no qualifying row returns '0'. All 731 exported sets have 12 slots with no non-None entry after the first None; duplicate IDs are valid because the index, not uniqueness, selects the step. Cross-table join: AttackSetDataTable -> AttackDataTable1..5.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:862",
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:865",
@@ -90,46 +100,81 @@
         "Source/Abrams/Private/CP_160_ActionController.cpp:1533",
         "Source/Abrams/Private/GameCommandListActionWidget.cpp:537",
         "Source/Abrams/Private/GameCommandListActionWidget.cpp:539",
-        "Source/AbramsDataTable/Public/GameDataTableRow_AttackSet.h:30"
+        "Source/AbramsDataTable/Public/GameDataTableRow_AttackSet.h:30",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:887",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:535",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:561",
+        "Source/Abrams/Private/CP_110_ActionController.cpp:544",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:1543",
+        "Source/Abrams/Private/CP_200_ActionController.cpp:591"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "AGameDataTableManager::Tick resolves only AttackSetDataTable into AttackSetDataTables (Source/Abrams/Private/GameDataTableManager.cpp:228, Source/Abrams/Public/GameDataTableManager.h:139). Action_FindAttackSetRow is the shared first-match finder declared at Source/Abrams/Public/GameDataTableManager.h:49.",
-    "The base GetAttackSetRow virtual uses the owner action row's Id_AttackSet_Normal_1; many CN_*/CP_* action classes override it to select other Id_AttackSet_* fields (for example the CN_041 air normal attack's Solo variant) or cache the chosen row. All feed the same row struct and fields documented here.",
-    "Missing AttackSetRow aborts the attack action (Phase=MAX_int32, Byte16=1) when GetAttackRow returns null, so Id_Attack values must resolve for a chain to play.",
-    "Exported arrays use 12 fixed slots with trailing None; the runtime consumer is length-agnostic and skips None. No numbered shards or localization variants were identified, and partial Content prevents excluding Blueprint-only users.",
-    "Evidence is reconstructed retail-behaviour C++ plus serialized export schema; exported values are not used as semantic proof."
+    "AGameDataTableManager::Tick registers exactly one AttackSetDataTable into AttackSetDataTables (Source/Abrams/Private/GameDataTableManager.cpp:228, Source/Abrams/Public/GameDataTableManager.h:139); Action_FindAttackSetRow (Source/Abrams/Private/GameDataTableManager.cpp:614) rejects None when requested and returns the first row found. The command-list widget uses a separate first-match FindRow helper over the same array.",
+    "Base GetAttackSetRow uses the owner action row's Id_AttackSet_Normal_1; CN_*/CP_* overrides select other scalar action-row IDs, cursed-energy ID arrays indexed by level (finish target forces index 3), or hard-coded alternates. Some actions retain the resolved pointer as HeldAttackSetRow (CN_090/CN_122/CN_230 and others) or StartedAttackSet (CN_240), and behavior code branches on the row's Id (CP_030, CP_060, CP_160, CN_240). All feed the same row struct and fields documented here.",
+    "A missing AttackSetRow or a null indexed AttackRow (out-of-range slot, None ID, or unresolved Attack ID) leaves Start's AttackRow null and aborts the action with Phase=MAX_int32 and Byte16=1 before range, cursed-energy and inertia logic runs.",
+    "Export check: 731 master rows, all with the seven documented fields and 12 Id_Attack slots; every Id matches its row key. The 45 per-character AttackSet exports partition those same 731 rows with identical row values (no extras or differences), and the five AttackDataTable shards contain 1,518 rows with no duplicate keys. 1,470 of 1,473 distinct referenced IDs resolve under FName's case-insensitive comparison; three index-0 references (CP_020_ATTACKA_AIR, CP_020_ATTACKG, CP_020_ATTACKH) have no row in the five Attack shards. Treat these as export-level dangling references unless the missing rows are recovered.",
+    "C++ constructor defaults are AttackRangeType=None, both bools=false, both inertia rates=0.0f; Id is NAME_None and Id_Attack is empty by implicit default construction. Exported values override these. Invalid=255 is not present in exports, nor is any AttackRangeType::Invalid row.",
+    "Behavioral evidence is reconstructed retail C++ plus serialized export schema/values; no retail Blueprint assets were available to verify Blueprint-only consumers or designer overrides. Exported values are not used as semantic proof."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameCharacterAction_Attack.cpp:197",
-      "detail": "Attack action Start resolves AttackSetRow and the indexed AttackRow, then applies range tracking, cursed-energy tracking and inertia scaling."
+      "detail": "Attack action Start resolves AttackSetRow and the indexed AttackRow, then applies range tracking, cursed-energy tracking and inertia scaling; a null AttackRow aborts first."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:614",
+      "detail": "Shared first-match AttackSet finder; optional bCheckNone rejects NAME_None before scanning the manager array."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterAction_Attack.cpp:720",
-      "detail": "GetCursedEnergyRecoverRate/GetCursedEnergyRecoveryWaitRate return 0 when the set disables cursed-energy recovery."
+      "detail": "GetCursedEnergyRecoverRate/GetCursedEnergyRecoveryWaitRate return 0 when the set disables cursed-energy recovery; the controller multiplies active layer rates."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterAction_Attack.cpp:863",
-      "detail": "GetAttackRow joins Id_Attack[Index] into AttackDataTables with bounds and None checks."
+      "detail": "Base virtual GetAttackRow joins Id_Attack[Index] into AttackDataTables with bounds and None checks; character overrides may remap or bypass the index."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Attack.cpp:887",
+      "detail": "GetNextCursedEnergyAdd re-resolves the set and reads the current or next Attack row index for previewed cursed-energy cost."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:40",
+      "detail": "Cursed-energy actions select a set from an action-row ID array by level (finish target uses index 3), with a validity check before lookup."
     },
     {
       "source": "Source/Abrams/Private/CN_041_ActionController.cpp:440",
       "detail": "Representative override choosing a Solo/non-Solo action-row ID before calling Action_FindAttackSetRow."
     },
     {
+      "source": "Source/Abrams/Public/CN_230_Actions.h:36",
+      "detail": "HeldAttackSetRow caches the first start's resolved set for later virtual GetAttackSetRow calls."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_240_ActionController.cpp:1382",
+      "detail": "StartedAttackSet alias and Id comparison drive adaptation/controller state."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_030_ActionController.cpp:660",
+      "detail": "Behavior branches directly on AttackSetRow->Id (ATTACKF_2 vs ATTACKF_3)."
+    },
+    {
       "source": "Source/Abrams/Private/CP_160_ActionController.cpp:1527",
       "detail": "AI/condition helper resolves a set by ID and reads its first attack row."
     },
     {
+      "source": "Source/Abrams/Private/CP_190_ActionController.cpp:1543",
+      "detail": "Example GetAttackRow override that bypasses Id_Attack and uses a hard-coded Attack ID when UpgradeCount > 0."
+    },
+    {
       "source": "Source/Abrams/Private/GameCommandListActionWidget.cpp:528",
-      "detail": "Command-list text iterates Id_Attack and sums scaled cursed-energy costs from the joined Attack rows."
+      "detail": "Command-list text returns the first qualifying attack's scaled cursed-energy cost; -1 for a missing set and 0 when no row qualifies."
     },
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:228",
-      "detail": "Load/registry path for AttackSetDataTable."
+      "detail": "Load/registry path for the single AttackSetDataTable shard."
     }
   ]
 }

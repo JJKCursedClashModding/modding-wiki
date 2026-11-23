@@ -1,48 +1,71 @@
 {
-  "description": "Core per-character combat stats: health, guard durability, down value and the timing constants that initialize the status controller.",
+  "description": "Core per-character/per-mission combat parameters: a single 122-row FName-keyed table supplying health, guard durability, down-gauge values and several timing constants to character setup and status controllers. Three fields have no traced native consumer in the reconstructed source.",
   "fields": {
     "Id": {
-      "simple": "Character ID used as the row key.",
-      "technical": "Unreal DataTable row name. ResolveDataRows resolves it from CharacterDataTable.Id_CharacterBaseParameter or the studio BaseParameterIdOverride and treats a miss as fatal; several UI phases resolve the same row directly from CharacterDataTable.Id_CharacterBaseParameter. The export has 122 rows.",
+      "simple": "Parameter row ID (exported as ID; native FName Id) used as the DataTable row key.",
+      "technical": "FName at row offset 0x8, declared UPROPERTY(BlueprintReadWrite, EditAnywhere) and named by ImportKeyField=Id; the export writes the key as ID and all 122 rows have row name == ID. AGameCharacter::ResolveDataRows searches the ordered CharacterBaseParameterDataTables array using GameCharacter_Override(Overrides.BaseParameterIdOverride, CharacterRow->Id_CharacterBaseParameter): NAME_None means use the default, and a miss returns false from ResolveDataRows and then ApplyCharacterSetup (no assertion in the reconstruction). Mission overrides reach BaseParameterIdOverride through GameMissionCharacter_CopyOverrideIds(MissionCharacter.Id_CharacterBaseParameter); PvE and UI paths separately look up the same row from Character.Id_CharacterBaseParameter. Lookup stops at the first matching table; no duplicate-key handling is present.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:10",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:589",
+        "Source/Abrams/Private/GameCharacter.cpp:477",
         "Source/Abrams/Private/GameCharacter.cpp:489",
+        "Source/Abrams/Private/GamePvESettings.cpp:230",
+        "Source/Abrams/Private/GameDataTableManager.cpp:193",
         "Source/Abrams/Private/GameCommandListWidget.cpp:417"
       ],
       "status": "verified"
     },
     "HitPoint": {
-      "simple": "Base maximum health for team play.",
-      "technical": "Float health units. ApplyHitPointParameters uses HitPoint unless FGameCharacterStatusSetup.SoloSide == 1 (then HitPoint_Solo) and no positive HitPointOverride is set; it initializes HitPointMax and current HitPoint. GamePvESettings also falls back to this column for a character with no explicit HitPoint when not in solo.",
+      "simple": "Base maximum health (HP) before PvE/equipment/vow or explicit setup overrides.",
+      "technical": "float at row offset 0x10 (constructor default 0). ApplyHitPointParameters first uses Setup.HitPointOverride when > 0; otherwise it uses HitPoint_Solo when Setup.SoloSide == 1 and HitPoint in all other cases, assigning both HitPointMax and current HitPoint. GamePvE_CalcMissionCharacterHitPoint uses HitPoint_Solo/HitPoint only when MissionCharacter.HitPoint <= 0 (not only when the side is non-solo), while PvE ally/Tag setup passes GamePvE_CalcHitPoint(Base->HitPoint, ...) as a positive override that supersedes the solo selection. Command-list and versus-enemy UI also read this raw column as a gauge base. Export values span 150-2000 across 36 distinct positive values.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:58",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:64",
-        "Source/Abrams/Private/GamePvESettings.cpp:415"
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:15",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterBaseParameter.cpp:4",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:590",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:54",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:61",
+        "Source/Abrams/Private/GamePvESettings.cpp:408",
+        "Source/Abrams/Private/GamePvESettings.cpp:415",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:573",
+        "Source/Abrams/Private/GamePhase_BattlePvETag.cpp:149",
+        "Source/Abrams/Private/GameCommandListWidget.cpp:420"
       ],
       "status": "verified"
     },
     "HitPoint_Solo": {
-      "simple": "Maximum health for one-character/solo sides.",
-      "technical": "Selected instead of HitPoint when Setup.SoloSide == 1 in ApplyHitPointParameters and in the GamePvESettings fallback. Setup.HitPointOverride still takes priority. CP_010 exports the same value as HitPoint (440).",
+      "simple": "Maximum health used for a character alone on its side.",
+      "technical": "float at row offset 0x14 (constructor default 0). It is selected by the same ApplyHitPointParameters branch as HitPoint when Setup.SoloSide == 1, and by GamePvE_CalcMissionCharacterHitPoint's fallback for mission characters; a positive Setup.HitPointOverride wins in both paths. In the export it equals HitPoint in all 122 rows (CP_010: 440), and PvE ally/Tag setups compute their override from Base->HitPoint, so the exported Solo column is not independently exercised there. BattleFree's SoloSide table marks exactly the one-member sides with true.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:18",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterBaseParameter.cpp:5",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:591",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:61",
         "Source/Abrams/Private/GamePvESettings.cpp:415",
-        "Source/Abrams/Private/GamePhase_BattleFree.cpp:93"
+        "Source/Abrams/Private/GamePhase_BattleFree.cpp:93",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:573"
       ],
       "status": "verified"
     },
     "AttackRange": {
-      "simple": "Serialized attack-range value; no direct consumer was found.",
-      "technical": "Float at row offset 0x18, exported 1250.0 for CP_010. No Source/Plugins consumer reads CharacterBaseParameterRow.AttackRange; distance gating in the reconstructed code uses AttackSet.AttackRangeType and action controller flags instead. The field's practical meaning is unresolved from available evidence.",
+      "simple": "Serialized attack-range number with no traced native consumer; meaning unresolved.",
+      "technical": "float at row offset 0x18 (constructor default 0); exported values are 1000.0 (67 rows), 1250.0 (51), 1050.0 (3) and 2000.0 (1), with CP_010 = 1250.0. No named read of FGameDataTableRow_CharacterBaseParameter::AttackRange was found in reconstructed Source/Plugins. Nearby distance logic instead uses Character.AutoAttackDash_Distance, AttackSet.AttackRangeType plus the action controller's bInEnemyAttackRange/bInAllyAttackRange flags, and per-AI hard-coded CloseAttackRange values; none reads this row. The unit and gameplay purpose are therefore not asserted, and retail Blueprint/engine-side references were not inspected.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:21",
-        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:592"
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterBaseParameter.cpp:6",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:592",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:212",
+        "Source/Abrams/Private/GameCharacterAction.cpp:340",
+        "Source/Abrams/Private/GameCharacterAIThinkNode.cpp:27"
       ],
       "status": "unresolved"
     },
     "Guard_Minimum_Time": {
-      "simple": "Minimum time a guard must be held before certain guard transitions.",
-      "technical": "Seconds. Guard action code tests Elapsed > Guard_Minimum_Time together with GuardRigidityTime <= 0.0f; CP_180's guard behavior uses the same predicate. At or below this time the relevant guard transition is blocked.",
+      "simple": "Minimum guard-hold time before the guard-end transition can run.",
+      "technical": "float seconds at row offset 0x1C (constructor default 0); all 122 exported rows use 0.2. FGameCharacterAction_Guard::Tick and FGameCharacterAction_GuardAir::Tick enter the release branch only when Elapsed > this value and GuardRigidityTime <= 0.0f; if the Guard key is no longer held they play the guard-end animation and signal GAISlot186(9,3,false,false) (GuardAir also sets its finished flag). CP_180's GuardAir override repeats the same predicate with its own animations. The comparison is strict, so a value exactly equal to the threshold does not yet qualify.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:24",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterBaseParameter.cpp:7",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:593",
         "Source/Abrams/Private/GameCharacterAction_Guard.cpp:94",
         "Source/Abrams/Private/GameCharacterAction_Guard.cpp:205",
         "Source/Abrams/Private/CP_180_ActionController.cpp:438"
@@ -50,40 +73,51 @@
       "status": "verified"
     },
     "GuardDurability": {
-      "simple": "Base guard gauge that depletes when hits are blocked.",
-      "technical": "Float. UpdateGuardDurability copies it into GuardDurabilityBase and initializes CurrentGuardDurability as GetGuardDurabilityMaxRate() * GuardDurability. AI value conditions divide current durability by this row value, and guard-hit effects use NewHitPoint / this value to choose an effect.",
+      "simple": "Base guard gauge depleted by blocked hits.",
+      "technical": "float at row offset 0x20 (constructor default 0). UpdateGuardDurability caches it as GuardDurabilityBase and sets CurrentGuardDurability = GetGuardDurabilityMaxRate() * GuardDurability; SetGuardDurability and the regen tick clamp to the same rate-scaled maximum. AI value conditions 23 and 31 divide self/target CurrentGuardDurability by this unscaled row value. Guard-hit FX use NewHitPoint / GuardDurability with FX_CP_000_03111 for >= 0.6, FX_CP_000_03121 for >= 0.3 and FX_CP_000_03131 below that. Blocked-hit damage is subtracted from the current gauge in GameBattleDamage. Export values are 150.0 in 119 rows and 160.0 in 3; no exported row is zero, although the CDO default would be a zero denominator for the AI divisions.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:27",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterBaseParameter.cpp:8",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:594",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:1029",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:1028",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3716",
         "Source/Abrams/Private/GameCharacterAIValueCondition.cpp:165",
-        "Source/Abrams/Private/GameCharacterAction_Guard.cpp:48"
+        "Source/Abrams/Private/GameCharacterAIValueCondition.cpp:215",
+        "Source/Abrams/Private/GameCharacterAction_Guard.cpp:48",
+        "Source/Abrams/Private/GameBattleDamage.cpp:571"
       ],
       "status": "verified"
     },
     "GuardDurability_Solo": {
-      "simple": "Serialized solo guard-durability value; no direct consumer was found.",
-      "technical": "Float at row offset 0x24 (CP_010 exports 150.0, equal to GuardDurability). UpdateGuardDurability only reads GuardDurability in this source snapshot; no solo-side substitution for durability is present. The rebuilt guard regeneration path likewise uses the shared BaseParameterRow->GuardDurability_Recover. Treat the solo override as unimplemented/unidentified rather than proven used.",
+      "simple": "Serialized solo guard-durability value; no native consumer was traced.",
+      "technical": "float at row offset 0x24 (constructor default 0), exported 150.0 in 119 rows and 160.0 in the same 3 rows as GuardDurability; it always equals GuardDurability in this export (CP_010: 150.0). Every named native row read found uses GuardDurability for the status cache, AI denominators and guard-hit FX; no Source/Plugins read of GuardDurability_Solo or solo-side substitution for durability was found. Its native purpose is therefore unresolved rather than proven unused, and retail Blueprint/engine-side references were not inspected.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:30",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterBaseParameter.cpp:9",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:595",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:1029",
-        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:595"
+        "Source/Abrams/Private/GameCharacterAction_Guard.cpp:48"
       ],
       "status": "unresolved"
     },
     "GuardDurability_RecoverWaitTime": {
-      "simple": "Serialized delay before guard durability regenerates; no direct consumer was found.",
-      "technical": "Float at row offset 0x28 (CP_010 exports 3.0 seconds by name/value convention). The current Tick implementation gates regeneration only with bGuardDurabilityRegenEnabled / bGuardDurabilityRegenBlocked and reads GuardDurability_Recover; no read of GuardDurability_RecoverWaitTime exists in Source/Plugins. This is a serialized-but-unconsumed field in the reconstruction.",
+      "simple": "Serialized guard-regeneration wait value; no native consumer was traced.",
+      "technical": "float at row offset 0x28 (constructor default 0), exported 3.0 in all 122 rows including CP_010. The name suggests seconds, but no C++ condition, timer or delay consumes it: the Tick checks only bGuardDurabilityRegenEnabled == 1 and bGuardDurabilityRegenBlocked == 0, then reads GuardDurability_Recover. No named Source/Plugins read of this field was found and the reconstructed Tick has no hidden wait timer; retail Blueprint/engine references were not inspected. The serialized value is retained, but its native purpose is unresolved.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:33",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:3537",
-        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:596"
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterBaseParameter.cpp:10",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:596",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3537"
       ],
       "status": "unresolved"
     },
     "GuardDurability_Recover": {
-      "simple": "Rate at which guard durability regenerates.",
-      "technical": "Float denominator in (100.0 / Recover) * DeltaTime: smaller values regenerate faster. With regeneration enabled and unblocked, below the rate-scaled maximum and Recover > 0, the tick adds that amount to CurrentGuardDurability and clamps to the scaled maximum. CP_010 exports 15.0.",
+      "simple": "Reciprocal-style rate controlling guard-durability regeneration.",
+      "technical": "float at row offset 0x2C (constructor default 0), exported 15.0 in all 122 rows. When regen is enabled and not blocked, CurrentGuardDurability is below the rate-scaled maximum, and Recover > 0, Tick adds (100.0 / Recover) * DeltaTime (about 6.67 durability units per second for 15.0) and clamps to [0, GetGuardDurabilityMaxRate() * GuardDurability]. A zero CDO would skip the division and disable this path; no exported row is zero.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:36",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterBaseParameter.cpp:11",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:597",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3537",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3541",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3545"
@@ -92,10 +126,14 @@
     },
     "DownValue": {
       "simple": "Down gauge: stamina-like value depleted by blows before a character is knocked down.",
-      "technical": "Float. ApplyDownValueParameters copies it to DownValueMax and current DownValue; ResetDownValue also uses it for adaptation values and max(HitPoint - DownValue, 0). Damage handling subtracts down damage scaled by the receiver's down-damage rate, and AI conditions inspect DownValue / DownValueMax. Many later DownValue hits are status-controller fields, not row reads.",
+      "technical": "float at row offset 0x30 (constructor default 0). ApplyDownValueParameters copies it to DownValueMax and SetDownValue (current gauge); InitializeStatus and ResetDownValue also copy it to AdaptDownValue/AdaptDownValueMax and set AdaptHitPoint = max(HitPoint - DownValue, 0). Armor/blocked-hit processing subtracts attackerScale * DamageRow.Down_Damage * receiver GetDownDamageRate from the current gauge; the shikigami damage path subtracts DamageRow.Down_Damage directly. Zero triggers down handling and RestartDownValueRecover, and AI checks current DownValue against DownValueMax. Export values span 180.0-2000.0, with 1000.0 in 112 rows; later DownValue reads on the status controller are cached state, not row reads.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:39",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterBaseParameter.cpp:12",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:598",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:71",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:136",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3773",
         "Source/Abrams/Private/GameBattleManager.cpp:2002",
         "Source/Abrams/Private/GameBattleDamage.cpp:907",
         "Source/Abrams/Private/GameCharacterAIThinkNode.cpp:1658"
@@ -103,59 +141,116 @@
       "status": "verified"
     },
     "LargeCharacterDownRecoverTime": {
-      "simple": "Down-gauge recovery delay for large characters.",
-      "technical": "Seconds. RestartDownValueRecover chooses this row value when GetActionSlot146() flags a large character; otherwise it uses Global.DownValue_Recover_Time. CN_240 adaptation also begins with this duration. CP_010 exports 0.0, so large-character recovery is effectively immediate for that row.",
+      "simple": "Timed down-gauge refill delay for large characters; also reused as a CN_240 adaptation delay.",
+      "technical": "float seconds at row offset 0x34 (constructor default 0). RestartDownValueRecover, when DownValueMax > DownValue and bRefill == false, sets DownRecoverTime from this column if Owner.Get()->GetActionSlot146() is nonzero, otherwise from Global.DownValue_Recover_Time. Tick counts that timer down by DeltaTime * DownRecoverRate and calls ApplyDownValueParameters only after it crosses from positive to <= 0; therefore CP_010's exported 0.0 does not mean an immediate refill in this reconstruction - with the large-character flag set and bRefill false it leaves the timer at zero and no timed refill is started. bRefill true still refills immediately and returns. CN_240's ATTACKK_1 also passes this row value to BeginAdaptation as AdaptDelayTime. Export: 0.0 in 111 rows, 5.0/7.0/10.0/15.0 in the remaining 11.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:42",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterBaseParameter.cpp:13",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:599",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3796",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:3799",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3471",
+        "Source/Abrams/Public/GameCharacterStatusController.h:666",
         "Source/Abrams/Private/CN_240_ActionController.cpp:1409",
-        "Source/Abrams/Public/GameCharacterStatusController.h:666"
+        "Source/Abrams/Private/CN_240_ActionController.cpp:338"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Three fields (AttackRange, GuardDurability_Solo, GuardDurability_RecoverWaitTime) are serialized with verified retail offsets but have no identifiable C++ consumer in this snapshot; their gameplay meaning is not asserted.",
-    "The solo flag is FGameCharacterStatusSetup.SoloSide == 1. Only HitPoint/HitPoint_Solo have an observed solo substitution in the available code.",
-    "The exported table has 122 rows; available Content is partial, so exported values do not characterize every retail character.",
-    "All consumer descriptions come from reconstructed source; layout-check references confirm field presence/offset only, not behavior or byte-match."
+    "AttackRange, GuardDurability_Solo and GuardDurability_RecoverWaitTime have verified retail offsets and serialized values, but no named native consumer was found in reconstructed Source/Plugins; their gameplay meaning is not asserted, and retail Blueprint/engine-side references were not inspected.",
+    "The solo flag is FGameCharacterStatusSetup.SoloSide == 1; BattleFree/PvE setup maps one-member sides to true. For health, a positive Setup.HitPointOverride wins first, PvE ally/Tag setup supplies one computed from HitPoint, and mission fallback or no-override setups can use HitPoint_Solo. No solo substitution exists for guard durability in the reconstruction.",
+    "The export is one CharacterBaseParameterDataTable with 122 rows; every row name equals its ID, ImportKeyField is Id, and the 46 by-character shard copies reproduce subsets with identical values. 119 exported rows are referenced by CharacterDataTable.Id_CharacterBaseParameter or MissionCharacterDataTable.Id_CharacterBaseParameter; three are not.",
+    "All consumer descriptions come from reconstructed C++ (AGENTS.md states Blueprints contain no logic); layout-check references prove field name/offset only, not byte-match or behavior. No retail Blueprint graphs or uncooked asset internals were inspected directly.",
+    "Constructor defaults are 0.0 for all ten numeric fields; those are CDO values, not the exported row values."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameCharacter.cpp:489",
-      "detail": "Resolves the required BaseParameter row during character setup (override id wins over CharacterDataTable.Id_CharacterBaseParameter)."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:193",
+      "detail": "Resolves the CharacterBaseParameterDataTable primary asset and adds it to the ordered CharacterBaseParameterDataTables array (+0x3F0)."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:58",
-      "detail": "Uses HitPoint/HitPoint_Solo to initialize maximum and current health, unless an explicit setup override is present."
+      "source": "Source/Abrams/Private/GameCharacter.cpp:489",
+      "detail": "ResolveDataRows finds the row by override-first ID and caches the pointer in AGameCharacter::BaseParameterRow (+0x3A8); a miss makes character setup fail."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:230",
+      "detail": "Copies MissionCharacter.Id_CharacterBaseParameter into FStudioBattleCharacterOverrides.BaseParameterIdOverride, so mission rows can replace the character's default parameter row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:54",
+      "detail": "ApplyHitPointParameters gives a positive Setup.HitPointOverride priority, then chooses HitPoint_Solo or HitPoint by SoloSide."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:71",
-      "detail": "Uses DownValue to initialize the down gauge and its maximum."
+      "detail": "ApplyDownValueParameters initializes DownValueMax and current DownValue from the row."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:1029",
-      "detail": "Uses GuardDurability to initialize GuardDurabilityBase and CurrentGuardDurability with the battle rate multiplier."
+      "detail": "UpdateGuardDurability caches GuardDurability as GuardDurabilityBase and initializes the current gauge through the rate multiplier."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Guard.cpp:48",
+      "detail": "Selects a guard-hit effect from NewHitPoint / row GuardDurability thresholds 0.6 and 0.3."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterAction_Guard.cpp:94",
-      "detail": "Blocks the guard transition until Guard_Minimum_Time has elapsed and rigidity has ended."
+      "detail": "Blocks the ground guard-end transition until Elapsed > Guard_Minimum_Time and rigidity has ended."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_180_ActionController.cpp:438",
+      "detail": "CP_180's GuardAir override applies the same minimum-time and rigidity predicate with character-specific animation names."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:3541",
-      "detail": "Uses GuardDurability_Recover as the regeneration-rate denominator."
+      "detail": "Regenerates guard durability using (100 / GuardDurability_Recover) * DeltaTime when enabled, unblocked and below the scaled maximum."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:2002",
+      "detail": "Applies armor/down damage to the current down gauge using attacker scale, DamageRow.Down_Damage and the receiver's down-damage rate."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:3796",
-      "detail": "Selects LargeCharacterDownRecoverTime for large-character down recovery instead of the Global row's time."
+      "detail": "Selects LargeCharacterDownRecoverTime for large-character down recovery instead of the Global row's time, with a zero value leaving no timed refill."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:3471",
+      "detail": "Counts DownRecoverTime down by DeltaTime * DownRecoverRate and refills the down gauge only when the positive timer expires."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_240_ActionController.cpp:1409",
+      "detail": "Passes LargeCharacterDownRecoverTime into CN_240 BeginAdaptation as AdaptDelayTime for ATTACKK_1."
     },
     {
       "source": "Source/Abrams/Private/GamePvESettings.cpp:411",
-      "detail": "Falls back to the row's HitPoint/HitPoint_Solo for PvE settings when a character has no explicit health."
+      "detail": "Mission-character HP fallback reads HitPoint_Solo or HitPoint only when MissionCharacter.HitPoint <= 0."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:573",
+      "detail": "PvE solo allies use raw Base->HitPoint as the seed for a positive HitPointOverride after growth/equipment/vow calculations."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvETag.cpp:149",
+      "detail": "PvE Tag allies use the same Base->HitPoint-derived override path."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:693",
+      "detail": "Interval PvE reads Base->HitPoint to recalculate current and maximum HP between stages."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCommandListWidget.cpp:417",
+      "detail": "Command-list UI resolves the row directly from Character.Id_CharacterBaseParameter and uses HitPoint as the raw gauge width."
     },
     {
       "source": "Source/Abrams/Private/GameVsEnemyCharacterSettingsWidget.cpp:105",
-      "detail": "Reads the same row for versus-enemy character settings UI."
+      "detail": "Versus-enemy settings UI resolves the row and feeds HitPoint into its PvE gauge preview."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAIValueCondition.cpp:165",
+      "detail": "AI value conditions 23 and 31 normalize current guard durability by this row's unscaled GuardDurability."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAIThinkNode.cpp:1658",
+      "detail": "AI down-gauge decisions compare status DownValue with the DownValueMax seeded from this row."
     }
   ]
 }

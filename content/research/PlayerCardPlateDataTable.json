@@ -1,51 +1,61 @@
 {
-  "description": "Defines the artwork assets for player-card decoration plates used on profiles, rankings, battle-situation overviews, and customization tiles.",
+  "description": "Defines the full-size and thumbnail artwork names for player-card decoration plates, consumed by profile and ranking cards, battle-situation overviews, plate customization tiles, and Plate-item icons/previews.",
   "fields": {
     "Id": {
       "simple": "Plate row identifier.",
-      "technical": "FName key saved in FGamePlayerCardParameter::PlateId and packed into leaderboard cards as a numeric string. Validate() and ResetUnownedIds substitute '1' when the row is missing or its linked Plate item is not owned. Widgets and tile items look up the row by this ID; owned plate lists are built by matching Item::VariableId to the row ID.",
+      "technical": "FName row key (+0x08) saved in FGamePlayerCardParameter::PlateId and serialized into leaderboard records as PlateNumber via Atoi, then reconstructed as a decimal FName. Validate() resets to '1' when the ID is None or no row exists; PlayerCard_ResetUnownedIds resets to '1' when no owned/unlocked Plate item's VariableId resolves to a plate row; leaderboard unpacking also falls back to '1' for an absent row. DTM_FindPlayerCardPlateRow and the other finders scan PlayerCardPlateDataTables in table order and return the first row with this ID; DTM's bCheckNone rejects NAME_None, while its bUnknown parameter is accepted but ignored. Customize tiles copy Row::Id into the tile item, and owned lists join Item::VariableId to this key.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardPlate.h:11",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:139",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:170",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:262",
-        "Source/Abrams/Private/GamePlayerCardParameter.cpp:349",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:354",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:649",
-        "Source/Abrams/Private/GameCustomizeCardPlateTileItemWidget.cpp:69"
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:676",
+        "Source/Abrams/Private/GameCustomizeCardPlateTileWidget.cpp:39"
       ],
       "status": "verified"
     },
     "ImageFileName": {
       "simple": "Full-size plate texture asset name.",
-      "technical": "FName resolved through FindDynamicLoadTexture and applied to the main player-card plate image. CollectTextureNames also adds this name to the primary-asset prefetch list for the current card. No thumbnail logic uses this field.",
+      "technical": "FName (+0x10) naming the full-size plate texture as a WidgetTexture primary asset. UGamePlayerCardWidget::RefreshPlateImage resolves it through the WidgetManager dynamic-texture cache and sets the main card brush; CollectTextureNames also queues it for WidgetTexture loading in customize/card-loading paths. GameItem_GetFullImageFileName returns it for Plate items (shop, lottery and archive overlays), and GameItemIconWidget uses it when bShowThumbnail is false. Thumbnail-specific tile and item-icon paths use ThumbnailImageFileName instead.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardPlate.h:15",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:148",
         "Source/Abrams/Private/GamePlayerCardParameter.cpp:150",
-        "Source/Abrams/Private/GamePlayerCardWidget.cpp:147",
-        "Source/Abrams/Private/GamePlayerCardWidget.cpp:151"
+        "Source/Abrams/Private/GamePlayerCardWidget.cpp:150",
+        "Source/Abrams/Private/GamePlayerCardWidget.cpp:151",
+        "Source/Abrams/Private/GameItemOwnership.cpp:249",
+        "Source/Abrams/Private/GameItemIconWidget.cpp:164",
+        "Source/Framework/Public/WidgetManager.h:96",
+        "Config/DefaultGame.ini:27"
       ],
       "status": "verified"
     },
     "ThumbnailImageFileName": {
       "simple": "Small plate texture asset name for lists and previews.",
-      "technical": "FName used by GameItem_GetImageFileName and plate tile async texture loading, and resolved by UGamePlayerCardPlateWidget::SetThumbnailImage for tile previews. It is the row field referenced by the Item-to-Plate asset join through Item::VariableId.",
+      "technical": "FName (+0x18) naming the thumbnail WidgetTexture. GameItem_GetImageFileName returns it for Plate items, UGameCustomizeCardPlateTileItemWidget::RequestTextureLoad queues it in the tile's WidgetTexture loader, and the loaded texture is cached in WidgetManager by that name; UGamePlayerCardPlateWidget::SetThumbnailImage and GameItemIconWidget read the cache when thumbnails are requested. The asset join is Item::VariableId -> this row's Id; the item ID is not stored in this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardPlate.h:18",
         "Source/Abrams/Private/GameItemOwnership.cpp:297",
+        "Source/Abrams/Private/GameItemOwnership.cpp:299",
         "Source/Abrams/Private/GameItemIconWidget.cpp:159",
+        "Source/Abrams/Private/GameItemIconWidget.cpp:164",
         "Source/Abrams/Private/GameCustomizeCardPlateTileItemWidget.cpp:69",
         "Source/Abrams/Private/GameCustomizeCardPlateTileItemWidget.cpp:73",
-        "Source/Abrams/Private/GamePlayerCardPlateWidget.cpp:15",
+        "Source/Abrams/Private/GameCustomizeCardPlateTileItemWidget.cpp:105",
+        "Source/Abrams/Private/GamePlayerCardPlateWidget.cpp:17",
         "Source/Abrams/Private/GamePlayerCardPlateWidget.cpp:18"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The export contains 463 rows; IDs are numeric strings and both texture fields are unique per row in the export.",
-    "Multiple PlayerCardPlateDataTable shards are supported; DTM_FindPlayerCardPlateRow loops them and returns the first match.",
-    "Plate row lookups are unguarded in several UI paths, so an invalid saved ID can lead to a null dereference rather than a graceful fallback; Validate is the sanitizer that prevents this for local player and leaderboard cards.",
-    "Only the supplied retail export and partial Content are available; no claim is made about all Blueprint or editor-tool uses."
+    "The single supplied export contains 463 rows under one PlayerCardPlateDataTable asset; no numbered shards or localization variants were found. All row keys and serialized ID values are numeric strings, and all 463 ImageFileName and ThumbnailImageFileName values are unique. The 463 ItemDataTable rows with ItemType Plate have distinct VariableId values that exactly match those row IDs, including the new-profile default '1'.",
+    "All three fields are FName. The reconstructed row constructor is empty, so native fallbacks are NAME_None; the export has no None or empty texture names. No unit, range or array-index semantics are present in this row schema.",
+    "The lookup API accepts an array of tables, and DTM_FindPlayerCardPlateRow, PlayerCard_FindPlateRow and the inlined icon/tile/situation finders return the first matching row in table order. The manager shown here registers only the unnumbered PlayerCardPlateDataTable and skips null loads; multi-shard behavior is structural, not evidence of additional shipped shards.",
+    "DTM's bCheckNone only rejects NAME_None and its bUnknown parameter is unused; Validate is the one traced caller passing true,true. Unguarded row dereferences remain in UGamePlayerCardPlateWidget::SetThumbnailImage and UGamePlayerCardWidget::RefreshPlateImage. Validate() handles save/online/supplied card IDs with no row, PlayerCard_ResetUnownedIds enforces ownership for the editor save, and PlayerCard_FromLeaderboardCard_1629650 defaults an unpacked missing PlateNumber to '1'; none of these proves every UI or network path is sanitized.",
+    "Evidence is reconstructed native C++ plus exported schema/values and shipped PrimaryAssetTypes config; the checked-out Content lacks the named plate textures, and no retail Blueprint graphs or editor-only tools were audited. No claim is made about all Blueprint/editor-tool uses."
   ],
   "usages": [
     {
@@ -54,23 +64,43 @@
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:254",
-      "detail": "Builds owned plate rows from owned Plate items' VariableId values."
+      "detail": "Builds owned plate rows from owned/unlocked Plate items' VariableId values, stable-sorted by Item::SortingOrder when requested."
     },
     {
-      "source": "Source/Abrams/Private/GamePlayerCardWidget.cpp:147",
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:150",
+      "detail": "CollectTextureNames prefetches the plate's full texture for card widgets, customize screens and lobby card loading."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:649",
+      "detail": "Unpacks a ranking entry's PlateNumber to PlateId, defaulting to '1' when no row exists."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardWidget.cpp:151",
       "detail": "Applies the full ImageFileName texture to the profile card."
     },
     {
-      "source": "Source/Abrams/Private/GamePlayerCardPlateWidget.cpp:15",
+      "source": "Source/Abrams/Private/GamePlayerCardPlateWidget.cpp:18",
       "detail": "Applies the ThumbnailImageFileName texture to plate previews."
     },
     {
-      "source": "Source/Abrams/Private/GameCustomizeCardPlateTileItemWidget.cpp:57",
-      "detail": "Requests asynchronous loading of the thumbnail texture for plate tiles."
+      "source": "Source/Abrams/Private/GameCustomizeCardPlateTileWidget.cpp:39",
+      "detail": "Copies each owned plate row's Id into its tile item for selection and thumbnail lookup."
     },
     {
-      "source": "Source/Abrams/Private/GameItemOwnership.cpp:228",
+      "source": "Source/Abrams/Private/GameCustomizeCardPlateTileItemWidget.cpp:116",
+      "detail": "Queues the row's thumbnail as a WidgetTexture primary asset for visible plate tiles."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemOwnership.cpp:247",
+      "detail": "Returns the plate's full ImageFileName for Plate items, feeding shop set/lottery and archive overlays."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemOwnership.cpp:297",
       "detail": "Uses the Plate row's thumbnail as the Item icon image for Plate-type items."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemIconWidget.cpp:159",
+      "detail": "Selects the plate thumbnail or full image by bShowThumbnail for Plate item icons."
     },
     {
       "source": "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:735",

@@ -1,65 +1,112 @@
 {
-  "description": "Weighted pools of mission-task ids, used to choose the active task for a wave.",
+  "description": "Per-wave mission-task lottery pools: ten candidate task ids paired with relative weights. The main battle paths (Arcade, Story battle and PvE) pick one weighted candidate per wave, while story-demo objective UI reads only the first candidate. The single exported asset has 134 rows.",
   "fields": {
     "Id": {
-      "simple": "Mission task lottery identifier.",
-      "technical": "FName import key/row name for FGameDataTableRow_MissionTaskLottery. Wave rows reference it as Id_MissionTaskLottery; the finder over MissionTaskLotteryDataTables (DTM+0x9F0) can skip None ids. No substantive consumer reads the member as data.",
+      "simple": "Mission task lottery row identifier.",
+      "technical": "FName import key / DataTable row name for FGameDataTableRow_MissionTaskLottery (export field ID; all 134 keys match the ID value). MissionWave rows point to it with Id_MissionTaskLottery; 1768 non-None references across MissionWaveDataTable cover all 134 lottery rows. AGameDataTableManager loads the single MissionTaskLotteryDataTable asset through the DataTable primary-asset loader named by that row key into MissionTaskLotteryDataTables (DTM+0x9F0); once all loaders complete, null tables are filtered and StoryFindRowOutOfLine checks tables in order with bCheckNone=true, so a None id returns no row. No C++ consumer reads the row's Id member as data; an unreconstructed retail GetRows<MissionTaskLottery> collector (0x15B7FD0, HOLD) leaves another possible use unknown.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTaskLottery.h:11",
+        "Source/AbramsDataTable/Private/GameDataTableRow_MissionTaskLottery.cpp:3",
+        "Source/Abrams/Private/GameDataTableManager.cpp:111",
+        "Source/Abrams/Private/GameDataTableManager.cpp:289",
+        "Source/Abrams/Private/GameDataTableManager.cpp:462",
         "Source/Abrams/Public/GameDataTableManager.h:200",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:118",
         "Source/Abrams/Private/GamePhase_BattleArcade.cpp:96",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:568"
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:568",
+        "JJKCCDatatables/datatables/MissionTaskLotteryDataTable.json",
+        "JJKCCDatatables/datatables/MissionWaveDataTable.json"
       ],
       "status": "observed"
     },
     "Id_MissionTask": {
       "simple": "Candidate mission-task ids in the pool.",
-      "technical": "TArray<FName>, default empty. BattleArcade_PickLotteryTask copies it with Weights, removes every None entry together with the same-index weight, then returns the task id at the weighted-picked index (NAME_None for an empty pool or no pick). The story demo task helper instead uses Id_MissionTask[0] directly when the array is non-empty. Exported rows pad unused slots with None.",
+      "technical": "TArray<FName>, default empty. All 134 exported rows have 10 slots; unused slots are the FName string \"None\" and every exported row's first slot is non-None. BattleArcade_PickLotteryTask copies the array with Weights, removes None tasks together with the same-index weight, and returns Tasks[Picked] from the weighted pick; if the row is absent, all candidates are None, or either filtered array is empty, it returns NAME_None. The 150 distinct non-None ids all resolve in MissionTaskDataTable, and the picked id is looked up there (a missing/no pick leaves a None slot). Story_GetDemoMissionTask_13096F0 instead takes Id_MissionTask[0] when the array is non-empty, ignoring Weights and without filtering None; in the export that first slot is always a real task id.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTaskLottery.h:15",
         "Source/Abrams/Private/GamePhase_BattleArcade.cpp:102",
         "Source/Abrams/Private/GamePhase_BattleArcade.cpp:106",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:112",
         "Source/Abrams/Private/GamePhase_BattleArcade.cpp:119",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:126",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:157",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:198",
+        "Source/Abrams/Private/GamePvESettings.cpp:674",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:569",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:571"
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:571",
+        "JJKCCDatatables/datatables/MissionTaskLotteryDataTable.json",
+        "JJKCCDatatables/datatables/MissionTaskDataTable.json"
       ],
       "status": "verified"
     },
     "Weights": {
       "simple": "Relative weight for each candidate task.",
-      "technical": "TArray<float>, default empty. After None candidates are removed, the weights are summed; BattleArcade_PickWeightIndex draws StoryFRand() * Sum and walks the array subtracting each weight until the roll is smaller, returning that index. If the walk exhausts the array it returns the last index; an empty pool returns NAME_None. Weights are therefore relative, not probabilities, and must stay index-aligned with Id_MissionTask.",
+      "technical": "TArray<float>, default empty; all 134 exported rows have 10 values aligned with Id_MissionTask (106 rows are all 1.0; 28 use tiered values such as 80/40/40/20/20/...). BattleArcade_PickLotteryTask removes weights at filtered None slots, sums the survivors, draws StoryFRand() * Sum (StoryFRand is a uniform [0,1) float from GameDataTableManager_RandRange(0, MAX_int32)), and BattleArcade_PickWeightIndex returns the first index whose interval contains the roll, falling back to the last index if the walk exhausts the array. An empty pool returns NAME_None. Weights are relative totals, not probabilities (row sums often exceed 1), and must stay index-aligned with Id_MissionTask; the export has no zero/negative weights, but the runtime picker does not reject them.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTaskLottery.h:18",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:182",
         "Source/Abrams/Private/GamePhase_BattleArcade.cpp:78",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:82",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:88",
         "Source/Abrams/Private/GamePhase_BattleArcade.cpp:103",
         "Source/Abrams/Private/GamePhase_BattleArcade.cpp:112",
-        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:117"
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:117",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:121",
+        "JJKCCDatatables/datatables/MissionTaskLotteryDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset contains 134 rows with FGameDataTableRow_MissionTaskLottery; the manager loads MissionTaskLotteryDataTable into MissionTaskLotteryDataTables (DTM+0x9F0).",
-    "The only full weighted consumer found is Arcade/PvE task selection via BattleArcade_PickLotteryTask (retail 0x1302490); PvE settings reuse the same helper. Story demo selection takes only the first id of the pool, so a row with several non-None tasks can behave differently by mode.",
-    "Lottery finder 0x12fb0a0 is labelled behavioural in status/functions.json; this is reconstructed behaviour. No localization variants or numbered shards were supplied for this table.",
-    "Only available C++ and the export were reviewed; Content is partial and Blueprint uses were not exhaustively inspectable."
+    "Single export shard: JJKCCDatatables/datatables/MissionTaskLotteryDataTable.json has 134 rows in one variant, with no localized or numbered shards; the retail registry has only /Game/DataTables/MissionTaskLotteryDataTable (Tools/verify/M4-mount/registry-summary.json). Row keys are unique and equal the exported ID, all 134 are referenced by MissionWaveDataTable, and all 150 distinct non-None task ids resolve in MissionTaskDataTable.",
+    "Lookup/cache chain: the DataTable primary asset named MissionTaskLotteryDataTable is loaded into MissionTaskLotteryDataTables (DTM+0x9F0) after every loader completes (GameDataTableManager.cpp:289,462; GameDataTableManager.h:200). All three weighted battle paths call BattleArcade_PickLotteryTask: Arcade setup (GamePhase_BattleArcade.cpp:157), Story battle setup (GamePhase_BattleStory.cpp:198) and PvE wave task generation (GamePvESettings.cpp:674). PvE caches the picked ids in FGamePvESettings::MissionTaskIds (GamePhase_IntervalPvE.cpp:972,1013), which PvE battle phases resolve through MissionTaskDataTables (GamePhase_BattlePvESolo.cpp:494, GamePhase_BattlePvETag.cpp:69). The story-demo objective path bypasses weighting and takes element 0 (StoryLaunchHelpers.cpp:568-571).",
+    "Evidence strength: current status/functions.json reports weighted picker 0x1302490 as state match (MATCH verdict) and finder 0x12fb0a0 as behavioural/BEHAV-certified, i.e. reconstructed behaviour rather than byte-identical code; older DIFF lane rows for the finder remain in status/verdicts.json. Retail also has a FGameDataTableArray::GetRows<FGameDataTableRow_MissionTaskLottery> collector at 0x15B7FD0 (state HOLD) called from an unreconstructed body at 0x15BABBF; its purpose is unknown.",
+    "Retail Blueprint/cooked-asset behaviour was not inspected; the checkout's Content is partial, so no claim about Blueprint-only readers is made. All consumer statements above come from reconstructed C++ and serialized export data."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GamePhase_BattleArcade.cpp:90",
-      "detail": "BattleArcade_PickLotteryTask resolves a lottery row, filters None candidates and performs the weighted task pick."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:289",
+      "detail": "Caches the loaded MissionTaskLotteryDataTable UDataTable in MissionTaskLotteryDataTables (DTM+0x9F0) once all DataTable loaders have completed; null tables are filtered."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:462",
+      "detail": "Adds MissionTaskLotteryDataTable to the DataTable primary asset loader name list, which becomes the loader map alias used by the manager."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleArcade.cpp:94",
+      "detail": "BattleArcade_PickLotteryTask resolves the row with bCheckNone=true, drops None tasks with their same-index weights, and performs the weighted pick with StoryFRand() times the weight sum; missing row or empty pool returns NAME_None."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattleArcade.cpp:157",
-      "detail": "Arcade battle setup converts each wave's Id_MissionTaskLottery into the task row used by the battle."
+      "detail": "Arcade wave setup picks one task id per wave and resolves it in MissionTaskDataTables before passing the task array to SetupArcadeMission."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:198",
+      "detail": "Story battle wave setup uses the same weighted picker and resolves the picked id into the task array for SetupStoryMission."
     },
     {
       "source": "Source/Abrams/Private/GamePvESettings.cpp:674",
-      "detail": "PvE settings call the same lottery picker for mission wave task ids."
+      "detail": "GamePvE_MakeMissionTasks uses the same picker for each selected wave, leaving None in output slots where no wave row or pick exists."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:972",
+      "detail": "Stores the picked task ids in FGamePvESettings::MissionTaskIds and forwards them in the interval parameter (line 1013)."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:494",
+      "detail": "PvE battle resolves cached MissionTaskIds through MissionTaskDataTables with bCheckNone=true."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvETag.cpp:69",
+      "detail": "PvE tag battle resolves the same cached MissionTaskIds through MissionTaskDataTables."
     },
     {
       "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:568",
-      "detail": "Story demo objective lookup reads only the first candidate id from the lottery row."
+      "detail": "Story-demo objective lookup resolves the lottery row and reads only Id_MissionTask[0], ignoring Weights."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:770",
+      "detail": "Explicit out-of-line row finder instantiation for this row struct at retail 0x12FB0A0, used by the weighted picker and the story-demo helper."
     }
   ]
 }

@@ -3,10 +3,20 @@
   "fields": {
     "Brush": {
       "simple": "Brush drawn for the matching inline image.",
-      "technical": "FindImageBrush resolves the tag or ID as an Unreal row name in CustomImageSet. It calls FindRow with warning disabled and returns the address of this brush on success or null when the row lookup fails. The native implementation does not branch on IconSizeType.",
+      "technical": "FSlateBrush, declared BlueprintReadWrite/EditAnywhere on FGameWidgetRichTextBlockImageRow, which derives from FTableRowBase and declares no other property. The row constructor is empty, so an uninitialized row carries the engine-default brush (no resource object); there is no custom sentinel, size enum, array, or fallback field. UGameWidgetRichTextBlockDecorator::FindImageBrush uses TagOrId directly as the FName row key in CustomImageSet->FindRow<FGameWidgetRichTextBlockImageRow>(TagOrId, FString(), false), then returns the address of this brush or nullptr when FindRow fails. FindRow itself performs the RowStruct and empty-name tests before the row-map lookup. The override performs no alias or input-key translation, reads neither IconSizeType nor its own bWarnIfMissing parameter, and hardcodes FindRow's warning flag to false. Retail layout evidence lists Brush at offset 16, occupying 208 bytes in a 224-byte struct.",
       "evidence": [
-        "Source/Abrams/Private/GameWidgetRichTextBlockDecorator.cpp:7",
-        "Source/Abrams/Private/GameWidgetRichTextBlockDecorator.cpp:12"
+        "Source/Abrams/Public/GameWidgetRichTextBlockImageRow.h:7",
+        "Source/Abrams/Public/GameWidgetRichTextBlockImageRow.h:8",
+        "Source/Abrams/Public/GameWidgetRichTextBlockImageRow.h:11",
+        "Source/Abrams/Public/GameWidgetRichTextBlockImageRow.h:12",
+        "Source/Abrams/Private/GameWidgetRichTextBlockImageRow.cpp:3",
+        "Source/Abrams/Public/GameWidgetRichTextBlockDecorator.h:20",
+        "Source/Abrams/Public/GameWidgetRichTextBlockDecorator.h:22",
+        "Source/Abrams/Private/GameWidgetRichTextBlockDecorator.cpp:9",
+        "Source/Abrams/Private/GameWidgetRichTextBlockDecorator.cpp:10",
+        "Source/Abrams/Private/GameWidgetRichTextBlockDecorator.cpp:12",
+        "Source/Abrams/Private/GameWidgetRichTextBlockDecorator.cpp:13",
+        "Tools/layout/struct-sizes.json:42204"
       ],
       "status": "verified"
     }
@@ -14,15 +24,54 @@
   "usages": [
     {
       "source": "Source/Abrams/Public/GameWidgetRichTextBlockDecorator.h:15",
-      "detail": "Exposes the decorator's CustomImageSet table as a widget property."
+      "detail": "Exposes the decorator's CustomImageSet table as a protected BlueprintReadWrite/EditAnywhere UDataTable property. Its constructor sets the pointer to null (WidgetRemainderCtors.cpp:74-76)."
     },
     {
       "source": "Source/Abrams/Private/GameWidgetRichTextBlockDecorator.cpp:12",
-      "detail": "Resolves a rich-text tag or ID to the row's Slate brush."
+      "detail": "Resolves a rich-text tag or ID directly as a DataTable row name and returns that row's Slate brush; the row struct is checked by FindRow rather than by a separate cast in this function."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetRichTextBlockDecoratorBase.cpp:6",
+      "detail": "The abstract base creates FGameWidgetRichTextBlockInlineDecorator for each owning rich-text block, which is the path that invokes FindImageBrush for <img> runs."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetRichTextBlockInlineImage.cpp:71",
+      "detail": "An <img> run is claimed only when it has an id and that id resolves to a non-null brush; this supports check calls FindImageBrush with false. <span> runs take a separate text-styling path."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetRichTextBlockInlineImage.cpp:89",
+      "detail": "The image widget fetches the brush again with a true warning argument, but the common decorator override ignores that argument. width and height attributes are parsed as int32 values, and stretch is parsed from EStretch enum names with ScaleToFit as the default; these are markup attributes, not row fields."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetRichTextBlockInlineImage.cpp:17",
+      "detail": "SRichInlineImage returns without content when the brush is null. Otherwise it uses min(font maximum character height, Brush.ImageSize.Y) for both dimensions unless width/height override them, then renders the unchanged brush through SScaleBox and SImage with DownOnly scaling and vertical centering."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetRichTextBlockInlineImage.cpp:165",
+      "detail": "The inline decorator defaults IconSizeType to 1 and only replaces it with UGameWidgetInputGuideText::GetIconSizeType() for a valid input-guide-text owner. It then dispatches virtually to the owning decorator, so the common UGameWidgetRichTextBlockDecorator override still ignores that value."
+    },
+    {
+      "source": "Source/Abrams/Public/GameWidgetRichTextBlock.h:56",
+      "detail": "A widget may set its own Decorator class; ApplyTextStyleSet uses that class when non-null and otherwise falls back to the widget manager's CommonDecorator (GameWidgetRichTextBlock.cpp:250-257). SetDecoratorClass clears DecoratorClasses and installs exactly the selected class (lines 269-272)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetManagerFont.cpp:141",
+      "detail": "GetCommonDecorator returns the manager's cached CommonDecorator class at +0x468. The shipped config scans Blueprintable TextDecorator assets derived from UGameWidgetRichTextBlockDecoratorBase under /Game/Widgets/Commons (Config/DefaultGame.ini:32), but source does not show which asset populates the member."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:35",
+      "detail": "Input-guide text decorators override FindImageBrush and use their own keyboard/controller brush rows and dynamic-icon fallback, guarded by a null-table check (line 41). Those rows are a different schema and are not read by UGameWidgetRichTextBlockDecorator."
     }
   ],
   "notes": [
-    "FindImageBrush directly dereferences CustomImageSet. The caller path needs an assigned table for this lookup.",
-    "The image-row schema and its consumer are present in the native source. The dataset has no matching asset export."
+    "FindImageBrush directly dereferences CustomImageSet. The caller path needs an assigned table for this lookup: unlike UGameWidgetInputGuideTextDecorator, the common decorator has no null-table guard, so a null pointer is dereferenced rather than converted into a safe miss. The C++ constructor initializes CustomImageSet to null; the retail Blueprint that assigns it is not in the source snapshot.",
+    "TagOrId is used directly as the DataTable row FName. There is no enum-name gate, binding lookup, row scan, alias map, or first-match precedence here; row-name lookup either finds this row or returns null. This differs from the input-guide decorators, which translate game-key tags and scan their own row maps by field value.",
+    "The decorator's bWarnIfMissing argument is never read. The inline caller passes false during Supports and true during widget creation, but the override always supplies false to UDataTable::FindRow, so neither call emits the FindRow missing-row warning.",
+    "IconSizeType is also unused by this override. The inline wrapper's default value of 1 is only meaningful to decorators that implement size selection, such as UGameWidgetInputGuideTextDecorator; this row has one brush and no small/tiny variants.",
+    "FindRow checks that the table's RowStruct derives from FGameWidgetRichTextBlockImageRow and rejects empty row names before the row-map lookup. The returned pointer is the brush stored in the row; no HasUObject/resource-validity test is performed, so a default empty brush still counts as a non-null lookup result for Supports.",
+    "No row field controls image dimensions or scaling. The <img> markup supplies optional integer width and height and an optional EStretch name; absent dimensions derive from the brush's ImageSize and the current font. The retail layout ledger reports one FSlateBrush at offset 16, size 208, in a 224-byte row.",
+    "Decorator selection precedence is explicit: a non-null per-widget Decorator wins; otherwise UGameWidgetRichTextBlock uses the manager's CommonDecorator when the widget opens. Exact Blueprint class assignments and CustomImageSet contents are not recoverable from the C++ or the provided exports.",
+    "All 321 JSON files in the read-only datatable export set (321 root asset exports, no nested JSON files) were parsed. None has this RowStruct or a RichText/ImageSet/ImageRow asset name, and the site catalog has zero variants and an empty row-key index. This is an evidence gap, not proof that retail shipped without the table.",
+    "The native header, empty row constructor, decorator body, inline-image consumer, manager accessor, and selection chain above are verified from the reconstructed source; the common FindImageBrush body is byte-matched to retail at 0x1560210 in status/functions.json. Actual retail Blueprint references, row names, and brush resources remain unverified because no matching Blueprint assignment evidence or DataTable export was available in the reviewed sources and no editor or game was launched."
   ]
 }

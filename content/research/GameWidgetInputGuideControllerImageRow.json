@@ -1,60 +1,121 @@
 {
-  "description": "Maps a set of controller button bits to an inline input-guide icon in each of the gamepad device decorators.",
+  "description": "Supplies the Normal, Small, and Tiny inline input-guide brushes for a gamepad decorator by matching the row's EInputKey button bit mask against the current binding of an EGameInputKey tag.",
   "fields": {
     "InputKey": {
-      "simple": "Controller button bits matched by the row.",
-      "technical": "The row defaults to EInputKey::None. For an EGameInputKey tag, the decorator reads the current game-key button bits and compares them with static_cast<uint32>(InputKey). It selects the first exact match encountered in row-map iteration.",
+      "simple": "The EInputKey controller-button bit mask matched by the row.",
+      "technical": "EInputKey is a uint32 flag enum (ENUM_CLASS_FLAGS), and the row constructor initializes this member to None (0). FindImageBrush first requires TagOrId to resolve to a registered EGameInputKey name through GetValueByNameString/IsValidEnumValue (the header also declares aliases Min, Max, Num, and Invalid). It then calls AGameInputManager::GetGameKeyButtons(GameKey), which returns GameKeyButtonMap[GameKey] as uint32 or 0 when the key is unmapped. The scan directly casts each CustomImageSet RowMap value without validating RowStruct, compares static_cast<uint32>(Row->InputKey) for exact equality with that whole word (not bitwise intersection), and stops at the first match. Row names are ignored. Default binds include composite words such as WidgetUp = DPad_Up | LeftStick_Up, and the config/save path can replace the map. Unlike the keyboard branch, no player index or Keys[0] is used here. A game-key tag with no matching row returns nullptr; it does not use the dynamic-icon fallback.",
       "evidence": [
+        "Source/Abrams/Public/GameWidgetInputGuideControllerImageRow.h:13",
         "Source/Abrams/Public/GameWidgetInputGuideControllerImageRow.h:24",
+        "Source/Framework/Public/EInputKey.h:6",
+        "Source/Framework/Public/EInputKey.h:36",
+        "Source/Abrams/Public/EGameInputKey.h:7",
+        "Source/Abrams/Public/EGameInputKey.h:58",
+        "Source/Abrams/Public/EGameInputKey.h:60",
+        "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:81",
         "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:138",
-        "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:143"
+        "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:140",
+        "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:142",
+        "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:143",
+        "Source/Abrams/Private/GameInputManager.cpp:618",
+        "Source/Abrams/Private/GameInputManager.cpp:620",
+        "Source/Abrams/Private/GameInputManager.cpp:624",
+        "Source/Abrams/Private/GameInputManager.cpp:83"
       ],
       "status": "verified"
     },
     "Brush": {
-      "simple": "Normal controller icon.",
-      "technical": "SelectBySize returns this brush for Normal after a row matches the current button bits.",
+      "simple": "Normal-size controller icon.",
+      "technical": "FSlateBrush. After a row matches, SelectBySize returns the address of this brush for EGameWidgetInputGuideSizeType::Normal (1). It is returned as stored: there is no HasUObject check, localization branch, or per-player override on the controller path. An unrecognized size value returns nullptr before a brush is selected.",
       "evidence": [
+        "Source/Abrams/Public/GameWidgetInputGuideControllerImageRow.h:16",
+        "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:15",
         "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:19",
+        "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:22",
         "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:153"
       ],
       "status": "verified"
     },
     "SmallBrush": {
-      "simple": "Small controller icon.",
-      "technical": "SelectBySize returns this brush for Small after a row matches the current button bits.",
+      "simple": "Small-size controller icon.",
+      "technical": "FSlateBrush. After a row matches, SelectBySize returns the address of this brush for EGameWidgetInputGuideSizeType::Small (2). Inline guide text selects Small when bUseSmallIcon is set and the game is not running on Steam Deck; UGameWidgetInputImage always requests Normal. No resource-validity check or localization override is applied here.",
       "evidence": [
+        "Source/Abrams/Public/GameWidgetInputGuideControllerImageRow.h:19",
+        "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:15",
         "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:20",
-        "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:153"
+        "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:153",
+        "Source/Abrams/Private/GameWidgetInputGuideText.cpp:48",
+        "Source/Abrams/Private/GameWidgetInputImage.cpp:98"
       ],
       "status": "verified"
     },
     "TinyBrush": {
-      "simple": "Tiny controller icon.",
-      "technical": "SelectBySize returns this brush for Tiny after a row matches the current button bits.",
+      "simple": "Tiny-size controller icon.",
+      "technical": "FSlateBrush. After a row matches, SelectBySize returns the address of this brush for EGameWidgetInputGuideSizeType::Tiny (3). Inline guide text selects Tiny when bUseSmallIcon is set and Story_IsSteamDeck_1312790() reports a Steam Deck; otherwise that path uses Small or Normal. No resource-validity check or localization override is applied here.",
       "evidence": [
+        "Source/Abrams/Public/GameWidgetInputGuideControllerImageRow.h:22",
+        "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:15",
         "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:21",
-        "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:153"
+        "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:153",
+        "Source/Abrams/Private/GameWidgetInputGuideText.cpp:48",
+        "Source/Abrams/Private/GameWidgetInputGuideText.cpp:52"
       ],
       "status": "verified"
     }
   },
   "usages": [
     {
+      "source": "Source/Abrams/Public/GameWidgetInputGuideTextDecorator_XInput.h:14",
+      "detail": "XInput, DualShock, DualSense, SwitchProController, and JoyCon subclasses each declare their own protected BlueprintReadWrite/EditAnywhere CustomImageSet UDataTable pointer and hardcode their EGameWidgetInputGuideType; each overrides GetCustomImageSet to return that pointer. Their constructors initialize all five pointers to null (WidgetConstructors.cpp:342-364)."
+    },
+    {
       "source": "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:41",
-      "detail": "Obtains the device decorator's CustomImageSet. A null table stops lookup."
+      "detail": "The shared FindImageBrush obtains GetCustomImageSet() and returns nullptr immediately when the pointer is null, before tag parsing or any fallback."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:47",
+      "detail": "TagOrId is parsed as an EGameInputKey enum name. A registered value routes to the binding-based path; anything else goes to the dynamic-icon fallback parameter (lines 63-77) and never consults this row struct. bWarnIfMissing is not read."
     },
     {
       "source": "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:132",
-      "detail": "Routes XInput, DualShock, DualSense, Switch Pro Controller, and Joy-Con to this row schema and returns null for a missing button match."
+      "detail": "The five gamepad guide types share one branch: read GetGameKeyButtons, scan the row map, return nullptr on a miss, and otherwise select a size-appropriate brush."
     },
     {
-      "source": "Source/Abrams/Private/GameWidgetInputGuideTextDecorator.cpp:63",
-      "detail": "Tags outside EGameInputKey use the fallback input-guide parameter path."
+      "source": "Source/Abrams/Private/GameInputManager.cpp:618",
+      "detail": "GetGameKeyButtons resolves the EGameInputKey through the manager's GameKeyButtonMap and returns 0 if absent. This is a global binding map, not a per-player key array; default bindings and config/save rebinding determine the compared word."
+    },
+    {
+      "source": "Source/Abrams/Private/GameInputManager.cpp:83",
+      "detail": "Default bindings demonstrate composite bit words (WidgetUp/Down/Left/Right OR a stick direction with a D-pad direction), so row InputKey must equal the full bound word, not one constituent button bit."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetManager.cpp:251",
+      "detail": "The widget manager loads BP_InputGuideTextDecorator_<Type> from /Game/Widgets/StreamingAssets/InputGuide/Win64/ for each guide type; the retail Blueprint's CustomImageSet assignment is not present in source or exports."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetManager.cpp:822",
+      "detail": "The loaded decorator classes and non-abstract instances are cached per EGameWidgetInputGuideType and retrieved through GetInputGuideDecoratorClass/GetInputGuideDecoratorInstances."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetInputImage.cpp:83",
+      "detail": "UGameWidgetInputImage resolves the cached decorator class for its selected guide type, calls FindImageBrush on the class default object with the EGameInputKey name and Normal size, and applies the returned brush's resource object."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetRichTextBlockInlineImage.cpp:165",
+      "detail": "Rich-text <img id=...> runs call the guide decorator's FindImageBrush. A live UGameWidgetInputGuideText owner supplies its GetIconSizeType value; otherwise the caller defaults to Normal."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetInputGuideText.cpp:65",
+      "detail": "UGameWidgetInputGuideText adds the manager's cached per-type decorator instances to its inline-decorator set, connecting these rows to input-guide rich text."
     }
   ],
   "notes": [
-    "The gamepad decorators each expose a CustomImageSet UDataTable pointer. The available dataset has no matching variant export.",
-    "The lookup compares the InputKey property while iterating the row map. Unreal row names do not select the gamepad icon."
+    "All five gamepad decorator subclasses have their own CustomImageSet pointer, initially null. The reconstructed C++ proves how the pointer is consumed, but the retail Blueprint that assigns the table (and the table's actual rows) is absent from the source snapshot and extracted content.",
+    "The lookup is by current binding, not row name: TagOrId supplies an EGameInputKey, GetGameKeyButtons supplies its EInputKey bit word, and the first RowMap entry whose InputKey equals that word wins. The scan casts row bytes directly without a RowStruct check, so the assigned table must actually contain FGameWidgetInputGuideControllerImageRow rows.",
+    "Equality is against the complete 32-bit word. Default binds include composite words (for example WidgetUp = DPad_Up | LeftStick_Up), and the config/save path can change the map. An unmapped key, including Invalid (255), which the default map does not bind, yields 0; therefore a row storing the constructor default None (0) would match on that path. No export confirms whether such a sentinel row exists in retail data.",
+    "Null CustomImageSet returns nullptr before parsing. A valid game-key tag with no row match also returns nullptr and does not use the dynamic-icon fallback; non-game-key tags use that fallback instead of these rows. The enum header declares aliases Min/Max/Num/Invalid, which are handled by the same enum-name parser.",
+    "SelectBySize maps Normal/Small/Tiny to Brush/SmallBrush/TinyBrush and returns nullptr for Invalid or any other size. Inline guide text chooses Small when bUseSmallIcon is true, Tiny on Steam Deck, and Normal otherwise; UGameWidgetInputImage always requests Normal. Unlike the keyboard path, no localized-brush HasUObject fallback exists for controller rows.",
+    "The retail layout ledger reports this struct EXACT with InputKey at offset 8 and the three brushes at offsets 16, 224, and 432. Provided row exports were checked across all 321 JSON DataTable shards (321 assets): none uses this row struct or an input-guide/controller-image table, and the generated row-key index for this group is empty.",
+    "Field types, defaults, and runtime control flow above are verified from reconstructed C++ and layout evidence; actual retail Blueprint asset references, table contents, row names, and brush resources remain unverified."
   ]
 }

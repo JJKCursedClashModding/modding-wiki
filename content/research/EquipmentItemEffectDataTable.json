@@ -1,13 +1,18 @@
 {
-  "description": "Defines the reusable stat, resource, buff/debuff, and one-shot effects granted by cursed tools, cursed objects, and extras, including their numeric parameters and the text shown in item descriptions.",
+  "description": "Defines the reusable stat, resource, rate, buff/debuff, and one-shot effects attached to cursed tools, cursed objects, and extras, including numeric thresholds/chances and the localized description text IDs shown on item cards.",
   "fields": {
     "Id": {
       "simple": "Equipment-effect row identifier.",
-      "technical": "FName key resolved from FGameDataTableRow_EquipmentItem::Id_EquipmentItemEffect. EquipmentItemDataTables points here through EquipmentItemEffectDataTables; helpers scan tables in order and append the first row with the requested name. A None effect ID is skipped by callers.",
+      "technical": "FName at row offset 0x08; the export serializes it as ID and it matches the DataTable row key. Runtime lookup uses effect IDs from FGameDataTableRow_EquipmentItem::Id_EquipmentItemEffect rather than this field value: an Item row's VariableId selects an EquipmentItem row, then each named effect row is found with FindRow. AGameDataTableManager resolves the registered table into EquipmentItemEffectDataTables; status, PvE, and description helpers scan that array in order and take the first match. None effect IDs are skipped.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItemEffect.h:11",
+        "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItemEffect.h:12",
+        "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItem.h:18",
+        "Source/Abrams/Private/GameDataTableManager.cpp:183",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2261",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2266",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2268",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2274",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:76",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:81",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:86"
       ],
@@ -15,101 +20,157 @@
     },
     "EffectType": {
       "simple": "Selects which gameplay effect this row applies.",
-      "technical": "EGameEquipmentItemEffectType (None=0 through StepDistance=78, Invalid=255). GameEquipment_GetEffectRowsOfType filters effect rows by exact type; status queries then add, multiply, threshold, or randomly apply EffectValue depending on that type. Examples: HitPointMax/HitPointMaxAlly/Enemy feed PvE HP calculations; SendAttackDamage and SendAttackDamageWithHitPointRate feed the damage-rate query; one-shot types are enumerated at the HP-change path and route the row's buff ID to self, ally, or rival lists. Default None.",
+      "technical": "EGameEquipmentItemEffectType (uint8) at row offset 0x10; None=0, StepDistance=72, Invalid=255, and the struct constructor defaults the field to None. GameEquipment_GetEffectRowsOfType filters effect rows by exact type without deduplication. Consumers then use EffectValue[0] as a signed flat amount (SumEffectValue), a multiplier whose neutral value is 1.0 (SumEffectRate subtracts one), a threshold (the AtValue helpers compare the caller's HP ratio/count/gauge against EffectValue[0] and use EffectValue[1]), or a chance (RollChance). HitPointMax sums flat HP, HitPointMaxAlly takes the maximum, and HitPointMaxEnemy sums a penalty in the PvE HP calculation; SendAttackDamage and SendAttackDamageWithHitPointRate feed the outgoing-damage rate, which is finally clamped to at least 0.01. The HP-change path enumerates 16 Once types: eight push Id_BuffDebuff to self, one to allies, three to rivals, and four consume EffectValue[1] directly. CursedEnergyOnceEnemy applies rival energy from EffectValue[1] inside the reconstructed retail loop over RivalBuffIds.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameEquipmentItemEffectType.h:6",
+        "Source/AbramsDataTable/Public/EGameEquipmentItemEffectType.h:7",
+        "Source/AbramsDataTable/Public/EGameEquipmentItemEffectType.h:70",
+        "Source/AbramsDataTable/Public/EGameEquipmentItemEffectType.h:79",
+        "Source/AbramsDataTable/Public/EGameEquipmentItemEffectType.h:80",
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItemEffect.h:16",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:2287",
+        "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItemEffect.h:27",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2295",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2353",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2370",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:4410",
-        "Source/Abrams/Private/GamePvESettings.cpp:349"
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4420",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4425",
+        "Source/Abrams/Private/GamePvESettings.cpp:349",
+        "Source/Abrams/Private/GamePvESettings.cpp:356",
+        "Source/Abrams/Private/GamePvESettings.cpp:421"
       ],
       "status": "verified"
     },
     "EffectValue": {
       "simple": "Numeric parameters for the effect; behavior depends on EffectType and array index.",
-      "technical": "TArray<float> at row offset 0x18; exported rows contain three floats and often use [0.0, 0.0, 0.0]. Index 0 is the additive/stat value for plain effects (for example HitPointMax) and a multiplier/rate for *Rate effects, where 1.0 is neutral and SumEffectRate adds Value-1.0. For probability-driven effects index 0 is a 0..1 chance passed as Value*100 out of 100, and index 1 is the applied magnitude; for at-value effects index 0 is the HP/ratio threshold and index 1 is the added rate or value. HitPointWhenJustGuard uses index 0 as chance and index 1 as flat HP. Index 2 is serialized but no identified consumer reads it. Missing indices are read unguarded by several helpers.",
+      "technical": "TArray<float> at row offset 0x18; all 268 exported rows have exactly three entries, with index 2 equal to 0.0 in every row, though the struct permits any length. Interpretation depends on EffectType and the consuming helper. SumEffectValue uses index 0 as a signed flat amount or max candidate; SumEffectRate uses index 0 as a multiplier with 1.0 neutral and accumulates value-1.0. Chance helpers use index 0 as a nominal percentage, static_cast<int32>(value*100) out of 100 with both endpoints inclusive, and use index 1 as the applied magnitude; HitPointWhenJustGuard and its ally variant use index 1 as flat HP. AtValue helpers use index 0 as an inclusive comparison threshold (caller value >= threshold when bAtLeast is true, <= threshold otherwise) and index 1 as a rate delta or flat value. Unsuccessful rolls contribute nothing; missing indices are read unguarded by these helpers, and no identified C++ consumer reads index 2.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItemEffect.h:19",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2325",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2361",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2378",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2411",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:2471",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:2553",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:3211",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:3982",
-        "Source/Abrams/Private/GamePvESettings.cpp:351"
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2478",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2485",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2560",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3218",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3225",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3989",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4446",
+        "Source/Abrams/Private/GameManager.cpp:836",
+        "Source/Abrams/Private/GameManager.cpp:839",
+        "Source/Abrams/Private/GamePvESettings.cpp:351",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:230"
       ],
       "status": "verified"
     },
     "Id_BuffDebuff": {
       "simple": "Buff/debuff row applied by this effect, if any.",
-      "technical": "FName at row offset 0x28; None means no direct buff. CollectAttackBuffDebuffIds and the once-effect path add this ID to self/ally/rival buff lists according to EffectType (for example HitPointWithTimeOnceAlly -> ally list, *Enemy -> rival list). Item description resolves the named BuffDebuff row; if its enum is not 0x1D, the buff's first FloatValue replaces EffectValue[0] as the displayed VALUE parameter. Exported rows use this mainly for timed/recovery and one-shot effects.",
+      "technical": "FName at row offset 0x28. None means no resolvable buff: the shared finder rejects None and uses the first matching BuffDebuff row. GameEquipment_GetBuffDebuffIdsOfType appends this ID (including None) for DashGaugeNotRecoverWhenSendDamage on positive damage, for AttackWithDashGaugeRecover and AttackWithDashDisabled on any damage row, and for ReceiveDamageWithDashGauseUnlimited while the owner is alive; GameEquipment_RollBuffDebuffIdsOfType appends it for NormalAttackWithMoveSlow only on normal attacks after an EffectValue[0] roll. The once-effect switch routes the ID to self, ally, or rival lists for the buff-backed Once types; direct-value Once types do not use it. In item descriptions, if a BuffDebuff row exists and its enum is not 0x1D (MoveSlowItem), that row's FloatValue[0] replaces EffectValue[0] as the displayed VALUE parameter; otherwise EffectValue[0] is used. All 45 non-None IDs in the supplied export resolve in BuffDebuffDataTable.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItemEffect.h:22",
+        "Source/AbramsDataTable/Public/EGameBuffDebuff.h:36",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1378",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2306",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:2339",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:4435",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2319",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2335",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3969",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4425",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4516",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:259",
-        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:263"
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:263",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:270"
       ],
       "status": "verified"
     },
     "Id_BattleText": {
       "simple": "Localized description text ID for this effect.",
-      "technical": "FName at row offset 0x30. GameItem_GetDescriptionText requests this ID with a VALUE text parameter derived from EffectValue[0] (or the linked BuffDebuff's FloatValue[0] when applicable). Extras use a separate fixed key BTL_ITEM_BUFF_MESSAGE_1000 with EffectValue[0] instead of this field.",
+      "technical": "FName at row offset 0x30. GameItem_GetDescriptionText requests this ID through the text manager for CursedTools, CursedObjects, and Extras at effect slots 0 and 1, passing VALUE from EffectValue[0] or the BuffDebuff override. Extras additionally render a separate extra-description line with the fixed key BTL_ITEM_BUFF_MESSAGE_1000 and EffectValue[0]; that fixed line is in addition to, not instead of, the normal Id_BattleText lines. No supplied row uses None for this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItemEffect.h:25",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:224",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:230",
-        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:269",
-        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:271"
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:235",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:250",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:258",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:270",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:271",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:385",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:404",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:407",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:408"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The export contains 268 rows and 72 distinct EffectType values. The full enum and all consumers were considered; the semantics above are grouped by how the source reads the fields, because each effect type supplies its own meaning to the same numeric array.",
-    "Chance rolls use stream 2 with EffectValue[0] * 100 out of 100. Rate helpers treat 1.0 as neutral by subtracting one, so exported values like 0.4 or 1.1 are not uniformly a percentage.",
-    "One-use effects are also tracked by BattleManager item-use counts; the effect's index in EquipmentItemDataTable::Id_EquipmentItemEffect is part of that state.",
-    "Multiple EquipmentItemEffectDataTable shards may exist; helpers append the first match per ID from each array. Only the supplied retail export and partial Content are available."
+    "The supplied export has one DataTable asset with 268 unique row keys and 72 distinct non-None EffectType values; every non-None enum member appears. Its 211 EquipmentItem rows reference 218 of those effect rows, leaving 50 currently unreferenced effect rows.",
+    "Chance rolls use GameManager stream 2: static_cast<int32>(EffectValue[0]*100) >= RandRange(0, 100), so the float is truncated to an integer percentage and both endpoints are inclusive. Rate helpers treat 1.0 as neutral by subtracting one; values such as 0.4 (a chance) and 1.1 (a rate multiplier) are in different domains.",
+    "One-shot effects are gated by Ratio <= EffectValue[0] after HP changes and by BattleManager GetItemUseCount(character, flat effect-slot index). That flat index counts every Id_EquipmentItemEffect slot, including None. In the reconstructed path only Extras clear the slot, call ConsumeItem, and increment the count; no other C++ AddItemUse caller exists in this checkout.",
+    "Lookup precedence is first Item row, first EquipmentItem row for its VariableId, then the first effect row in each effects-table array; rows are appended without deduplication across item IDs. All 211 exported EquipmentItem rows have exactly two effect slots (115 None entries), and the item description widget reads slots 0 and 1.",
+    "All non-None Id_BuffDebuff IDs resolve in the supplied BuffDebuff export. All Id_BattleText IDs except BTL_ITEM_BUFF_MESSAGE_0027_10, on the unreferenced CURSED_OBJECTS_CURSED_ENERGY_EXP_INCREASE_01_01 row, resolve in all 11 BattleText locale shards; the fixed Extras key also resolves.",
+    "The manager registers one primary asset named EquipmentItemEffectDataTable and adds at most one resolved UDataTable to EquipmentItemEffectDataTables per load, although the array type supports multiple tables and helpers scan it in order. No numbered effect-table shards or named Content .uasset files were available. Behavior above is verified from reconstructed C++ and exported data; no retail Blueprint graphs were available and no Blueprint-side behavior is asserted."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:331",
+      "detail": "Registers EquipmentItemEffectDataTable for initial primary-asset loading."
+    },
+    {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:183",
-      "detail": "Loads EquipmentItemEffectDataTable into EquipmentItemEffectDataTables."
+      "detail": "After all loaders complete, resolves the asset-manager object and appends it to EquipmentItemEffectDataTables."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2250",
-      "detail": "Resolves all effects named by the equipped Item's VariableId-linked EquipmentItem row."
+      "detail": "Resolves Item -> VariableId/EquipmentItem -> Id_EquipmentItemEffect -> the first effect row in each effects table, skipping None IDs."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2287",
-      "detail": "Filters resolved effect rows by EGameEquipmentItemEffectType for every stat query."
+      "detail": "Filters resolved rows by exact EGameEquipmentItemEffectType for status and PvE queries."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2353",
-      "detail": "Sums or maximizes EffectValue[0] for additive effect types."
+      "detail": "Sums or maximizes EffectValue[0] for signed flat-value effects."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2370",
-      "detail": "Aggregates multiplier-style effects by subtracting 1.0 from EffectValue[0]."
+      "detail": "Aggregates multiplier effects as EffectValue[0]-1.0; the max form is floored at zero."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2317",
-      "detail": "Rolls EffectValue[0] as a chance before granting an effect's Id_BuffDebuff."
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2404",
+      "detail": "Rolls EffectValue[0] as a stream-2 percentage before adding EffectValue[1]-1.0."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2471",
+      "detail": "Applies an inclusive EffectValue[0] threshold and uses EffectValue[1] as the rate delta."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2319",
+      "detail": "Rolls EffectValue[0] before appending Id_BuffDebuff for probability-based buff collection."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:4379",
-      "detail": "Applies one-shot effect types on HP change and routes Id_BuffDebuff to self/ally/rival."
+      "detail": "Applies HP-threshold one-shot effects, routing buff IDs or consuming EffectValue[1] by type and tracking Extras use counts."
     },
     {
       "source": "Source/Abrams/Private/GamePvESettings.cpp:333",
-      "detail": "Applies HitPointMax, HitPointMaxAlly, and HitPointMaxEnemy effects to PvE character hit point calculations."
+      "detail": "Applies HitPointMax (sum), HitPointMaxAlly (max), and HitPointMaxEnemy (sum) to PvE HP calculations."
     },
     {
-      "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:235",
-      "detail": "Builds the two item-description lines from EffectValue and Effect->Id_BattleText."
+      "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:1050",
+      "detail": "Builds a unique cross-character Item ID cache from per-character setup lists for indirect team and enemy effect queries."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:2654",
+      "detail": "Combines the special-combo flat effect value with the maximum threshold-gated value across the cached per-character item lists."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:385",
+      "detail": "Renders effect slots 0 and 1 for cursed tools, cursed objects, and Extras; Extras also receive the fixed-key line from slot 0."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleExtrasItemWidget.cpp:73",
+      "detail": "Checks the status controller's EquipmentItemIds cache for an Extras item to show the battle-use widget."
     }
   ]
 }

@@ -1,11 +1,16 @@
 {
-  "description": "Core gameplay VFX definition table: per-effect actor Blueprint and pool settings, spawn/lifetime and collision rules, pass-through/ground-check behavior, and links to movement, damage, child-effect, decal, sound, color-correction, trap and external-force data consumed by AGameEffect and the battle systems.",
+  "description": "Core gameplay VFX definition table: per-effect actor Blueprint and pool settings, spawn/lifetime and collision rules, pass-through/ground-check behavior, and links to movement, damage, child-effect, decal, sound, color-correction, trap and external-force data consumed by AGameEffect, battle systems, action controllers, animation notifies and the sequencer module.",
   "fields": {
     "bIsEffectExternalForceEnabled": {
       "simple": "Allows this effect to pull other projectile effects.",
-      "technical": "Checked only in FStudioBattleSystem340::UpdateExternalForces after the effect's own time gate: when true, each live opposing Projectile effect within the external-force radius can be pulled toward this effect. It does not gate the character/shikigami attraction path or the push-out branch, which are registered by nonzero ExternalForce_Strength/PushExternalForce_Strength alone.",
+      "technical": "Checked only in FStudioBattleSystem340::UpdateExternalForces. After the time gate it allows this registered effect to pull other live Projectile effects on opposing teams (target row EffectType == Projectile, non-null source, and this row's Collision_Priority >= the target's) with ExternalForce_Strength/GravityCorrect along the directed range; the projectile branch does not repeat the >0 strength test. It does not gate character/shikigami attraction or the forward push, which are reached from registration by nonzero ExternalForce_Strength/PushExternalForce_Strength alone. The three exported true rows are FX_CP_051_08113_1/_2/_3 (Projectile, strengths 5000/5500/6000, fixed ranges 650/900/1000, ExternalForce_Time -1, priority 250).",
       "evidence": [
-        "Source/Abrams/Private/GameBattleSystems_B.cpp:238",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:242",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:257",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:265",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:271",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:279",
+        "Source/Abrams/Private/GameEffect.cpp:1245",
         "Source/AbramsDataTable/Private/GameDataTableRow_Effect.cpp:25"
       ],
       "status": "verified"
@@ -50,9 +55,10 @@
     },
     "Collision_Delay_Time": {
       "simple": "Delay before this effect's collision components become active.",
-      "technical": "Initialize copies any positive value into AGameEffect::CollisionEnableDelay and disables all three collision keepers; Tick counts the delay down in seconds, then enables them, hits destructible meshes in the attack bounds, and broadcasts/clears OnEffectDelegate310. Nonpositive values enable collisions immediately (and run the destructible-mesh hit once at Initialize). Constructor default 0.0f.",
+      "technical": "Initialize copies any positive value into AGameEffect::CollisionEnableDelay and disables all three collision keepers; Tick counts the delay down in seconds, then enables them, hits destructible meshes in the attack bounds when attack components exist, and broadcasts/clears OnEffectDelegate310. Nonpositive values enable collisions immediately (and run the destructible-mesh hit once at Initialize, again only with attack components). Constructor default 0.0f.",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:1111",
+        "Source/Abrams/Private/GameEffect.cpp:1125",
         "Source/Abrams/Private/GameEffect.cpp:129",
         "Source/AbramsDataTable/Private/GameDataTableRow_Effect.cpp:10"
       ],
@@ -60,11 +66,12 @@
     },
     "Collision_Priority": {
       "simple": "Resolves which effect survives effect-to-effect contact.",
-      "technical": "Read from this effect and its rival: negative values are treated as non-blocking / pass-through, equal priorities finish both type-1 effects (subject to OnCollisionFinish), and a higher-priority effect makes the lower-priority rival finish while it survives. Also used by the beam/hit contact gate (higher priority passes) and by external-force projectile-vs-projectile gates. Null EffectRow is treated as priority 0. Constructor and most exported rows are 0; positive exported values reach 30+.",
+      "technical": "Read from this effect and its rival: negative values are treated as non-blocking/pass-through in contact and swept effect checks, equal priorities finish both type-1 effects (subject to OnCollisionFinish), and a higher-priority effect makes the lower-priority rival finish while it survives. Also used by the beam/hit contact gate (a higher row priority lets the beam pass) and by external-force projectile-vs-projectile gating (source priority must be >= target). Null EffectRow is treated as priority 0 in these gates. Constructor and most exported rows are 0; exported values span -1 to 1000.",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:668",
         "Source/Abrams/Private/GameEffect.cpp:695",
         "Source/Abrams/Private/GameEffect.cpp:1442",
+        "Source/Abrams/Private/GameEffect.cpp:1589",
         "Source/Abrams/Private/GameEffect.cpp:1610",
         "Source/Abrams/Private/GameEffect.cpp:1774",
         "Source/Abrams/Private/GameBattleSystems_B.cpp:265"
@@ -73,9 +80,10 @@
     },
     "DecalScale": {
       "simple": "Uniform scale for every decal spawned by this effect.",
-      "technical": "Initialize builds FVector::OneVector * DecalScale as the transform scale of each Id_Decal entry's decal; the constructor default is 0.0f but exported rows are normally 1.0 (a few 0.8/1.25/1.5). Do not confuse this with GameTrapAction::DecalScale, which comes from a character-unique value and is not this row field.",
+      "technical": "Initialize builds FVector::OneVector * DecalScale as the transform scale of each Id_Decal entry's decal; the constructor default is 0.0f but exported rows are normally 1.0 (0.8/1.2/1.25/1.5 exceptions). This field is used only by the Id_Decal loop; the separate AGameEffect::SpawnDecal(DecalId, Scale) helper takes its scale from the caller (damage rows' GroundBoundDecalScale in known callers), not from this row. Do not confuse it with GameTrapAction::DecalScale, which comes from a character-unique value.",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:1179",
+        "Source/Abrams/Private/GameEffect.cpp:1481",
         "Source/AbramsDataTable/Private/GameDataTableRow_Effect.cpp:19"
       ],
       "status": "verified"
@@ -91,9 +99,10 @@
     },
     "EffectType": {
       "simple": "Marks projectile effects, which drive contact/sweep behavior.",
-      "technical": "Only EGameEffectType::Projectile (enum value 1) is special. It gates: finishing on contact, clear the source's attack-active flag when attack components exist, projectiles being tracked/swept by character controllers, negative pass-through checks with traps, and the rival collision-priority path. Non-projectile/None effects instead notify OnCollisionContact. Constructor default None; 153 exported rows are Projectile.",
+      "technical": "Only EGameEffectType::Projectile (enum value 1; Invalid=255 is declared but not exported) is special. It gates finishing on contact, the projectile branch of source attack-flag clearing at Initialize (non-projectiles clear it from OnAttackHit), projectiles being tracked/swept by character controllers, negative pass-through checks with traps, rival collision-priority handling, and the external-force projectile target filter. Non-projectile/None effects instead notify OnCollisionContact. Constructor default None; 153 exported rows are Projectile.",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:639",
+        "Source/Abrams/Private/GameEffect.cpp:1014",
         "Source/Abrams/Private/GameEffect.cpp:1106",
         "Source/Abrams/Private/GameEffect.cpp:1294",
         "Source/Abrams/Private/GameBattleSystems_B.cpp:257",
@@ -132,12 +141,13 @@
     },
     "ExternalForce_Strength": {
       "simple": "Strength of the periodic pull toward the effect.",
-      "technical": "A nonzero value registers the effect in AGameEffectManager::ExternalForceEffects at Initialize and keeps it there until OnPoolReleased; zero disables registration. While eligible, FStudioBattleSystem340 calls ApplyExternalForce with the normalized direction from target to effect and this strength (not scaled by System340_MeanScale). A separate >0.0f test gates the character/shikigami attraction branch.",
+      "technical": "A nonzero value registers the effect in AGameEffectManager::ExternalForceEffects at Initialize and keeps it there until OnPoolReleased; zero disables registration. While eligible, FStudioBattleSystem340 calls ApplyExternalForce with the normalized direction from target to effect and this strength (not scaled by System340_MeanScale). A >0.0f test gates the character/shikigami attraction branch; the flag-gated projectile pull does not re-test the sign, although all exported true-flag rows have positive strength.",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:931",
         "Source/Abrams/Private/GameEffect.cpp:1245",
         "Source/Abrams/Private/GameBattleSystems_B.cpp:149",
-        "Source/Abrams/Private/GameBattleSystems_B.cpp:159"
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:159",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:242"
       ],
       "status": "verified"
     },
@@ -163,25 +173,28 @@
     },
     "GroundCheckDistance": {
       "simple": "Search distance used when this effect owns the ground trace.",
-      "technical": "Passed as the distance argument of IGameActorInterface::GetMapGroundRow when GroundCheckTargetType is Own; ignored for Possessor (the source's current map ground row is used). The per-tick result feeds `GroundAttribute` on all Niagara components. Exported nonzero values are 50 and 100 world units.",
+      "technical": "Passed as the distance argument of IGameActorInterface::GetMapGroundRow when GroundCheckTargetType is Own; ignored for Possessor (the source's current map ground row is used). The per-tick result feeds MapGround::EffectAttribute into the GroundAttribute Niagara float and hit presence into IsGround on all Niagara components. Exported nonzero values are 50 and 100 world units.",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:1566",
-        "Source/Abrams/Public/GameActorInterface.h:453"
+        "Source/Abrams/Private/GameEffect.cpp:1570",
+        "Source/Abrams/Private/GameEffect.cpp:1578",
+        "Source/Abrams/Public/GameActorInterface.h:454"
       ],
       "status": "verified"
     },
     "GroundCheckTargetType": {
       "simple": "Chooses whose ground row drives Niagara ground attributes.",
-      "technical": "Possessor or Own enables per-tick UpdateGroundAttribute at Initialize. Possessor reads SourceInterface368->GetCurrentMapGroundRow(); Own calls GetMapGroundRow(this effect's location, GroundCheckDistance). None disables the tick. Other enum values fall into the Possessor path. Only two exported rows use Own; the rest are None.",
+      "technical": "Possessor or Own enables per-tick UpdateGroundAttribute at Initialize (which also runs once immediately). Possessor reads SourceInterface368->GetCurrentMapGroundRow(); Own calls GetMapGroundRow(this effect's location, GroundCheckDistance). None disables the tick. Other enum values, including the declared Invalid=255 sentinel, fall into the Possessor path. Only two exported rows use Own; the rest are None, so Possessor has no shipped data use in this export.",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:1250",
+        "Source/Abrams/Private/GameEffect.cpp:1542",
         "Source/Abrams/Private/GameEffect.cpp:1560"
       ],
       "status": "verified"
     },
     "ID": {
       "simple": "Unique row key used for lookups, pool keys, tags, and action-specific branches.",
-      "technical": "The export key (native Id) is the FindRow key in EffectDataTables; Status_FindEffectRow/DTM::FindEffectRow return the first table holding it. Initialize caches it in the actor tag `<Id>_<PoolIndex>`, and BootInitialize keys EffectPools by Row->Id. Character/action controllers also compare Effect->GetEffectRow()->Id against literal FX_* names to select branch behavior. The export has 1,132 unique keys.",
+      "technical": "The export key (native Id) is the FindRow key in EffectDataTables; Status_FindEffectRow/DTM::FindEffectRow return the first table holding it. Initialize caches it in the actor tag '<Id>_<PoolIndex>', formatted with %05d (zero-padded five-digit pool index), and BootInitialize keys EffectPools by Row->Id. Character/action controllers also compare Effect->GetEffectRow()->Id against literal FX_* names to select branch behavior. The export has 1,132 unique keys.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:1563",
         "Source/Abrams/Public/GameDataTableManager.h:232",
@@ -194,19 +207,22 @@
     },
     "Id_Damage": {
       "simple": "Damage row bound to this effect's nullifies-damage collision components.",
-      "technical": "Initialize looks up the row with Status_FindDamageRow(DamageDataTables, Id_Damage, true); a missing/None row resets each FGameCollisionParameter on the NullifiesDamage collision components, otherwise Parameter->Setup receives the damage row plus source-computed rates/target. The presence of a row is also part of collision filtering (DamageType/HitTargetType). Attack keeper components only contribute the bHasAttack flag for the EffectType projectile branch.",
+      "technical": "Initialize looks up the row with Status_FindDamageRow(DamageDataTables, Id_Damage, true); a missing/None row resets each FGameCollisionParameter on the NullifiesDamage collision components, otherwise Parameter->Setup receives the damage row plus source-computed rates/target. The presence of a row is also part of collision filtering (DamageType/HitTargetType). In this damage-binding block, attack keeper components only contribute the bHasAttack flag for the EffectType projectile branch. The export has 882 None rows; all non-None ids except two resolve in the read-only DamageDataTable1-5 keys: CP_050_ATTACKG_02_02_3 (FX_CP_050_08113_3) and CP_180_ATTACKF_01_01_3 (FX_CP_180_06231) have no Damage row key, so the reconstructed finder returns null and resets those parameters.",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:1085",
+        "Source/Abrams/Private/GameEffect.cpp:1093",
         "Source/Abrams/Private/GameEffect.cpp:1103",
+        "Source/Abrams/Private/GameEffect.cpp:1106",
         "Source/Abrams/Private/GameEffect.cpp:639"
       ],
       "status": "verified"
     },
     "Id_Decal": {
       "simple": "Decal rows spawned and optionally steered by this effect.",
-      "technical": "For each non-None element Initialize resolves DecalDataTables, spawns a decal at the effect location/rotation with uniform DecalScale, restarts its fade-in, flips the third decal's relative scale to -1, then either retains it (see bNotControlDecalEnabled) for UpdateDecals or fades it immediately. UpdateDecals sizes/positions elements 0-2 between their initial locations and the moving effect; OnPoolReleased fades all retained decals.",
+      "technical": "For each non-None element Initialize resolves DecalDataTables, spawns a decal at the effect location/rotation with uniform DecalScale, restarts its fade-in, flips the third decal's relative scale to -1, then either retains it (see bNotControlDecalEnabled) for UpdateDecals or fades it immediately. A single retained decal is also rotated to -Z after the loop. UpdateDecals sizes/positions elements 0-2 between their initial locations and the moving effect; OnPoolReleased fades all retained decals.",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:1174",
+        "Source/Abrams/Private/GameEffect.cpp:1205",
         "Source/Abrams/Private/GameEffect.cpp:1504"
       ],
       "status": "verified"
@@ -232,11 +248,13 @@
     },
     "Id_EffectColorCorrect": {
       "simple": "Links this effect to its area post-process/color-correction row.",
-      "technical": "A non-None id makes Initialize zero the color-correct row's NiagaraParameterName on every component and register the effect in AGameEffectManager::ColorCorrectEffects; OnPoolReleased removes it. Each tick FStudioBattleSystem2D0 resolves the same id in EffectColorCorrectDataTables and applies the color-correct row with effect-age, attack-collision, range, culling and fade gates. The export has 48 non-None rows.",
+      "technical": "A non-None id makes Initialize resolve the color-correct row and set the float parameter named by that row's NiagaraParameterName to 0.0 on every Niagara component, then register the effect in AGameEffectManager::ColorCorrectEffects; OnPoolReleased removes it. Each tick FStudioBattleSystem2D0 re-resolves the same id in EffectColorCorrectDataTables and applies the row with effect-age, attack-collision, range, culling and fade gates. The export has 48 non-None rows (33 unique ids), all of which resolve in EffectColorCorrectDataTable.",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:927",
         "Source/Abrams/Private/GameEffect.cpp:1229",
+        "Source/Abrams/Private/GameEffect.cpp:1235",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:381",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:395",
         "Source/Abrams/Private/GameEffectManager.cpp:408"
       ],
       "status": "verified"
@@ -252,10 +270,12 @@
     },
     "Id_SoundEffect": {
       "simple": "One-shot 3D sound cues played when the effect initializes.",
-      "technical": "For each non-None element Initialize resolves SoundEffectDataTables and plays Sound->CueSheetName/CueName with GameSoundDefaultPlayParameter at the effect location. The stored handle is overwritten per entry (only the last successful play remains tracked); Finish/OnPoolReleased stop the loop handle, not this one-shot handle.",
+      "technical": "For each non-None element Initialize resolves SoundEffectDataTables and plays Sound->CueSheetName/CueName with GameSoundDefaultPlayParameter at the effect location. The stored OneShotSe3DHandle is overwritten per entry (only the last successful play remains tracked); ColParamSlot3 nullification stops that handle with a 0.25 s fade before resetting it, while Finish/OnPoolReleased reset or ignore it and stop only the loop handle.",
       "evidence": [
+        "Source/Abrams/Private/GameEffect.cpp:623",
         "Source/Abrams/Private/GameEffect.cpp:1212",
-        "Source/Abrams/Private/GameEffect.cpp:1219"
+        "Source/Abrams/Private/GameEffect.cpp:1219",
+        "Source/Abrams/Private/GameEffect.cpp:915"
       ],
       "status": "verified"
     },
@@ -307,10 +327,11 @@
     },
     "Life_Hit": {
       "simple": "Hit count needed before the effect finishes on contact.",
-      "technical": "In ColParamSlot2, when Life_Hit > 0 the collision parameter's per-victim GetHitCount + 1 is compared with this value; the effect returns without finishing until that count is reached. Nonpositive disables the gate. Constructor default 0; only a handful of exported rows set it (1, 4, 9, ...).",
+      "technical": "In ColParamSlot2, when Life_Hit > 0 the collision parameter's per-victim GetHitCount + 1 is compared with this value; the effect returns without finishing until that count is reached. Nonpositive disables the gate. Constructor default 0; exported nonzero values are 1, 3, 4, 9 and 14 (14 rows total).",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:1429",
-        "Source/Abrams/Private/GameEffect.cpp:1433"
+        "Source/Abrams/Private/GameEffect.cpp:1433",
+        "Source/AbramsDataTable/Private/GameDataTableRow_Effect.cpp:8"
       ],
       "status": "verified"
     },
@@ -326,11 +347,11 @@
     },
     "NullifiesEffectType": {
       "simple": "Chooses which fixed nullification effect is spawned.",
-      "technical": "When a nullifying damage contact reaches AGameEffect::ColParamSlot3 and its OnCollisionNullify delegate allows it, Small/Middle/Large select FX_CP_200_00111/00121/00131 respectively; the row is looked up, spawned at the contact component's location facing its owner's forward vector, and Initialize'd before the hit effect is released. AGameCharacter::CanCollide also requires a non-None value for a character to be nullifiable by an effect. GameTrap.cpp:422 uses a hardcoded middle id instead of this field.",
+      "technical": "When a nullifying damage contact reaches the target AGameEffect::ColParamSlot3 and its OnCollisionNullify delegate allows it, the target row's Small/Middle/Large value selects FX_CP_200_00111/00121/00131 respectively; the row is looked up, spawned at the contact component's location facing its owner's forward vector, and Initialize'd before the hit effect is released. AGameCharacter::CanCollide also requires the effect's cached row to have a non-None value for the character to be nullifiable. GameTrap.cpp:422 uses a hardcoded middle id instead of this field. Constructor default None; export has 1020 None, 33 Small, 54 Middle and 25 Large rows.",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:586",
-        "Source/Abrams/Private/GameCharacter.cpp:1107",
-        "Source/Abrams/Private/GameTrap.cpp:422",
+        "Source/Abrams/Private/GameCharacter.cpp:1106",
+        "Source/Abrams/Private/GameTrap.cpp:421",
         "Source/AbramsDataTable/Private/GameDataTableRow_Effect.cpp:15"
       ],
       "status": "verified"
@@ -437,11 +458,13 @@
     },
     "ThroughDestructibleObjectType": {
       "simple": "Controls pass-through of destructible objects and traps.",
-      "technical": "None (default, 1066 rows) blocks and lets contacts finish the effect. ThroughOnly passes only destructibles with HasNoDefence. Always passes all destructibles, traps, and swept contacts. AlwaysCheckObject passes on sweep regardless of break state but contact logic still checks destructible defence. It gates both CanCollide/ColParamSlot2 and the swept SetGameActorLocation path; GameTrap::ColParamSlot3 additionally skips its channel-8 handler for Projectile effects whose value is None.",
+      "technical": "Enum with path-dependent behavior: in ColParamSlot3 contact resolution and damage-vs-destructible finish checks, any non-None value passes destructibles/traps; in attack-vs-destructible contact ThroughOnly passes only destructibles with HasNoDefence while Always and AlwaysCheckObject pass all. During swept SetGameActorLocation only Always skips destructible and trap sweeps entirely; AlwaysCheckObject removes broken destructibles from the hit list so only intact ones can stop the move, while ThroughOnly behaves like None for the blocking test (no-defence destructibles are still reported through the collision manager). CanCollide does not read this field; it uses the attack capsule's separate bIgnoreDestructibleObjectHitEnabled. GameTrap::ColParamSlot3 additionally skips its channel-8 handler for Projectile effects whose value is None. Constructor default None; exported rows are 1066 None, 25 ThroughOnly, 35 Always and 6 AlwaysCheckObject.",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:643",
         "Source/Abrams/Private/GameEffect.cpp:1318",
+        "Source/Abrams/Private/GameEffect.cpp:1456",
         "Source/Abrams/Private/GameEffect.cpp:1674",
+        "Source/Abrams/Private/GameEffect.cpp:1681",
         "Source/Abrams/Private/GameTrap.cpp:400"
       ],
       "status": "verified"
@@ -450,12 +473,15 @@
   "notes": [
     "One exported asset, EffectDataTable, contains 1,132 unique Id keys and one RowStruct (GameDataTableRow_Effect); the source resolves a single DTM array rather than numbered shards. No localization variants were identified for this group.",
     "Loading path: GameDataTableManager registers the DataTable primary asset named EffectDataTable and appends the resolved UDataTable to EffectDataTables (+0x680). Status_FindEffectRow (retail 0x141014930) returns the first table holding an id; DTM::FindEffectRow/FindRowInline are aliases used by callers. Boot case 4 collects all rows and passes them to AGameEffectManager::BootInitialize, which builds the row-id -> pool map and Effect primary-asset loaders.",
-    "AGameEffect caches the resolved row pointer in EffectRow (+0x3B0) at Initialize and clears it on pool acquire; action/state code reads it through GetEffectRow(). EffectPools is keyed by Row->Id while loaders are keyed by FileName_BP, and the runtime actor tag is `<Id>_<PoolIndex>`.",
+    "AGameEffect caches the resolved row pointer in EffectRow (+0x3B0) at Initialize and clears it on pool acquire; action/state code reads it through GetEffectRow(). EffectPools is keyed by Row->Id while loaders are keyed by FileName_BP, and the runtime actor tag is '<Id>_<PoolIndex>' with a zero-padded five-digit index.",
     "The export is an observation, not proof of retail behavior: PoolCount is 0 for 989 rows, -1 for 131 rows, and positive for 12; negative rows still get a loader/map entry but no preallocated actors and no bForce. Life_Time is 0 for 1,012 rows, -1 for 64 (no time expiry in the traced Tick), and positive for the remainder. EffectType is Projectile on 153 rows. All OffsetRotation values and all Id_Trap_Background entries are empty/zero, but the consumers exist and are marked verified.",
-    "C++ evidence is from the locally reconstructed Abrams source, which cites retail RVAs and byte-match notes; it is not itself a claim of retail byte equivalence. No Blueprint-only consumers, uncooked assets, editor-only behavior, or retail-only claim is inferred. No launch or network access was used.",
+    "Runtime descriptions are based on reconstructed Abrams C++ with retail RVAs and byte-match notes. The table exports provide FileName_BP values. Asset availability, cook state, and Blueprint wiring remain unverified.",
     "FVector/FRotator component fields (X/Y/Z, Pitch/Yaw/Roll) are intentionally omitted here: the site renderer inherits the parent vector/rotator annotation. Numeric values are Unreal world units/seconds unless the consumer text says otherwise.",
     "Several row arrays are indexed in parallel without length checks in the reconstruction (Id_Effect_Ground with Effect_Ground_Height; Id_Decal by position for the -1 scale flip). Exported data uses matching two-/three-element arrays, so no shipped mismatch was observed.",
-    "External force has two distinct paths: periodic attraction toward the effect (ExternalForce_* plus bIsEffectExternalForceEnabled for projectile targets) and a forward shove (PushExternalForce_*). Both share effect registration/unregistration but have separate time, range, and team gates."
+    "External force has two distinct paths: periodic attraction toward the effect (ExternalForce_* plus bIsEffectExternalForceEnabled for projectile targets) and a forward shove (PushExternalForce_*). Both share effect registration/unregistration but have separate time, range, and team gates.",
+    "Native-type check: all 46 properties in the single export match the catalog's native types and FGameDataTableRow_Effect header (FName/int32/float/bool/enums/FVector/FRotator/TArray). The four enums declare Invalid=255 sentinels; no exported row uses any Invalid value, and no localized/shard variants of EffectDataTable were found.",
+    "Referential check against the read-only target shards: every non-None Id_EffectMove (114 unique), Id_Decal (7), Id_SoundEffect/Id_SoundEffect_Loop/Id_SoundEffect_Disappear/Id_SoundEffect_Ground (110/55/2/5 unique), Id_EffectColorCorrect (33), Id_Effect_Disappear (58) and Id_Effect_Ground (1) id resolves. Id_Trap_Background has no non-None values. Id_Damage has 217 unique non-None ids; two do not resolve in DamageDataTable1-5 (CP_050_ATTACKG_02_02_3 is an AttackDataTable key, CP_180_ATTACKF_01_01_3 has no exported row key), so the reconstruction resets the collision parameters on FX_CP_050_08113_3 and FX_CP_180_06231.",
+    "Indirect cached-row uses are broader than the spawn call sites: CN_071/CN_080/CN_081/CP_140/CP_160/CP_190/CP_220/CP_230 action controllers call EffectPassesContact, which reads Beam/Hit GetEffectRow()->Collision_Priority for beam/charge hit clipping; many action controllers also filter GetEffectRow()->EffectType and compare GetEffectRow()->Id against literal FX_* names. GroundCheckTargetType::Possessor, Id_Trap_Background and the Invalid enum sentinels are traced code paths with no observed shipped rows in this export."
   ],
   "usages": [
     {
@@ -593,6 +619,38 @@
     {
       "source": "Source/AbramsSequencer/Private/AbramsSequencerEffectModule.cpp:24",
       "detail": "Sequencer effect module finishes its held effect, inline-searches EffectDataTables by id, and spawns the row with the sequence transform."
+    },
+    {
+      "source": "Source/Abrams/Private/GameEffect.cpp:1589",
+      "detail": "EffectPassesContact reads both cached EffectRows' Collision_Priority and source tags; a higher beam priority lets the beam pass a hit effect."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_071_ActionController.cpp:61",
+      "detail": "Representative beam/charge caller of EffectPassesContact (also CN_080, CN_081, CP_140, CP_160, CP_190, CP_220 and CP_230), truncating a sweep at the first non-passing effect."
+    },
+    {
+      "source": "Source/Abrams/Private/GameEffect.cpp:1793",
+      "detail": "Swept type-1 character branch: bThroughCharacterEnabled false stops at the nearest hit, true enqueues all character hits through the collision manager."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTrap.cpp:399",
+      "detail": "A trap's collision handler reads a projectile effect's cached EffectType and ThroughDestructibleObjectType before deciding whether to skip its channel-8 response; its nullify path uses a hardcoded middle-effect id."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:1106",
+      "detail": "Character CanCollide checks the effect's cached NullifiesEffectType (plus the damage row's nullify flag) before allowing an effect to be nullified."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:4151",
+      "detail": "Character and shikigami ApplyExternalForce implementations forward ExternalForce_GravityCorrect to their movement controllers' AccumulateMoveTo; AGameEffect's override ignores it."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimNS_PlayEffect.cpp:39",
+      "detail": "State-machine animation notify resolves an Id_Effect row from EffectDataTables and spawns/tracks it with animation-derived placement."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_030_ActionController.cpp:111",
+      "detail": "Representative action-controller literal FX_* lookup that resolves a row from EffectDataTables and spawns it; similar sites are spread across CN_/CP_ action controllers rather than a single accessor."
     }
   ]
 }

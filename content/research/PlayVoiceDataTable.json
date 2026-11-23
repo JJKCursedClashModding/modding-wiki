@@ -1,21 +1,25 @@
 {
-  "description": "Defines context-triggered system voice lines (menu focus/select, tutorial, story, title logo) as weighted candidate sets with delay and progress-flag gating.",
+  "description": "Defines context-triggered system voice lines (title logo, menus, tutorial, story, PvP/PvE, lobby and shop) as weighted candidate sets with PlayIndexOrder sequences, start delay and save-flag gating.",
   "fields": {
     "Id": {
-      "simple": "Row key / system-voice definition ID.",
-      "technical": "FName primary key. StoryChapter.Id_PlayVoice_OnOpenMissionSelect, Id_PlayVoice_StartDialog and Id_PlayVoice_OnSelectMission, and GameManager.StudioStoryRequestName_CEC, are used to look up rows in DTM.PlayVoiceDataTables (+0x760). Export keys are numeric strings (for example \"50\").",
+      "simple": "DataTable row name / system-voice definition ID.",
+      "technical": "FName key in a BlueprintType row struct; the export serializes it as ID and declares ImportKeyField Id, while runtime FindRow uses the FName row key rather than the struct member. All 181 exported keys are unique numeric strings (50 through 1680) and match their ID value. StoryChapter Id_PlayVoice_OnOpenMissionSelect, Id_PlayVoice_StartDialog and Id_PlayVoice_OnSelectMission, plus GameManager.StudioStoryRequestName_CEC (set from a cached SelectVoice->Id), are resolved with first-table-with-a-match precedence through DTM.PlayVoiceDataTables (+0x760).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:12",
+        "Source/Abrams/Public/GameDataTableManager.h:159",
+        "Source/Abrams/Private/GameDataTableManager.cpp:248",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:959",
         "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:967",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1200",
         "Source/Abrams/Private/GameStoryCharacterSelectWidget.cpp:210",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1224"
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1224",
+        "JJKCCDatatables/datatables/PlayVoiceDataTable.json"
       ],
       "status": "verified"
     },
     "PlayVoiceType": {
       "simple": "UI/game event that triggers this voice definition.",
-      "technical": "EGamePlayVoiceType (None default) cast to uint8 and compared with the requested VoiceId in PlaySystemVoice; VoiceId 0 is rejected outright. Rows are also filtered by this enum for the sound-volume sample voice (Title_TitleLogo_OnFinishLogoAnimation) and searched by type in lobby/story character-select code. The enum names encode screen and event, such as MainMenu_Story_OnFocus or Story_Tutorial_OnAchieveTask.",
+      "technical": "EGamePlayVoiceType (uint8, constructor default None=0), cast to uint8 and compared with the requested VoiceId in PlaySystemVoice; VoiceId 0 is rejected before any table read. The export contains 166 distinct valid symbolic enum values and no None or Invalid rows. The same enum filters the config screen's title-logo sample, is compared directly by PickLobbyVoiceIndex, is read from cached chapter rows for PlaySystemVoice, and identifies the CP_051/CP_121 pair-character row (type 0x22 = Story_MemberSelect_OnSelectStartDialog). The StoryLaunchHelpers chapter helper returns 0xFF on a missing row, which the mission-select caller suppresses. Enum names encode screen and event, such as MainMenu_Story_OnFocus and Story_Tutorial_OnAchieveTask.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:16",
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:33",
@@ -24,31 +28,40 @@
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:147",
         "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:106",
         "Source/Abrams/Private/GamePhase_MainMenuLobby.cpp:120",
-        "Source/Abrams/Private/GamePhase_StoryCharacterSelect.cpp:244"
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1670",
+        "Source/Abrams/Private/GamePhase_StoryCharacterSelect.cpp:244",
+        "Source/Abrams/Private/GameStoryMissionSelectWidget.cpp:347",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1226",
+        "JJKCCDatatables/datatables/PlayVoiceDataTable.json"
       ],
       "status": "verified"
     },
     "PlayIndexOrder": {
       "simple": "Ordering/grouping key for voice variations that play in sequence.",
-      "technical": "int32, default 0. Collected rows are grouped by this key; groups are stable-sorted ascending by key. Within a group, Id_Voice and Weights_VoiceLottery arrays from later rows are appended. The first group determines the lottery variation, DelayTime and the order in which one voice per group is queued.",
+      "technical": "int32, constructor default 0. After type/flag filtering, rows are grouped in a TMap by this key: the first row copied into a group keeps its DelayTime, and Id_Voice and Weights_VoiceLottery from later rows with the same key are appended. Groups are stable-sorted ascending by key, so Keys[0] supplies the variation lottery and the validation bound, and each group in sorted order contributes at most one in-bounds, non-None voice at that variation. The export has 172 rows at order 0, six at order 1 and one each at orders 2, 3 and 4.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:19",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:168",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:171",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:178",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:182",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:187",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:201",
-        "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:121"
+        "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:121",
+        "JJKCCDatatables/datatables/PlayVoiceDataTable.json"
       ],
       "status": "verified"
     },
     "DelayTime": {
       "simple": "Seconds to wait before the queued voice sequence starts.",
-      "technical": "float, constructor default 0.0f, but exported rows often use -1.0f. Only the lowest PlayIndexOrder group is consulted: DelayTime >= 0 is used verbatim, otherwise the player default (0.15f set at GameManager boot) is used. SetQueue clamps the countdown to >= 0.",
+      "technical": "float, constructor default 0.0f. Exported values are -1.0f on 156 rows and 0.4f on 25 rows. PlaySystemVoice reads only the first sorted group: DelayTime >= 0 is used verbatim, otherwise DefaultDelayTime is used (0.15f set in AGameManager::BootInitialize). SetQueue stores FMath::Max(DelayTime, 0) in DelayTimer; Tick starts the head when the countdown expires and advances through the queue as each cue finishes. This is one start delay for the whole sequence, not a per-group or inter-line delay.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:22",
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:33",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:229",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:266",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:273",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:296",
         "Source/Abrams/Private/GameManager.cpp:182",
         "JJKCCDatatables/datatables/PlayVoiceDataTable.json"
       ],
@@ -56,81 +69,109 @@
     },
     "UserProgressFlag": {
       "simple": "Save-data condition controlling whether the row is eligible.",
-      "technical": "int32, constructor default 0; negative means \"no condition\". A zero-or-greater value indexes UserInfo.UserProgressFlagWords by Flag>>2 and bit Flag&3; the row is eligible only when that bit is set and the word index is below 128. The sound-volume sample picker uses the same test (negative counts as set) to filter title-logo rows.",
+      "technical": "int32, constructor default 0; a negative value means no condition (179 exported rows use -1). For Flag >= 0, Word = Flag>>2 and Bit = Flag&3; the row is kept only when Word < 128 and bit (1u<<Bit) of UserProgressFlagWords[Word] is set. The two exported nonnegative values, 6 and 7, therefore test word 1 bits 2 and 3. Flag 0 is not a sentinel: it tests word 0 bit 0. The config-volume picker applies the equivalent test with negative treated as set; PickLobbyVoiceIndex performs no flag filtering.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:25",
+        "Source/Abrams/Public/GameManager.h:229",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:151",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:156",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:158",
         "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:22",
-        "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:107"
+        "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:107",
+        "Source/Abrams/Private/GamePhase_MainMenuLobby.cpp:118",
+        "JJKCCDatatables/datatables/PlayVoiceDataTable.json"
       ],
       "status": "verified"
     },
     "Id_Voice": {
       "simple": "Candidate VoiceDataTable IDs for this voice event.",
-      "technical": "TArray<FName>. A variation index is chosen from the first group's weights (or supplied by the caller), then VoiceIds[variation] is taken from every group in PlayIndexOrder; None and out-of-range entries are skipped. Each ID is resolved against VoiceDataTables (+0x740) and the resulting cue sheet/cue is queued. Story character-select uses the array directly to find the pair-character voice whose ID contains the character ID.",
+      "technical": "TArray<FName> of candidate VoiceDataTable row names. Every exported row has 18 slots (2776 None fillers, 482 non-None references, 480 unique; all resolve in VoiceDataTable). If the caller supplies a Variation inside the first group's Id_Voice bounds, that index is used and weights are ignored; otherwise the weighted pick from the first group is used. Each sorted group then contributes Id_Voice[variation] only when the index is in bounds and the name is not None; those IDs are resolved in DTM.VoiceDataTables (+0x740) with the first matching table winning, and the resulting cue sheet/cue strings are queued. Upstream helpers also index the array directly: a case-insensitive character-ID substring match for CP_051/CP_121, and unguarded First.Id_Voice[Index] in the config-volume and lobby pickers.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:28",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:173",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:189",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:203",
-        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:211",
-        "Source/Abrams/Private/GamePhase_StoryCharacterSelect.cpp:248"
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:205",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:220",
+        "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:157",
+        "Source/Abrams/Private/GamePhase_MainMenuLobby.cpp:122",
+        "Source/Abrams/Private/GamePhase_StoryCharacterSelect.cpp:248",
+        "JJKCCDatatables/datatables/PlayVoiceDataTable.json"
       ],
       "status": "verified"
     },
     "Weights_VoiceLottery": {
       "simple": "Per-candidate weights for choosing the voice variation.",
-      "technical": "TArray<float>, parallel to Id_Voice (no length validation observed; arrays are appended when rows are grouped). GameSound_PickWeightedIndex rolls Sum(Weights)*StoryFRand(), walks weights in order subtracting until Roll < weight, and returns that index; an empty list returns -1 (no voice). Exported rows use 100.0 for active candidates and 0.0 for None placeholders.",
+      "technical": "TArray<float> parallel to Id_Voice; every exported row has 18 aligned weights: 100.0 for ordinary active candidates, 30.0 in six shop rows, and 0.0 for None fillers. GameSound_PickWeightedIndex returns -1 only for an empty array; otherwise it computes Sum(Weights)*StoryFRand(), walks weights in order subtracting until Roll < weight, and falls back to the last index if no entry wins. There is no exact length or positivity validation: PlaySystemVoice checks the picked/supplied index against First.Id_Voice.Num() only, while the config-volume and lobby pickers use the weight-derived index to read First.Id_Voice directly.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:31",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:31",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:33",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:37",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:46",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:174",
         "Source/Abrams/Private/GameSoundVoicePlayer.cpp:191",
+        "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:130",
+        "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:157",
+        "Source/Abrams/Private/GamePhase_MainMenuLobby.cpp:123",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:182",
         "JJKCCDatatables/datatables/PlayVoiceDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Loaded as a DataTable primary asset named PlayVoiceDataTable into DTM.PlayVoiceDataTables (+0x760).",
-    "This table defines variation sets, not a single line: the chosen variation index is shared across all PlayIndexOrder groups, enabling sequences such as a title-logo voice followed by another line.",
-    "The config sound-volume screen uses the same table only to pick a sample title-logo voice; the main consumer is UGameSoundVoicePlayer::PlaySystemVoice(uint8 VoiceId, int32 Variation).",
-    "The companion export contains 181 rows; retail completeness and Blueprint-only references are not asserted. Source is reconstructed retail C++ with retail RVAs recorded inline."
+    "PlayVoiceDataTable is registered as a DataTable primary asset (GameDataTableManager.cpp:420), resolved by the manager's completion Tick into DTM.PlayVoiceDataTables (+0x760), with null tables filtered out; the companion header declares the one table array at GameDataTableManager.h:159.",
+    "This table defines variation sets, not a single line: the chosen variation index is shared across all PlayIndexOrder groups, enabling sequences such as a tutorial line followed by later ordered lines. The first group also supplies the lottery weights and the start-delay value.",
+    "Eight distinct C++ source files reference the table directly (the loader plus seven consumer sites): the manager loader, GameSoundVoicePlayer, GameConfigSoundVolumeWidget, GamePhase_MainMenuLobby, GamePhase_MainMenuStory, GamePhase_StoryCharacterSelect/GameStoryCharacterSelectWidget and StoryLaunchHelpers. Row-name lookups use first-table-with-a-match precedence; GetRows walks table order then row-name order.",
+    "The config sound-volume screen uses the table only to pick a title-logo sample: it caches the resolved Voice row in SampleVoiceRow and plays its cue directly through AGameSoundManager, bypassing PlaySystemVoice's grouping, default delay and queue. PickLobbyVoiceIndex instead caches one index from OnlineLobby_Top_OnFocusFindLobby and reuses it for voice IDs 101-103.",
+    "MainMenuStory caches OpenVoice/SelectVoice/PickIndex per chapter, rolls the index from OpenVoice's None-filtered weights, then plays the enum from those cached rows; chapter select forwards the same index through GameStoryWidget/GameStoryMissionSelectWidget and Story_GetChapterSelectVoiceType.",
+    "The companion export contains one 181-row shard; retail completeness and Blueprint-only references are not asserted. Source is reconstructed retail C++ with retail RVAs recorded inline."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:248",
-      "detail": "Resolves PlayVoiceDataTable into DTM.PlayVoiceDataTables."
+      "detail": "Registers PlayVoiceDataTable as a primary asset (name list at :420) and resolves it into DTM.PlayVoiceDataTables (+0x760); null tables are filtered by AddLoadedDataTables."
     },
     {
       "source": "Source/Abrams/Private/GameSoundVoicePlayer.cpp:134",
-      "detail": "PlaySystemVoice filters by type/flag, groups by order, chooses a variation and queues voices."
+      "detail": "PlaySystemVoice rejects VoiceId 0, filters by PlayVoiceType and UserProgressFlag, groups by PlayIndexOrder, picks or validates Variation, resolves one voice per group through VoiceDataTables, applies first-group DelayTime/default, and queues cue names. Empty rows, an empty weight list or no resolved voices yield no playback."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSoundVoicePlayer.cpp:245",
+      "detail": "SetQueue replaces the queue, fades a playing voice when needed, copies each resolved Voice row's CueSheetName/CueName, clamps DelayTime to >= 0, and Tick starts/plays queued cues in order."
+    },
+    {
+      "source": "Source/Abrams/Private/GameManager.cpp:790",
+      "detail": "AGameManager::PlaySystemVoice is the indirect forwarder used by the UI (one-arg overload at :790 supplies Variation=-1; two-arg overload at :796 passes the caller's cached/picked variation)."
     },
     {
       "source": "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:103",
-      "detail": "Builds the sample-voice lottery from title-logo rows."
+      "detail": "Filters title-logo rows by type and progress flag, groups by PlayIndexOrder, picks First.Id_Voice[Index] from the combined lottery, caches the resolved Voice row, and plays that cue directly when the sample button is pressed."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_MainMenuLobby.cpp:117",
-      "detail": "Picks a lobby voice variation from rows of the online-lobby focus type."
+      "detail": "Picks an index from the OnlineLobby_Top_OnFocusFindLobby row's weights without flag filtering, caches it at StudioLobbyValue_9AC, then reuses it for PlaySystemVoice types 101/102/103 at :583/:633/:648."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:959",
-      "detail": "Resolves chapter open/start-dialog voice definitions."
+      "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:945",
+      "detail": "Builds per-chapter OpenVoice/SelectVoice row pointers via first-table FindRow; RollChapterVoicePicks at :896 removes None candidates and rolls a shared index from OpenVoice, which is played with either row's PlayVoiceType at :1670/:2192. Chapter select stores the same row ID and index in AGameManager at :1200/:1201 and :2250/:2251."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_StoryCharacterSelect.cpp:241",
-      "detail": "Finds the pair-character voice row and index by character ID."
+      "detail": "For CP_051/CP_121, finds the type-0x22 PlayVoice row, locates the candidate ID containing the character ID, and calls PlaySystemVoice with the explicit index."
     },
     {
-      "source": "Source/Abrams/Private/GameStoryCharacterSelectWidget.cpp:210",
-      "detail": "Resolves the story request voice row and plays its type."
+      "source": "Source/Abrams/Private/GameStoryCharacterSelectWidget.cpp:208",
+      "detail": "Resolves StudioStoryRequestName_CEC (the cached SelectVoice->Id) to a PlayVoice row, then plays its PlayVoiceType with StudioStoryRequestInt48_CF4 (the cached pick index)."
     },
     {
-      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:1224",
-      "detail": "Reads PlayVoiceType of the chapter select-mission voice row."
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:1219",
+      "detail": "Story_GetChapterSelectVoiceType resolves Chapter.Id_PlayVoice_OnSelectMission and returns 0xFF when the chapter or PlayVoice row is missing; GameStoryMissionSelectWidget.cpp:347 suppresses that sentinel and forwards VoicePickIndex."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSoundManager.cpp:480",
+      "detail": "Downstream cue boundary: AGameSoundManager applies bSystemVoiceEnabled, localized cue names and DTM.VoiceVolumeDataTables to cues supplied by PlaySystemVoice or the config sample path."
     }
   ]
 }

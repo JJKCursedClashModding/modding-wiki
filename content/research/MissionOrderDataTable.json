@@ -3,46 +3,60 @@
   "fields": {
     "Id": {
       "simple": "Mission order identifier.",
-      "technical": "FName import key/row name for FGameDataTableRow_MissionOrder. The active MissionWave->Id_MissionOrder is resolved through MissionOrderDataTables (DTM+0x9D0) in gameplay, UI and pre-battle filtering; the finder supports skipping None ids. No observed consumer reads the member as a value.",
+      "technical": "FName import key/row name for FGameDataTableRow_MissionOrder; the export's ImportKeyField is Id. The manager registers one MissionOrderDataTable loader and resolves it into MissionOrderDataTables (DTM+0x9D0). The first matching row in that array is returned by the shared finder; with bCheckNone true it rejects a None id, and some UI callers pass false. MissionWave.Id_MissionOrder supplies the key for gameplay, UI and pre-battle filtering. No observed C++ consumer reads the row's Id member as a value.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionOrder.h:13",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:30",
         "Source/Abrams/Public/GameDataTableManager.h:198",
+        "Source/Abrams/Private/GameDataTableManager.cpp:287",
+        "Source/Abrams/Private/GameDataTableManager.cpp:460",
         "Source/Abrams/Private/GameBattleSystems_B.cpp:54",
-        "Source/Abrams/Private/GameBattleMissionOrderWidget.cpp:47"
+        "Source/Abrams/Private/GameBattleMissionOrderWidget.cpp:47",
+        "JJKCCDatatables/datatables/MissionOrderDataTable.json"
       ],
       "status": "observed"
     },
     "OrderType": {
       "simple": "Kind of objective or wave special rule.",
-      "technical": "EGameMissionOrderType, default None. BattleStory_IsMissionOrderAchieved switches on it: Protracted compares elapsed TimeLimit to Value[0]; Event compares enemy HitPointRate to Value[0]; SuperCursedEnergyAttack, SuperCursedEnergyAttackFinish and SpecialTagCombo require a matching log hit >= 1. Boss changes wave-transition UI and radar cost display. Raw value 3 makes an Arcade result treat remaining time as exhausted for the winning player; raw value 4 with Value[1] > 0 sets enemy HitPointMin to Value[0] times base HitPoint. GetMissionOrderType returns Invalid when no order is active.",
+      "technical": "EGameMissionOrderType (uint8), default None; enum order gives None=0, Normal=1, Boss=2, Protracted=3, Event=4, SuperCursedEnergyAttack=5, SuperCursedEnergyAttackFinish=6, DomainExpansion=7, SpecialTagCombo=8, Extra=9 and Invalid=255. BattleStory_IsMissionOrderAchieved switches on it: Protracted succeeds when the player's logged elapsed battle time (the TimeLimit log value) is >= Value[0]; Event succeeds when the mean enemy-team HitPointRate is <= Value[0]; SuperCursedEnergyAttack, SuperCursedEnergyAttackFinish and SpecialTagCombo require an ally-send log hit >= 1. SuperCursedEnergyAttackFinish also has an explicit failure path when enemy stock is <= 0 and no finish hit is logged. Boss selects the boss wave transition and boss-cost indicator paths in the battle overlay, radar, player-info and versus-interval widgets. Raw 3 (Protracted) suppresses the remaining-time display in both Arcade and PvE results when the winning team is the player's; raw 4 (Event) with Value[1] > 0 sets HitPointMin on each resolved enemy character to Value[0] times its MissionCharacter row's HitPoint. DomainExpansion and SpecialTagCombo are also read through the cached GetMissionOrderType in end-state checks; with no cached order it returns Invalid.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionOrder.h:17",
+        "Source/AbramsDataTable/Public/EGameMissionOrderType.h:7",
         "Source/Abrams/Private/GameBattleStoryStates.cpp:43",
         "Source/Abrams/Private/GameBattleStoryStates.cpp:51",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:107",
         "Source/Abrams/Private/GameBattleOverlayWidget.cpp:53",
+        "Source/Abrams/Private/GameBattlePlayerInfoWidget.cpp:143",
         "Source/Abrams/Private/GameBattleRadarWidget.cpp:171",
+        "Source/Abrams/Private/GameVsEnemyIntervalWaveInfoWidget.cpp:86",
         "Source/Abrams/Private/GameBattleStoryStates.cpp:608",
-        "Source/Abrams/Private/GamePhase_BattleStory.cpp:249",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2665",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:250",
+        "Source/Abrams/Private/GameBattleState_06.cpp:273",
+        "Source/Abrams/Private/GameBattleState_07.cpp:572",
         "Source/Abrams/Private/GameBattleSystems_B.cpp:2589"
       ],
       "status": "verified"
     },
     "Value": {
       "simple": "Numeric parameters for the order condition and display.",
-      "technical": "TArray<float>, default empty. Value[0] is the comparison threshold in Protracted and Event conditions, the VALUE text parameter in the in-battle order widget, and the HitPointMin rate for OrderType 4. Value[1] gates that OrderType-4 HitPointMin behaviour (> 0). Consumers index by position without a general length check, so rows must supply enough entries for their OrderType.",
+      "technical": "TArray<float>, default empty; all 18 exported rows contain exactly two floats. Value[0] is the Protracted elapsed-time threshold in seconds (the exported PVE_PROTRACTED_30/60 values match their MissionWave TimeLimit), the mean-enemy-HP-rate threshold for Event, and the HitPointMin rate for OrderType 4. It is also inserted as the VALUE float parameter by the in-battle mission-order widget for every row, but of the exported text ids only Event message BTL_MISSION_ORDER_MESSAGE_0010 contains <DYN=VALUE> and formats it as a percentage. Value[1] gates the Event/raw-4 HitPointMin behaviour (> 0); exported Event rows No.112_1/2/3 use 1.0 while the other Event rows use 0.0. Consumers index Value[0], and Event battle setup indexes Value[1], without a general length guard. The 999.0 in exported Normal/Extra rows has no sentinel behaviour in the reconstructed consumer code.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionOrder.h:20",
         "Source/Abrams/Private/GameBattleStoryStates.cpp:58",
         "Source/Abrams/Private/GameBattleStoryStates.cpp:67",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:513",
         "Source/Abrams/Private/GameBattleMissionOrderWidget.cpp:55",
         "Source/Abrams/Private/GamePhase_BattleStory.cpp:247",
-        "Source/Abrams/Private/GamePhase_BattleStory.cpp:251"
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:251",
+        "JJKCCDatatables/datatables/MissionOrderDataTable.json",
+        "JJKCCDatatables/datatables/BattleTextDataTable_En.json:855"
       ],
       "status": "verified"
     },
     "Id_BattleText_OrderName": {
       "simple": "Localized text id for the order name.",
-      "technical": "FName, default None. Displayed by the in-battle mission-order widget, the wave overlay's subtext, the situation overview win-condition title and the versus-enemy interval wave-info widget. The table supplies a text id; localization strings are not stored here.",
+      "technical": "FName, default None. Displayed by the in-battle mission-order widget, the wave overlay's subtext, the situation overview win-condition title and the versus-enemy interval wave-info widget. The overlay falls back to an empty id when its lookup misses, and the interval widget hides the order text. The table supplies a text id; localization strings are not stored here.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionOrder.h:23",
         "Source/Abrams/Private/GameBattleMissionOrderWidget.cpp:56",
@@ -54,52 +68,108 @@
     },
     "Id_BattleText_OrderDetail": {
       "simple": "Localized text id for the order description.",
-      "technical": "FName, default None. Shown in the in-battle mission-order detail widget with a VALUE float parameter taken from Value[0], and as plain text in the situation overview and story character-select mission info widgets.",
+      "technical": "FName, default None. The in-battle mission-order detail widget passes it to SetTextIdWithParameters with VALUE taken from Value[0]; of the exported detail texts only Event message BTL_MISSION_ORDER_MESSAGE_0010 contains <DYN=VALUE> and renders that parameter as a percentage. The situation overview uses it as plain text. The story character-select mission-info widget uses this field except for Event rows (hard-coded BTL_MISSION_ORDER_MESSAGE_0001) and null orders (hard-coded BTL_MISSION_ORDER_MESSAGE_0003), so those two cases do not read it. Localization strings are resolved from BattleTextDataTable shards, not stored here.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionOrder.h:26",
         "Source/Abrams/Private/GameBattleMissionOrderWidget.cpp:57",
         "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:655",
-        "Source/Abrams/Private/GameStoryCharacterSelectMissionInfoWidget.cpp:89"
+        "Source/Abrams/Private/GameStoryCharacterSelectMissionInfoWidget.cpp:79",
+        "Source/Abrams/Private/GameStoryCharacterSelectMissionInfoWidget.cpp:83",
+        "Source/Abrams/Private/GameStoryCharacterSelectMissionInfoWidget.cpp:89",
+        "JJKCCDatatables/datatables/BattleTextDataTable_En.json:855"
       ],
       "status": "verified"
     },
     "ExcludeBindingVowsEffectType": {
       "simple": "Binding-vow effect types disallowed for waves using this order.",
-      "technical": "TArray<EGameBindingVowsEffectType>, default empty. During PvE interval setup, each candidate binding vow's effect rows are expanded and if any EffectType is contained in this array the candidate vow is removed before weighted picking. The same filter is applied separately for MissionTask.ExcludeBindingVowsEffectType; both filters operate on the same candidate list.",
+      "technical": "TArray<EGameBindingVowsEffectType>, default empty. In IntervalPvE_PickBindingVows, a PvE mission's weighted BindingVowsLottery first produces a deduplicated candidate list. For every wave with a non-None Id_MissionOrder, the order row is resolved and each candidate vow's BindingVows.Id_BindingVowsEffect rows are expanded; the candidate is removed if any EffectType is contained in this array. MissionTask.ExcludeBindingVowsEffectType is then applied in a separate pass to the surviving candidates, so the two filters are conjunctive on the same list. Exported rows use eight-element arrays padded with None; no exported BindingVowsEffect row has EffectType None, so that padding is inert in the retail export.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionOrder.h:29",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:637",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:647"
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:38",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:604",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:639",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:647",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:657",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:665",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:241",
+        "JJKCCDatatables/datatables/MissionOrderDataTable.json",
+        "JJKCCDatatables/datatables/BindingVowsEffectDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset contains 18 rows with FGameDataTableRow_MissionOrder; the manager loads MissionOrderDataTable into MissionOrderDataTables (DTM+0x9D0).",
-    "The active order pointer is cached on FStudioBattleMissionTaskSystem (System360) by SetupArcade/SetupPvE/SetupStory, so aliases such as AGameBattleManager::GetMissionOrder and local Order variables all lead back to this table's row.",
-    "OrderType numeric cases in reconstructed code (for example raw 3 and 4) are recorded from consumer branches; the enum headers provide the named cases where the source names them.",
-    "Order finder 0x1048c30 is labelled behavioural in status/functions.json; this documents reconstructed behaviour, not byte parity. Content is partial and Blueprint uses were not exhaustively inspectable."
+    "The sole exported asset contains 18 MissionOrderDataTable rows; every row key matches its Id/ID, every row has two Value floats and eight exclusion entries, and all non-None exclusions are the four time/death effects used by PVE_PROTRACTED_*. The manager loads MissionOrderDataTable into MissionOrderDataTables (DTM+0x9D0).",
+    "FStudioBattleMissionTaskSystem (System360) caches the row from InWaves[RetryCount] in SetupArcade/SetupPvE/SetupStory and clears it in OnFinishBattle; AGameBattleManager::GetMissionOrder and GetMissionOrderType read that cache. Other consumers resolve a fresh first-match row from DTM+0x9D0 through Battle_FindMissionOrderRow or first-match template finders BattleStory_FindRowOutOfLine and IntervalPvE_FindRowInline (the inline PvE body has no up-front None check; its caller skips None ids), so not every read passes through the cache.",
+    "The enum order maps raw 3 to Protracted and raw 4 to Event. Reconstructed consumers sometimes compare the raw byte (as recorded from the retail branch); enum headers supply the named values where the source names them.",
+    "Order finder 0x1048c30 is classified behavioural in status/functions.json (BEHAV certification, not byte parity). This documentation records reconstructed behaviour; content is partial and retail Blueprint uses were not exhaustively inspectable.",
+    "In MissionWaveDataTable, 1601 of 1774 waves reference a known order row; PROTRACTED, PVE_PROTRACTED_90, PVE_PROTRACTED_120 and SPECIAL_TAG_COMBO are not referenced by any exported MissionWave.Id_MissionOrder, and no exported wave references an unknown order id.",
+    "All 15 text ids referenced by this table, plus the hard-coded BTL_MISSION_ORDER_MESSAGE_0001 fallback, exist in all 11 BattleTextDataTable_* locale shards; the actual localized strings live there, not in MissionOrderDataTable."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:43",
-      "detail": "Evaluates task/order success and failure conditions from OrderType and Value."
+      "detail": "Evaluates story/arcade order success from OrderType and Value (plus the SuperCursedEnergyAttackFinish failure path)."
     },
     {
       "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:769",
-      "detail": "SetupArcade/SetupPvE/SetupStory resolve and cache the order for the active wave."
+      "detail": "SetupArcade/SetupPvE/SetupStory resolve the current wave's order and cache it on System360; OnFinishBattle clears it."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:405",
+      "detail": "GetMissionOrder and GetMissionOrderType expose the cached row and its OrderType (Invalid when no order is cached)."
     },
     {
       "source": "Source/Abrams/Private/GameBattleMissionOrderWidget.cpp:47",
-      "detail": "Displays order name/detail and inserts the numeric VALUE text parameter."
+      "detail": "Displays order name/detail and inserts Value[0] as the VALUE text parameter."
     },
     {
       "source": "Source/Abrams/Private/GameBattleOverlayWidget.cpp:50",
-      "detail": "Chooses boss versus normal wave transition and overlay subtext from OrderType."
+      "detail": "Chooses boss versus normal wave transition and supplies the order-name subtext."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:637",
-      "detail": "Filters binding-vow candidates using ExcludeBindingVowsEffectType."
+      "source": "Source/Abrams/Private/GameBattleRadarWidget.cpp:170",
+      "detail": "Boss orders collect enemy MissionCharacter Costs for radar cost indicators."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattlePlayerInfoWidget.cpp:142",
+      "detail": "Boss orders check that no enemy MissionCharacter Cost exceeds the player's character cost."
+    },
+    {
+      "source": "Source/Abrams/Private/GameVsEnemyIntervalWaveInfoWidget.cpp:84",
+      "detail": "Boss orders mark enemy icons with the boss canvas; a separate lookup at line 129 sets the order-name text."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:653",
+      "detail": "PvE situation overview resolves the row to display the win-condition name and detail text."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryCharacterSelectMissionInfoWidget.cpp:76",
+      "detail": "Story character-select mission info uses OrderType and OrderDetail, with hard-coded overrides for Event rows and missing rows."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:249",
+      "detail": "OrderType 4 with Value[1] > 0 sets enemy HitPointMin from Value[0] times each MissionCharacter HitPoint."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:604",
+      "detail": "Filters PvE binding-vow candidates using both this row's and the mission task's ExcludeBindingVowsEffectType arrays."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:600",
+      "detail": "Arcade result suppresses remaining time for a winning player on raw OrderType 3."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2658",
+      "detail": "PvE result applies the same raw OrderType 3 remaining-time suppression."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_06.cpp:273",
+      "detail": "SpecialTagCombo win check via the cached mission order type."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_07.cpp:572",
+      "detail": "DomainExpansion win check via the cached mission order type."
     }
   ]
 }

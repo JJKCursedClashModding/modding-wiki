@@ -1,31 +1,45 @@
 {
-  "description": "Localized captions for character stamp messages. Stamp rows store Id_StampText; the stamp selector and chat message widgets use that id to show the caption while the sprite and voice come from the same Stamp row.",
+  "description": "Localized captions for character stamp messages. Stamp rows store Id_StampText; the stamp selector button and the inbound chat stamp widget resolve that id through the shared GameText lookup, while the sprite and voice come from the same Stamp row (the voice is played by the chat message path, not the selector).",
   "fields": {
     "ID": {
       "simple": "Stamp caption text id (row key), e.g. CP_010_STAMP_001.",
-      "technical": "FName ID of FGameDataTableRow_GameText, used as the FindRow key in the combined GameText array. FGameDataTableRow_Stamp::Id_StampText carries this id; UGameStampListViewItemWidget passes it to SetButtonTextId, and chat stamp requests copy it into FGameStampMessageRequest.TextId before SetTextIdOnly on the message block. The table is loaded as StampTextDataTable_<Language> in slot 6 of the 14-table array. Note that the Stamp row's own Id (row name) is a different key, used for network/message identification and to look up the Stamp row.",
+      "technical": "FName ID of FGameDataTableRow_GameText (row offset +0x08; the FTableRowBase vptr occupies +0x00). In all 11 exported locale shards, each of the 43 row names equals its exported ID field, so the request FName used by FindRow matches both. FGameDataTableRow_Stamp::Id_StampText (not the Stamp row's own Id) supplies that key: UGameStampListViewItemWidget passes it to SetButtonTextId(..., EApplicationLanguage::Invalid), whose Invalid branch calls SetTextIdOnly; inbound stamps copy it into FGameStampMessageRequest.TextId before ShowStampMessage calls SetTextIdOnly. SetTextIdOnly -> SetTextRequest -> AGameTextManager::GetText -> GetGameText -> FindRow over TextDataTables; ids beginning with SYS_ (case-insensitive) are routed to SystemTextDataTables instead. The locale table is loaded as StampTextDataTable_<Language> in the sixth of the 14 GameText tables (zero-based index 5). A Stamp row's own Id (STAMP_001, etc.) is the network/message payload key into the separately cached StampDataTables, not a key into this table.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:11",
         "Source/AbramsDataTable/Public/GameDataTableRow_Stamp.h:19",
         "Source/Abrams/Private/GameTextManager.cpp:56",
         "Source/Abrams/Private/GameTextManager.cpp:555",
+        "Source/Abrams/Private/GameTextManager.cpp:589",
         "Source/Abrams/Private/GameTextManager.cpp:597",
+        "Source/Abrams/Private/GameTextManager.cpp:605",
+        "Source/Abrams/Private/GameTextManager.cpp:622",
+        "Source/Abrams/Private/GameTextManager.cpp:681",
         "Source/Abrams/Private/GameStampListViewItemWidget.cpp:18",
         "Source/Abrams/Private/GameStampListViewItemWidget.cpp:19",
+        "Source/Abrams/Private/GameWidgetButton.cpp:116",
+        "Source/Abrams/Private/GameWidgetButton.cpp:120",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:52",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:72",
         "Source/Abrams/Private/GameChatMessageWidget.cpp:377",
-        "Source/Abrams/Private/GameChatMessageWidget.cpp:397"
+        "Source/Abrams/Private/GameChatMessageWidget.cpp:397",
+        "Source/Abrams/Private/GameCommonChatListWidget.cpp:167",
+        "Source/Abrams/Private/GameDataTableManager.cpp:262",
+        "Source/Abrams/Public/GameDataTableManager.h:173"
       ],
       "status": "verified"
     },
     "Text": {
       "simple": "The localized stamp caption shown with the stamp icon.",
-      "technical": "FString row text (+0x10), copied by GetGameText and formatted by FormatText with the usual GLO/DYN/modifier rules; the text block resolves the id when SetButtonTextId/SetTextIdOnly is applied. The stamp's PaperSprite is loaded separately from Stamp.FileName and its voice from Stamp.Id_Voice, so this field is only the caption. Missing rows render empty. All 43 rows are nonempty in every companion language export and no tags were observed in En.",
+      "technical": "FString Text at row offset +0x10. GetGameText copies Row->Text by value and passes it through FormatText; no GLO/DYN/<TYPE=KEY> tags occur in any of the 11 exported shards, so the literal localized text is returned unchanged. SetButtonTextId/SetTextIdOnly resolve the id to this text when applied; a non-None id with no row, or a row with empty Text, yields an empty string with no fallback, while a Stamp row whose Id_StampText is NAME_None makes the request invalid and clears the text block before any lookup. All 43 rows in all 11 exported locale shards have nonempty ID and Text. Some De, En, Es, Es_LA, Fr and It rows contain literal line breaks; whether those are joined depends on widget settings (bForceOneLine/auto-size) that are not part of these exports. The stamp's PaperSprite is loaded separately from Stamp.FileName and its voice from Stamp.Id_Voice, so this field is only the caption. There are no numeric fields, units, or coded sentinel values in this table.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:15",
+        "Source/Abrams/Private/GameTextManager.cpp:456",
+        "Source/Abrams/Private/GameTextManager.cpp:661",
         "Source/Abrams/Private/GameTextManager.cpp:667",
         "Source/Abrams/Private/GameTextManager.cpp:681",
         "Source/Abrams/Private/GameTextManager.cpp:683",
         "Source/Abrams/Private/GameTextManager.cpp:742",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:60",
         "Source/Abrams/Private/GameWidgetTextBlock.cpp:72",
         "Source/Abrams/Private/GameChatMessageWidget.cpp:398",
         "Source/Abrams/Private/GameStampListViewItemWidget.cpp:20"
@@ -34,31 +48,44 @@
     }
   },
   "notes": [
-    "FGameDataTableRow_GameText with 11 exported language variants (43 identical row ids each). Slot 6 in GameTextManager::Tick; Config/DefaultGame.ini:35-45 cooks one variant per language chunk.",
-    "Cross-table join: FGameDataTableRow_Stamp provides Id (message payload, GameCommonChatListWidget.cpp:167), FileName (sprite), Id_Voice (voice) and Id_StampText (this table). UGameCommonChatListWidget enumerates StampDataTables into UGameStampListItemData (GameCommonChatListWidget.cpp:44-48).",
-    "No stamp-prefix dispatch exists in the text manager; any non-SYS_ id is searched across all 14 GameText tables in fixed order, so collisions with earlier groups would shadow this caption.",
-    "Reconstruction caveat: text resolution functions are byte-matched, while FindTextRow/Tick are behaviour-certified (status/functions.json 0x14af290, 0x14c96f0; BEHAV BG03). Content is partial; retail Blueprint-only uses are not asserted."
+    "FGameDataTableRow_GameText with 11 exported locale shards (De, En, Es, Es_LA, Fr, It, Ja, Ko, Pt, Zh_Hans, Zh_Hant), each with the same 43 row keys and matching ID fields. GameTextManager::Tick places StampTextDataTable_<Language> sixth of 14 GameText tables (zero-based index 5), after ChatText and before StoryText; Config/DefaultGame.ini:35-45 assigns one locale suffix per chunk (En 1, Ja 2, Fr 3, Es 4, De 5, It 6, Ko 7, Zh_Hant 8, Zh_Hans 9, Pt 10, Es_LA 11). The runtime EApplicationLanguage enum also names Ar, Ind, Pl, Ru and Th (Source/Framework/Public/EApplicationLanguage.h:18-23), but no corresponding export shards are present, so their rows cannot be checked.",
+    "Cross-table join: FGameDataTableRow_Stamp provides Id (network/message key, GameCommonChatListWidget.cpp:167), FileName (sprite), Id_Voice (voice) and Id_StampText (this table). UGameCommonChatListWidget caches StampDataTables rows in UGameStampListItemData (GameCommonChatListWidget.cpp:44-48); GameDataTableManager loads that separate table into StampDataTables (GameDataTableManager.cpp:262). All 31 shipped Stamp rows resolve to 31 of the 43 caption IDs; the other 12 caption rows (CP_051_STAMP_001, CP_121_STAMP_001, CP_170_STAMP_002, CP_170_STAMP_003, CP_180_STAMP_001, CP_190_STAMP_002, CP_200_STAMP_001, CP_210_STAMP_001, CP_220_STAMP_002, CP_230_STAMP_001, CP_240_STAMP_002, CP_270_STAMP_001) are not referenced by any supplied export or C++ callsite; reaching them would require an ID source outside the supplied data.",
+    "No stamp-prefix dispatch exists in the text manager: only ids starting with SYS_ (case-insensitive) go to SystemTextDataTable. Every other id, including CP_..._STAMP_..., is searched with FindRow through TextDataTables in the fixed 14-table order and the first match wins. No exported GameText table repeats a StampText ID, so no supplied shard currently shadows a caption; null table pointers are skipped by AddTextDataTables. Stamp captions are not copied into GlossaryParameters (only GlossaryTextDataTable_<Language> rows are, at GameTextManager.cpp:571-576), and the text block stores only the last TextId/parameters after resolving immediately.",
+    "Consumer conditions: selector OnListItemSet casts the list item to UGameStampListItemData and reads StampRow without null checks (GameStampListViewItemWidget.cpp:18), then SetButtonTextId acts only if ButtonText is bound (GameWidgetButton.cpp:116-122). EApplicationLanguage::Invalid (255) selects the current-language SetTextIdOnly path, not a fixed locale. Tick clears and refills TextDataTables only after all language loaders complete in state 2 (GameTextManager.cpp:536-547); before the first such Tick the array is empty (lookups resolve empty), and during a language switch the previous array is retained until the completion Tick replaces it. Inbound stamps are handled only for EGameOnlineSendMessageType::Stamp, find the Stamp row by Request.RowName, break after the first match, and call ShowStampMessage only if a widget is available in StampContentPool (GameChatMessageWidget.cpp:365-387); voice playback happens before that pool check, but caption and sprite need the widget.",
+    "Reconstruction caveat: C++ and export evidence only. GetText (0x14afde0), GetGameText (0x14af510) and FormatText (0x14c4870) are byte-matched in status/functions.json. FindTextRow (0x14af290) is behaviour-certified in Tools/verify/BEHAV/records/NA15.json and Tick (0x14c96f0) in BG03.json/ZA06.json; neither is byte-matched. Retail Blueprint assets were not inspected, so widget-level properties or Blueprint-only uses are not asserted."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameStampListViewItemWidget.cpp:19",
-      "detail": "OnListItemSet sets the stamp selector button text from the Stamp row's Id_StampText."
+      "detail": "OnListItemSet sets the stamp selector button text from the Stamp row's Id_StampText; Invalid language delegates to SetTextIdOnly/current language, while the sprite is loaded separately at line 20."
     },
     {
       "source": "Source/Abrams/Private/GameChatMessageWidget.cpp:377",
-      "detail": "Copies Stamp.Id_StampText into an inbound stamp message request (alongside FileName and Id_Voice)."
+      "detail": "In the EGameOnlineSendMessageType::Stamp path (after FindRow on StampDataTables by Request.RowName), copies Stamp.Id_StampText into FGameStampMessageRequest.TextId alongside FileName and plays Id_Voice; ShowStampMessage is called only when the widget pool has an entry."
     },
     {
       "source": "Source/Abrams/Private/GameChatMessageWidget.cpp:397",
-      "detail": "ShowStampMessage applies Request.TextId to the stamp message's text block."
+      "detail": "ShowStampMessage applies Request.TextId to the stamp message's text block via SetTextIdOnly, then sets the sprite from Request.FileName."
     },
     {
       "source": "Source/Abrams/Private/GameCommonChatListWidget.cpp:44",
-      "detail": "Collects StampDataTables rows into list items that expose those rows to the selector and chat widgets."
+      "detail": "Collects StampDataTables rows into UGameStampListItemData for the selector; the chosen stamp sends Stamp.Id as the network message key (line 167), which later selects the Stamp row."
     },
     {
       "source": "Source/Abrams/Private/GameTextManager.cpp:555",
-      "detail": "Loads StampTextDataTable_<Language> into the shared GameText search array."
+      "detail": "Loads StampTextDataTable_<Language> into the shared 14-table GameText array as the sixth entry (zero-based index 5)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:589",
+      "detail": "FindTextRow scans TextDataTables in fixed order and returns the first matching row; SYS_ prefixed ids are dispatched to SystemTextDataTables before this scan (lines 605-618)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetTextBlock.cpp:72",
+      "detail": "SetTextRequest resolves the id through AGameTextManager::GetText immediately, then stores the TextId and parameters; an invalid NAME_None id clears the text instead (lines 60-65)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetButton.cpp:120",
+      "detail": "The Invalid-language branch of SetButtonTextId used by the stamp selector calls SetTextIdOnly; ButtonText must exist (line 116)."
     }
   ]
 }

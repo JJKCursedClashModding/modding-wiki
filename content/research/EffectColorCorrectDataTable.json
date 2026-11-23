@@ -1,97 +1,123 @@
 {
-  "description": "Spatial post-process/effect-fade correction presets: a live effect whose row references one of these entries tints the battle-area post-process volume while its attack volume reaches the player or camera.",
+  "description": "Spatial post-process/effect-visibility correction presets: a live effect whose EffectDataTable row names one of these entries is registered while alive; each tick the battle system resolves the correction row and, when its configured sphere/segment/attack-collision test reaches the focused character or camera, drives battle-area post-process colour tweens plus the effect's hide/fade/Niagara state.",
   "fields": {
     "ID": {
       "simple": "Color-correction row ID (e.g. FX_CP_140_09101).",
-      "technical": "FName row key. AGameEffect::Initialize resolves EffectRow.Id_EffectColorCorrect over EffectColorCorrectDataTables (+0x6A0) and registers the effect with the manager; each tick the battle system re-resolves the same ID and uses Row->Id as the key of Area.ActiveCorrections / ReleasingCorrections. 34 exported rows.",
+      "technical": "FName row key; declared default NAME_None. AGameEffect::Initialize reads EffectRow.Id_EffectColorCorrect (effect row +0x150), resolves it through GameDataTableManager.EffectColorCorrectDataTables (+0x6A0) with FindRow(..., /*bWarnIfMissing=*/false) and registers the effect in ColorCorrectEffects even if that lookup fails. Each tick FStudioBattleSystem2D0 re-resolves the same ID (first table wins), silently skips a missing row, and uses the resolved Row->Id - not the effect row's copy - as the key of RowsInRange and of each area's ActiveCorrections/ReleasingCorrections; several live effects sharing one ID therefore collapse to a single area correction (TMap.Add overwrites). Export: 34 unique keys; 33 are referenced by 48 EffectDataTable rows, FX_CP_121_08102 is unreferenced, and no referenced ID is missing.",
       "evidence": [
-        "Source/Abrams/Private/GameEffect.cpp:1233",
+        "Source/Abrams/Private/GameEffect.cpp:1229",
+        "Source/Abrams/Private/GameEffect.cpp:1235",
+        "Source/Abrams/Private/GameEffect.cpp:1243",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:381",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:651",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:382",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:387",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:596",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:647",
         "Source/Abrams/Private/GameDataTableManager.cpp:236"
       ],
       "status": "verified"
     },
     "Radius": {
       "simple": "Horizontal reach of the correction around the effect.",
-      "technical": "float cm. For an attack collision sphere the reach is SphereRadius + Radius; for a capsule, Radius is added to the closest-point-on-segment distance (character/capsule radii included); for a plain effect with Height<=0 the reach is mean ActorScale * Radius; with Height>0 the segment reach is (Scale.X+Scale.Y)/2 * Radius. Culling tests use Radius * Culling_ScaleRate. Exported example: 50.0.",
+      "technical": "float cm; declared default 0.0f; all 34 rows serialize a value (0 in two rows, otherwise 25..1800). For an attack sphere the in-range reach is Sphere.GetScaledSphereRadius() + Row.Radius; for an attack capsule Radius is added to the closest-point-on-segment distance along with both capsule radii. With bUseAttackCollisionEnabled=false, Height<=0 uses (Scale.X+Scale.Y+Scale.Z)/3 * Radius, while Height>0 uses (Scale.X+Scale.Y)/2 * Radius about a vertical segment. The culling test rebuilds the same geometry with Culling_ScaleRate substituted (ScaleRate*Reach for sphere/segment, ScaleRate*Radius for capsule); because every shipped row has ScaleRate=1, the culling reach equals the normal reach and bInCulling is set from bInRange.",
       "evidence": [
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:465",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:484",
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:15",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:463",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:486",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:537",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:550",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:561"
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:574"
       ],
       "status": "verified"
     },
     "Height": {
-      "simple": "Vertical extent of the correction around the effect.",
-      "technical": "float cm. With bUseAttackCollisionEnabled=false: Height<=0 selects a mean-scale sphere using Radius; Height>0 selects a vertical segment from Location.Z +/- Height*Scale.Z/2, using PointDistToSegment. For capsule attack collisions, Height extends the capsule half-height of the test segment (and ScaleRate*Height for the culling segment). Exported example: 0.0.",
+      "simple": "Vertical extent / segment selector for the correction around the effect.",
+      "technical": "float cm; declared default 0.0f; exported values are -650..10000, with 20 rows at 0. It is used as a segment half-height only in the attack-capsule path (Capsule.GetScaledCapsuleHalfHeight() + Height) and in the non-attack Height>0 branch, which builds a segment from Location.Z +/- Height*Scale.Z/2 and tests PointDistToSegment. Height<=0 - including all six negative exported values - selects the mean-scale sphere branch rather than an inverted segment. The culling capsule/segment extend by ScaleRate*Height; shipped ScaleRate is always 1.",
       "evidence": [
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:543",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:561",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:475",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:527"
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:18",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:478",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:551",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:536",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:550",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:563"
       ],
       "status": "verified"
     },
     "bCheckUpperOnly": {
-      "simple": "Reject effects above the character/camera height.",
-      "technical": "bool. When true and bCheckCharacterLocation is true, the row is rejected if either CameraLocation.Z or CharacterLocation.Z is below the effect's Z (i.e. the effect must be above both). Takes precedence over bCheckLowerOnly in the else-if chain. Export example: false.",
+      "simple": "Upper-side Z gate: reject effects that sit above either test point.",
+      "technical": "bool; declared default false; only FX_CN_250_02103 exports true. This branch is tested first and takes precedence over bCheckLowerOnly. It does nothing unless bCheckCharacterLocation is true; in that case the row is rejected before any distance test if CameraLocation.Z < effect-location.Z OR CharacterLocation.Z < effect-location.Z (the effect is above at least one test point). bCheckCameraLocation does not enable this gate: camera Z is compared whenever the character flag is set.",
       "evidence": [
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:428"
-      ],
-      "status": "verified"
-    },
-    "bCheckLowerOnly": {
-      "simple": "Reject effects below the character/camera height.",
-      "technical": "bool. Checked only when bCheckUpperOnly is false; with bCheckCharacterLocation true it rejects the effect if its Z is below either CameraLocation.Z or CharacterLocation.Z. Export example: false.",
-      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:21",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:428",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:430",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:432",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:438"
       ],
       "status": "verified"
     },
-    "bCheckCharacterLocation": {
-      "simple": "Use the player character as a distance test point.",
-      "technical": "bool. Enables the character location in the upper/lower height gates and in all sphere/capsule/segment distance tests (otherwise only the camera may count). Export example: true.",
+    "bCheckLowerOnly": {
+      "simple": "Lower-side Z gate: reject effects that sit below either test point.",
+      "technical": "bool; declared default false; all 34 exported rows are false. It is only parsed in the else-if after bCheckUpperOnly is false, and only acts when bCheckCharacterLocation is true: the row is rejected if effect-location.Z < CameraLocation.Z OR effect-location.Z < CharacterLocation.Z. As with the upper gate, bCheckCameraLocation alone does not enable the comparison.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:24",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:438",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:440"
+      ],
+      "status": "verified"
+    },
+    "bCheckCharacterLocation": {
+      "simple": "Use the player character as a distance and height test point.",
+      "technical": "bool; declared default false; 29 exported rows set true and 5 set false. When true, the character location participates in the upper/lower Z gates and in sphere/segment/capsule in-range and culling tests. When false, both Z gates are skipped entirely even though camera Z has been read, while camera-only distance tests can still apply. In the capsule camera-only branch the reconstruction still adds the focused character's capsule radius to the reach.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:27",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:424",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:470"
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:430",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:438",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:466",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:491"
       ],
       "status": "verified"
     },
     "bCheckCameraLocation": {
       "simple": "Use the camera as a distance test point.",
-      "technical": "bool. Enables camera location in the height gates and distance tests; for capsules the camera test is only attempted when the character test did not already put the row in range. Export example: true.",
+      "technical": "bool; declared default false; all 34 exported rows set true. It enables the camera location in the sphere/segment/capsule in-range and culling distance tests; for capsules the camera test is only attempted when the character test has not already put the row in range/culling. It does NOT control the upper/lower Z gates: camera Z is used there whenever a Z gate runs with bCheckCharacterLocation true.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:30",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:425",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:489"
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:432",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:466",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:491"
       ],
       "status": "verified"
     },
     "Culling_ScaleRate": {
-      "simple": "Outer-radius multiplier that fades the effect instead of applying the correction.",
-      "technical": "float. When != 1.0, a second, larger reach (Radius/Height scaled by this value) sets bInCulling: the effect actor's hidden-in-game flag is set to bCullingEnabled and it fades toward 1 over CrossFadeTime; when ==1.0 the ordinary in-range state is also treated as culling (the row comment says 'within Radius * Culling_ScaleRate: the effect fades out'). Export example: 1.0.",
+      "simple": "Reach multiplier for the effect-side cull/fade state.",
+      "technical": "float; declared default 0.0f but all 34 exported rows serialize exactly 1.0. When !=1.0 the reconstruction rebuilds the test geometry with this multiplier (whole reach for attack sphere and non-attack sphere/segment; Radius and Height only for capsules) to set bInCulling. When ScaleRate==1.0, any non-rejected bInRange also sets bInCulling. No shipped row uses a distinct larger band, so hide/fade and Niagara state track the normal in-range state exactly.",
       "evidence": [
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:423",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:570",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:601"
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:33",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:426",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:470",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:561",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:574"
       ],
       "status": "verified"
     },
     "SaturationRate": {
       "simple": "Saturation multiplier while the correction is active.",
-      "technical": "FVector4 (X,Y,Z,W exported). The area tween starts at the post-process volume's BaseSaturation and targets Row.SaturationRate * BaseSaturation over FadeInTime with linear easing; on release it eases from the current value back toward the stored start over FadeOutTime scaled by fade-in progress. Export sample: (1,1,1,1) i.e. no change.",
+      "technical": "FVector4 (X,Y,Z,W); declared FVector4(ForceInit) (all components zero, including W per the inline ctor pin) but every exported row has W=1 and X/Y/Z multipliers. 32 rows are (1,1,1,1); FX_CP_121_08101 is (0.3,0.1,0.5,1) and FX_CN_250_02103 is (0.1,0.1,0.8,1). The area tween starts at the collected BaseSaturation and targets Rate * BaseSaturation over FadeInTime (Linear, exponent 2, 2 args); on release it eases from the current value back to the stored From value over scaled FadeOutTime.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:36",
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:86",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:632",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:660",
-        "Source/Abrams/Public/GameBattleSystems_A.h:163"
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:660"
       ],
       "status": "verified"
     },
     "ContrastRate": {
       "simple": "Contrast multiplier while the correction is active.",
-      "technical": "FVector4; same tween pattern as SaturationRate with Area.BaseContrast as the starting value. Export sample: (0.8,0.8,0.8,1.0) for FX_CP_140_09101, i.e. 80% contrast.",
+      "technical": "FVector4 (X,Y,Z,W); declared all-zero FVector4(ForceInit), exported W=1 in all 34 rows. Exported X/Y/Z values include (1,1,1) on 16 rows, (0.5,0.5,0.5) on 10, (0.2,0.2,0.2) on 4, and the FX_CP_140_09101 sample (0.8,0.8,0.8,1). Same tween pattern as SaturationRate, using Area.BaseContrast as the start value.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:39",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:633",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:661"
       ],
@@ -99,8 +125,9 @@
     },
     "GainRate": {
       "simple": "Gain multiplier while the correction is active.",
-      "technical": "FVector4; same tween pattern with Area.BaseGain as the starting value. Export sample: (0.3,0.3,0.3,1.0).",
+      "technical": "FVector4 (X,Y,Z,W); declared all-zero FVector4(ForceInit), exported W=1 in all 34 rows and varied X/Y/Z, e.g. FX_CP_140_09101 (0.3,0.3,0.3,1), FX_CP_050_07112 (0.1,0.2,1.0,1) and FX_CP_050_09111 (3,2,5,1). Same tween pattern as SaturationRate, using Area.BaseGain as the start value.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:42",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:634",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:662"
       ],
@@ -108,8 +135,9 @@
     },
     "FadeInTime": {
       "simple": "Time to blend the correction in.",
-      "technical": "float seconds used for all three color tweens and stored in FGameBattleAreaColorCorrect.FadeInTime. On release, the fade-out duration is scaled by GetElapsed()/FadeInTime (or 1 when FadeInTime<=0) so partially faded-in corrections unwind proportionally. Export sample: 0.1.",
+      "technical": "float seconds; declared default 0.0f; exported as 0 (8 rows), 0.1 (21), 0.3 (3) or 1.0 (2). Used as the duration of all three colour tweens and stored in FGameBattleAreaColorCorrect.FadeInTime. On release the colour fade-out duration is (GetElapsed()/FadeInTime when >0, otherwise 1) * FadeOutTime, so a partially faded-in correction unwinds proportionally.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:45",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:632",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:635",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:660"
@@ -118,136 +146,186 @@
     },
     "FadeOutTime": {
       "simple": "Time to blend the correction out after the effect leaves range.",
-      "technical": "float seconds stored on the correction; used as the duration of the release tweens after the fade-in-progress scaling. A correction stays in ReleasingCorrections until its color/blendable tweens finish. Export sample: 0.1.",
+      "technical": "float seconds; declared default 0.0f; exported as 0 (3 rows), 0.1 (17), 0.3 (4) or 1.0 (10). Stored on the correction and used as the base duration of the three colour release tweens after the fade-in-progress scaling. It is NOT used for the optional blendable weight release, which restarts with the blendable's current elapsed value as its duration. A correction stays in ReleasingCorrections until its colour and blendable interpolators are inactive.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:48",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:636",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:660",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:665",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:679"
       ],
       "status": "verified"
     },
     "ForceCorrectTime": {
-      "simple": "Time window in which the correction is forced without attack collisions.",
-      "technical": "float seconds compared with Effect.LifeElapsedTime. While 0 < LifeElapsedTime <= ForceCorrectTime, the attack-collision-enabled check is skipped; after that time, the collision list must contain at least one component with collision enabled, and when bUseAttackCollisionEnabled=false the row is skipped entirely after ForceCorrectTime. Export values are 0.0 in the sampled rows.",
+      "simple": "Effect-age window in which attack collisions are not required.",
+      "technical": "float seconds; declared default 0.0f; exported 0 in 26 rows and 0.5, 0.75, 1.0 or 10.0 in 8 rows. When ForceCorrectTime>0 and >= Effect.LifeElapsedTime (the comparison includes time 0 and the exact boundary), the attack-collision availability query/filter is bypassed. After that window, at least one attack collision component with collision enabled must remain if any components were returned; an empty component list does not itself reject the row. Additionally, with bUseAttackCollisionEnabled=false, ForceCorrectTime>0 and LifeElapsedTime>ForceCorrectTime, the row is skipped entirely.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:51",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:399",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:403",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:413"
       ],
       "status": "verified"
     },
     "DelayCorrectTime": {
       "simple": "Delay before the correction can apply.",
-      "technical": "float seconds; the battle system skips the row while Effect.LifeElapsedTime < DelayCorrectTime (only when the field is >0). Export values are 0.0 in the sampled rows.",
+      "technical": "float seconds; declared default 0.0f; all 34 exported rows are 0. When >0, the battle system skips the row while Effect.LifeElapsedTime < DelayCorrectTime, before all other range checks.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:54",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:395"
       ],
       "status": "verified"
     },
     "bColorCorrectEnabled": {
       "simple": "Master enable for the post-process colour change.",
-      "technical": "bool. A row in range is added to RowsInRange only when this is true AND the spawned effect's own bColorCorrectionEnabled flag is set; it does not gate effect hiding/fading or the Niagara parameter. Export sample: true.",
+      "technical": "bool; declared default false; 27 exported rows are true and 7 are false. A row is added to RowsInRange only when bInRange is true, this flag is true, and the live effect's own bColorCorrectionEnabled is 1 (reset to 1 on pool acquire; FCN_200_AttackAAction::ReleaseChargeEffect sets it to 0). This flag does not gate effect hiding/fading or the Niagara parameter write.",
       "evidence": [
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:594"
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:57",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:594",
+        "Source/Abrams/Private/GameEffect.cpp:837",
+        "Source/Abrams/Private/CN_200_Actions.cpp:37"
       ],
       "status": "verified"
     },
     "bCullingEnabled": {
-      "simple": "Hidden-in-game flag applied to the effect while in the culling band.",
-      "technical": "bool passed verbatim to IGameActorInterface.SetHiddenInGameFlag when bInCulling is true. Effects are never hidden through this path outside the culling band; CrossFadeTime controls the accompanying fade. Export sample: false.",
+      "simple": "Hidden-in-game flag applied to the effect in the culling state.",
+      "technical": "bool; declared default false; 13 exported rows are true and 21 false. Passed verbatim to IGameActorInterface.SetHiddenInGameFlag when bInCulling is true; when bInCulling is false the flag is explicitly cleared to 0. Because every shipped Culling_ScaleRate is 1.0, bInCulling tracks bInRange, so these 13 rows hide their effect for the whole in-range interval; bColorCorrectEnabled does not affect it.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:60",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:588",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:600"
       ],
       "status": "verified"
     },
     "bUseAttackCollisionEnabled": {
       "simple": "Whether range is measured against the effect's attack collision shapes.",
-      "technical": "bool selecting between two range algorithms: true uses the effect's attack collision sphere/capsule components (with Radius/Height expansion); false uses a sphere or vertical segment around the effect actor's location. Also gates the ForceCorrectTime post-window skip. Export sample: false.",
+      "technical": "bool; declared default false; 12 exported rows are true and 22 false. True iterates GetAttackCollision() components; the reconstruction only handles UGameSphereComponent and UGameCapsuleComponent (other component classes are skipped) and applies Radius/Height expansions. False tests a mean-scale sphere around the effect location when Height<=0, or a vertical segment when Height>0. The early attack-collision availability gate around ForceCorrectTime runs regardless of this flag.",
       "evidence": [
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:447",
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:63",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:399",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:413",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:543"
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:447",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:536"
       ],
       "status": "verified"
     },
     "NiagaraParameterName": {
-      "simple": "Niagara float parameter toggled 0/1 with in-range state.",
-      "technical": "FName; skipped when None. On effect initialization, zero is written to every UNiagaraComponent (0x141320851); each tick the battle system writes 0 when neither in-range nor culling, and 1 when either is true. Export sample: None (unused in these 34 rows).",
+      "simple": "Niagara float parameter toggled 0/1 with in-range/culling state.",
+      "technical": "FName; declared default None. None skips all writes. 11 exported rows use IsCharacterCulling (FX_CP_140_08211, FX_CP_051_08113/08114, FX_CP_000_23121/23131, FX_CP_220_03102/08112/08113/08123/08133, FX_CN_250_04101) and 23 are None. On effect Initialize the resolved row's non-None name is written as 0.0f on every UNiagaraComponent; each tick the battle system writes 0.0f when neither bInRange nor bInCulling is set and 1.0f when either is set, independently of bColorCorrectEnabled and bCullingEnabled.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:66",
+        "Source/Abrams/Private/GameEffect.cpp:1236",
+        "Source/Abrams/Private/GameEffect.cpp:1240",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:579",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:606",
-        "Source/Abrams/Private/GameEffect.cpp:1236"
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:606"
       ],
       "status": "verified"
     },
     "PostProcessMaterial_Name": {
-      "simple": "Name of a blended post-process material in the area volume.",
-      "technical": "FName looked up in Area.BlendableWeights (built from the post-process volume's WeightedBlendables by object name). When found, a FGameBattleAreaBlendableWeight tweens that blendable's weight from its base value to PostProcessMaterial_Weight. Export sample: None (no extra blendable in these rows).",
+      "simple": "Name of an optional blended post-process material in the area volume.",
+      "technical": "FName; declared default None; all 34 exported rows are None, so no shipped row exercises this path. When non-None the name is looked up in Area.BlendableWeights, a map collected from each \"BattleAreaPostProcess\"-tagged APostProcessVolume's WeightedBlendables by Object->GetFName(). A found entry gets a FGameBattleAreaBlendableWeight tween toward PostProcessMaterial_Weight.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:69",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:637",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:639",
-        "Source/Abrams/Public/GameBattleSystems_A.h:128"
+        "Source/Abrams/Public/GameBattleSystems_A.h:128",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:725"
       ],
       "status": "verified"
     },
     "PostProcessMaterial_Weight": {
       "simple": "Target weight for the named post-process material.",
-      "technical": "float; used as the goal of a linear float tween (exponent 2, 2 args) from the area's base blendable weight over PostProcessMaterial_Time. Only read when PostProcessMaterial_Name resolves in Area.BlendableWeights. Export sample: 0.0.",
+      "technical": "float; declared default 0.0f; all 34 exported rows are 0. It is the goal of a linear float tween (EEasingFunc::Linear, exponent 2, 2 args) from the area's collected base weight over PostProcessMaterial_Time, and is only read when PostProcessMaterial_Name resolves in Area.BlendableWeights.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:72",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:643"
       ],
       "status": "verified"
     },
     "PostProcessMaterial_Time": {
       "simple": "Blend time for the post-process material weight tween.",
-      "technical": "float seconds passed to the blendable weight interpolator together with PostProcessMaterial_Weight; on release the interpolator is restarted using its current/start values and elapsed time. Export sample: 0.0.",
+      "technical": "float seconds; declared default 0.0f; all 34 exported rows are 0. Passed as the duration of the blendable weight Start tween. On release that interpolator is restarted from its current value toward its start value using GetElapsed() as the duration (not FadeOutTime).",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:75",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:643",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:667"
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:665"
       ],
       "status": "verified"
     },
     "CrossFadeTime": {
-      "simple": "Duration of the effect actor's fade while entering/leaving the culling band.",
-      "technical": "float seconds passed to AGameEffect::FadeTo(0.0, CrossFadeTime) when not culled and FadeTo(1.0, CrossFadeTime) when culled, only for effects with bFadeEnabled. It is distinct from the post-process colour correction's FadeInTime/FadeOutTime. Export sample: 0.0.",
+      "simple": "Effect-actor fade time/rate used when the culling state changes.",
+      "technical": "float; declared default 0.0f; exported 0 in 32 rows and 0.2 in FX_CP_121_08101 and FX_CN_250_02103. Passed as the Time argument to AGameEffect::FadeTo(0.0f, CrossFadeTime) when not culling and FadeTo(1.0f, CrossFadeTime) when culling, only for effects with bFadeEnabled. The reconstruction's FadeTo treats Time as seconds per alpha unit: when >0 it starts a linear tween over abs(DeltaFadeAlpha)*Time, and when <=0 the fade is applied immediately. This is separate from FadeInTime/FadeOutTime, which drive the volume colour tweens.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:78",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:591",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:603"
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:603",
+        "Source/Abrams/Private/GameEffect.cpp:248"
       ],
       "status": "verified"
     },
     "Id_RemoveEffectColorCorrect": {
-      "simple": "Other correction IDs to cancel when this row activates.",
-      "technical": "TArray<FName> (3 slots in every exported row, None padded). When the row is in range, each non-None ID is removed from Area.ReleasingCorrections before this row's own ID is also removed there; the row's own ID then goes into ActiveCorrections. This lets higher-priority effects cancel fading-out corrections. Export sample: three None entries.",
+      "simple": "Other correction IDs whose fade-out is cancelled when this row applies.",
+      "technical": "TArray<FName>; declared empty; every exported row serializes exactly 3 slots, with None as padding. Non-None entries are index 0 in FX_CP_051_08113 and FX_CP_051_08114 (both cancel FX_CP_051_08111), index 1 in FX_CP_051_08114 (cancels FX_CP_051_08113), and index 2 in FX_CP_220_08113/08123/08133 (all cancel FX_CP_220_08112). For each in-range row, before the ActiveCorrections.Contains early-out, every non-None ID is removed from Area.ReleasingCorrections. If this row's ID is not already active, a new correction is built and added to ActiveCorrections and its own ID is also removed from ReleasingCorrections; if it is already active, neither of those latter actions happens.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectColorCorrect.h:81",
         "Source/Abrams/Private/GameBattleSystems_A.cpp:619",
-        "Source/Abrams/Private/GameBattleSystems_A.cpp:648",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:623",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:626",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:647",
         "Source/Abrams/Public/GameBattleSystems_A.h:168"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "EffectColorCorrectDataTables is manager slot +0x6A0; the name is registered at GameDataTableManager.cpp:408 and resolved at line 236. The join is from EffectDataTable.Id_EffectColorCorrect (row +0x150), so a correction row is only evaluated while an effect that names it is alive and registered in GameEffectManager.ColorCorrectEffects.",
-    "The range test first honours DelayCorrectTime (effect life) and attack-collision availability, then optional upper/lower height rejection, then either attack collision shapes or an actor-centred sphere/vertical segment, and finally the culling band. Character/camera test points come from AGameCameraManager.GetCameraLocation() and the character actor location.",
-    "Area corrections are keyed by row ID in two maps (ActiveCorrections/ReleasingCorrections) on each 'BattleAreaPostProcess'-tagged APostProcessVolume; the tween object layout is decomp-pinned in GameBattleSystems_A.h (0x1D0 bytes).",
-    "No localization variants or numbered shards of this table exist in the export; the 34 rows are distinct effect-specific presets."
+    "EffectColorCorrectDataTables is the single manager array at +0x6A0; the DataTable name is registered in GameDataTableManager.cpp:408 and resolved into that array at line 236. There is one exported asset (34 unique keys, no repeated keys, no numbered/localized shards) and every row serializes every catalog field.",
+    "The join is EffectDataTable.Id_EffectColorCorrect (effect row +0x150) -> this table. AGameEffect::Initialize registers the effect in GameEffectManager.ColorCorrectEffects for any non-None ID, even if the correction row itself fails to resolve; the per-tick lookup silently skips such missing rows (FindRow bWarnIfMissing=false). In the export, 48 effect rows reference 33 correction IDs: none are missing, FX_CP_121_08102 is unreferenced, and shared IDs (e.g. FX_CP_140_09101 from four effect rows) collapse to one RowsInRange/area-correction entry keyed by Row->Id.",
+    "Per-tick order: valid focused character (GetFocusActor850 or PlayerCharacter) and valid effect/EffectRow; resolve correction row; DelayCorrectTime; ForceCorrectTime collision-availability exception and the bUseAttackCollisionEnabled=false post-window skip; IGameActorInterface.GetColParamFlag; upper/lower Z gates (upper first, both requiring bCheckCharacterLocation); sphere/capsule/segment range and culling geometry; then Niagara write 0/1, SetHiddenInGameFlag(0 or Row.bCullingEnabled), and effect FadeTo. Character/camera points come from BattleManager/AGameCameraManager.GetCameraLocation().",
+    "Shipped values narrow several branches: all 34 rows have Culling_ScaleRate=1.0 (so culling == in-range outside height rejection), DelayCorrectTime=0, PostProcessMaterial_Name=None/Weight=0/Time=0, and every FVector4 W=1. 11 rows drive Niagara IsCharacterCulling; 13 set bCullingEnabled=true; 7 set bColorCorrectEnabled=false; 12 use attack collisions; CrossFadeTime is 0.2 on two rows; eight rows have non-zero ForceCorrectTime; and six non-None Id_RemoveEffectColorCorrect entries occur across five rows.",
+    "Declared in-class defaults differ from the serialized row: booleans default false, numeric/time fields default 0.0f, vectors default FVector4(ForceInit) (all zero including W per the ctor pin), and FNames/TArray default to None/empty. The exported rows are the evidence for what ships; the defaults only matter for missing/unsaved fields, and no such omissions occur in this export.",
+    "Area caches are per \"BattleAreaPostProcess\"-tagged APostProcessVolume collected by FStudioBattleSystem2D0::CollectAreaPostProcesses: base ColorSaturation/Contrast/Gain and WeightedBlendables-by-FName are snapshotted, ActiveCorrections/ReleasingCorrections are keyed by correction row ID, and ApplyColorCorrections writes the tweened values each tick. On battle reset the maps are emptied and the collected base values restored. The reconstructed FGameBattleAreaColorCorrect layout is 0x1D0 bytes; tween/copy internals are reconstruction, not retail-header evidence.",
+    "Runtime descriptions are based on reconstructed Abrams C++ with retail RVAs and matching notes. Behavior in uncooked assets remains unverified."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameEffect.cpp:1233",
-      "detail": "Effect initialization resolves Id_EffectColorCorrect, zeroes the row's Niagara parameter on all components and registers the effect in ColorCorrectEffects."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:408",
+      "detail": "Registers the table loader name EffectColorCorrectDataTable; line 236 resolves the primary asset into AGameDataTableManager.EffectColorCorrectDataTables (+0x6A0)."
     },
     {
-      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:363",
-      "detail": "Battle system tick (retail 0x100d3e0) evaluates every registered correction effect against character/camera range and builds RowsInRange."
+      "source": "Source/Abrams/Private/GameEffect.cpp:1229",
+      "detail": "Initialize resolves EffectRow.Id_EffectColorCorrect, zeroes the resolved row's NiagaraParameterName on all components (if non-None), and adds the effect to AGameEffectManager.ColorCorrectEffects; a failed row lookup does not prevent registration."
+    },
+    {
+      "source": "Source/Abrams/Private/GameEffect.cpp:927",
+      "detail": "OnPoolReleased removes the effect from ColorCorrectEffects when its EffectRow still names a correction effect."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:348",
+      "detail": "TickAreaPostProcesses advances existing corrections, then evaluates every registered effect against life/time/collision/Z/range/culling gates and builds RowsInRange keyed by the resolved row ID; effect hide/fade/Niagara updates happen here."
     },
     {
       "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:614",
-      "detail": "Applies each in-range row to every area post-process volume: color/contrast/gain tweens, optional blendable weight tween and cancellation of removed IDs."
+      "detail": "For every area volume, applies in-range rows: cancels removed/fading IDs, constructs colour (and optional blendable) tweens and moves the row into ActiveCorrections."
     },
     {
       "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:653",
-      "detail": "Rows no longer in range are eased back toward base values and moved from ActiveCorrections to ReleasingCorrections until tweens finish."
+      "detail": "Active rows no longer in range are eased back toward their stored start values and moved into ReleasingCorrections until all interpolators finish."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:691",
+      "detail": "ApplyColorCorrections ticks the maps and writes ColorSaturation/Contrast/Gain (with overrides) and optional WeightedBlendables weights to the volume."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:725",
+      "detail": "CollectAreaPostProcesses snapshots the base post-process values and blendable weights for \"BattleAreaPostProcess\"-tagged volumes; ResetAreaPostProcesses restores them."
+    },
+    {
+      "source": "Source/Abrams/Private/GameEffectManager.cpp:371",
+      "detail": "ColorCorrectEffects is the weak-pointer cache read by the battle-system tick; AddColorCorrectEffect (line 404) appends valid effects and RemoveColorCorrectEffect removes them on pool release."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_200_Actions.cpp:37",
+      "detail": "Indirect effect-side gate: FCN_200_AttackAAction::ReleaseChargeEffect sets ChargeEffect.bColorCorrectionEnabled=0, so that effect can still drive hide/fade/Niagara but not an area colour correction."
     }
   ]
 }

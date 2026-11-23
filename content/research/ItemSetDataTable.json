@@ -1,53 +1,66 @@
 {
-  "description": "Bundles one or more ItemDataTable entries with quantities so shops, progress rewards, mission rewards, and unlock text can grant, spend, price, and display a complete item package as one unit.",
+  "description": "Groups ItemDataTable entries with one amount per member so shop lineups, progress/story/rank rewards, DLC grants, collections, unlock progress and unlock text can treat a package of items as one row. Quantity describes package contents or a currency amount, not the shop price; ShopLineupDataTable.Price is separate.",
   "fields": {
     "Id": {
-      "simple": "Item-set row identifier.",
-      "technical": "FName key used by ShopLineupDataTable::Id_ItemSet, ProgressRewardDataTable::Id_ItemSet, mission/demo reward lists, DLC entitlement lists, and direct shop/ownership lookups. Consumers scan ItemSetDataTables in order and use the first row with the requested name; when no set is found several helpers fall back to probing ItemDataTables with the same ID.",
+      "simple": "Item-set row identifier (exported as ID; native field name Id).",
+      "technical": "FName row key. ShopLineupDataTable.Id_ItemSet, ProgressRewardDataTable.Id_ItemSet, StoryDemoDataTable.Id_ItemSet arrays, RankSystemReward/StoryCharaRelateReward/ShopLotteryLineup.Id_ItemSet, rank-reward label maps and hard-coded DLC entitlement lists reference it. DataTableLoaders resolve one ItemSetDataTable primary asset into AGameDataTableManager.ItemSetDataTables; GameShop_FindRow, GameItem_FindRow, StoryFindRowOutOfLine/InlineChecked and PvEResult_FindRow scan that array in order, so the first matching row wins. The generic holder supports multiple tables, but the current loader registers only one ItemSet asset. Item and set finders cross-probe the other table on a miss but discard the probed row, so those probes are not an alias; no exported ItemSet ID currently equals an ItemDataTable ID.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ItemSet.h:11",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:77",
-        "Source/Abrams/Private/GameItemOwnership.cpp:802",
-        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:93",
+        "Source/Abrams/Public/GameDataTableManager.h:92",
+        "Source/Abrams/Private/GameDataTableManager.cpp:181",
+        "Source/Abrams/Private/GameItemOwnership.cpp:118",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:76",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:118",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:36",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2132",
         "Source/Abrams/Private/GameManager.cpp:1042",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:1254"
       ],
       "status": "verified"
     },
     "Id_ItemText": {
-      "simple": "Optional override text key for the whole set.",
-      "technical": "FName used by GameShop_GetItemSetNameText after Money and Nickname special cases. When it is None the function falls back to the first contained Item row's Id_ItemText. Every exported row has this field set to None, so the retail snapshot relies on the fallback or the special cases.",
+      "simple": "Optional whole-set text-ID override.",
+      "technical": "FName. GameShop_GetItemSetNameText reads it only after resolving the first item and after the Money and Nickname special cases. A non-None value becomes the direct text request; NAME_None falls back to the first item's Id_ItemText and then to no text. All 2,402 exported rows have Id_ItemText = None, so the supplied snapshot relies on the fallback or special cases. This field is not consulted by the per-item name-text list or by unlock-text prefix handling.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ItemSet.h:15",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1197",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1201",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1215",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1225",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1237",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1241"
       ],
       "status": "verified"
     },
     "Id_Item": {
-      "simple": "Ordered list of ItemDataTable row IDs included in the set.",
-      "technical": "TArray<FName>. Iterated by grant/spend code, unlock filtering, shop name generation, collection filtering, and DLC entitlement exclusion. None entries are skipped by some loops but are indexed unguarded by others; exported rows use fixed-length arrays with trailing None values. Shop nickname sets rely on indices 0 and 1 being the top/bottom nickname items.",
+      "simple": "Ordered ItemDataTable row IDs included in the package.",
+      "technical": "TArray<FName>, paired element-for-element with Quantity. Every exported row has exactly five entries: 2,374 have trailing NAME_None fillers (positions 1-4) and 28 fill all five slots; all 3,122 non-None references resolve in ItemDataTable. Grant, spend and content collectors skip None slots, but representative-item helpers read index 0 (and nickname text index 1) without a Num check, and Story_GetDemoRewardItem reads GetData()[0]. The first item controls the Money/Nickname text branches and is used as the representative for image, ItemType and sorting order; nickname sets place TOP and BOTTOM items at indices 0 and 1. Unlock tests ignore None slots.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ItemSet.h:18",
+        "Source/AbramsDataTable/Private/GameDataTableRow_ItemSet.cpp:3",
         "Source/Abrams/Private/GameItemOwnership.cpp:808",
-        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:101",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:103",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:147",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:174",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:233",
-        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:266",
-        "Source/Abrams/Private/GameManager.cpp:1045",
-        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1259"
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1227",
+        "Source/Abrams/Private/GameCollectionArchiveTextListWidget.cpp:104",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1259",
+        "Source/Abrams/Private/GameManager.cpp:1045"
       ],
       "status": "verified"
     },
     "Quantity": {
       "simple": "Per-item amounts paired element-for-element with Id_Item.",
-      "technical": "TArray<int32>. GameItem_SpendItemSet subtracts Quantity[Index] for each non-None item; GameShop_AddItemSet grants Count * Quantity[Index] (Money via AddUserMoney, others clamped by Item::PossessionMax). Shop item-name requests receive Quantity[Index] as their VALUE parameter; money-set display uses Quantity[0] directly. Mission reward extraction returns ItemSet::Quantity[0] with the first item. Consumers index this array without a length check, so it must stay aligned with Id_Item.",
+      "technical": "TArray<int32>. GameItem_SpendItemSet passes Quantity[Index] to GameItem_SpendItem: Money uses AddUserMoney(-Count), other stocks are lowered and clamped at 0. GameShop_AddItemSet grants Count * Quantity[Index]: Money uses AddUserMoney, other stocks use FindOrAdd and clamp to PossessionMax, and the amount list feeds KPI/collection reporting unless GetType is -1. GameShop_GetItemSetItemNameTexts passes Quantity[Index] to GameItem_GetNameTextCore, which uses it only as ITEM_VALUE or grouped digits for Money and ignores it for other item types. A Money set title uses Quantity[0] directly; Story_GetDemoRewardItem returns Quantity[0] or -1 on failure; PvP GetItemSetMoney sums Money members with an IsValidIndex guard. Exported values range 1..100000: every non-money member is 1 and every unused None slot is 1 padding, so trailing values are not grants. Several consumers index [Index] or [0] unchecked, so keep the arrays aligned.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ItemSet.h:21",
         "Source/Abrams/Private/GameItemOwnership.cpp:813",
         "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:111",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:259",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1220",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1223",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:165",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:181",
         "Source/Abrams/Private/StoryLaunchHelpers.cpp:1266",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2480"
       ],
@@ -55,47 +68,85 @@
     }
   },
   "notes": [
-    "The export contains 2402 rows. Multiple ItemSetDataTable shards can be loaded; helpers take the first matching row and several fall back to an Item row with the same ID, so set IDs and item IDs share a lookup namespace in those call sites.",
-    "A set is considered unlocked for display when all non-None named items pass their individual progress gates. Shop and collection code use that test before showing or sorting a set.",
-    "The reconstructed GameShop_FindSetRowItem checks the requested index against Id_Item but then reads Id_Item[0] (and applies the first item's progress gate) regardless of Index; this is documented as a retail behavior in the source comment, not a documentation-site inference.",
-    "Only the supplied retail export and partial Content are available; no claim is made about all Blueprint or editor-tool uses."
+    "Export scope: the only supplied ItemSetDataTable shard contains 2,402 unique rows, every export row key equals its ID, and all 3,122 non-None member references resolve in ItemDataTable. References from ProgressRewardDataTable, ShopLineupDataTable, StoryDemoDataTable, RankSystemRewardDataTable, StoryCharaRelateRewardDataTable and ShopLotteryLineupDataTable all resolve to exported set IDs. All exported rows use five aligned slots, Id_ItemText is always None, and all quantities are positive; only the MONEY item carries non-unit quantities.",
+    "Lookup chain: DataTableLoaders and the primary-asset object cache feed AGameDataTableManager.ItemSetDataTables; StoryDataTables() is an alias to that same manager, not a second cache. GameShop_FindRow, GameItem_FindRow, StoryFindRowOutOfLine/InlineChecked and PvEResult_FindRow all return the first matching row in array order. FGameDataTableArray::GetRows instead collects every row in table order then row-name order for unlock-text, unlock-progress and archive scans. No separate ItemSet-specific cache was found in the checked C++.",
+    "First-item precedence: image, ItemType, sorting order, money/nickname naming and story-demo reward display all use Id_Item[0]. The reconstructed GameShop_FindItemSetItem and GameShop_FindSetRowItem validate Index but return the progress-gated first item regardless of Index; source comments attribute both to retail functions 0x12c5eb0 and 0x12c5f70, so this is verified reconstructed behavior, not an independently re-derived retail binary claim. GameShop_GetItemSetNameText also reads Id_Item[1] for nickname sets without a Num check, and GameShop_GrantProgressRewardRows reads Id_Item[0] unguarded.",
+    "Unlock semantics: GameItem_IsItemSetRowUnlocked and the inlined shop/reward equivalents require every non-None member's Item row to pass the UserProgressFlag gate (negative means always unlocked; otherwise flag F uses word F>>2 and bit F&3 among the first 128 words). Shop lineup filtering, progress-reward granting, rank rewards and nickname archive display apply that test. Full-row scans infer the progress source or unlock text from the set-ID prefix (STMSN, CHARA_RELATE, PVP_REWARD, PROGRESS_REWARD, SHOP/NICKNAME, SHOP_LOTTERY, DLC/UD/EARLY_PURCHASE) and related tables; sentinel pairs are {-1,0} for no condition and {0,1} for locked/not reached.",
+    "Data relationships: Id is the package identity referenced by shop lineups, progress rewards, story demos, rank and story-character rewards, lottery lineups and hard-coded DLC lists. Set IDs and Item IDs do not overlap in the supplied exports, so the cross-table probes are defensive behavior rather than an active fallback for current data. The table defines contents and amounts, while ShopLineupDataTable holds Price.",
+    "Evidence limit: all runtime statements above come from the reconstructed C++ and the supplied retail DataTable export. Source comments cite retail RVAs, but no retail Blueprint/editor-tool coverage or independent binary re-derivation was supplied in this review; UI call-site behavior is therefore verified as reconstruction-consistent rather than proven from separate retail Blueprint evidence."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:181",
-      "detail": "Loads ItemSetDataTable into ItemSetDataTables."
+      "detail": "Resolves the ItemSetDataTable primary asset from the loader cache into the single ItemSetDataTables array used by all finders."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:76",
+      "detail": "StoryDataTables() aliases the same manager; StoryFindRowOutOfLine/InlineChecked provide first-match ItemSet lookups for demo rewards and other consumers."
+    },
+    {
+      "source": "Source/Abrams/Public/GameDataTableArray.h:19",
+      "detail": "GetRows collects all ItemSet rows in table order then row-name order for unlock-progress, unlock-text and archive scans."
     },
     {
       "source": "Source/Abrams/Private/GameItemOwnership.cpp:799",
-      "detail": "Spends each contained item in the paired quantity."
+      "detail": "Spends Quantity[Index] of each non-None contained item, with money spend and stock clamped at zero."
     },
     {
       "source": "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:90",
-      "detail": "Grants Count * Quantity of each set item and reports the amounts to KPI/achievement systems."
+      "detail": "Grants Count * Quantity[Index] of each item, applies PossessionMax clamping and reports amounts to KPI/collection systems unless GetType is -1."
     },
     {
       "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:225",
-      "detail": "Builds per-item name text requests using each quantity as the VALUE parameter."
+      "detail": "Builds per-item name requests; Quantity[Index] becomes ITEM_VALUE/grouped digits for Money only and is ignored for other item types."
     },
     {
       "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1201",
-      "detail": "Builds the set title, with Money and Nickname composite special cases."
+      "detail": "Builds the set title with Money and composite Nickname special cases before the Id_ItemText/first-item fallback."
     },
     {
-      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1729",
-      "detail": "Treats a set as unlocked only when all named items are unlocked."
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:84",
+      "detail": "Filters shop lineups and reward sets by requiring all non-None member items to be unlocked."
     },
     {
-      "source": "Source/Abrams/Private/GameCollectionArchiveTextListWidget.cpp:94",
-      "detail": "Builds nickname archive entries from unlocked sets and sorts them by the first item's SortingOrder."
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:914",
+      "detail": "Infers an item's unlock progress from the first containing set and its ID prefix, using {-1,0}/{0,1} sentinels when no progress source applies."
     },
     {
-      "source": "Source/Abrams/Private/GameManager.cpp:1038",
-      "detail": "Adds DLC-entitlement set members to the excluded list for new-item achievement checks."
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1059",
+      "detail": "Grants reached progress-reward sets once after checking their first item and member unlock state."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1748",
+      "detail": "Chooses unlock text from the first unlocked set containing an item and its ID prefix."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCollectionArchiveTextListWidget.cpp:98",
+      "detail": "Builds nickname archive entries from unlocked sets and sorts them by the representative first item's SortingOrder."
+    },
+    {
+      "source": "Source/Abrams/Private/GameManager.cpp:1040",
+      "detail": "Appends DLC-entitlement set members to the excluded list used by new-item achievement checks."
     },
     {
       "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:1253",
-      "detail": "Extracts the first reward item and its quantity for a story-demo reward display."
+      "detail": "Extracts the first item and Quantity[0] of a story-demo reward set; failures leave quantity at the -1 sentinel."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2460",
+      "detail": "Sums Money quantities in PvP fixed/rank reward sets for result display and payout."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2148",
+      "detail": "Grants rank-system reward sets once, gated by score, prior receipt and member unlock state."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopLotteryWidget.cpp:376",
+      "detail": "Uses the set's representative first item to decide whether a lottery result is replaced, then grants the drawn or replacement set."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:302",
+      "detail": "Shows a set's collected item contents and its set title in the item description widget."
     }
   ]
 }

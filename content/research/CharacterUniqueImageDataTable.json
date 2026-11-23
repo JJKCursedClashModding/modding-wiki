@@ -1,45 +1,70 @@
 {
-  "description": "Small table of per-character unique image asset-name lists. The export contains only CP_270 variants whose image slots are all None; no consumer of the table or its field was identifiable in the reconstructed source.",
+  "description": "Small serialized table whose rows pair a CP_270_* key with a TArray<FName> of image names. Both exported rows contain only NAME_None entries. No runtime consumer of the table or of the corresponding CharacterVariation identifier was found in the reconstructed C++.",
   "fields": {
     "ID": {
-      "simple": "Row key, apparently a character/variation ID (CP_270_00, CP_270_10).",
-      "technical": "FName primary key (ImportKeyField=Id in the export). CharacterVariationDataTable has an Id_CharacterUniqueImage FName field, but no reconstructed code reads that field, and CharacterUniqueImageDataTable is not one of the table names registered/loaded by AGameDataTableManager::StartInitialLoading or resolved in its Tick. The lookup key can therefore be described only as a serialized row key, not as an observed join.",
+      "simple": "Serialized row key. Both exported keys are CP_270_* names that also occur as CharacterVariation row IDs.",
+      "technical": "Native FName Id (exported as property ID; ImportKeyField=Id). The row key equals ID in both rows. CharacterVariationDataTable.Id_CharacterUniqueImage is also FName and has exactly ten non-None values: CP_270_00 is referenced by variation rows CP_270_00..04, and CP_270_10 by CP_270_10..14. No reconstructed C++ reads Id_CharacterUniqueImage or performs a CharacterUniqueImageDataTable lookup. The table name is absent from AGameDataTableManager::StartInitialLoading's loader-name array and from Tick's table-resolution/cache assignments, and no CharacterUniqueImageDataTables array exists. This is therefore a data-level association only, not a verified runtime join.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUniqueImage.h:10",
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:30",
-        "Source/Abrams/Private/GameDataTableManager.cpp:340",
-        "Source/Abrams/Private/GameDataTableManager.cpp:192"
+        "Source/Abrams/Private/GameDataTableManager.cpp:321-489",
+        "Source/Abrams/Private/GameDataTableManager.cpp:168-315",
+        "Source/Abrams/Public/GameDataTableManager.h:78-128",
+        "datatables/CharacterUniqueImageDataTable.json",
+        "datatables/CharacterVariationDataTable.json"
       ],
       "status": "observed"
     },
     "ImageFileName": {
-      "simple": "Array of unique image asset names for the row (all None in the export).",
-      "technical": "TArray<FName> with 16 slots in both exported rows, all NAME_None. The field is a serialized property of FGameDataTableRow_CharacterUniqueImage (retail row struct 0x16cc740 with a verified layout pin), but no substantive consumer was found in Source/ or Plugins/: ImageFileName appears only in the row struct declaration/constructor. No behavior, loader type or UI use can be attributed to it from the available evidence.",
+      "simple": "Serialized list of image asset names; in both exported rows it consists of sixteen None entries.",
+      "technical": "Native TArray<FName> (UPROPERTY at row +0x10). Each exported row serializes sixteen elements at indices 0-15, every one the NAME_None sentinel; this is an observed serialized length, not a fixed array bound or evidence of index semantics. The constructor is empty, so a default-constructed struct has an empty TArray. The reconstruction's type-registration table records the retail struct at 0x16cc740 and its layout checks assert Id at +0x8 and ImageFileName at +0x10. Exact-qualified searches find no game-side read of FGameDataTableRow_CharacterUniqueImage::ImageFileName, no FindRow/GetRows instantiation for this row type, and no typed manager array; unrelated structs also have fields named ImageFileName, so their consumers do not apply here. No texture loader, UI branch, condition, fallback, or slot-specific behavior can be attributed to this field from the reconstructed source.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUniqueImage.h:15",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUniqueImage.h:14",
         "Source/AbramsDataTable/Private/GameDataTableRow_CharacterUniqueImage.cpp:3",
-        "Source/AbramsDataTable/Private/DataTableStructTables.cpp:73"
+        "Source/AbramsDataTable/Private/DataTableStructTables.cpp:73",
+        "Source/Abrams/Private/GameDataTableManager.cpp:725-731",
+        "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:724",
+        "datatables/CharacterUniqueImageDataTable.json"
       ],
       "status": "observed"
     }
   },
   "notes": [
-    "Export contains exactly 2 rows (CP_270_00 and CP_270_10); both have 16 ImageFileName entries and every entry is None, so the table conveys no active asset references in the available data.",
-    "Limit: the only identifier-level connection is CharacterVariation::Id_CharacterUniqueImage, which is itself unread in the reconstructed source. The table is not loaded by the reconstructed DataTable manager path (no loader name and no manager array), so this documentation deliberately stops at serialization/loader-level observations rather than inventing a consumer.",
-    "No per-locale or numbered-shard variants exist in the export. Retail may use this table through code not represented in the reconstruction or through Blueprint; that cannot be established here.",
-    "The row struct layout is recorded in Tools/verify layout checks (offset 0x8 Id, 0x10 ImageFileName), but that is reconstruction evidence, not a consumer."
+    "Export analysis: one asset/variant named CharacterUniqueImageDataTable has exactly two row keys, CP_270_00 and CP_270_10. Each row's ID equals its row key and each ImageFileName array has sixteen entries, all None/NAME_None. No numbered or locale-shard files for this table were found.",
+    "Data relationship: in the 437-row CharacterVariationDataTable, Id_CharacterUniqueImage is None in 427 rows and points to the two exported CharacterUniqueImage rows from ten records (five per target). CharacterDataTable.CP_270 lists those ten variation IDs. This is serialized referential data, not a traced lookup.",
+    "Runtime evidence: the exact table name has no occurrence in Source/, Plugins/, or Config/; the row type appears only in its own header/constructor, the reconstruction's retail type-registration table, and verification/layout tooling. AGameDataTableManager loads and resolves CharacterUniqueDataTable1..5 but not CharacterUniqueImageDataTable, has no CharacterUniqueImageDataTables cache, and never instantiates FindRow or GetRows for this row type. Id_CharacterUniqueImage is likewise declaration-only.",
+    "Array semantics: sixteen is only the serialized element count (indices 0-15). TArray is dynamically sized and the empty constructor supplies no default elements; None is the sentinel used for absent names. No consumer establishes ordering, an index meaning, units, or precedence.",
+    "Layout/provenance: DataTableStructTables.cpp records retail struct address 0x16cc740, and reconstruction layout checks assert offsets 0x8 for Id and 0x10 for ImageFileName. These are type/layout evidence only, not consumer evidence.",
+    "Evidence boundary: no retail Blueprint graphs/packages or other unincluded retail code were inspected. The project guide says gameplay logic is C++, but the absence of a reconstructed consumer is not proof that uninspected packaged retail assets cannot reference this table."
   ],
   "usages": [
     {
-      "source": "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:30",
-      "detail": "Only identifier-level link: a CharacterVariation row has an Id_CharacterUniqueImage FName, with no reconstructed reader."
+      "source": "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUniqueImage.h:10",
+      "detail": "Declares native FName Id and TArray<FName> ImageFileName as BlueprintType UPROPERTY fields; no method in this row struct consumes either value."
     },
     {
-      "source": "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUniqueImage.h:15",
-      "detail": "Declares the serialized ImageFileName array; no consumer found."
+      "source": "Source/AbramsDataTable/Private/GameDataTableRow_CharacterUniqueImage.cpp:3",
+      "detail": "The only constructor is empty; it does not initialize a fixed sixteen-element array."
+    },
+    {
+      "source": "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:30",
+      "detail": "Declaration-only Id_CharacterUniqueImage field: the serialized identifier-level link, with no reconstructed reader."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:321-489",
+      "detail": "StartInitialLoading creates DataTable primary-asset loaders from an explicit name list; this table is absent, while CharacterUniqueDataTable1..5 are present at lines 368-372."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:168-315",
+      "detail": "Tick resolves explicit loader names into cached table arrays; there is no CharacterUniqueImage resolution or cache assignment."
     },
     {
       "source": "Source/AbramsDataTable/Private/DataTableStructTables.cpp:73",
-      "detail": "Records the retail row-struct address and construct thunk for the type, establishing that the struct exists in retail."
+      "detail": "Records the retail row-struct address and construct thunk for the type; this is registration/layout evidence, not a consumer."
+    },
+    {
+      "source": "Tools/verify/layout-checks/AbramsDataTable-LayoutCheckM1.cpp:724",
+      "detail": "Static layout assertion for ImageFileName at +0x10 (and Id at +0x8 on line 723); verification only."
     }
   ]
 }

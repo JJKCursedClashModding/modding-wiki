@@ -1,60 +1,77 @@
 {
-  "description": "Sharded, character-specific numeric parameter tables (five shards with a common row schema). Rows are referenced in order by Character::Id_CharacterUnique and read as untyped float slots through IGameActorInterface by character-specific action code.",
+  "description": "Five sharded, character-specific numeric parameter tables sharing FGameDataTableRow_CharacterUnique. FGameDataTableRow_Character::Id_CharacterUnique supplies an ordered list of row keys; AGameCharacter resolves them against the manager's merged CharacterUniqueDataTables and caches the pointers in UniqueRows. Runtime code reads FloatValue as untyped per-row slots through IGameActorInterface, so each slot's meaning and units are defined by the calling character/action rather than by a shared field schema.",
   "fields": {
     "ID": {
-      "simple": "Row key for a character or a character-specific technique/variant.",
-      "technical": "FName primary key (ImportKeyField=Id in each shard); examples include CP_050 (character-wide) and CP_050_ATTACKG / CP_020_ATTACKA_... (per-technique). Character::Id_CharacterUnique lists the IDs; ResolveDataRows resolves each with an optional finder over the merged CharacterUniqueDataTables array and preserves array order (including null placeholders) in AGameCharacter::UniqueRows (+0x420).",
+      "simple": "Row key for a character-wide tuning block or a named technique/variant block.",
+      "technical": "The exported key is ID; the native UPROPERTY is FName Id (ImportKeyField=Id in every shard). Each shard's Rows map is keyed by it: examples include CP_050 and CP_020_ATTACKA for character and technique blocks. FGameDataTableRow_Character::Id_CharacterUnique is TArray<FName>; AGameCharacter::ResolveDataRows iterates it and calls GameCharacter_FindOptionalRow over the five-table array. The finder skips FName None and calls FindRow<TRow>(Id, TEXT(\"\"), false) in shard order, so an unmatched name inserts nullptr and a duplicate would resolve to the first matching shard. The cached pointer array preserves the Id_CharacterUnique order (AGameCharacter +0x420).",
       "evidence": [
-        "Source/Abrams/Private/GameCharacter.cpp:560",
-        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUnique.h:11",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Character.h:54",
+        "Source/Abrams/Private/GameCharacter.cpp:449",
+        "Source/Abrams/Private/GameCharacter.cpp:481",
+        "Source/Abrams/Private/GameCharacter.cpp:559",
         "Source/Abrams/Public/GameCharacter.h:245",
-        "Source/Abrams/Private/GameDataTableManager.cpp:220"
+        "Source/Abrams/Private/GameDataTableManager.cpp:220",
+        "Source/Abrams/Public/GameDataTableManager.h:128"
       ],
       "status": "verified"
     },
     "FloatValue": {
-      "simple": "Ordered array of untyped numeric tuning values for that character/technique.",
-      "technical": "TArray<float>, 14 entries in every exported row (unused trailing slots are 0.0). AGameCharacter::GetCharacterUniqueFloatValue(ValueIndex, RowIndex) returns UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds checks; character-specific controllers/actions call it with their own hard-coded index pairs for distances, durations, scales, speeds, shot counts, hit counts, angles and other one-off parameters. The meaning of each index is defined only by the consuming character code, not by a shared schema; zeros commonly mean 'unused' for a given row.",
+      "simple": "Ordered array of untyped numeric tuning values for that character/technique row.",
+      "technical": "Declared as TArray<float>; the row constructor is empty, so 14 entries are a property of the supplied data, not a C++-level fixed size. All 195 exported rows in all five shards have exactly 14 entries. AGameCharacter::GetCharacterUniqueFloatValue(ValueIndex, RowIndex) (retail 0x14126d6f0) dereferences UniqueRows.GetData()[RowIndex]->FloatValue.GetData()[ValueIndex] with no bounds or null checks; the reconstructed body is byte-matched to retail (27/27 bytes). Callers use literal slots 0..13 and level/state-selected index tables; some cast a float to int32 for counts or enum selectors. Units and sentinel rules are established only at each call site (seconds, world-space distances, angles/FOV, counts, cost or rate multipliers); for example CP_160 treats row 3 slot 0 as an unlimited range when negative. Zero is not a table-wide 'unused' sentinel.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUnique.h:15",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterUnique.cpp:3",
         "Source/Abrams/Private/GameCharacter.cpp:1759",
-        "Source/Abrams/Private/GameCharacter.cpp:1761",
         "Source/Abrams/Public/GameCharacter.h:1012",
-        "Source/Abrams/Private/CN_050_ActionController.cpp:227",
-        "Source/Abrams/Private/CN_070_Actions.cpp:142",
-        "Source/Abrams/Private/CN_122_ActionController.cpp:2378",
-        "Source/Abrams/Private/CN_010_Actions.cpp:603"
+        "Source/Abrams/Public/GameActorInterface.h:448",
+        "Source/Abrams/Private/GameCharacterAction.cpp:931",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:83",
+        "Tools/verify/CHAR/UniqueRowsInline.md:18"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Exported shards: CharacterUniqueDataTable1 (30 rows), 2 (24), 3 (60), 4 (55), 5 (26); all rows have 14 FloatValue entries. The manager loads all five primary assets and appends them into one CharacterUniqueDataTables array (DTM +0x570), so lookups search the shards in order and duplicate IDs would resolve to the first match.",
-    "The row index passed to GetCharacterUniqueFloatValue is the index into Character::Id_CharacterUnique / AGameCharacter::UniqueRows, not the data-table shard number. A missing row leaves a null pointer in that array, so consumers assume the character's row list is complete.",
-    "Indices are per-character: e.g. CN_070 uses indices 0..10 of row 1 for shot count/beam scale/range, CN_050 uses row 1 indices 0..3 for dash tangents and timings, CN_122 uses rows 0,3,4,5,6 for position/distance/timing parameters. No generic meaning can be assigned to a slot across characters.",
-    "No localization variants exist for these numeric tables; no claim about additional retail rows absent from the partial Content export or about Blueprint-only readers.",
-    "Reconstructed source with cited retail RVAs; both array indices are unchecked in the accessor, matching retail behavior."
+    "Exported shards are CharacterUniqueDataTable1 (30 rows), 2 (24), 3 (60), 4 (55) and 5 (26): 195 rows total. All use RowStruct GameDataTableRow_CharacterUnique and ImportKeyField=Id, have the same two exported fields, and have no duplicate row IDs. The manager creates DataTable primary-asset loaders for the five numbered tables and appends the resolved non-null UDataTables in that order to CharacterUniqueDataTables (DTM +0x570); the ordered finder therefore gives the first shard precedence.",
+    "Every one of the 48 exported CharacterDataTable rows has nine Id_CharacterUnique slots. All 195 non-None IDs resolve to the 195 unique rows; every unused slot is the FName None and becomes a null UniqueRows entry. RowIndex is the index into that nine-slot cache, not a shard number, and ValueIndex is the FloatValue element. Because the accessor dereferences both arrays directly, a missing/None row or out-of-range index faults rather than returning a default.",
+    "Slot meaning is per consumer. FGameCharacterAction::MakeUniqueCameraRequest reads slots 0..2 as camera offset, 3/4 as limit angles, 5 as FOV, 6 as blend time, 7 as an easing selector (0 Linear, 1 EaseIn, 2 EaseOut, 3 EaseInOut), and 8..10 as orbit angles. CP_050 row 0 uses slots 0..3 for gauge cost, maximum count, charge-rate divisor and guard hold time; CP_070 selects row-0 multiplier slots 2..9 from owner-minus-target cursed-energy level; CP_230, CP_240 and CN_122 also index through small runtime tables keyed by level, passive or shot index. CN_122 and CN_250 read rows as high as row 8 and slots up to 13, so trailing zeros are not inherently unused.",
+    "The interface name is shared but the backing table is not: IGameActorInterface::GetCharacterUniqueFloatValue's default implementation returns 0.0, AGameCharacter's override reads this table, while AGameShikigami's override reads ShikigamiUniqueDataTable through Id_ShikigamiUnique. Consequently FCN_050 and FCN_070 shikigami action calls to the same method are not CharacterUniqueDataTable consumers. FGameTrapAction::GetUniqueFloat can be an indirect consumer when its spawner source is an AGameCharacter: it returns 0 without a source interface, otherwise forwards to that source's slot-155 accessor.",
+    "The supplied export set contains only the five numbered shards; no locale-specific CharacterUnique variant was provided. Consumer roles here come from reconstructed C++ tied to retail RVAs, and the accessor body itself is byte-matched; no retail Blueprint graph was supplied, so no Blueprint-only reader or additional retail row outside the export is asserted."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:220",
-      "detail": "Loads CharacterUniqueDataTable1-5 into the merged CharacterUniqueDataTables array."
+      "detail": "Resolves CharacterUniqueDataTable1-5 as primary assets and appends them, in order, to CharacterUniqueDataTables (+0x570); null tables are filtered out."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacter.cpp:560",
-      "detail": "Character setup walks Id_CharacterUnique and caches each resolved row in UniqueRows."
+      "source": "Source/Abrams/Private/GameCharacter.cpp:481",
+      "detail": "ResolveDataRows walks Id_CharacterUnique and caches an ordered row pointer (or nullptr) per ID in UniqueRows."
     },
     {
       "source": "Source/Abrams/Private/GameCharacter.cpp:1759",
-      "detail": "GetCharacterUniqueFloatValue selects UniqueRows[RowIndex]->FloatValue[ValueIndex]."
+      "detail": "GetCharacterUniqueFloatValue performs the unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference (retail 0x14126d6f0)."
     },
     {
-      "source": "Source/Abrams/Private/CN_050_ActionController.cpp:227",
-      "detail": "One consumer uses specific float slots as dash tangent magnitudes."
+      "source": "Source/Abrams/Private/GameCharacterAction.cpp:941",
+      "detail": "MakeUniqueCameraRequest maps slots 0..10 of the selected row to camera offset, angle limits, FOV, blend time, easing selector and orbit angles."
     },
     {
-      "source": "Source/Abrams/Private/CN_070_Actions.cpp:142",
-      "detail": "Another uses slots as shot count, beam scale and maximum range."
+      "source": "Source/Abrams/Private/CP_050_ActionController.cpp:2199",
+      "detail": "TickLimitless uses row 0 slots 1 (maximum count), 3 (guard hold time), 2 (charge-rate denominator) and 0 (gauge cost)."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_070_ActionController.cpp:113",
+      "detail": "Owner-minus-target cursed-energy level selects row-0 multiplier slots 2..9 for two pending bonus accumulators."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_122_ActionController.cpp:56",
+      "detail": "Uses literal and runtime-table-selected value indices across rows 0..6 for timing, range, radius, position and shot parameters."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTrapActionController.cpp:182",
+      "detail": "Indirect path: trap actions forward GetUniqueFloat to the spawner's IGameActorInterface accessor, or return 0 when no source interface exists."
     }
   ]
 }

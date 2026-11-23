@@ -1,80 +1,112 @@
 {
-  "description": "Defines paired-character unique sequencer voice lines, linking a two-character pair to the voice each character speaks in an appearance or result sequence.",
+  "description": "Defines unique appearance/result sequencer voice lines for a two-character team: each row maps three character/model ID slots to parallel voice row IDs, and the runtime returns the speaking character's voice from the selected pair row.",
   "fields": {
     "Id": {
       "simple": "Row key / unique voice-pair ID.",
-      "technical": "FName primary key. FindUniquePairVoice collects rows matching the sequencer type and character pair, then stores the chosen row Id in UniquePairChoice.PairRowId (cached per team side) and uses it to re-find the row and read voices. Export spells it ID.",
+      "technical": "FName import key stored as the DataTable row name; the export property is spelled ID. FindUniquePairVoice adds each matching row's Id to the candidate list, selects ComputeSideSeed(Side) % Candidates.Num(), stores it as UniquePairChoice.PairRowId, and later resolves that ID with FindRow in UniqueVoicePairDataTables table order (first matching table wins). Candidate enumeration itself is table order then row-name order (FGameDataTableArray::GetRows). All 344 exported row names equal their ID and are unique.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_UniqueVoicePair.h:12",
+        "Source/Abrams/Public/GameDataTableArray.h:19",
         "Source/Abrams/Private/GameSequencerManager.cpp:2060",
-        "Source/Abrams/Private/GameSequencerManager.cpp:2070",
-        "Source/Abrams/Private/GameSequencerManager.cpp:2079"
+        "Source/Abrams/Private/GameSequencerManager.cpp:2069",
+        "Source/Abrams/Private/GameSequencerManager.cpp:2071",
+        "Source/Abrams/Private/GameSequencerManager.cpp:2078",
+        "JJKCCDatatables/datatables/UniqueVoicePairDataTable.json"
       ],
       "status": "verified"
     },
     "SeuqnecerType": {
       "simple": "Sequencer context the pair applies to (appearance or result).",
-      "technical": "EGameSequencerUniquePairType with the misspelled property name exactly as in the retail struct (None, Appearance, Result, Invalid). FindUniquePairVoice receives the requested type from the sequencer section and skips rows whose value differs. Constructor default is None.",
+      "technical": "EGameSequencerUniquePairType (uint8) has None=0, Appearance=1, Result=2 and Invalid=255; the property name SeuqnecerType is misspelled exactly as in the retail struct and export. The row constructor defaults it to None, and the sequencer section constructor also defaults its requested SequencerType to None. FindUniquePairVoice requires exact equality with the section's requested type, so None/Invalid rows cannot be selected by an Appearance or Result section. The export has 172 Appearance rows and 172 Result rows; no None or Invalid rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_UniqueVoicePair.h:16",
         "Source/AbramsDataTable/Public/EGameSequencerUniquePairType.h:6",
         "Source/AbramsDataTable/Private/GameDataTableRow_UniqueVoicePair.cpp:4",
-        "Source/Abrams/Private/GameSequencerManager.cpp:2054"
+        "Source/Abrams/Private/GameSequencerManager.cpp:2054",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:230",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairSection.cpp:15",
+        "JJKCCDatatables/datatables/UniqueVoicePairDataTable.json"
       ],
       "status": "verified"
     },
     "Id_Character": {
-      "simple": "The up-to-three character IDs that identify the pair.",
-      "technical": "TArray<FName>, parallel to Id_Voice. Selection checks the unordered index pairs [0]-[1], [0]-[2] and [1]-[2] against the target character ID and the teammate model name; exported rows use two real IDs and a trailing None. Later, the chosen row is scanned for the index equal to the speaking character, and the same index selects from Id_Voice. Consumers index [0..2] directly without a bounds check.",
+      "simple": "The three character/model ID slots that identify the pair (unused slots are None).",
+      "technical": "TArray<FName>, parallel to Id_Voice. Candidate matching unconditionally reads indices [0], [1] and [2], so the runtime expects exactly three entries; all 344 exported rows have three. A row qualifies only for the ordered checks ids[0]==target && ids[1]==mate, ids[0]==target && ids[2]==mate, or ids[1]==target && ids[2]==mate; reversed pair order is a separate row, not an in-row swap. 336 rows use two real IDs plus trailing None; 8 rows (UNIQUE_PAIR_0509_01..04 and UNIQUE_PAIR_1509_01..04) use three real IDs, with CN_080 in an extra slot. The export has 43 unordered character pairs x 2 sequencer types, with 4 candidate rows per pair/type. The CN_080 ID is a shikigami model rather than a CharacterDataTable row. On the chosen row, the manager scans indices 0..Id_Character.Num()-1 for equality with the speaking target's ID; the first match selects the voice at the same index.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_UniqueVoicePair.h:19",
+        "Source/Abrams/Private/GameSequencerManager.cpp:2050",
         "Source/Abrams/Private/GameSequencerManager.cpp:2058",
         "Source/Abrams/Private/GameSequencerManager.cpp:2059",
         "Source/Abrams/Private/GameSequencerManager.cpp:2080",
-        "Source/Abrams/Private/GameSequencerManager.cpp:2081",
-        "JJKCCDatatables/datatables/UniqueVoicePairDataTable.json"
+        "JJKCCDatatables/datatables/UniqueVoicePairDataTable.json",
+        "JJKCCDatatables/datatables/CharacterDataTable.json",
+        "JJKCCDatatables/datatables/ShikigamiDataTable.json"
       ],
       "status": "verified"
     },
     "Id_Voice": {
       "simple": "Voice row ID spoken by the character at the matching Id_Character index.",
-      "technical": "TArray<FName>, parallel to Id_Character. After a pair row is chosen (by side-specific seed), the manager returns Id_Voice[Index] where Id_Character[Index] equals the target character ID; no match returns None. The caller then plays or searches that Voice ID.",
+      "technical": "TArray<FName>, parallel to Id_Character, with three entries in every exported row. After a pair row is chosen, the manager returns Id_Voice[Index] for the first Id_Character[Index] equal to the target ID, or NAME_None if there is no match; the character index is bounded by Id_Character.Num() but the voice array itself is not bounds-checked. 336 rows end in None and 8 rows use all three real voices. All 696 distinct non-None IDs resolve to VoiceDataTable rows carrying CueSheetName/CueName; 688 have CharacterMouthAnim rows by Id_Voice, the exceptions being the eight CN_080 lines. The evaluator wraps the result in a one-element list (keeping None), then may fall through to common voice selection; playback resolves the ID through VoiceDataTable to CueSheetName/CueName and derives the subtitle ID by removing the first two characters of the voice string.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_UniqueVoicePair.h:22",
-        "Source/Abrams/Private/GameSequencerManager.cpp:2077",
         "Source/Abrams/Private/GameSequencerManager.cpp:2082",
-        "Source/Abrams/Private/GameSequencerManager.cpp:2085"
+        "Source/Abrams/Private/GameSequencerManager.cpp:2085",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:228",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:405",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:532",
+        "Source/Abrams/Private/GameSoundManager.cpp:960",
+        "JJKCCDatatables/datatables/UniqueVoicePairDataTable.json",
+        "JJKCCDatatables/datatables/VoiceDataTable.json",
+        "JJKCCDatatables/datatables/CharacterMouthAnimDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Loaded as a DataTable primary asset named UniqueVoicePairDataTable into DTM.UniqueVoicePairDataTables (+0xB20).",
-    "A two-character team is required; the teammate is found from the target actor team and the pair choice is cached per team side. A different side asking later re-rolls the candidate row with ComputeSideSeed.",
-    "Character IDs are model names derived from GameCharacter, GameShikigami (via owner), sequencer NPC or regular NPC bindings; the target is resolved from sequencer binding tags or request bindings.",
-    "The sequencer evaluator also has a StoryVoiceOverrideDataTable path that can bypass this unique-pair selection entirely.",
-    "The companion export contains 344 rows; retail completeness and Blueprint-only references are not asserted. Source is reconstructed retail C++ with retail RVAs recorded inline."
+    "Loading is verified through GamePrimaryAssetType_DataTable: StartInitialLoading registers the name UniqueVoicePairDataTable (GameDataTableManager.cpp:481), GamePrimaryAssetLoader_CreateLoaders builds the loader, and GameDataTableManager_ResolveLoadedTable calls GetAbramsAssetManager()->GetPrimaryAssetObject<UDataTable>() before appending the table to DTM.UniqueVoicePairDataTables (+0xB20) once all loads complete (GameDataTableManager.cpp:162-165, 308, 488). Config/DefaultGame.ini:24 scans /Game/DataTables as DataTable primary assets. No separate DLC/numbered shard of this table exists among the 321 exported DataTables.",
+    "FindUniquePairVoice requires a playing sequence and a resolvable actor. The section's TargetCharacterType selects binding tags FirstCharacter, SecondCharacter, ThirdCharacter, their Support variants, or NoBindingNPC; non-support First/Second/Third can fall back to CurrentRequest bindings. Character IDs are model names from GameCharacter, a Shikigami target (with its owning character used as TargetOwner), a sequencer NPC interface, or a regular NPC; NPC paths take the team side from the first bound character. The acting side must yield exactly two team characters; the teammate's model name and the resolved target ID form the checked pair.",
+    "The deterministic choice is ComputeSideSeed(Side) % Candidates.Num(): a unitless integer seed made from a name hash of the battle level, the integer time limit, and, for the chosen side, each team character's row-ID hash plus variation index (GameSequencerManager.cpp:1721-1758). This table has no numeric quantities or units; None/Invalid are name/enum sentinels, and trailing None array entries are unused slots. There is no runtime random roll in this selection.",
+    "The cache struct stores Side, CharacterId and PairRowId, but reuse compares only Side: a different side resets and recursively re-selects, while a same-side call for a different CharacterId reuses the same PairRowId (GameSequencerManager.cpp:2066-2075; GameSequencerManager.h:13, 95-98). It is cleared by ResetSequencer and by OnPlayerStop when no request is queued (GameSequencerManager.cpp:755, 920). The struct and member names are reconstructed names, not proven retail symbol names.",
+    "The evaluator's verified precedence is: story override first (only outside result sequences, and only when an active/correlation story demo matches the character) -> unique pair unless PlaySituationType is CommonOnly -> common VoiceGroup fallback only when bFallbackPlayVoice is true (AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:371-421). Section defaults are SequencerType=None, TargetCharacterType=None, PlaySituationType=All, bFallbackPlayVoice=true and bCheckPlayVoiceOtherModule=true (AbramsSequencerPlayVoiceForUniquePairSection.cpp:15-24). A CommonOnly/NoBindingNPC section also stays silent if the first character has a non-None unique line (evaluate.cpp:305-321).",
+    "Downstream use is verified: the selected ID is played by the sequencer sound module (2D or 3D) or queued, then PlayNextQueuedVoice and PlayVoiceById resolve VoiceDataTable rows to CueSheetName/CueName (evaluate.cpp:537-568; GameSequencerManager.cpp:1138-1143, 1176-1196; GameSoundManager.cpp:960-967). VoiceVolumeDataTable rows are keyed by cue name and optional; a missing row uses volume 1.0 (GameSoundManager.cpp:947-953). CharacterMouthAnim rows use Id_Voice for lip-sync (evaluate.cpp:569-605).",
+    "Evidence limits: behavior is documented from reconstructed retail C++ with inline RVAs and the companion uncooked exports, not from retail Blueprint graphs. No Blueprint-only consumer or retail sequence-section asset was inspected, so exact runtime coverage, DLC/version completeness and the purpose of the debug-only UniquePairVoiceForceSecond toggle (declared at GameDebugManager.h:374 and written by DebugMenuWidget.cpp:688 but unused in the reconstructed lookup) remain unproven."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:308",
-      "detail": "Resolves UniqueVoicePairDataTable into DTM.UniqueVoicePairDataTables."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:481",
+      "detail": "Registers UniqueVoicePairDataTable as a DataTable primary asset; line 308 appends the resolved UDataTable to DTM.UniqueVoicePairDataTables (+0xB20) after async loading."
     },
     {
-      "source": "Source/Abrams/Private/GameSequencerManager.cpp:1948",
-      "detail": "FindUniquePairVoice entry point with sequencer type and binding target."
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:230",
+      "detail": "The PlayVoiceForUniquePair section evaluator passes Section->SequencerType and TargetCharacterType to FindUniquePairVoice and wraps the returned ID in a one-entry array."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSequencerManager.cpp:1949",
+      "detail": "FindUniquePairVoice entry point: validates the playing sequence, resolves the bound target, its character model ID and team side, with request-binding and NPC fallbacks."
     },
     {
       "source": "Source/Abrams/Private/GameSequencerManager.cpp:2052",
-      "detail": "Collects and filters unique-pair rows by type and character pair."
+      "detail": "Collects all rows via FGameDataTableArray::GetRows, filtering by exact SeuqnecerType and the ordered target/mate ID checks on indices [0]-[2]."
     },
     {
       "source": "Source/Abrams/Private/GameSequencerManager.cpp:2069",
-      "detail": "Chooses a candidate row using the side seed."
+      "detail": "Picks a candidate using ComputeSideSeed(Side) modulo the candidate count and caches its row ID, comparing only Side on later reuse."
     },
     {
       "source": "Source/Abrams/Private/GameSequencerManager.cpp:2079",
-      "detail": "Re-resolves the chosen row and returns the matching character voice."
+      "detail": "Re-resolves the cached row by Id and returns Id_Voice at the first Id_Character index matching the speaking target, or None."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:371",
+      "detail": "ResolveVoiceId applies story-override, unique-pair and common-group precedence; a unique None result can fall through to the common group."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:537",
+      "detail": "Plays or queues the resolved voice, derives the subtitle ID, and selects CharacterMouthAnim rows for lip-sync."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSoundManager.cpp:960",
+      "detail": "PlayVoiceById resolves the voice ID through VoiceDataTables and plays the row's CueSheetName/CueName."
     }
   ]
 }

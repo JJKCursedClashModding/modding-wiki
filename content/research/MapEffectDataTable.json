@@ -1,47 +1,115 @@
 {
-  "description": "Per-map list of ambient/effect Blueprint assets that are preloaded when a battle on that map starts.",
+  "description": "Per-map list of Effect Blueprint primary-asset names preloaded before battle startup. MapDataTable.Id_MapEffect selects a row by its ID/row key, and the row's Filename array supplies Effect asset names to the AssetManager. The available reconstructed C++ preloads these assets but does not spawn or place them; retail Blueprint/level activation is not present in the evidence set.",
   "fields": {
     "ID": {
-      "simple": "Map ID that owns the effect list.",
-      "technical": "FName row key, normally the MAP_xx key used by MapDataTable. Battle preload resolves the current map row's Id_MapEffect against MapEffectDataTables (+0x3B0) (retail 0x12bd820); NAME_None skips the join. 9 exported rows; most map rows in MapDataTable have Id_MapEffect=None, so only the maps with ambient effects have rows here.",
+      "simple": "FName row key that MapDataTable.Id_MapEffect uses to select this map's effect list.",
+      "technical": "Declared as FName Id in Source/AbramsDataTable/Public/GameDataTableRow_MapEffect.h:11; retail reflection and the export write it as ID (NameProperty at row offset 0x8), and the runtime join ledger pins the two spellings to the same offset. The export's Properties.ImportKeyField is Id, and all nine exported map keys equal their embedded ID values. BattleAssets_MapEffects_12BD820 first rejects a null Map row and NAME_None Id_MapEffect, then searches MapEffectDataTables (manager slot +0x3B0) and appends the first matching row's FileName list; the embedded ID value itself is never read by that consumer. MapDataTable has 30 rows and 11 non-None Id_MapEffect links: MAP_05, MAP_06, MAP_09, MAP_11, MAP_12, MAP_13, MAP_14, MAP_14_01, MAP_15, MAP_15_01 and MAP_16. MAP_14_01 and MAP_15_01 reuse the MAP_14 and MAP_15 effect rows, so every exported effect row is referenced and there are no orphan rows. The manager registers the single primary asset named MapEffectDataTable and resolves it into the array; lookup precedence is first matching table, then first matching row within that table.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MapEffect.h:11",
+        "Tools/layout/runtime-join-ledger.json:388",
+        "Tools/layout/class-layouts.json:128873",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:23",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:280",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:287",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:291",
-        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:141",
-        "Source/Abrams/Private/GameDataTableManager.cpp:189"
+        "Source/Abrams/Private/GameDataTableManager.cpp:189",
+        "Source/Abrams/Private/GameDataTableManager.cpp:337",
+        "Source/Abrams/Public/GameDataTableManager.h:100",
+        "Tools/verify/M4-mount/registry-summary.json:484",
+        "JJKCCDatatables/datatables/MapDataTable.json",
+        "JJKCCDatatables/datatables/MapEffectDataTable.json"
       ],
       "status": "verified"
     },
     "Filename": {
-      "simple": "Effect Blueprint asset names used by this map.",
-      "technical": "Serialized C++ property TArray<FName> FileName (16 slots in every exported row, trailing NAME_None entries). BattleAssets_MapEffects appends the array to the preload names; GamePrimaryAssetLoader_CreateLoaders creates Effect-type primary asset loaders keyed by these names into StudioMapEffectLoaders_180. Export examples for MAP_05: FX_OB_000_90111_BP, FX_OB_000_90112_BP, FX_OB_000_90311_BP. These are asset names (the _BP suffix is retained), not EffectDataTable row IDs.",
+      "simple": "Effect Blueprint primary-asset names to preload for the map; export key Filename corresponds to native FileName.",
+      "technical": "Declared as TArray<FName> FileName in the header at line 15; retail reflection and the export write Filename (ArrayProperty of NameProperty at row offset 0x10, within a 32-byte row). All nine rows export exactly 16 slots: 30 non-None names, 29 unique names, and 114 trailing NAME_None entries. MAP_14 has 12 names; no row contains a duplicate name; FX_OB_020_90311_BP is shared by MAP_13 and MAP_14. No consumer indexes the array: BattleAssets_MapEffects_12BD820 appends the whole list, including None entries, into the caller's Names array. GamePrimaryAssetLoader_CreateLoaders then forms FPrimaryAssetId(Effect, Name), skips None names, deduplicates by PrimaryAssetName, and empties the destination loader map first, so the padding produces no loaders and an in-list duplicate would resolve to its first occurrence. The shipped Effect primary-asset rule scans /Game/Effects with base /Game/Effects/GameEffect_BP.GameEffect_BP_C and bHasBlueprintClasses=True, so these _BP-suffixed values are Blueprint asset names, not file paths. The direct preload paths create loaders in StudioMapEffectLoaders_180 (UGamePhase::StartBattleAssetPreload) and StudioMapEffectLoaders_720 (UGamePhase_BattleBase::PreparePhase state 1). Each of the 29 names also matches an EffectDataTable row whose ID is the name without _BP and whose FileName_BP is exactly this value; all 29 of those Effect rows have PoolCount 0. GameEffectManager::SpawnEffect resolves the same (Effect, FileName_BP) ID from the AssetManager cache, but no available C++ path passes these map-list names into SpawnEffect, so spawning/placement is not verified from this table alone.",
       "evidence": [
-        "Source/AbramsDataTable/Public/GameDataTableRow_MapEffect.h:16",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MapEffect.h:15",
+        "Tools/layout/runtime-join-ledger.json:396",
+        "Tools/layout/struct-sizes.json:25298",
+        "Tools/layout/usmap-schemas.json:267049",
         "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:293",
+        "Source/Abrams/Private/GameDataTableManager.cpp:82",
+        "Source/Abrams/Private/GameDataTableManager.cpp:87",
+        "Source/Abrams/Private/GameDataTableManager.cpp:111",
         "Source/Abrams/Private/GamePhase_BattlePreload.cpp:143",
         "Source/Abrams/Private/GamePhase_BattlePreload.cpp:144",
-        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:170"
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:283",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:292",
+        "Config/DefaultGame.ini:19",
+        "Source/Abrams/Private/GameEffectManager.cpp:193",
+        "Source/Abrams/Private/GameEffectManager.cpp:197",
+        "JJKCCDatatables/datatables/MapEffectDataTable.json",
+        "JJKCCDatatables/datatables/EffectDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "MapEffectDataTables is manager slot +0x3B0; 'MapEffectDataTable' is registered/resolved at GameDataTableManager.cpp:189 and line 337.",
-    "The only direct consumer found for this row struct is battle preload (0x12bd820). The loader gate at GamePhase_BattlePreload.cpp:170 waits for these effect assets before battle startup. No available code spawns them directly; their placement/activation may be in map levels or Blueprints, which are not part of this evidence set.",
-    "Export key 'Filename' corresponds to C++ FileName (case-insensitive generator match)."
+    "Export coverage: the read-only datatables directory contains one MapEffectDataTable top-level object, one array element per file, with RowStruct Class'GameDataTableRow_MapEffect', ImportKeyField Id and nine rows (MAP_05, MAP_06, MAP_09, MAP_11, MAP_12, MAP_13, MAP_14, MAP_15, MAP_16). No numbered shard, locale variant, or second file with this table name was found. The retail registry summary lists one /Game/DataTables/MapEffectDataTable asset.",
+    "Field naming: the reconstructed native header spells the properties Id and FileName, while retail reflection and the JSON export spell them ID and Filename. The runtime join ledger and class-layout dump agree on offsets 0x8 and 0x10; these are casing variants of the same two properties, not extra fields. The struct constructor has no body, so native defaults are NAME_None and an empty array; the export instead materializes 16 fixed slots per row with NAME_None padding. There are no numeric fields, units, or index-dependent semantics.",
+    "Manager and lookup: AGameDataTableManager::StartInitialLoading registers the FName MapEffectDataTable at GameDataTableManager.cpp:337, and Tick resolves that loader into MapEffectDataTables (+0x3B0) at line 189. AddLoadedDataTables drops null tables, and the collector returns the first row found in array order. A NAME_None Id_MapEffect or a missing row contributes no names rather than falling back to another table.",
+    "Two direct C++ consumer paths exist; depending on the battle flow, one or both may execute, and they use separate loader maps. UGamePhase::StartBattleAssetPreload (retail 0x13d4f60) resolves the requested BattleLevel map and creates StudioMapEffectLoaders_180 at GamePhase_BattlePreload.cpp:144; IsBattleAssetPreloaded polls that map at line 170. UGamePhase_BattleBase::PreparePhase state 1 resolves the GameManager battle-level request and creates StudioMapEffectLoaders_720 at GamePhase_BattleBase.cpp:292; state 2 polls it at line 312.",
+    "Loader lifecycle: each loader constructor starts an AssetManager primary-asset load; duplicate names are collapsed and None names are skipped before construction. The _180 map is appended to StudioRetainedLoaders_90 and emptied in UGamePhase::LeavePhase (GamePhase.cpp:232-233). The _720 map is either released at battle teardown (GamePhase_BattleBase.cpp:474) or appended to the same retained cache by RetainBattleLoaders (line 1069) and emptied at line 1084. Thus the table's effect classes can remain loaded across phase transitions through the shared retained-loader cache.",
+    "Indirect vs verified use: all 29 effect names match EffectDataTable.FileName_BP values, and GameEffectManager::SpawnEffect uses that same Effect primary-asset ID to obtain a UClass. That is a shared asset-ID namespace/cache relationship only. The available reconstructed C++ has no call that feeds a MapEffectDataTable Filename value to SpawnEffect, and no retail Blueprint bytecode or extracted /Game/Effects packages are available. The description therefore claims preloading, not spawning, placement, activation, timing, or ambient behavior. The one direct collector, retail 0x12bd820, is behavior-certified in Tools/verify/BEHAV/behav.json; no retail Blueprint-derived behavior is claimed."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:280",
-      "detail": "BattleAssets_MapEffects resolves Map.Id_MapEffect and appends the row's FileName list (retail 0x12bd820)."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:337",
+      "detail": "Registers the DataTable primary asset named MapEffectDataTable for initial loading."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:141",
-      "detail": "Preload looks up the current battle map row before collecting its effect assets."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:189",
+      "detail": "Resolves that asset into MapEffectDataTables at manager slot +0x3B0 after all DataTable loaders complete."
+    },
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:280",
+      "detail": "BattleAssets_MapEffects_12BD820 (retail 0x12bd820): joins Map.Id_MapEffect to the first matching MapEffect row and appends its entire FileName array."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:140",
+      "detail": "UGamePhase::StartBattleAssetPreload resolves the current BattleLevel to a Map row with bCheckNone=true before collecting map effects."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:144",
-      "detail": "Creates Effect primary asset loaders for the collected names into StudioMapEffectLoaders_180; load completion is checked at line 170."
+      "detail": "Creates Effect primary asset loaders from the collected names into StudioMapEffectLoaders_180."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:170",
+      "detail": "IsBattleAssetPreloaded blocks on completion of the _180 map-effect loaders among the other preload batches."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:283",
+      "detail": "UGamePhase_BattleBase::PreparePhase state 1 uses the same collector for the GameManager battle-level request."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:292",
+      "detail": "Creates a second Effect loader batch in StudioMapEffectLoaders_720 for the battle-base preparation path."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:312",
+      "detail": "PreparePhase state 2 waits for the _720 map-effect loaders before registration can proceed."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:82",
+      "detail": "Loader construction skips NAME_None, deduplicates by FName, and starts one AssetManager load per remaining name; AreAllLoadCompleted at line 122 treats a missing handle as already complete."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase.cpp:232",
+      "detail": "UGamePhase::LeavePhase moves _180 map-effect loaders into StudioRetainedLoaders_90 so their assets stay loaded across phase transitions."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:474",
+      "detail": "Battle teardown releases the _720 map-effect loaders on the non-retained exit path."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:1069",
+      "detail": "RetainBattleLoaders moves the _720 map-effect loaders into the retained cache on the alternate exit path."
+    },
+    {
+      "source": "Source/Abrams/Private/GameEffectManager.cpp:193",
+      "detail": "SpawnEffect resolves an Effect primary asset by FileName_BP through the same AssetManager ID namespace; no call from the map-effect list to this function is present in the available C++ evidence."
     }
   ]
 }

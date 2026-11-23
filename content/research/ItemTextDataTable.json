@@ -1,9 +1,9 @@
 {
-  "description": "Localized item names, descriptions, currency/quantity formats and unlock messages. Item/ItemSet/PlayerCard rows reference this table by Id_ItemText, and GameItem helpers add type-specific parameters before resolution.",
+  "description": "Localized item names, money/count display templates, nickname and title labels, and shop unlock messages. Item and PlayerCardTitle/PlayerCardNickname rows reference this table through Id_ItemText; GameItem helpers add type-specific parameters before resolution. ItemSet rows have the same schema column, but all exported sets leave it as None and derive set names from member items.",
   "fields": {
     "ID": {
       "simple": "Item text id (row key), e.g. ITM_MONEY_1001, ITM_COSTUME_1001.",
-      "technical": "FName ID in FGameDataTableRow_GameText, used as FindRow key. FGameDataTableRow_Item, ItemSet, PlayerCardTitle and PlayerCardNickname carry Id_ItemText FNames that feed GameItem_GetNameTextCore; that helper may replace the id with a cosmetic wrapper id (ITM_COSTUME_1001, ITM_CUSTOM_VOICE_1001, ITM_SITUATION_OVERVIEW_POSE_1001) or transform it via PlayerCard_MakeNicknameTextId for nickname top/bottom variants. Shop unlock text also calls GetGameText with hard-coded ITM_UNLOCK_MESSAGE_*. The table is loaded as ItemTextDataTable_<Language> in slot 3 of the combined GameText array.",
+      "technical": "FName ID in FGameDataTableRow_GameText (export ImportKeyField Id), matched to the row name; all 11 exported language shards have the same 4,817 keys with ID equal to the row key. FindTextRow scans the 14-table GameText array in order and returns the first table holding the id, so there is no ITM_ prefix dispatch and an earlier-table collision or an empty Text still stops the search. SYS_-prefixed ids are routed to SystemText instead. Item.Id_ItemText feeds GameItem_GetNameText/GameItem_GetNameTextCore (or GameItem_GetNameTextById); ItemSet.Id_ItemText is a schema field but all 2,402 exported ItemSet rows set it to None, so GameShop_GetItemSetNameText uses money/nickname templates, then Set->Id_ItemText, then the first item's id. PlayerCardTitle/Nickname Id_ItemText feeds title/nickname label requests; nickname ids may be suffix-swapped by PlayerCard_MakeNicknameTextId. Shop unlock text and nickname set templates use hard-coded ITM_UNLOCK_MESSAGE_* / ITM_NICKNAME_* ids. The table is loaded as ItemTextDataTable_<LoadedLanguageName> in slot 3 (index 2) of the combined GameText array.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:11",
         "Source/AbramsDataTable/Public/GameDataTableRow_Item.h:16",
@@ -12,65 +12,98 @@
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardNickname.h:22",
         "Source/Abrams/Private/GameTextManager.cpp:53",
         "Source/Abrams/Private/GameTextManager.cpp:552",
+        "Source/Abrams/Private/GameTextManager.cpp:589",
+        "Source/Abrams/Private/GameTextManager.cpp:605",
+        "Source/Abrams/Private/GameTextManager.cpp:645",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:165",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:184",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:199",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:214",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:493",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1201",
         "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1838"
       ],
       "status": "verified"
     },
     "Text": {
       "simple": "Localized item name/description/message, possibly with formatting placeholders and rich-text images.",
-      "technical": "FString row text (+0x10), copied by GetGameText and run through FormatText. In this group the En export uses <DYN=ITEM_VALUE> (integer with grouping/width options), <DYN=ITEM_NAME> and <DYN=CHARACTER_NAME> (nested text-id parameters) plus <GLO=...> glossary tags (492 GLO, 97 DYN occurrences in En). GameItem_GetNameTextCore supplies ITEM_VALUE for Money, ITEM_NAME + CHARACTER_NAME for Costume/CustomVoice/SituationOverviewPose, and redirects nickname ids. Rich-text markup such as <img id=\"Money_0001\"/> is parsed by GameWidgetRichTextBlock. With bWithValue=false, money bypasses the table id and formats the raw integer via GroupDigits instead. Empty rows are common in non-en/zh variants (e.g. 1974 empty Zh rows in the export), and HasGameTextContent tests for emptiness before using a title/nickname label.",
+      "technical": "FString row text (+0x10), copied by GetGameText and run through FormatText. <GLO=...> tags are filled from the glossary map rebuilt from GlossaryTextDataTable_<Language>, and <DYN=...> tags from the request parameters; other tag types are left as-is. The En export has 492 GLO and 97 DYN occurrences and two <img id=...> runs, with no bracket modifiers in any shard. ITM_MONEY_1001 is '<img id=\"Money_0001\"/><DYN=ITEM_VALUE>'; the three cosmetic wrapper rows combine <DYN=CHARACTER_NAME> and <DYN=ITEM_NAME>; ITM_NICKNAME_1001/1002 combine <DYN=NICKNAME_TOP> and <DYN=NICKNAME_BOTTOM>; 74 ITM_UNLOCK_MESSAGE_* rows use caller-supplied keys such as VALUE. GameItem_GetNameTextCore supplies ITEM_VALUE as an int32 only when bWithValue=true (digits grouped through SYS_COMMON_LABEL_0124/0123/0122 by GroupDigits, with optional width flags); when bWithValue=false Money bypasses this table and returns a raw grouped-number request. For Costume/CustomVoice/SituationOverviewPose it redirects to the three wrapper ids, with ITEM_NAME as the item's own Id_ItemText resolved as a nested request and CHARACTER_NAME from Character.Id_GlossaryText_Name. Item effect descriptions are not ItemText rows: GameItem_GetDescriptionText takes EquipmentItemEffect.Id_BattleText (BattleTextDataTable) and supplies VALUE from EffectValue[0], or BuffDebuff.FloatValue[0] when the buff row is found and its type is not 0x1D; Extras use BTL_ITEM_BUFF_MESSAGE_1000. <img id=...> runs are rendered by the rich-text inline decorator only when the id resolves to a brush in CustomImageSet. A missing row or an empty string yields empty text; empty rows vary by shard (0 in En/Ja/Ko, 165 De, 1,974 each Zh_Hans/Zh_Hant), and HasGameTextContent tests for emptiness before title/nickname labels are used.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:15",
+        "Source/Abrams/Private/GameTextManager.cpp:198",
+        "Source/Abrams/Private/GameTextManager.cpp:575",
         "Source/Abrams/Private/GameTextManager.cpp:667",
+        "Source/Abrams/Private/GameTextManager.cpp:675",
         "Source/Abrams/Private/GameTextManager.cpp:681",
         "Source/Abrams/Private/GameTextManager.cpp:683",
         "Source/Abrams/Private/GameTextManager.cpp:742",
         "Source/Abrams/Private/GameTextManager.cpp:786",
+        "Source/Abrams/Private/GameTextManager.cpp:803",
+        "Source/Abrams/Private/GameTextManager.cpp:813",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:161",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:176",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:181",
         "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:185",
-        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:172",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:258",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:271",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1220",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1231",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1233",
         "Source/Abrams/Private/GameWidgetRichTextBlock.cpp:59",
-        "Source/Abrams/Private/GameTextManager.cpp:675",
-        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:106"
+        "Source/Abrams/Private/GameWidgetRichTextBlockInlineImage.cpp:72",
+        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:106",
+        "Source/Abrams/Private/GameCustomizeCardNicknameTileWidget.cpp:55"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "FGameDataTableRow_GameText with 11 language variants, 4817 identical ids each in the companion export. Slot 3 of the 14-table array; Config/DefaultGame.ini:35-45 cooks one variant per chunk.",
-    "Cross-table joins: ItemTypeId -> Item.Id_ItemText -> this table, with EquipmentItemEffect.BuffDebuff/FloatValue and Effect.Id_BattleText supplying DYN=VALUE for description templates (GameItemDescriptionTextWidget.cpp:218-271); PlayerCardTitle/Nickname Id_ItemText -> title/nickname labels (GamePlayerCardParameter.cpp:517-566); shop lineups append ITM_UNLOCK_MESSAGE_4050; free-battle/visual-lobby costume selectors map costumes to item text ids.",
-    "Some ids in this table are used only after transformation (nickname top/bottom by language) or as nested parameters, so the literal row name seen in a widget may differ from the exported id.",
-    "Reconstruction caveat: GameItem helpers and text manager GetText paths are byte-matched in status, while FindTextRow/Tick are behaviour-certified (0x14af290, 0x14c96f0; BG03). Partial Content only; no retail Blueprint-only usage claims."
+    "FGameDataTableRow_GameText has 11 exported language shards with 4,817 identical ids each (ID equals the row key in every row). The runtime builds ItemTextDataTable_<LoadedLanguageName> from EApplicationLanguage and appends it as the third table (index 2) of 14; Config/DefaultGame.ini:35-45 cooks one TextDataTable_<Lang> variant per chunk. The enum also names Ar/Ind/Pl/Ru/Th, for which no companion export is available.",
+    "Cross-table joins: Item.Id_ItemText -> this table for names (2,724 of 2,769 non-None references in the En export resolve; the other 45 are STR_STDM_SS_* short-story ids outside this table). ItemSet.Id_ItemText is None in all 2,402 exported sets, whose five Id_Item/Quantity entries are aligned; GameShop_GetItemSetNameText instead uses ITM_MONEY_1001 with ITEM_VALUE=Quantity[0], nickname pairs ITM_NICKNAME_1001/1002 with NICKNAME_TOP/BOTTOM from Id_Item[0]/[1], then Set->Id_ItemText, then First->Id_ItemText (GameShopSaleItemListItemDataBase.cpp:1201-1245). PlayerCardTitle/Nickname Id_ItemText -> labels with an empty-text twin fallback by Id_Item (GamePlayerCardParameter.cpp:517-566). Equipment descriptions are a separate join: EquipmentItemEffect.Id_BattleText -> BattleTextDataTable with DYN=VALUE from EffectValue[0] or BuffDebuff.FloatValue[0] (buff type 0x1D keeps the effect value); Extras use BTL_ITEM_BUFF_MESSAGE_1000 (GameItemDescriptionTextWidget.cpp:235-271).",
+    "Some ids are used only after transformation: PlayerCardNickname has 1,482 _TOP and 1,482 _BOTTOM rows; PlayerCard_MakeNicknameTextId swaps the suffix for languages 2/3/5/9/10 (Fr/Es/It/Es_LA/Th), while nickname set templates already print BOTTOM before TOP in several shards. ITEM_NAME and CHARACTER_NAME are nested requests, so the literal row name seen in a widget may differ from the displayed string.",
+    "Lookup and caching: GetText routes only SYS_ ids to SystemText; all other ids scan TextDataTables in array order (FindTextRow, 0x14af290). TextDataTables are rebuilt only in AGameTextManager::Tick after all language loaders complete, skipping null tables; glossary parameters are rebuilt from the glossary shard before OnCultureTextLoaded. There is no per-row cache (some UI code freezes a resolved string into a raw-text request via GameShop_MakeResolvedText), and a missing or empty row simply renders empty. Free-battle and visual-lobby costume selectors also map costumes to Id_ItemText (GameFreeBattleTeamCharacterSelectWidget.cpp:316, GameVisualLobbyCharacterSelectVariationWidget.cpp:266).",
+    "Reconstruction caveat: status/functions.json marks GetGameText (0x14af510), GetTextById (0x14afde0), GameItem_GetNameTextById (0x12ca160) and SetItemRow (0x1545580) as byte-matched, while GameItem_GetNameTextCore (0x12ca260, DV30), the description/extra helpers (0x12c9d00 NA06, 0x12c8be0 NA08), GameShop_GetItemSetNameText (0x12cac30), FindTextRow (0x14af290 NA15) and Tick (0x14c96f0 BG03) are behaviour-certified; GameItem_GetNameText (0x12ca700) has equal bytes but a HOLD verdict. Content is partial; no retail runtime or Blueprint-only uses are claimed."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:208",
-      "detail": "GameItem_GetNameText reads Item->Id_ItemText and delegates to the type-aware helper that builds the final GameTextRequest."
+      "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:214",
+      "detail": "GameItem_GetNameText passes the nullable Item row's Id_ItemText and ItemType to GameItem_GetNameTextCore; null rows produce an empty request."
     },
     {
       "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:165",
-      "detail": "GameItem_GetNameTextCore redirects ids for Money/Costume/CustomVoice/SituationOverviewPose/Nickname and adds ITEM_VALUE, ITEM_NAME, CHARACTER_NAME parameters."
+      "detail": "GameItem_GetNameTextCore redirects Money/Costume/CustomVoice/SituationOverviewPose/Nickname ids and adds ITEM_VALUE, ITEM_NAME, CHARACTER_NAME or the nickname suffix swap; Money with bWithValue=false uses GroupDigits only."
     },
     {
       "source": "Source/Abrams/Private/GameItemOwnership.cpp:611",
-      "detail": "GameItem_GetNameTextById resolves an item id to its Item row and then to ItemText via the same helper."
+      "detail": "GameItem_GetNameTextById resolves an item id through ItemDataTables and then Id_ItemText through the same helper."
     },
     {
       "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:517",
-      "detail": "Builds a plain GameTextRequest from PlayerCardTitle/Nickname Id_ItemText and checks HasGameTextContent before use."
+      "detail": "Title requests start from a plain Id_ItemText request and HasGameTextContent; nickname requests at :548 use the suffix-swapped transformed id with the same empty-text twin fallback."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1215",
+      "detail": "Item-set names use Money's ITEM_VALUE from Quantity[0], nickname templates with the first two items' text ids, then Set->Id_ItemText and First->Id_ItemText in that precedence."
     },
     {
       "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1836",
-      "detail": "Appends GetGameText of a lineup unlock id plus ITM_UNLOCK_MESSAGE_4050 for locked shop items."
+      "detail": "A matching shop lineup appends GetGameText of the hard-coded ITM_UNLOCK_MESSAGE_4050 after the lineup unlock text."
     },
     {
       "source": "Source/Abrams/Private/GameCollectionArchiveTextListWidget.cpp:70",
-      "detail": "Calls GetGameText(GameItem_GetNameText(...)) and requires more than one character before displaying an archive text entry."
+      "detail": "Calls GetGameText(GameItem_GetNameText(Row, 0, true)) and keeps unlocked title rows only when the rendered string has more than one character."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:589",
+      "detail": "FindTextRow scans the ordered GameText table array and returns the first matching row; ItemText is third, and only SYS_ ids bypass it for SystemText."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetRichTextBlock.cpp:59",
+      "detail": "Text blocks resolve requests through GetText; the rich-text inline decorator handles <img id=...> runs when the id maps to a brush."
+    },
+    {
+      "source": "Source/Abrams/Private/GameRankSystemRewardListItemWidget.cpp:97",
+      "detail": "Rank rewards request cosmetic item names with value 1 and bWithValue=false, so Money-style quantity formatting bypasses the table."
     }
   ]
 }

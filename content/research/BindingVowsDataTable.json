@@ -1,80 +1,99 @@
 {
-  "description": "Binding-vow definitions that group a difficulty tier and an ordered pair of BindingVowsEffect rows into one selectable vow.",
+  "description": "Binding-vow definitions: each row declares a difficulty tier and an ordered array of BindingVowsEffect row IDs. All 146 exported rows use two IDs (debuff first, buff second), but the native field is a TArray and the generic status resolver accepts any non-None entries.",
   "fields": {
     "Id": {
       "simple": "Binding vow identifier.",
-      "technical": "FName row key in BindingVowsDataTable; export label ID. UGameBindingVowsWidget::SetBindingVows and UGameVsEnemyBindingVowsSelectWidget::OnVowFocused scan BindingVowsDataTables with FindRow<FGameDataTableRow_BindingVows>(VowId); GameBindingVows_GetEffectRows resolves the same key from an active/setup vow ID list. None is treated as no vow by the widget callers.",
+      "technical": "FName row key (export label ID; ImportKeyField Id) in BindingVowsDataTable. UGameBindingVowsWidget::SetBindingVows and UGameVsEnemyBindingVowsSelectWidget::OnVowFocused iterate BindingVowsDataTables and use FindRow<FGameDataTableRow_BindingVows>(VowId), so the first table containing the row wins. GameBindingVows_GetEffectRows resolves the same key from caller-supplied vow IDs: FGameCharacterStatusSetup::Array28 for status queries and lottery candidates for PvE selection. All 146 exported ID labels equal their row keys. SetBindingVows returns immediately on NAME_None; OnVowFocused has no explicit None check. GetEffectRows also has no vow-ID None check, but no exported row is named None, and its own IsNone check applies only to Id_BindingVowsEffect entries.",
       "evidence": [
         "Source/Abrams/Private/GameBindingVowsWidget.cpp:165",
+        "Source/Abrams/Private/GameBindingVowsWidget.cpp:170",
         "Source/Abrams/Private/GameBindingVowsWidget.cpp:176",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:241",
         "Source/Abrams/Private/GameCharacterStatusController.cpp:247",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:304",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:628",
         "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:148",
-        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVows.h:11"
+        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVows.h:11",
+        "datatables/BindingVowsDataTable.json"
       ],
       "status": "verified"
     },
     "Difficulty": {
       "simple": "Vow difficulty tier shown on the vow icon.",
-      "technical": "EGameBindingVowsDifficulty (None=0, Low=1, Middle=2, High=3, Invalid=255). that value maps to EGameWidgetBindingVowsDifficultType (Low->Easy, Middle->Medium, High->Hard, None/Invalid->Special), selects the material's DifficultTypeMaskTexture/FrameTexture, and makes LevelMaxEffect visible only for Special (value 4). Default is None.",
+      "technical": "EGameBindingVowsDifficulty (uint8: None=0, Low=1, Middle=2, High=3, Invalid=255); the row constructor default is None. UGameBindingVowsWidget remaps only Low->Easy(1) and Middle->Medium(2); High(3) remains Hard(3), while None and Invalid (and any other value) become Special(4). That widget enum selects the dynamic material's DifficultTypeMaskTexture and FrameTexture, and LevelMaxEffect is visible only for Special. Exported rows use Low (45), Middle (75), High (5), and None (21); no Invalid row is exported, so None is a real exported tier here rather than merely an unset default.",
       "evidence": [
         "Source/Abrams/Private/GameBindingVowsWidget.cpp:182",
         "Source/Abrams/Private/GameBindingVowsWidget.cpp:183",
         "Source/Abrams/Private/GameBindingVowsWidget.cpp:185",
         "Source/Abrams/Private/GameBindingVowsWidget.cpp:187",
+        "Source/Abrams/Private/GameBindingVowsWidget.cpp:189",
         "Source/Abrams/Private/GameBindingVowsWidget.cpp:200",
+        "Source/Abrams/Public/EGameWidgetBindingVowsDifficultType.h:6",
         "Source/AbramsDataTable/Public/EGameBindingVowsDifficulty.h:6",
-        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVows.h:15"
+        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVows.h:21",
+        "datatables/BindingVowsDataTable.json"
       ],
       "status": "verified"
     },
     "Id_BindingVowsEffect": {
       "simple": "Ordered IDs of the two effect rows belonging to the vow: debuff first, buff second.",
-      "technical": "TArray<FName>. GameBindingVows_GetEffectRows iterates every non-None ID, resolves the first matching BindingVowsEffect row in table order and appends it; effect-type queries then filter the resolved rows. The VsEnemy selection UI requires Num() >= 2 and treats [0] as the debuff and [1] as the buff for text; UGameBindingVowsWidget also reads [0] and [1] unchecked for category icons. All exported rows contain exactly two IDs, but the status consumer is length-agnostic.",
+      "technical": "TArray<FName>; the row constructor leaves it empty. GameBindingVows_GetEffectRows takes the first BindingVowsDataTables entry whose key matches the vow ID, skips None entries, and for each ID appends the first BindingVowsEffectDataTables hit, preserving array order. GameBindingVows_GetEffectRowsOfType filters those joined rows by EffectType; no persistent cache of resolved effect rows was found. The VsEnemy selection UI requires Num() >= 2 and formats [0] as the debuff and [1] as the buff using each effect row's Id_BattleText and EffectValue[0]/[1]; UGameBindingVowsWidget reads [0]/[1] unchecked for DebuffTexture/BuffTexture. All 146 exported rows contain exactly two distinct, resolvable IDs (292 references): first references carry BTL_BINDING_VOWS_DEBUFF_* text IDs and second references carry BTL_BINDING_VOWS_BUFF_* text IDs, with no None references. The generic status join itself is length-agnostic.",
       "evidence": [
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:252",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:254",
-        "Source/Abrams/Private/GameCharacterStatusController.cpp:260",
         "Source/Abrams/Private/GameBindingVowsWidget.cpp:191",
         "Source/Abrams/Private/GameBindingVowsWidget.cpp:192",
         "Source/Abrams/Private/GameBindingVowsWidget.cpp:194",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:252",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:254",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:260",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:273",
+        "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:80",
         "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:153",
         "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:157",
         "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:170",
-        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVows.h:18"
+        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVows.h:18",
+        "datatables/BindingVowsDataTable.json",
+        "datatables/BindingVowsEffectDataTable.json"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "AGameDataTableManager::Tick resolves the single retail asset BindingVowsDataTable into BindingVowsDataTables (Source/Abrams/Private/GameDataTableManager.cpp:290, Source/Abrams/Public/GameDataTableManager.h:201).",
-    "Cross-table join: Id_BindingVowsEffect resolves into BindingVowsEffectDataTables; that in turn carries EffectType, EffectValue and Id_BattleText. PvE lotteries select vow IDs through BindingVowsLotteryDataTable (Source/Abrams/Private/GamePhase_IntervalPvE.cpp:604-679).",
-    "The first/second effect slot convention is explicit in two UI consumers and in every export row, while the generic status helper consumes all listed effects; no evidence of additional slots was found.",
-    "Reconstructed static C++ evidence only. The available Content is partial, so direct Blueprint or uncooked consumers cannot be excluded."
+    "AGameDataTableManager::StartInitialLoading registers the single primary-asset name BindingVowsDataTable (Source/Abrams/Private/GameDataTableManager.cpp:463); after all loaders complete, Tick resolves it through the asset manager and appends it to BindingVowsDataTables (Source/Abrams/Private/GameDataTableManager.cpp:168-176,290; Source/Abrams/Public/GameDataTableManager.h:201). FGameDataTableArray is a plain TArray<UDataTable*> (Source/Abrams/Public/GameDataTableArray.h:11), so consumers scan the loaded array per lookup; no dedicated BindingVows row cache was found.",
+    "Lookup precedence is first-table-wins at both join levels: the vow row comes from the first BindingVowsDataTables table containing the key, then each non-None effect ID comes from the first BindingVowsEffectDataTables table containing that ID. DTM_FindBindingVowsEffectRow used by the UI follows the same first-hit rule and rejects None when bCheckNone is true. Returned row pointers are held only in transient TArrays for the calling query.",
+    "Cross-table join: Id_BindingVowsEffect resolves into BindingVowsEffectDataTables; those rows carry EffectType, EffectValue and Id_BattleText. PvE mission setup picks a weighted BindingVowsLotteryDataTable row, takes its distinct non-None vow IDs, and removes any candidate whose joined effect types appear in MissionOrder or MissionTask ExcludeBindingVowsEffectType (Source/Abrams/Private/GamePhase_IntervalPvE.cpp:604-681).",
+    "The debuff-first/buff-second convention is explicit in two UI consumers and in all 146 exported rows: every first reference resolves to a BTL_BINDING_VOWS_DEBUFF_* text ID and every second to a BTL_BINDING_VOWS_BUFF_* text ID. Every exported row has exactly two distinct IDs, all present in the effect export; the generic status helper does not assume that length, and the widget only has an unchecked two-index read.",
+    "Indirect consumers re-resolve vow IDs rather than reading a cached row: PvE battle setup copies selected IDs into FGameCharacterStatusSetup::Array28 (Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:571, Source/Abrams/Private/GamePhase_BattlePvETag.cpp:147), battle records convert them to FGameCharacterBindingVowsRecord (Source/Abrams/Private/GameCharacterStatusController.cpp:301-348), FStudioBattleSystem380 flattens per-slot IDs into a deduplicated BindingVowIds list (Source/Abrams/Private/GameBattleSystems_B.cpp:1064-1074), and status/battle helpers query joined effect rows for combat and reward modifiers.",
+    "Exported Difficulty=None is not a missing value: 21 rows use it and the icon widget maps it to Special, enabling LevelMaxEffect. Invalid=255 exists in the enum but is not present in the export; other non-1/2 values would also be coerced to Special by the widget's remap.",
+    "Reconstructed static C++ evidence plus serialized export data only. The available Content is partial and no retail Blueprint or uncooked consumer evidence was inspected, so exhaustiveness of runtime consumers cannot be claimed."
   ],
   "usages": [
     {
-      "source": "Source/Abrams/Private/GameBindingVowsWidget.cpp:165",
-      "detail": "SetBindingVows resolves the row to drive icon difficulty frame/mask, debuff/buff category textures and counters."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:168,290,463",
+      "detail": "Loads the single BindingVowsDataTable primary asset name and resolves it into the BindingVowsDataTables lookup array once all table loads complete."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:241",
-      "detail": "GameBindingVows_GetEffectRows joins each vow ID to its effect rows for all status/battle-log queries."
+      "source": "Source/Abrams/Private/GameBindingVowsWidget.cpp:165-201",
+      "detail": "SetBindingVows rejects NAME_None, resolves the row, maps Difficulty to icon material textures and Special-only LevelMaxEffect visibility, and reads effect IDs [0]/[1] for debuff/buff category textures."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:273",
-      "detail": "GameBindingVows_GetEffectRowsOfType filters the joined effect rows by EGameBindingVowsEffectType."
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:241-287",
+      "detail": "GameBindingVows_GetEffectRows joins vow IDs to effect rows with first-table/first-hit precedence; GetEffectRowsOfType filters the joined rows by EffectType for status queries."
     },
     {
-      "source": "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:141",
-      "detail": "OnVowFocused resolves the focused vow and formats its two effect rows' battle text."
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:301-348",
+      "detail": "GetBindingVowsRecords builds per-vow records from resolved effect rows; GameBattleBindingVowsListWidget (GameBattleBindingVowsListWidget.cpp:63-118) passes their [0] debuff and [1] buff states back to the vow icon widget."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:604",
-      "detail": "PvE mission vow selection obtains vow IDs from lotteries and filters candidates through each vow's effect rows."
+      "source": "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:37-56,141-182",
+      "detail": "Focused-vow text requires at least two effect IDs and resolves [0] to debuff text and [1] to buff text through the effect-table finder."
     },
     {
-      "source": "Source/Abrams/Private/GameDataTableManager.cpp:290",
-      "detail": "Load/registry path for BindingVowsDataTable."
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:604-681",
+      "detail": "PvE vow selection obtains candidates from BindingVowsLotteryDataTable, skips None, removes duplicates, and filters them through the joined effect types before weighted selection."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:1064-1074,1094-1186,2605-2692",
+      "detail": "Battle system 380 deduplicates configured vow IDs and repeatedly re-resolves them through the status helpers for HP, cursed-energy, guard, movement, and attack modifiers."
     }
   ]
 }

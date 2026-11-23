@@ -1,113 +1,146 @@
 {
-  "description": "Risk-band-scaled multipliers applied to the PvE cooperative partner's stats.",
+  "description": "Risk-band-scaled multipliers for the PvE AI ally: the second friendly slot in solo battles and the offline partner in interval PvE.",
   "fields": {
     "Id": {
       "simple": "Ally parameter row id.",
-      "technical": "FName import key/row name for FGameDataTableRow_PvEAllyParameter. GamePvE_GetAllyParameter enumerates all rows of PvEAllyParameterDataTables (DTM+0x960) and selects by Id_GlobalThreshold, so the id itself is not used as a lookup key in the observed consumer.",
+      "technical": "FName row key (header field Id; retail UStruct/export label ID, ImportKeyField Id). Exported values PVE_ALLY_PARAMETER_01..05 equal their row names. The observed helper enumerates all rows from PvEAllyParameterDataTables with FGameDataTableArray::GetRows and never reads this value; selection is through Id_GlobalThreshold.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEAllyParameter.h:11",
+        "Source/Abrams/Public/GameDataTableArray.h:21",
         "Source/Abrams/Public/GameDataTableManager.h:191",
         "Source/Abrams/Private/GamePvESettings.cpp:294"
       ],
-      "status": "observed"
+      "status": "verified"
     },
     "Id_GlobalThreshold": {
       "simple": "Risk-value band that selects this parameter row.",
-      "technical": "FName, default None. For each ally row the consumer resolves a FGameDataTableRow_GlobalThreshold in GlobalThresholdDataTables (DTM+0x300) and tests RiskValue against its Min/Max with inclusive bounds. The first matching row is returned; a missing threshold or a risk outside every band leaves the ally pointer null and no multipliers are applied. Exported rows share one id with their row name.",
+      "technical": "FName, default None. GamePvE_FindThresholdInline resolves it against GlobalThresholdDataTables (DTM+0x300; first table/row wins) and tests the int32 RiskValue against inclusive Min/Max. Exported ally bands, in row order: 01=0-5000, 02=5001-10000, 03=10001-15000, 04=15001-25000, 05=25001-99999. A missing threshold row or a risk outside all bands returns null and no ally multipliers are applied. These are distinct from the PVE_AI_LEVEL_* bands used for the AI level.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEAllyParameter.h:15",
-        "Source/Abrams/Private/GamePvESettings.cpp:295",
-        "Source/Abrams/Private/GamePvESettings.cpp:296",
-        "Source/Abrams/Private/GamePvESettings.cpp:298"
+        "Source/Abrams/Private/GamePvESettings.cpp:21",
+        "Source/Abrams/Private/GamePvESettings.cpp:297",
+        "Source/Abrams/Private/GamePvESettings.cpp:298",
+        "Source/Abrams/Private/GameDataTableManager.cpp:178"
       ],
       "status": "verified"
     },
     "HitPointMaxRate": {
-      "simple": "Multiplier for the partner's maximum hit points.",
-      "technical": "float, row ctor default 0.0f (data supplies values such as 1.0-1.4). GamePvE_CalcHitPoint starts from Growth->HitPointMaxRate (or 1.0), multiplies by this ally rate, then applies equipment/vow terms and floors the final HP at 1.0. This calculation is used for the player/partner in PvE solo and interval setup; enemy HP uses MissionCharacter.HitPoint instead.",
+      "simple": "Multiplier for the ally's maximum hit points.",
+      "technical": "float, row ctor default 0.0f; the export supplies 1.0/1.2/1.3/1.4/1.5. For the partner only, GamePvE_CalcHitPoint starts from Growth->HitPointMaxRate or 1.0, multiplies by this ally rate, applies HitPointMaxRate and HitPointMaxRateAlly vow factors (positive ally vow values use the maximum) and additive HitPointMax equipment/vow terms, then floors the result at 1.0f. Used for the solo partner's HP override and the interval partner's maximum HP; enemies use MissionCharacter.HitPoint with a HitPointMaxEnemy gear bonus instead.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEAllyParameter.h:18",
-        "Source/Abrams/Private/GamePvESettings.cpp:333",
+        "Source/Abrams/Private/GamePvESettings.cpp:337",
         "Source/Abrams/Private/GamePvESettings.cpp:340",
         "Source/Abrams/Private/GamePvESettings.cpp:344",
+        "Source/Abrams/Private/GamePvESettings.cpp:391",
+        "Source/Abrams/Private/GamePvESettings.cpp:408",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:573",
         "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:699",
-        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:710"
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:708"
       ],
       "status": "verified"
     },
     "CursedEnergyExpAddRate": {
-      "simple": "Partner multiplier for cursed-energy experience gain.",
-      "technical": "float, row ctor default 0.0f. In PvE solo battle entry construction for slot 1 (the AI partner), the consumer adds (rate - 1.0f) to Setup.StatusSetup.Rates.CursedEnergyExp, which starts at 1.0; growth-row contributions are added on top. Slot 0 (local player) does not receive ally-parameter rates.",
+      "simple": "Ally multiplier for cursed-energy experience gain.",
+      "technical": "float, row ctor default 0.0f; the export uses 1.0/1.03/1.05. Only the AI partner (solo slot index 1) adds (rate - 1.0f) to StatusSetup.Rates.CursedEnergyExp, whose neutral default is 1.0f; the growth row's contribution is added on top. The downstream exp-rate calculation folds in this setup rate with buffs, equipment and vows and clamps the result at 0.0f.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEAllyParameter.h:21",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:530",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:550",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:552"
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:552",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:563",
+        "Source/Abrams/Public/GameCharacterStatusController.h:145",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3069"
       ],
       "status": "verified"
     },
     "CursedEnergyRecoverRate": {
-      "simple": "Partner multiplier for cursed-energy recovery.",
-      "technical": "float, row ctor default 0.0f. Applied only to slot 1 in PvE solo as (rate - 1.0f) added to StatusSetup.Rates.CursedEnergyRecover before growth contributions.",
+      "simple": "Ally multiplier for cursed-energy recovery.",
+      "technical": "float, row ctor default 0.0f; all exported rows set 1.0. Only the AI partner (solo slot index 1) adds (rate - 1.0f) to StatusSetup.Rates.CursedEnergyRecover (neutral default 1.0f) before the growth-row contribution; the downstream recovery rate includes this setup rate and is clamped at 0.0f.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEAllyParameter.h:24",
-        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:553"
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:553",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:564",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:905"
       ],
       "status": "verified"
     },
     "GuardDurabilityMaxRate": {
-      "simple": "Partner multiplier for maximum guard durability.",
-      "technical": "float, row ctor default 0.0f. Applied only to slot 1 as an additive (rate - 1.0f) adjustment to StatusSetup.Rates.GuardDurabilityMax; downstream guard-durability maxima are derived from the status controller and battle team rate.",
+      "simple": "Ally multiplier for maximum guard durability.",
+      "technical": "float, row ctor default 0.0f; all exported rows set 1.0. Only the AI partner (solo slot index 1) adds (rate - 1.0f) to StatusSetup.Rates.GuardDurabilityMax (neutral default 1.0f) before the growth-row contribution. The controller folds that rate with equipment and binding vows; the character multiplies the result by the battle manager's team guard-durability rate to obtain the effective rate, which is applied to a base durability value.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEAllyParameter.h:27",
         "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:554",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:565",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1064",
         "Source/Abrams/Private/GameCharacter.cpp:1471"
       ],
       "status": "verified"
     },
     "DashGaugeMaxRate": {
-      "simple": "Partner multiplier for maximum dash gauge.",
-      "technical": "float, row ctor default 0.0f. Applied only to slot 1 as (rate - 1.0f) added to StatusSetup.Rates.DashGaugeMax; later dash-gauge clamping uses Owner->GetDashGaugeMaxRate() times the dash gauge base value.",
+      "simple": "Ally multiplier for maximum dash gauge.",
+      "technical": "float, row ctor default 0.0f; all exported rows set 1.0. Only the AI partner (solo slot index 1) adds (rate - 1.0f) to StatusSetup.Rates.DashGaugeMax (neutral default 1.0f) before the growth-row contribution; the controller folds that rate with equipment and vows, and dash-gauge clamping uses Owner->GetDashGaugeMaxRate() times the dash-gauge base value.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEAllyParameter.h:30",
         "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:555",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:566",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:820",
         "Source/Abrams/Private/GameCharacter.cpp:1464"
       ],
       "status": "verified"
     },
     "DamageRate": {
-      "simple": "Partner multiplier for sent attack damage.",
-      "technical": "float, row ctor default 0.0f. Applied only to slot 1 as (rate - 1.0f) added to StatusSetup.Rates.SendAttackDamage; the resulting rate feeds the character's damage calculation.",
+      "simple": "Ally multiplier for sent attack damage.",
+      "technical": "float, row ctor default 0.0f; the export uses 1.0/1.1/1.2/1.4/1.6. Only the AI partner (solo slot index 1) adds (rate - 1.0f) to StatusSetup.Rates.SendAttackDamage (neutral default 1.0f) before the growth-row contribution. The character's damage-rate product includes the team, action and status rates; the status rate folds in this setup rate together with equipment and binding-vow terms.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEAllyParameter.h:33",
         "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:556",
-        "Source/Abrams/Private/GameCharacter.cpp:3445"
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:567",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2518",
+        "Source/Abrams/Private/GameCharacter.cpp:3442"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "The exported asset has 5 rows with FGameDataTableRow_PvEAllyParameter; the manager loads PvEAllyParameterDataTable into PvEAllyParameterDataTables (DTM+0x960). No localization variants or numbered shards were supplied.",
-    "Ally-parameter rate bonuses are applied to the partner slot only in the observed battle-entry code (GamePhase_BattlePvESolo); the interval phase uses the row only for partner HP calculation. Tag mode uses growth rows but not an ally-parameter lookup.",
-    "Row defaults are 0.0f in the reconstructed struct ctor, while the rate system's neutral baseline is 1.0f; exported data supplies explicit multipliers, so a serialized 0 would not mean neutral.",
-    "Selection helper 0x1303d20 and related functions are reconstructed; consult status/functions.json for byte status. Content is partial and Blueprint uses were not exhaustively inspectable."
+    "The sole exported asset has 5 rows (PVE_ALLY_PARAMETER_01..05) with FGameDataTableRow_PvEAllyParameter; the manager registers PvEAllyParameterDataTable at GameDataTableManager.cpp:453 and resolves it into PvEAllyParameterDataTables (DTM+0x960) at :280 once all primary-asset loaders complete. No localization variants or numbered shards exist in the supplied exports.",
+    "Id_GlobalThreshold joins to GlobalThresholdDataTable: inclusive integer bands 0-5000, 5001-10000, 10001-15000, 15001-25000 and 25001-99999 in exported row order. A negative risk or one above 99999 has no ally row. These bands do not align with PVE_AI_LEVEL_* (for example AI level 3 covers 0-600) even though both lookups consume the same risk value.",
+    "In solo battle setup the ally is entry index 1 (ControlType 3/AI). All six numeric fields are consumed: five are added as (rate - 1) to the neutral-1.0 StatusSetup.Rates fields, and HitPointMaxRate is used through GamePvE_CalcHitPoint. Index 0 (local player) receives no ally-parameter rates. The growth row's matching rate is added on top for index 1; no clamp is applied at the setup step.",
+    "Interval PvE resolves this table only when bAlly is true (offline partner; BuildPartnerInfo sets Value4C=1 when not online) and uses only HitPointMaxRate via the HP helper. It indexes RiskValueArray[CharacterIndex] directly after guarding GrowthInfoArray and EquipmentItemIds, so it relies on the caller having supplied one risk per character.",
+    "Exported multipliers are explicit (HP 1.0-1.5, DamageRate 1.0-1.6, CursedEnergyExpAddRate up to 1.05, the other three rates 1.0). The reconstructed row ctor defaults all float members to 0.0f (not neutral 1.0f) and FName members to None, so a missing or zero serialized multiplier would not be neutral.",
+    "Tag battle setup applies growth rows but performs no ally-parameter lookup. The row-selection helper 0x1303d20 and null-ally HP forwarder 0x1305490 are byte-matched; the seven-argument HP helper 0x13054c0 and the Solo/Interval callers are behaviour-certified rather than byte-matched (status/functions.json). Retail Blueprint assets are unavailable for exhaustive inspection, but no alternate C++ consumer of this struct/table name exists in Source/.",
+    "Retail layout evidence lists the eight properties at offsets 0x08..0x2C (ID/NameProperty x2 then six FloatProperty), matching the reconstructed header's field order and types."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GamePvESettings.cpp:289",
-      "detail": "GamePvE_GetAllyParameter selects the first row whose global risk threshold contains the current risk value."
+      "detail": "GamePvE_GetAllyParameter enumerates ally rows in table/row-name order and returns the first whose GlobalThreshold band includes the risk value."
     },
     {
-      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:550",
-      "detail": "Applies five partner rate fields to the co-op AI's battle setup."
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:280",
+      "detail": "Resolves PvEAllyParameterDataTable through the primary-asset loader into PvEAllyParameterDataTables (DTM+0x960)."
     },
     {
-      "source": "Source/Abrams/Private/GamePvESettings.cpp:333",
-      "detail": "GamePvE_CalcHitPoint multiplies the growth rate by HitPointMaxRate and adds equipment/vow modifiers."
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:549",
+      "detail": "Resolves the partner row from RiskValueArray[1] for the AI-controlled entry at slot index 1."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:552",
+      "detail": "Applies five ally rate fields as (rate - 1) adjustments to the partner's neutral StatusSetup.Rates; growth-row adjustments are added afterward."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:573",
+      "detail": "Passes HitPointMaxRate through GamePvE_CalcHitPoint for the partner's maximum-HP override."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:344",
+      "detail": "GamePvE_CalcHitPoint multiplies the growth HP rate by the ally HP rate before equipment/vow terms and the 1.0 floor."
     },
     {
       "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:699",
-      "detail": "Interval PvE uses the ally row together with growth data to compute partner maximum HP."
+      "detail": "Resolves the ally row for the offline partner only, using that character's risk value."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:708",
+      "detail": "Passes the ally row to GamePvE_CalcHitPoint for the interval partner's maximum HP; no other ally fields are read there."
     }
   ]
 }

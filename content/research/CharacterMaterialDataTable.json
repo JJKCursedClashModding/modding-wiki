@@ -1,113 +1,168 @@
 {
-  "description": "Per-variation costume material pattern table: eight parallel arrays (P1-P8) of material instance names that a character material controller shows or hides depending on the selected material pattern index.",
+  "description": "Per-variation costume material-pattern table: eight arrays of exported material/parent-material FNames that UGameCharacterMaterialController hides or shows according to a zero-based pattern index.",
   "fields": {
     "ID": {
-      "simple": "Row key referenced by CharacterVariation::Id_CharacterMaterial.",
-      "technical": "FName primary key (ImportKeyField=Id in the export), typically a variation ID (CP_xxx_yy). UGameCharacterMaterialController::SetMaterialPattern resolves the owner's current CharacterVariation row, reads its Id_CharacterMaterial and finds this row in CharacterMaterialDataTables (DTM +0x490). A null Row pointer passed explicitly (as for shikigami capture) bypasses the lookup.",
+      "simple": "Row key referenced by CharacterVariation.Id_CharacterMaterial; several variations can share one material row.",
+      "technical": "FName row property exported as ID (ImportKeyField=Id). When the optional Row argument is null, SetMaterialPattern resolves the owner's cached CharacterRow and VariationIndex to a CharacterVariation row in CharacterVariationDataTables (DTM +0x400), rejects a None Id_CharacterMaterial, then searches CharacterMaterialDataTables (DTM +0x490) and uses the first matching table's row. A non-null Row argument bypasses that owner/variation chain. Every character caller in the reconstructed source passes null; the shikigami call with a null pointer belongs to the separate ShikigamiMaterial controller and table.",
       "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMaterial.h:11",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:18",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:83",
         "Source/Abrams/Private/GameCharacterMaterialController.cpp:89",
-        "Source/Abrams/Private/GameCharacterMaterialController.cpp:93"
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:93",
+        "Source/Abrams/Private/GameDataTableManager.cpp:203"
       ],
       "status": "verified"
     },
     "MaterialName_P1": {
-      "simple": "Material-instance names belonging to costume pattern 1 (index 0).",
-      "technical": "TArray<FName>, first of eight parallel arrays. SetMaterialPattern accepts Pattern in [0,7] (range-checked as a float); index 0 selects this array as the shown pattern. All eight arrays are first applied with bShow=false in stable sorted order, then the selected array with bShow=true; None names are skipped. A name is only acted upon if it is present in the controller's harvested Outline/RimParameters map, in which case ShowMaterialSections toggles that material's mesh sections.",
+      "simple": "Material names belonging to pattern 1 (index 0).",
+      "technical": "TArray<FName>; pattern 0 selects it. The parameter is int32, but the reconstructed retail body compares it as a float against 0 and 7, so only 0 through 7 proceed. Eight entries are sorted by bShow, applying every non-selected array with bShow=false and then the selected array with bShow=true. Each non-None name is an exact FName lookup in OutlineRimParameters, whose key is the parent-material name of a dynamic material harvested by Initialize; the matched material index is shown or hidden on every LOD when the mesh is a USkinnedMeshComponent. Unmatched names, None entries, and failed row/pattern checks produce no section toggle. A successful call stores the pattern in AppliedPattern.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMaterial.h:15",
-        "Source/Abrams/Private/GameCharacterMaterialController.cpp:100",
-        "Source/Abrams/Private/GameCharacterMaterialController.cpp:116",
-        "Source/Abrams/Private/GameCharacterMaterialController.cpp:130"
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:98",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:106",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:110",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:121",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:126",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:132",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:138",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:187",
+        "Source/Abrams/Private/GameActorMaterialController.cpp:148"
       ],
       "status": "verified"
     },
     "MaterialName_P2": {
-      "simple": "Material-instance names belonging to costume pattern 2 (index 1).",
-      "technical": "TArray<FName> selected when Pattern == 1; otherwise hidden by the same hide-first/show-selected pass. Exported slots contain names like MI_CP_050_00_Hair_P2 and None padding.",
+      "simple": "Material names belonging to pattern 2 (index 1).",
+      "technical": "TArray<FName>; switch case 1 selects it, and the hide-first/show-selected pass hides it for every other valid pattern. Array position does not encode a material slot: each non-None name is matched by exact FName against the harvested parent-material map described on P1. Exported arrays have six fixed slots with 'None' padding; CP_050_00, for example, contains MI_CP_050_00_Hair_P2 here.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMaterial.h:18",
-        "Source/Abrams/Private/GameCharacterMaterialController.cpp:118"
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:111",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:121",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:126"
       ],
       "status": "verified"
     },
     "MaterialName_P3": {
-      "simple": "Material-instance names belonging to costume pattern 3 (index 2).",
-      "technical": "TArray<FName> selected when Pattern == 2; hidden otherwise. Behavior identical to the other pattern arrays; arrays can repeat the same material names across patterns.",
+      "simple": "Material names belonging to pattern 3 (index 2).",
+      "technical": "TArray<FName>; switch case 2 selects it; otherwise it is hidden before the selected array is shown. CP_050_00 and CP_050_20 reuse names between P2 and P3. Because all hidden entries precede the single shown entry, a shared name ends in the shown state when the selected pattern includes it.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMaterial.h:21",
-        "Source/Abrams/Private/GameCharacterMaterialController.cpp:119"
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:112",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:121",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:130"
       ],
       "status": "verified"
     },
     "MaterialName_P4": {
-      "simple": "Material-instance names belonging to costume pattern 4 (index 3).",
-      "technical": "TArray<FName> selected when Pattern == 3; hidden otherwise.",
+      "simple": "Material names belonging to pattern 4 (index 3).",
+      "technical": "TArray<FName>; switch case 3 selects it; otherwise it is hidden by the same pass. In the export only the seven CP_130_* rows populate P4 (three or four names each); every other row has six 'None' entries.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMaterial.h:24",
-        "Source/Abrams/Private/GameCharacterMaterialController.cpp:120"
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:113",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:121"
       ],
       "status": "verified"
     },
     "MaterialName_P5": {
-      "simple": "Material-instance names belonging to costume pattern 5 (index 4).",
-      "technical": "TArray<FName> selected when Pattern == 4; hidden otherwise.",
+      "simple": "Material names belonging to pattern 5 (index 4).",
+      "technical": "TArray<FName>; switch case 4 selects it; otherwise it is hidden. As with P4, only the seven CP_130_* rows have non-None entries in this export.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMaterial.h:27",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:114",
         "Source/Abrams/Private/GameCharacterMaterialController.cpp:121"
       ],
       "status": "verified"
     },
     "MaterialName_P6": {
-      "simple": "Material-instance names belonging to costume pattern 6 (index 5).",
-      "technical": "TArray<FName> selected when Pattern == 5; hidden otherwise.",
+      "simple": "Material names belonging to pattern 6 (index 5).",
+      "technical": "TArray<FName>; switch case 5 selects it; otherwise it is hidden. Only the seven CP_130_* rows have non-None entries in this export.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMaterial.h:30",
-        "Source/Abrams/Private/GameCharacterMaterialController.cpp:122"
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:115",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:121"
       ],
       "status": "verified"
     },
     "MaterialName_P7": {
-      "simple": "Material-instance names belonging to costume pattern 7 (index 6).",
-      "technical": "TArray<FName> selected when Pattern == 6; hidden otherwise.",
+      "simple": "Material names belonging to pattern 7 (index 6).",
+      "technical": "TArray<FName>; switch case 6 selects it; otherwise it is hidden. Only the seven CP_130_* rows have non-None entries in this export.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMaterial.h:33",
-        "Source/Abrams/Private/GameCharacterMaterialController.cpp:123"
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:116",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:121"
       ],
       "status": "verified"
     },
     "MaterialName_P8": {
-      "simple": "Material-instance names belonging to costume pattern 8 (index 7).",
-      "technical": "TArray<FName> selected when Pattern == 7; hidden otherwise. Exported P8 arrays are commonly all None, i.e. no extra material sections for the last pattern.",
+      "simple": "Material names belonging to pattern 8 (index 7).",
+      "technical": "TArray<FName>; switch case 7 selects it; otherwise it is hidden. All six entries are 'None' in every one of the 27 exported rows, so pattern 7 is accepted and records AppliedPattern=7 but toggles no material sections in this export.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMaterial.h:36",
-        "Source/Abrams/Private/GameCharacterMaterialController.cpp:124",
-        "Source/Abrams/Private/GameCharacterMaterialController.cpp:100"
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:117",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:127",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:138"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Export contains 27 rows, each with eight material-name arrays of six slots. Missing variation material references simply leave the controller's default pattern state.",
-    "Pattern is an int32 in [0,7]; values outside that range return without changing AppliedPattern. The controller's material harvesting (Outline/Rim parameters) must have run, otherwise names cannot be mapped to mesh sections.",
-    "Both battle characters and capture spawns call SetMaterialPattern; capture SituationOverview poses choose the pattern from the variation parameter rather than the slot. Shikigami passes an explicit row pointer (null), so CharacterMaterial is not used for shikigami.",
-    "No per-locale or numbered-shard variants exist in the export; no claim about Blueprint-only consumers or uncooked assets."
+    "The canonical export has 27 rows, each with ID and exactly MaterialName_P1 through MaterialName_P8; every array has six exported slots. P1 is populated in all rows, P2 in 19, P3 in 10, P4-P7 only in the seven CP_130_* rows, and P8 in none. The ten per-character export views are value-identical subsets of these rows, not additional runtime shards.",
+    "Pattern is a zero-based selector with no physical unit: 0..7 map to P1..P8. An out-of-range value returns before any section call or AppliedPattern write, leaving the previous value in place (0 on a fresh controller); AGameCharacter nevertheless forwards the raw value to ActionController::OnMaterialPatternChanged. The studio level-sequencer debug path uses -1 as a no-material-change value, while cinematic sequencer tracks clamp their evaluated value to 0..7.",
+    "Variations with Id_CharacterMaterial=None (335 of 437 exported variation rows) and lookups of a missing ID return before any section work. Of the 27 material row IDs, 26 are referenced by at least one variation and CP_110_20 is unreferenced; no exported variation points to a missing material row.",
+    "Material names are exact FName keys against the parent-material names harvested by Initialize into OutlineRimParameters. ShowMaterialSections acts only when the mesh is a USkinnedMeshComponent, changes every LOD, and marks the render state dirty; unmatched names are silently ignored.",
+    "Each successfully applied call processes hidden arrays first and the selected array last, so a name shared between patterns (for example between CP_050_00's P2 and P3) finishes shown when the selected array contains it. Array order itself is not a material-slot index; the harvested map supplies the material index.",
+    "AGameCharacter's interface call passes a null row and then notifies the action controller: CP_110 mirrors the pattern to its shikigami, and CP_150 uses pattern 1 to restore a passive buff. Animation notifies save/restore the value through GetMaterialPattern and a per-object cache, and sequencer evaluation saves AppliedPattern and restores it on teardown. These indirect consumers never read the arrays directly.",
+    "Shikigami material calls use UGameShikigamiMaterialController, FGameDataTableRow_ShikigamiMaterial (P1..P5 only) and ShikigamiMaterialDataTables at DTM +0x6D0; they are not consumers of CharacterMaterialDataTable.",
+    "Only one canonical asset plus per-character subset views are present in the export; no locale or numbered runtime shards were found. Retail Blueprint assets and loaded/cooked DataTable objects were not available here, so no Blueprint-only consumer or asset-existence claim is made."
   ],
   "usages": [
     {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:351",
+      "detail": "Registers the unsharded name CharacterMaterialDataTable among the DataTable primary assets loaded by StartInitialLoading."
+    },
+    {
       "source": "Source/Abrams/Private/GameDataTableManager.cpp:203",
-      "detail": "Loads CharacterMaterialDataTable into AGameDataTableManager::CharacterMaterialDataTables."
+      "detail": "Once all loads complete, Tick resolves that loader to a UDataTable and appends it to CharacterMaterialDataTables (DTM +0x490); null results are skipped."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterMaterialController.cpp:82",
-      "detail": "SetMaterialPattern resolves the row when no explicit row is supplied."
+      "source": "Source/Abrams/Private/GameCharacterMaterialController.cpp:89",
+      "detail": "With a null row, resolves the current CharacterVariation through the cached character row and variation index."
     },
     {
-      "source": "Source/Abrams/Private/GameCharacterMaterialController.cpp:116",
-      "detail": "Switches P1-P8 arrays into the selected pattern and toggles matching mesh sections."
+      "source": "Source/Abrams/Private/GameCharacterMaterialController.cpp:93",
+      "detail": "Finds this material row by Variation.Id_CharacterMaterial in the manager's table list; first match wins."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterMaterialController.cpp:121",
+      "detail": "Sorts the P1-P8 entries so hidden arrays are applied before the selected array, then toggles exact-name matches and stores AppliedPattern."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:406",
+      "detail": "IGameActorInterface::SetMaterialPattern calls the controller with a null row and forwards the requested pattern to OnMaterialPatternChanged."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:869",
+      "detail": "Battle spawn setup passes Slot.MaterialPattern directly to the character material controller."
     },
     {
       "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:603",
-      "detail": "Capture setup calls SetMaterialPattern with a slot or variation parameter pattern."
+      "detail": "Capture setup uses VariationParameter.MaterialPattern for SituationOverview captures and Slot.Parameter.MaterialPattern otherwise."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimNS_MaterialPattern.cpp:30",
+      "detail": "Animation notify caches the owner's current pattern by object index, switches to the notify pattern, and restores the cached value on end."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSetMaterialPatternEvaluate.cpp:79",
+      "detail": "Cinematic tracks clamp the evaluated pattern to 0..7, save AppliedPattern once, and restore it on teardown when bResetParameter is set."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_150_ActionController.cpp:1103",
+      "detail": "Indirect consumer: pattern 1 reapplies BUFF_CP_150_PASSIVE while the owner is alive."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:1710",
+      "detail": "Distinguishes the shikigami twin: its null-row lookup uses ShikigamiMaterialDataTables and only P1..P5."
     }
   ]
 }

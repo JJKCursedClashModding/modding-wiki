@@ -1,67 +1,103 @@
 {
-  "description": "Localized command-list text: character descriptions, passive/attack names, and long attack descriptions. CommandList rows reference these strings by id; the command-list widgets resolve and specially parse the description text.",
+  "description": "Localized command-list strings: one row supplies a character description, passive/attack name, or attack description. CommandListDataTable supplies the CMD_ ids, and the command-list widgets resolve them through the shared GameTextManager; attack descriptions receive an additional C++-side parser.",
   "fields": {
     "ID": {
-      "simple": "Command-list text id (row key), e.g. CMD_CHARACTER_DESCRIPTION_CP_010.",
-      "technical": "FName ID in FGameDataTableRow_GameText, identical to the row name used by FindRow. The owning CommandList row stores these ids in many named FName/FName-array fields (Id_CommandListText_CharacterDescription, Id_CommandListText_PassiveName/Description[], Id_CommandListText_NormalAttack_*_Name/Description, cursed-energy/extra/super variants). UGameCommandListWidget checks IsNone() to show/hide an entry and copies the ids into FGameCommandListActionParameter for the action widget; name ids are applied directly with SetTextIdOnly, description ids are fetched with GetText. The table is loaded as CommandListTextDataTable_<Language> in slot 4 of the GameText array.",
+      "simple": "Command-list text row key/id, e.g. CMD_CHARACTER_DESCRIPTION_CP_010.",
+      "technical": "FName ID in FGameDataTableRow_GameText. All 11 exported shards have row keys equal to ID. Runtime FindRow uses FName(Request.TextId) as the row name; the lookup does not read the row's ID property, which FindTextIdsContaining instead reads for substring matching. CommandListDataTable owns the references in Id_CommandListText_CharacterDescription, paired Id_CommandListText_PassiveName/Description arrays, and named normal-, cursed-energy-, super-, and extra-attack name/description fields; Id_CommandListText_TagComboAttack_Name exists in the header but has no C++ consumer in this reconstruction. UGameCommandListWidget gates action slots on the name id being non-None, gates passive slots on valid paired array indices and both ids being non-None, and sends the character description to SetTextIdOnly without an IsNone gate; NAME_None requests clear the text block. Attack names use SetTextIdOnly and attack descriptions use GetText, while passive names are injected as SKILL_NAME request parameters behind SYS_COMMANDLIST_LABEL_0002. StartLanguageLoading loads CommandListTextDataTable_<Language> and Tick inserts it fourth (zero-based index 3) into the 14-table TextDataTables search order.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:11",
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:16",
         "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:19",
-        "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:25",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CommandList.h:96",
         "Source/Abrams/Private/GameTextManager.cpp:54",
         "Source/Abrams/Private/GameTextManager.cpp:553",
+        "Source/Abrams/Private/GameTextManager.cpp:456",
+        "Source/Abrams/Private/GameTextManager.cpp:590",
         "Source/Abrams/Private/GameTextManager.cpp:597",
+        "Source/Abrams/Private/GameTextManager.cpp:645",
+        "Source/Abrams/Private/GameTextManager.cpp:681",
         "Source/Abrams/Private/GameCommandListWidget.cpp:399",
+        "Source/Abrams/Private/GameCommandListWidget.cpp:476",
+        "Source/Abrams/Private/GameCommandListWidget.cpp:482",
+        "Source/Abrams/Private/GameCommandListWidget.cpp:489",
         "Source/Abrams/Private/GameCommandListWidget.cpp:519",
-        "Source/Abrams/Private/GameCommandListActionWidget.cpp:192"
+        "Source/Abrams/Private/GameCommandListWidget.cpp:524",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:192",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:195",
+        "Source/Abrams/Private/GameWidgetRichTextBlock.cpp:46",
+        "Source/Abrams/Private/GameWidgetRichTextBlock.cpp:55"
       ],
       "status": "verified"
     },
     "Text": {
       "simple": "The localized command-list name or description body.",
-      "technical": "FString row text (+0x10), resolved by GetText/GetGameText and run through FormatText (<GLO=...> from the glossary map, <DYN=...> from request parameters, modifiers). Description rows have an application-level mini-language in addition: UGameCommandListActionWidget splits them on the literal '<SplitCommand>', then on '【'/'[' or ':'/line breaks to build explanation frames; '<img id=\"...\"/>' markup is parsed by the rich-text widget. Name rows are short labels without that split. Empty ids disable the corresponding UI entry; an existing row with an empty string renders empty. The En export contains 628 rows (one empty) with 51 GLO tags; no DYN tags in this group.",
+      "technical": "FString Text (+0x10) returned by value; a missing row returns an empty FString. GetGameText/GetText run FormatText over <TYPE=KEY>[MODS] tags: GLO keys resolve against GlossaryParameters (rebuilt from GlossaryTextDataTable_<Language> rows keyed by row name), DYN keys against request parameters, unmatched tags remain unchanged, and recognized modifiers change number/format conversion. The En export has 51 GLO tag occurrences (27 distinct keys) and no DYN tags; no shard contains DYN tags, and every GLO key has a matching glossary row in its language. Action-widget descriptions are additionally parsed before display: split on the literal '<SplitCommand>' with empty pieces culled, then '【'/'[' opener and '】'/']' closer, ':' labels, line breaks, and ASCII/full-width 1/2/3 level digits build up to two message frames and two rows per level; exact ids CMD_COMMAND_DESCRIPTION_CP_170_4000, CMD_COMMAND_DESCRIPTION_CP_080_3000, and CMD_COMMAND_DESCRIPTION_CP_210_3000 have special branches. '<img id=\"...\"/>' survives FormatText and is rendered by the rich-text inline decorator using a custom image-row brush; the description parser also has a special img-id line branch except for CP_170_4000. Name rows are not passed through this description parser. An existing row can hold empty text: all shards leave CMD_COMMAND_NAME_CP_210_7000 empty, and it is referenced only by CP_210's Id_CommandListText_TagComboAttack_Name, for which no C++ consumer was found.",
       "evidence": [
         "Source/Abrams/Public/GameDataTableRow_GameText.h:15",
         "Source/Abrams/Private/GameTextManager.cpp:667",
         "Source/Abrams/Private/GameTextManager.cpp:681",
         "Source/Abrams/Private/GameTextManager.cpp:683",
+        "Source/Abrams/Private/GameTextManager.cpp:575",
         "Source/Abrams/Private/GameTextManager.cpp:742",
+        "Source/Abrams/Private/GameTextManager.cpp:786",
+        "Source/Abrams/Private/GameTextManager.cpp:803",
         "Source/Abrams/Private/GameCommandListActionWidget.cpp:195",
         "Source/Abrams/Private/GameCommandListActionWidget.cpp:197",
         "Source/Abrams/Private/GameCommandListActionWidget.cpp:198",
-        "Source/Abrams/Private/GameCommandListActionWidget.cpp:236",
-        "Source/Abrams/Private/GameWidgetRichTextBlock.cpp:59"
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:244",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:333",
+        "Source/Abrams/Private/GameCommandListActionWidget.cpp:349",
+        "Source/Abrams/Private/GameWidgetRichTextBlock.cpp:59",
+        "Source/Abrams/Private/GameWidgetRichTextBlockInlineImage.cpp:73",
+        "Source/Abrams/Private/GameWidgetRichTextBlockInlineImage.cpp:89"
       ],
       "status": "verified"
     }
   },
   "notes": [
-    "Same FGameDataTableRow_GameText struct and 11 identical language variants as other GameText tables (628 ids each in the companion export). Slot 4 of the 14-table search array; Config/DefaultGame.ini:35-45 assigns each language variant to a cooked chunk.",
-    "Cross-table join: CommandListDataTable supplies the ids, this table supplies the strings; glossary ids inside the text are resolved from GlossaryTextDataTable_<Language>, so a CMD row can embed a GLS_ term.",
-    "The '<SplitCommand>' token and full-width bracket parsing are consumer-side conventions specific to command descriptions; the data table itself stores them as ordinary characters in the FString. No prefix-specific table lookup is used, so colliding ids in earlier tables take precedence.",
-    "Reconstruction caveat: GetText/GetGameText/FormatText are byte-matched; FindTextRow/Tick are behaviour-certified (status/functions.json 0x14af290, 0x14c96f0; BG03). Only partial Content is available; no claims about retail Blueprint-only presentation code."
+    "All 11 shards export the same 628 row keys with zero row-key/ID mismatches and one empty Text value (CMD_COMMAND_NAME_CP_210_7000). All 628 distinct non-None ids referenced by CommandListDataTable resolve in these rows; no row is orphaned in the export.",
+    "Same FGameDataTableRow_GameText struct and 11 language variants; exported strings differ by locale. Config/DefaultGame.ini:35-45 assigns cooked chunks with a shared TextDataTable_<Language> filter that also catches this table, not with table-specific entries.",
+    "Cross-table join: CommandListDataTable supplies ids, this table supplies strings, and GLO keys resolve through the GlossaryParameters map rebuilt from GlossaryTextDataTable_<Language> (verified present for every key in every shard). DYN keys come from request parameters; no DYN tags occur in this group. SYS_ ids bypass TextDataTables and are looked up in SystemTextDataTable.",
+    "Lookup precedence and refresh: FindTextRow scans the 14-table array in order (Glossary, Battle, Item, CommandList fourth, then the rest) and returns the first matching row name, so an earlier duplicate wins; there is no CMD_ prefix routing. Tick rebuilds TextDataTables and GlossaryParameters after all loaders complete, then clears the loader map; rich-text blocks keep their TextId/parameters and StudioLocalization2 re-resolves them after OnCultureTextLoaded.",
+    "'<SplitCommand>', full-width/ASCII brackets, level digits, and '<img id>' markup are ordinary characters in the exported FString; only UGameCommandListActionWidget's description path interprets them. The widget arrays hold two generic message frames and two rows per level, so a third section or a third level row has no destination and is skipped. An empty non-None id is not a hide sentinel; action visibility is driven by the CommandList name id being NAME_None, while the one empty-text row is attached to TagComboAttack_Name with no C++ consumer traced.",
+    "Reconstruction caveat: status/functions.json marks GetText/GetGameText/FormatText byte-matched and FindTextRow/Tick behaviour-certified (0x14af290 NA15, 0x14c96f0 BG03); SetupContent and BuildContents are behaviour-certified reconstructions, not byte matches. No retail Blueprint widget layout or animation was inspected, so visual presentation beyond these traced C++ consumers and exported strings remains unverified."
   ],
   "usages": [
     {
       "source": "Source/Abrams/Private/GameCommandListWidget.cpp:399",
-      "detail": "Sets the character explanation text block to Id_CommandListText_CharacterDescription."
+      "detail": "Sets the character explanation rich-text block to Id_CommandListText_CharacterDescription with no explicit IsNone gate."
     },
     {
       "source": "Source/Abrams/Private/GameCommandListWidget.cpp:476",
-      "detail": "Bounds-checks the passive name/description id arrays and builds passive action parameters."
+      "detail": "Bounds-checks paired passive name/description arrays before indexing; later lines require both ids non-None, inject the name as SKILL_NAME into SYS_COMMANDLIST_LABEL_0002, and set the description directly."
     },
     {
       "source": "Source/Abrams/Private/GameCommandListWidget.cpp:519",
-      "detail": "Copies normal-attack name and description ids into FGameCommandListActionParameter and tests the name id for visibility."
+      "detail": "Copies attack name and description ids into FGameCommandListActionParameter; each attack slot's visibility is set from its name id being non-None."
     },
     {
-      "source": "Source/Abrams/Private/GameCommandListActionWidget.cpp:195",
-      "detail": "Fetches the description string with GetText and parses its <SplitCommand> sections into explanation frames."
+      "source": "Source/Abrams/Private/GameCommandListActionWidget.cpp:192",
+      "detail": "AttackName uses SetTextIdOnly; DescriptionTextId is fetched with GetText and then split/parsed into explanation frames."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCommandListActionWidget.cpp:244",
+      "detail": "Description parser handles img-id lines specially except for CMD_COMMAND_DESCRIPTION_CP_170_4000; later branches assign level labels/messages by ASCII or full-width digit."
     },
     {
       "source": "Source/Abrams/Private/GameTextManager.cpp:553",
-      "detail": "Loads CommandListTextDataTable_<Language> into the shared GameText table list."
+      "detail": "Loads CommandListTextDataTable_<Language> as the fourth of 14 GameText tables put into TextDataTables by Tick."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:590",
+      "detail": "FindTextRow returns the first table with a matching row name; GetGameText reads row Text at +0x10 and returns an empty string when no row is found."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetRichTextBlock.cpp:59",
+      "detail": "SetTextIdOnly builds a request resolved by GameTextManager::GetText; StudioLocalization2 re-resolves the stored id and parameters after a culture change."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetRichTextBlockInlineImage.cpp:73",
+      "detail": "Rich-text decorator accepts <img id=...> runs when the id resolves to a brush in the custom image set, rendering markup left intact by FormatText."
     }
   ]
 }
