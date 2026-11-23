@@ -1,6 +1,6 @@
-# Jujutsu Kaisen CC DataTables
+# Jujutsu Kaisen CC Modding Wiki
 
-A static Astro reference for the Jujutsu Kaisen Cursed Clash Unreal project. The site builds one page per table family and a browser-side search index from JSON.
+A static Astro reference for the Jujutsu Kaisen Cursed Clash Unreal project. The site builds DataTable, enum, and Data Blueprint pages from JSON and indexes them for browser-side search.
 
 Read the [modding wiki](https://jjkcursedclashmodding.github.io/modding-wiki/). GitHub Actions builds, verifies, and publishes the site on pushes to `main`.
 
@@ -40,6 +40,12 @@ Add or edit `content/research/<ExactGroupName>.json`. The name comes from `conte
 ```
 
 Use `verified` for behavior with a traced code consumer, `observed` for a schema, loader, or data observation, and `unresolved` for a field whose behavior still lacks evidence. The catalog supplies the Unreal type. Add a `type` to an annotation when the native type is known and absent from the catalog. Fields without annotations display their review status on the page.
+
+## Edit other reference pages and links
+
+- `content/enum-research/<ExactEnumName>.json` has an `overview`, a `values` map keyed by exact member name, and `notes`. Each member uses the same `simple`, `technical`, `status`, and `evidence` keys as a table setting. Declaration names, numbers, and types come from `content/enums.json` and `content/engine-enums.json`.
+- `content/table-links.json` maps source table names to fields. Each field holds an array of objects with a target `table`, source `evidence`, and an optional `note` for conditional lookups. The site builds the reverse links automatically.
+- `content/data-blueprints.json` describes Blueprint families, example asset paths, native settings, and related DataTables. Keep package observations and consumer-traced defaults distinct.
 
 ## Refresh the catalog
 

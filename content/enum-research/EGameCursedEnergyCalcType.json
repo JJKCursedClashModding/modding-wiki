@@ -1,0 +1,56 @@
+{
+  "overview": "This enum controls how an attack handles Cursed Energy cost and gain.",
+  "values": {
+    "None": {
+      "simple": "The attack uses Cursed Energy normally.",
+      "technical": "StateCondition_IsCursedEnergyNotCheckOnly returns true, so ShouldCalculateCursedEnergy adds Owner.Get()->GetPassiveAttackRate() multiplied by AttackRow->CursedEnergy_Add to the current gauge. StateCondition_IsCursedEnergyNotForce returns true, so cancellation checks reject a cost that would take Cursed Energy below 0.0. This is the row constructor default and 1406 exported AttackDataTable rows use None.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameCursedEnergyCalcType.h:7",
+        "Source/AbramsDataTable/Private/GameDataTableRow_Attack.cpp:10",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:1302",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:1320",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:248"
+      ]
+    },
+    "CheckOnly": {
+      "simple": "The attack checks the Cursed Energy amount without spending it.",
+      "technical": "StateCondition_IsCursedEnergyNotCheckOnly returns false, so ShouldCalculateCursedEnergy skips the CursedEnergy_Add change at attack start. StateCondition_IsCursedEnergyNotForce returns true, so cancellation checks still compare the scaled cost with the current gauge. CP_240 stores CursedEnergy_Add as PendingCursedEnergyRefund when it summons a shikigami group for a CheckOnly attack. 65 exported AttackDataTable rows use CheckOnly.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameCursedEnergyCalcType.h:8",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:1304",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:1321",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:825",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1309"
+      ]
+    },
+    "Force": {
+      "simple": "The attack goes ahead even when Cursed Energy is too low.",
+      "technical": "StateCondition_IsCursedEnergyNotForce returns false, so Cursed Energy Attack cancellation skips the cost floor and CP_160 order logic skips its zero-energy guard. StateCondition_IsCursedEnergyNotCheckOnly returns true, so the normal CursedEnergy_Add calculation still runs. 47 exported AttackDataTable rows use Force.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameCursedEnergyCalcType.h:9",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:1306",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:1323",
+        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:112",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:1543"
+      ]
+    },
+    "Invalid": {
+      "simple": "A reserved out-of-range Cursed Energy calculation value.",
+      "technical": "Both state conditions reach their default arm and return true for Invalid, which gives the same paths as None. No exported AttackDataTable row stores Invalid, and the header declares no enumerator between Force and Invalid.",
+      "status": "observed",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameCursedEnergyCalcType.h:10",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:1306",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:1325"
+      ]
+    }
+  },
+  "notes": [
+    "Both state conditions accept a null attack row and return true.",
+    "The value read by the conditions is AttackRow->CursedEnergyCalcType at row offset 0x58.",
+    "CursedEnergy_Add is multiplied by GetPassiveAttackRate before it is applied or compared."
+  ]
+}

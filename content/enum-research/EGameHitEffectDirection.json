@@ -1,0 +1,84 @@
+{
+  "overview": "This uint8 enum selects which vector sets the rotation of a hit effect when the game spawns it.",
+  "values": {
+    "None": {
+      "simple": "The hit effect keeps its default orientation.",
+      "technical": "FGameDataTableRow_Damage's constructor sets HitEffectDirection to None. BuildHitEffectSpawnParams copies that row value into FGameEffectSpawnParams.Direction. AGameEffectManager::SpawnEffect has no None case, so it leaves the rotation at identity and applies only RotationOffset. Tag-combo effects overwrite Direction with None at their call site.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameHitEffectDirection.h:7",
+        "Source/AbramsDataTable/Private/GameDataTableRow_Damage.cpp:61",
+        "Source/Abrams/Private/GameBattleManager.cpp:2581",
+        "Source/Abrams/Private/GameEffectManager.cpp:286",
+        "Source/Abrams/Private/GameEffectManager.cpp:318",
+        "Source/Abrams/Private/GameBattleDamage.cpp:724"
+      ]
+    },
+    "HitNormal": {
+      "simple": "The hit effect points away from the surface it struck.",
+      "technical": "SpawnEffect faces the effect along -Params.HitNormal using FRotationMatrix::MakeFromX(-Params.HitNormal - FVector::ZeroVector). BuildHitEffectSpawnParams fills HitNormal from Request.Offset, and destructible hit callbacks fill it from Hit.ImpactNormal. No exported damage row uses HitNormal.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameHitEffectDirection.h:8",
+        "Source/Abrams/Private/GameEffectManager.cpp:291",
+        "Source/Abrams/Private/GameEffectManager.cpp:293",
+        "Source/Abrams/Private/GameBattleManager.cpp:2578",
+        "Source/Abrams/Private/GameDestructibleDecal.cpp:106",
+        "Source/Abrams/Private/GameDestructibleObject.cpp:380"
+      ]
+    },
+    "MovementDirection": {
+      "simple": "The hit effect points along the movement toward the contact.",
+      "technical": "When Params.HitComponent is valid, SpawnEffect faces the effect from Params.Origin toward the component location. A zero difference falls back to FVector::ForwardVector, and the result is normalized before FRotationMatrix::MakeFromX. BuildHitEffectSpawnParams sets Origin from CollisionParameter.Location118 or from a zero vector.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameHitEffectDirection.h:9",
+        "Source/Abrams/Private/GameEffectManager.cpp:297",
+        "Source/Abrams/Private/GameEffectManager.cpp:300",
+        "Source/Abrams/Private/GameEffectManager.cpp:301",
+        "Source/Abrams/Private/GameBattleManager.cpp:2579"
+      ]
+    },
+    "AttackerDirection": {
+      "simple": "The hit effect points where the attacker is facing.",
+      "technical": "SpawnEffect faces the effect along Params.Owner.Get()->GetActorForwardVector(). BuildHitEffectSpawnParams sets Owner from Request.Attacker->GetGameActor(), and destructible hit callbacks set it to the character that owns the struck component.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameHitEffectDirection.h:10",
+        "Source/Abrams/Private/GameEffectManager.cpp:306",
+        "Source/Abrams/Private/GameEffectManager.cpp:308",
+        "Source/Abrams/Private/GameBattleManager.cpp:2548",
+        "Source/Abrams/Private/GameDestructibleDecal.cpp:102"
+      ]
+    },
+    "ActorDirection": {
+      "simple": "The hit effect points where the instigator actor is facing.",
+      "technical": "SpawnEffect faces the effect along Params.Instigator.Get()->GetActorForwardVector(). BuildHitEffectSpawnParams copies Request.Instigator into that slot, and destructible hit callbacks use Component->GetOwner().",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameHitEffectDirection.h:11",
+        "Source/Abrams/Private/GameEffectManager.cpp:312",
+        "Source/Abrams/Private/GameEffectManager.cpp:314",
+        "Source/Abrams/Private/GameBattleManager.cpp:2549",
+        "Source/Abrams/Private/GameDestructibleObject.cpp:377"
+      ]
+    },
+    "Invalid": {
+      "simple": "An out-of-range marker that leaves the hit effect at its default orientation.",
+      "technical": "FGameEffectSpawnParams.Direction defaults to Invalid. SpawnEffect has no Invalid case, so the switch default leaves the rotation at identity and applies only RotationOffset. The same default handles any unrecognized uint8 value, and no exported damage row uses Invalid.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameHitEffectDirection.h:12",
+        "Source/Abrams/Public/GameEffectManager.h:28",
+        "Source/Abrams/Private/GameEffectManager.cpp:318",
+        "Source/Abrams/Private/GameEffectManager.cpp:321"
+      ]
+    }
+  },
+  "notes": [
+    "Direction controls rotation only. HitEffectLocationType chooses the spawn position, and HitEffectRotation adds a fixed rotation after the chosen direction.",
+    "The exported damage shards use AttackerDirection on most rows, with small numbers of ActorDirection, MovementDirection and None rows. HitNormal and Invalid do not appear in the exports.",
+    "MovementDirection needs a valid HitComponent. Without one, SpawnEffect leaves the direction rotation at identity.",
+    "None is a real exported value for non-damaging rows and is also forced on tag-combo effects. Invalid is only a struct default and a catch-all."
+  ]
+}

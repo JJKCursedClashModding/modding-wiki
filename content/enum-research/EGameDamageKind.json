@@ -1,0 +1,82 @@
+{
+  "overview": "Classifies a damage row by the way its hit reaches the target.",
+  "values": {
+    "None": {
+      "simple": "No damage kind is assigned.",
+      "technical": "Constructor default for FGameDataTableRow_Damage::DamageKind. The field is read at offset 0x8C by action callbacks that compare it with Projectile, but no exported damage row uses this value.",
+      "status": "observed",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameDamageKind.h:7",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Damage.h:147",
+        "Source/AbramsDataTable/Private/GameDataTableRow_Damage.cpp:44",
+        "Source/AbramsDataTable/Private/GameDataTableRow_Damage.cpp:81",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:92"
+      ]
+    },
+    "Melee": {
+      "simple": "A close strike from the attacker.",
+      "technical": "Declared as the ordinary close-strike kind. No source expression names EGameDamageKind::Melee directly. Exported damage rows use it for most attacks, and it follows the non-Projectile path in the traced callbacks.",
+      "status": "observed",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameDamageKind.h:8",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Damage.h:147",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:92",
+        "Source/Abrams/Private/GameBattleDamage.cpp:538",
+        "Source/Abrams/Private/GameCharacterAction_Damage.cpp:259"
+      ]
+    },
+    "Projectile": {
+      "simple": "A hit carried by a launched effect.",
+      "technical": "Explicitly detected by many attack callbacks. Projectile hits skip target lock and Z auto-homing in OnAttackHit and OnAttackGuarded, skip the attacker custom Just Guard hit slow, pass 2 to ActionUnknownSlot89 on guarded hits, and use a different damage-direction calculation. Character-specific callbacks for CP_020, CP_130, CP_150, CP_180, and CN_250 return early or gate their ordinary-hit bookkeeping on this value.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameDamageKind.h:9",
+        "Source/AbramsDataTable/Private/GameDataTableRow_Damage.cpp:73",
+        "Source/AbramsDataTable/Private/GameDataTableRow_Damage.cpp:74",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:92",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:107",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:116",
+        "Source/Abrams/Private/GameBattleDamage.cpp:538",
+        "Source/Abrams/Private/GameBattleDamage.cpp:601",
+        "Source/Abrams/Private/GameCharacterAction_Damage.cpp:259",
+        "Source/Abrams/Private/CP_020_ActionController.cpp:46",
+        "Source/Abrams/Private/CP_130_ActionController.cpp:159",
+        "Source/Abrams/Private/CP_150_ActionController.cpp:256",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:1146",
+        "Source/Abrams/Private/CN_250_ActionController.cpp:149"
+      ]
+    },
+    "Throwing": {
+      "simple": "A throw that grabs the target.",
+      "technical": "IsThrowable requires this value together with a valid target that is not defeated and passes ActionUnknownSlot175, super armor, hyper armor, and status checks. On success ApplyCharacterDamage calls OnDamageReceived with zero damage, queues the attacker and receiver in System310, processes a throw reaction, and returns. IsHitBlockedBySuperArmor also returns false for this kind.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameDamageKind.h:10",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Damage.h:147",
+        "Source/Abrams/Private/GameBattleDamage.cpp:467",
+        "Source/Abrams/Private/GameBattleDamage.cpp:469",
+        "Source/Abrams/Private/GameBattleDamage.cpp:473",
+        "Source/Abrams/Private/GameBattleDamage.cpp:475",
+        "Source/Abrams/Private/GameBattleDamage.cpp:483",
+        "Source/Abrams/Private/GameBattleDamage.cpp:485",
+        "Source/Abrams/Private/GameCharacter.cpp:3197"
+      ]
+    },
+    "Invalid": {
+      "simple": "Reserved invalid damage kind.",
+      "technical": "Declared as the uint8 sentinel value 255. No exported row and no explicit consumer were found. Generic comparisons would place it on the non-Projectile path, so no dedicated behavior is traced.",
+      "status": "unresolved",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameDamageKind.h:11",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Damage.h:147",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:92",
+        "Source/Abrams/Private/GameBattleDamage.cpp:538"
+      ]
+    }
+  },
+  "notes": [
+    "FGameDataTableRow_Damage stores the enum as uint8 at offset 0x8C. The traced code uses it as a category selector and does not use it as an array index.",
+    "The supplied damage exports contain 1103 Melee rows, 96 Projectile rows, and 2 Throwing rows. None and Invalid are absent.",
+    "The two Throwing rows are CN_030_ATTACKA_01_01 and CN_030_ATTACKB_01_01."
+  ]
+}

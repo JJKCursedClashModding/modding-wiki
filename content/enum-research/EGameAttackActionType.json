@@ -1,0 +1,76 @@
+{
+  "overview": "This enum classifies an attack row so AI logic can recognize strikes, charges, unblockable attacks, and wide attacks.",
+  "values": {
+    "None": {
+      "simple": "No attack classification is active.",
+      "technical": "The attack row constructor uses None, and FGameCharacterAction_AttackBase::GetAttackActionType returns it when AttackRow is null. UGameCharacterActionController::GetAttackLayerAttackType also returns 0 when the Attack-layer action is absent or is AttackDefault. AI condition 0x40 treats a nonzero code as evidence that the subject is attacking.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameAttackActionType.h:7",
+        "Source/AbramsDataTable/Private/GameDataTableRow_Attack.cpp:20",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:666",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:1698",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:775"
+      ]
+    },
+    "Attack": {
+      "simple": "The move is a normal attack.",
+      "technical": "The attack row supplies this code through GetAttackActionType and GetAttackLayerAttackType. AI conditions 0x03 and 0x41 group it with UnblockableAttack and AroundAttack, and AI value condition case 0 returns target distance only for that group. CP_220's cursed-energy attack also forces this code during the first start's release phase.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameAttackActionType.h:8",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:1705",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:350",
+        "Source/Abrams/Private/GameCharacterAIValueCondition.cpp:37",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:1107"
+      ]
+    },
+    "Charge": {
+      "simple": "The move is a charge attack.",
+      "technical": "The attack row supplies this code through GetAttackActionType and GetAttackLayerAttackType. AI condition case 0x04 checks this code alone and is false for the other classifications. Charge is excluded from the 1, 3, and 4 groups used by attack-detection and distance conditions.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameAttackActionType.h:9",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:1705",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:361"
+      ]
+    },
+    "UnblockableAttack": {
+      "simple": "The move is an attack that cannot be blocked.",
+      "technical": "The attack row supplies this code through GetAttackActionType and GetAttackLayerAttackType. It joins Attack and AroundAttack in AI conditions 0x03, 0x41, and value case 0. Condition 0x05 checks it alone, and the AI brain gives a rival with this code priority when choosing a target.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameAttackActionType.h:10",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:1705",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:365",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:674"
+      ]
+    },
+    "AroundAttack": {
+      "simple": "The move is a wide attack that affects surrounding space.",
+      "technical": "The attack row supplies this code through GetAttackActionType and GetAttackLayerAttackType. It joins Attack and UnblockableAttack in AI conditions 0x03, 0x41, and value case 0. The AI brain skips its 30 degree facing requirement when the rival's code is this value.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameAttackActionType.h:11",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:1705",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:352",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:659"
+      ]
+    },
+    "Invalid": {
+      "simple": "An invalid attack classification is declared.",
+      "technical": "Declared as the 255 sentinel. No traced consumer compares this code with 255, so it is not part of the 1, 2, 3, or 4 tests used by the observed AI conditions.",
+      "status": "observed",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameAttackActionType.h:12",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:350",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:362"
+      ]
+    }
+  },
+  "notes": [
+    "The action header marks the slot names as unproven. The getter and controller call sites are traced.",
+    "The AI avoidance code reads the attack-layer type and treats raw values 1, 3, and 4 as the cases that request an evasion response.",
+    "The read-only attack tables export None, Attack, Charge, UnblockableAttack, and AroundAttack. Invalid is not exported."
+  ]
+}

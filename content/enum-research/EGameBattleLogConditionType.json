@@ -1,0 +1,77 @@
+{
+  "overview": "This enum decides how a measured battle result is compared with a target value for mission tasks and story battle talks.",
+  "values": {
+    "None": {
+      "simple": "This leaves the comparison with no pass or fail result.",
+      "technical": "EGameBattleLogConditionType::None has no explicit case in the mission task tick or the battle talk credit switch. A mission task with an otherwise valid log value keeps State at zero and stays pending, and a battle talk slot adds no credit toward its condition count.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameBattleLogConditionType.h:7",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:673",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:710",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:283",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:297"
+      ]
+    },
+    "Success_GreaterThanEquals": {
+      "simple": "This completes the goal once the measured result reaches the target.",
+      "technical": "In mission tasks the consumer stores Value[i] as Progress.Target and Value from EvaluateLog as Progress.Current. It sets State to 1 when Current >= Target and clamps Current to Target. In battle talks the same comparison increments Held, and the set is queued when Held covers every non-None ValueType slot.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameBattleLogConditionType.h:8",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:675",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:678",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:285"
+      ]
+    },
+    "Success_LessThanEquals": {
+      "simple": "This completes the goal while the measured result stays at or below the target.",
+      "technical": "In mission tasks the consumer stores Value[i] as Progress.Target and Value from EvaluateLog as Progress.Current. It sets State to 1 when Current <= Target and clamps Current to Target. In battle talks the same comparison increments Held toward the required condition count.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameBattleLogConditionType.h:9",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:684",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:687",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:291"
+      ]
+    },
+    "Failure_GreaterThanEquals": {
+      "simple": "This fails the goal once the measured result reaches or exceeds the target.",
+      "technical": "In mission tasks the consumer computes Progress.Current as max(ceil(Target - Value), 0) and sets State to -1 when that value reaches zero. A pending task with this condition is converted to success by OnEvent13 when BattleResult is Win_TeamA.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameBattleLogConditionType.h:10",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:693",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:695",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:745"
+      ]
+    },
+    "Failure_LessThanEquals": {
+      "simple": "This fails the goal once the measured result rises above the target.",
+      "technical": "In mission tasks the consumer computes Progress.Current as max(Value - Target, 0) and sets State to -1 when that value is zero. A pending task with this condition is converted to success by OnEvent13 when BattleResult is Win_TeamA.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameBattleLogConditionType.h:11",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:701",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:703",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:746"
+      ]
+    },
+    "Invalid": {
+      "simple": "This is an undefined battle condition.",
+      "technical": "EGameBattleLogConditionType::Invalid has no explicit case in either consumer, so it reaches the same default branch as None. No exported BattleTalkSet or MissionTask slot uses this value, so no authored behavior can be claimed for it.",
+      "status": "observed",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameBattleLogConditionType.h:12",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:710",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:297"
+      ]
+    }
+  },
+  "notes": [
+    "ConditionType is a TArray read at the same index as ValueType, TargetType, PassiveType, and Value in both BattleTalkSet and MissionTask rows.",
+    "Battle talk sets count one condition for each ValueType slot that is not None. A comparison that reaches the default branch leaves that slot uncredited and prevents the set from being queued.",
+    "Mission tasks evaluate only after EvaluateLog succeeds. Success conditions set State to 1, failure conditions set State to -1, and default handling leaves State at zero.",
+    "Thresholds come from Value[i] and use the units of the selected EGameBattleLogValueType. The enum itself carries no unit."
+  ]
+}

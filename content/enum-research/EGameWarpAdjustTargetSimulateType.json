@@ -1,0 +1,72 @@
+{
+  "overview": "This enum controls how a warp landing point reacts to a recently hit target's movement.",
+  "values": {
+    "None": {
+      "simple": "The warp ignores knockback prediction.",
+      "technical": "GameWarp_ComputeWarpLocation opens the simulation block only when SimulateType is not None and the other gates pass. With None, Heading stays WarpDirection and no blow prediction runs. HomingDashAir passes None directly, and five exported ActionHoming rows use None.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameWarpAdjustTargetSimulateType.h:7",
+        "Source/Abrams/Private/GameWarpLocation.cpp:260",
+        "Source/Abrams/Private/GameWarpLocation.cpp:265",
+        "Source/Abrams/Private/GameWarpLocation.cpp:267",
+        "Source/Abrams/Private/GameCharacterAction_Dash.cpp:710"
+      ]
+    },
+    "DeviationOnlySimulate": {
+      "simple": "The warp follows target drift while keeping its original approach angle.",
+      "technical": "When the simulation gates pass and the target is blow-like with nonzero MoveDelta3D0, the function reverses Heading against the last move, sets reach to target capsule radius plus twice the movement magnitude, and sweeps vertically by half VerticalSpeed to predict where the target settles. It then restores Heading to WarpDirection and checks walls. The separate BlowSimulate sweep requires BlowSimulate. Thirteen exported ActionHoming rows use this type.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameWarpAdjustTargetSimulateType.h:8",
+        "Source/Abrams/Private/GameWarpLocation.cpp:269",
+        "Source/Abrams/Private/GameWarpLocation.cpp:274",
+        "Source/Abrams/Private/GameWarpLocation.cpp:277",
+        "Source/Abrams/Private/GameWarpLocation.cpp:280",
+        "Source/Abrams/Private/GameWarpLocation.cpp:288",
+        "Source/Abrams/Private/GameWarpLocation.cpp:291",
+        "Source/Abrams/Private/GameWarpLocation.cpp:311",
+        "Source/Abrams/Private/GameWarpLocation.cpp:315",
+        "Source/Abrams/Private/GameWarpLocation.cpp:366"
+      ]
+    },
+    "BlowSimulate": {
+      "simple": "The warp approaches the target against its knockback path.",
+      "technical": "When the simulation gates pass and the target is blow-like with nonzero MoveDelta3D0, Heading becomes the negative normalized MoveDelta3D0, target position is refreshed, and reach becomes target capsule radius plus twice the movement magnitude. The BlowSimulate block sweeps back along Heading. A wall angle above 75 degrees slides Heading along the wall, while shorter hits push out using WallBoundSpeedRate and WallBoundSlowRate or stand off by the target radius and owner radius before grounding the candidate. Two hundred fifty exported ActionHoming rows use this type.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameWarpAdjustTargetSimulateType.h:9",
+        "Source/Abrams/Private/GameWarpLocation.cpp:269",
+        "Source/Abrams/Private/GameWarpLocation.cpp:274",
+        "Source/Abrams/Private/GameWarpLocation.cpp:277",
+        "Source/Abrams/Private/GameWarpLocation.cpp:366",
+        "Source/Abrams/Private/GameWarpLocation.cpp:372",
+        "Source/Abrams/Private/GameWarpLocation.cpp:380",
+        "Source/Abrams/Private/GameWarpLocation.cpp:386",
+        "Source/Abrams/Private/GameWarpLocation.cpp:394",
+        "Source/Abrams/Private/GameWarpLocation.cpp:421",
+        "Source/Abrams/Private/GameWarpLocation.cpp:444"
+      ]
+    },
+    "Invalid": {
+      "simple": "This value is a reserved invalid marker.",
+      "technical": "Declared as the uint8 slot 255 in the enum header. The gate excludes only None, so Invalid can pass when the target is valid, the damage-action slot is clear, there are no collision locks, and the owner is the last attacker. A blow-like target with nonzero movement can then reverse Heading and set reach to target radius plus twice the movement magnitude. Invalid matches neither the DeviationOnly vertical sweep nor the BlowSimulate wall handling. No exported ActionHoming row uses Invalid.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameWarpAdjustTargetSimulateType.h:10",
+        "Source/Abrams/Private/GameWarpLocation.cpp:260",
+        "Source/Abrams/Private/GameWarpLocation.cpp:269",
+        "Source/Abrams/Private/GameWarpLocation.cpp:274",
+        "Source/Abrams/Private/GameWarpLocation.cpp:277",
+        "Source/Abrams/Private/GameWarpLocation.cpp:280",
+        "Source/Abrams/Private/GameWarpLocation.cpp:366"
+      ]
+    }
+  },
+  "notes": [
+    "Simulation requires SimulateType other than None, a valid secondary target, IsDamageActionUnknownSlot80Clear, no collision locks, and GetLastAttacker equal to the owner interface.",
+    "The far or absent target branch sweeps toward the target using WarpDistance and does not branch on SimulateType.",
+    "The near target branch starts with reach equal to target capsule radius plus WarpTargetDistance. A blow-like target with nonzero MoveDelta3D0 can replace that reach with target capsule radius plus twice the movement magnitude.",
+    "Direct callers pass DeviationOnlySimulate from CN_020, CP_050, CP_200, and dash actions. HomingDashAir passes None. The exported ActionHoming tables contain 250 BlowSimulate rows, 13 DeviationOnlySimulate rows, and 5 None rows."
+  ]
+}

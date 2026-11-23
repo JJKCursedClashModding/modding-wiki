@@ -1,7 +1,8 @@
 ---
 import Reference from '../../layouts/Reference.astro';
 import InlineText from '../../layouts/InlineText.astro';
-import { categoryNames, fieldAnchor, fieldParentName, groups, slugFor } from '../../data.js';
+import CrossReferences from '../../layouts/CrossReferences.astro';
+import { categoryNames, enumHref, fieldAnchor, fieldParentName, groups, hrefFor, referencedBy, slugFor } from '../../data.js';
 
 export function getStaticPaths() {
   return groups.map((group) => ({ params: { slug: slugFor(group.id) }, props: { group } }));
@@ -17,6 +18,7 @@ const statuses = {
 };
 const formatCount = (value) => value.toLocaleString('en-US');
 const refs = Object.entries(group.references);
+const incoming = referencedBy.get(group.id);
 const fieldGroups = new Map(group.fields.map((field) => [field.name.toLowerCase(), { field, components: [] }]));
 for (const field of group.fields) {
   const parent = field.componentOf && fieldGroups.get(fieldParentName(field.name));
@@ -32,10 +34,10 @@ const fieldColumns = [
 ];
 const componentCount = group.fields.length - fieldGroups.size;
 ---
-<Reference title={group.id} description={group.overview ?? group.description ?? `Unreal schema for ${group.id}.`} current={group.id}>
+<Reference title={group.id} description={group.overview ?? group.description ?? `Unreal schema for ${group.id}.`} current={group.id} section="tables">
   <div class="doc-grid">
     <article class="doc">
-      <div class="breadcrumb"><a href={base}>Overview</a><span aria-hidden="true">/</span><a href={`${base}#${group.category}`}>{categoryNames[group.category]}</a></div>
+      <div class="breadcrumb"><a href={`${base}tables/`}>DataTables</a><span aria-hidden="true">/</span><a href={`${base}tables/#${group.category}`}>{categoryNames[group.category]}</a></div>
       <h1 class="table-title">{group.id}</h1>
       <p class="lead"><InlineText value={group.overview ?? group.description ?? 'Purpose is pending review.'} /></p>
       <details class="table-details">
@@ -74,6 +76,9 @@ const componentCount = group.fields.length - fieldGroups.size;
               {[parent, ...components].map((field) => {
                 const child = field !== parent;
                 const label = child ? field.name.split('.').at(-1) : field.name;
+                const type = field.type || 'Unknown';
+                const enumOffset = field.enumId ? type.indexOf(field.enumId) : -1;
+                const evidence = [...new Set([field.source, ...(field.evidence ?? []), ...field.links.flatMap((link) => link.evidence)].filter(Boolean))];
                 return (
                   <tr class:list={['field', { 'field-component': child }]} id={fieldAnchor(field.name)} role="row" data-field-name={field.name}>
                     <th scope="row" role="rowheader" class="field-heading">
@@ -86,9 +91,12 @@ const componentCount = group.fields.length - fieldGroups.size;
                         </button>
                       )}
                     </th>
-                    <td class="field-type" role="cell"><code>{field.type || 'Unknown'}</code></td>
+                    <td class="field-type" role="cell"><code>{enumOffset < 0 ? type : <>{type.slice(0, enumOffset)}<a href={enumHref(field.enumId)}>{field.enumId}</a>{type.slice(enumOffset + field.enumId.length)}</>}</code></td>
                     <td class="field-body" role="cell">
                       <p class="simple"><InlineText value={field.simple ?? 'Definition pending review.'} /></p>
+                      {!!field.links.length && <ul class="outgoing-links" aria-label="Related DataTables">{field.links.map(({ table, note }) => (
+                        <li><a href={hrefFor(table)}><code>{table}</code></a>{note && <> <span>· <InlineText value={note} /></span></>}</li>
+                      ))}</ul>}
                       <details class="field-details">
                         <summary>Technical details</summary>
                         <div class="field-metadata">
@@ -101,17 +109,10 @@ const componentCount = group.fields.length - fieldGroups.size;
                           )}
                         </div>
                         {field.technical && <p class="technical"><InlineText value={field.technical} /></p>}
-                        {field.enum && (
-                          <details class="field-evidence">
-                            <summary>Enum values{field.enum.underlying ? ` · ${field.enum.underlying}` : ''}</summary>
-                            <ul class="enum-values">{field.enum.values.map(([name, value]) => <li><code>{name}</code> <span>{value}</span></li>)}</ul>
-                            <p><code>{field.enum.source}</code></p>
-                          </details>
-                        )}
-                        {(field.source || field.evidence?.length) && (
+                        {!!evidence.length && (
                           <details class="field-evidence">
                             <summary>Evidence</summary>
-                            <ul>{[...new Set([field.source, ...(field.evidence ?? [])].filter(Boolean))].map((ref) => <li><code>{ref}</code></li>)}</ul>
+                            <ul>{evidence.map((ref) => <li><code>{ref}</code></li>)}</ul>
                           </details>
                         )}
                       </details>
@@ -160,6 +161,12 @@ const componentCount = group.fields.length - fieldGroups.size;
         )}
       </section>
 
+      {!!incoming.length && (
+        <section id="referenced-by" class="doc-section">
+          <h2>Referenced by</h2>
+          <CrossReferences entries={incoming} />
+        </section>
+      )}
       <section id="notes" class="doc-section">
         <h2>Notes</h2>
         {group.notes.length ? <ul class="notes">{group.notes.map((note) => <li><InlineText value={note} /></li>)}</ul> : <p class="section-intro">Additional findings are pending review.</p>}
@@ -170,6 +177,7 @@ const componentCount = group.fields.length - fieldGroups.size;
       <a href="#fields">Settings</a>
       <a href="#variants">Assets & row keys</a>
       <a href="#usage">Code usage</a>
+      {!!incoming.length && <a href="#referenced-by">Referenced by</a>}
       <a href="#notes">Notes</a>
     </nav>
   </div>

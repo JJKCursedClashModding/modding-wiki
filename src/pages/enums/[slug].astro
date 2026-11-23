@@ -1,0 +1,103 @@
+---
+import Reference from '../../layouts/Reference.astro';
+import InlineText from '../../layouts/InlineText.astro';
+import CrossReferences from '../../layouts/CrossReferences.astro';
+import { enums, slugFor, valueAnchor } from '../../data.js';
+
+export function getStaticPaths() {
+  return enums.map((entry) => ({ params: { slug: slugFor(entry.id) }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const statuses = { verified: 'Consumer traced', observed: 'Observed', unresolved: 'Unresolved' };
+---
+<Reference title={entry.id} description={entry.overview} current={entry.id} section="enums">
+  <div class="doc-grid">
+    <article class="doc">
+      <div class="breadcrumb"><a href={base}>Overview</a><span aria-hidden="true">/</span><a href={`${base}enums/`}>Enums</a></div>
+      <h1 class="table-title">{entry.id}</h1>
+      <p class="lead"><InlineText value={entry.overview} /></p>
+      <details class="table-details">
+        <summary>Declaration</summary>
+        {entry.underlying && <p class="technical">Underlying type <code>{entry.underlying}</code></p>}
+        <p class="technical"><code>{entry.source}</code></p>
+      </details>
+      <section class="doc-section" id="values">
+        <h2 id="values-heading">Values</h2>
+        {entry.values.length > 12 && (
+          <div class="field-tools" id="value-tools" hidden>
+            <input class="filter" type="search" id="value-filter" aria-label="Filter enum values" placeholder="Filter values by name, number, or description" autocomplete="off" />
+            <p class="field-count" id="value-count" role="status">{entry.values.length} values</p>
+          </div>
+        )}
+        <table class="value-table reference-index" aria-labelledby="values-heading">
+          <thead><tr><th scope="col">Name</th><th scope="col">Number</th><th scope="col">Description</th></tr></thead>
+          <tbody>
+            {entry.values.map(({ name, value, simple, technical, status, evidence, notes }) => (
+              <tr class="field" id={valueAnchor(name)}>
+                <th scope="row" class="field-heading"><a href={`#${valueAnchor(name)}`}><code>{name}</code></a></th>
+                <td class="value-number"><code>{value}</code></td>
+                <td>
+                  <p class="simple"><InlineText value={simple ?? 'Explanation pending review.'} /></p>
+                  {technical && (
+                    <details class="field-details">
+                      <summary>Technical details</summary>
+                      <div class="field-metadata"><span class:list={['badge', status]}>{statuses[status]}</span></div>
+                      <p class="technical"><InlineText value={technical} /></p>
+                      {!!notes?.length && <ul class="notes">{notes.map((note) => <li><InlineText value={note} /></li>)}</ul>}
+                      {!!evidence?.length && (
+                        <details class="field-evidence">
+                          <summary>Evidence</summary>
+                          <ul>{evidence.map((ref) => <li><code>{ref}</code></li>)}</ul>
+                        </details>
+                      )}
+                    </details>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+      {!!entry.usedBy.length && (
+        <section class="doc-section" id="used-by">
+          <h2>Used by</h2>
+          <CrossReferences entries={entry.usedBy} />
+        </section>
+      )}
+      {!!entry.notes.length && (
+        <section class="doc-section" id="notes">
+          <h2>Notes</h2>
+          <ul class="notes">{entry.notes.map((note) => <li><InlineText value={note} /></li>)}</ul>
+        </section>
+      )}
+    </article>
+    <nav class="toc" aria-label="On this page">
+      <strong>On this page</strong>
+      <a href="#values">Values</a>
+      {!!entry.usedBy.length && <a href="#used-by">Used by</a>}
+      {!!entry.notes.length && <a href="#notes">Notes</a>}
+    </nav>
+  </div>
+  <script>
+    const tools = document.querySelector('#value-tools');
+    const input = document.querySelector('#value-filter');
+    const count = document.querySelector('#value-count');
+    if (tools instanceof HTMLElement && input instanceof HTMLInputElement && count) {
+      const rows = [...document.querySelectorAll('#values tbody tr')].map((row) => [row,
+        [...row.querySelectorAll('.field-heading, .value-number, .simple')].map((cell) => cell.textContent).join(' ').toLowerCase(),
+      ]);
+      tools.hidden = false;
+      input.addEventListener('input', () => {
+        const query = input.value.trim().toLowerCase();
+        let shown = 0;
+        for (const [row, text] of rows) {
+          row.hidden = !text.includes(query);
+          shown += Number(!row.hidden);
+        }
+        count.textContent = shown === 0 ? 'No matching values' : `${shown} ${shown === 1 ? 'value' : 'values'}`;
+      });
+    }
+  </script>
+</Reference>

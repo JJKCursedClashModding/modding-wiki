@@ -1,0 +1,78 @@
+{
+  "overview": "This enum chooses how an effect or shikigami attack picks its launch direction.",
+  "values": {
+    "None": {
+      "simple": "An empty movement style that leaves the effect heading unchanged.",
+      "technical": "Declared as the zero value of the uint8 enum and used as the default of FGameDataTableRow_EffectMove::EffectMoveType. UGameEffectMovementController::Start has no case for this value, so the default branch leaves MoveDirection untouched and Start then normalizes it with GetSafeNormal. No exported EffectMoveDataTable row uses this type.",
+      "status": "observed",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameEffectMoveType.h:7",
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectMove.h:18",
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectMove.h:83",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:135",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:196",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:199"
+      ]
+    },
+    "Straight": {
+      "simple": "The effect flies in the direction it is facing.",
+      "technical": "Declared as uint8 slot 1. The Start case calls AimAlong with the effect forward vector, which faces the actor using FRotationMatrix::MakeFromX and sets MoveDirection to that rotation applied to the row MoveDirection vector. Start normalizes the result once. Speed_Start, Speed_End, and Speed_InterpolateTime drive the speed interpolator, and Update advances the location by MoveDirection times speed times DeltaSeconds. This is the most common exported type with 141 of 147 rows.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameEffectMoveType.h:8",
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectMove.h:18",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:137",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:113",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:199",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:216",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:262"
+      ]
+    },
+    "Target": {
+      "simple": "The effect steers toward the current target.",
+      "technical": "Declared as uint8 slot 2. With Limit_AngleXY and Limit_AngleZ both at zero or below, the Start case aims from the effect location at Source->GetTargetLocation(Source->GetSecondaryTargetActor()). With either limit positive, it builds a basis from the source auto-aim yaw and pitch and the source root quaternion, clamps the horizontal and vertical aim offsets to Limit_AngleXY and Limit_AngleZ in degrees, then calls AimAlong on the clamped vector. All six exported rows of this type use positive angle limits. Homing can then track the secondary target independently when bHomingEnabled is set.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameEffectMoveType.h:9",
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectMove.h:18",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:140",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:113",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:141",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:157",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:168",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:183",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:190",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:209"
+      ]
+    },
+    "Location": {
+      "simple": "The effect steers toward a chosen point in the world.",
+      "technical": "Declared as uint8 slot 3. The Start case calls AimAlong with Source->GetEffectMoveTargetLocation() minus the effect location. AimAlong faces the actor along that vector and rotates the row MoveDirection into it before Start normalizes the result. The switch case is present in the reconstructed controller, but no exported EffectMoveDataTable row selects it.",
+      "status": "verified",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameEffectMoveType.h:10",
+        "Source/AbramsDataTable/Public/GameDataTableRow_EffectMove.h:18",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:193",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:113",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:199"
+      ]
+    },
+    "Invalid": {
+      "simple": "A reserved invalid marker for effect movement styles.",
+      "technical": "Declared as the uint8 slot 255 in the enum header. The Start switch has no case for Invalid, so the value would reach the same default branch as None. No consumer compares against Invalid, no exported row carries it, and no caller passes it explicitly in this checkout, so its intended runtime behavior is unresolved.",
+      "status": "unresolved",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameEffectMoveType.h:11",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:135",
+        "Source/Abrams/Private/GameEffectMovementController.cpp:196"
+      ]
+    }
+  },
+  "notes": [
+    "UGameEffect::Initialize calls UGameEffectMovementController::Start only when the effect row names an EffectMove row. A None id there leaves movement unstarted, which is separate from the EffectMoveType value inside the row.",
+    "AimAlong rotates the effect actor and derives MoveDirection from the row MoveDirection vector. Start then normalizes MoveDirection once after the type switch.",
+    "Angle limits on the Target case are measured in degrees by GameAnimNotify_AngleDegrees2D and AngleBetweenDegrees. The 12 degree and 30 degree values seen in exported Target rows are row data, not enum semantics.",
+    "Homing, ground following, tilt, and the speed interpolator are independent of this enum and are configured by other fields of the same row.",
+    "The export has 141 Straight rows and 6 Target rows. None, Location, and Invalid have no exported rows."
+  ]
+}

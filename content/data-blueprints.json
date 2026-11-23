@@ -1,0 +1,1231 @@
+{
+  "overview": "Find the Blueprints that hold editable settings for menus, character previews, sequencers, and story playback. The related actor pages show how DataTables select a character, summon, trap, effect, weapon, or decal Blueprint.",
+  "notes": [
+    "The Parameter asset type scans the Commons folders for widgets, sequences, and scripts. The game reads these Blueprint class defaults as shared settings.",
+    "The wiki documents native setting types, traced code paths, and examples found in the available project assets. Individual values saved in Blueprint packages are outside this coverage.",
+    "The mod cook configuration adds `/Game/Mods` to the Parameter scan. See `Config/Custom/JJKModCook/DefaultGame.ini:46`."
+  ],
+  "entries": [
+    {
+      "id": "game-parameter-base",
+      "title": "GameParameterBase and the Parameter primary asset type",
+      "overview": "This is the common root for Blueprint assets that exist mainly to hold editable game settings.",
+      "description": "UGameParameterBase is a Blueprintable UObject with no declared properties of its own. The asset manager scans PrimaryAssetType 'Parameter' with this class as AssetBaseClass and bHasBlueprintClasses=True in three Commons directories. Managers load a parameter Blueprint's generated class synchronously through TSoftClassPtr and read its class default object, so the Blueprint's edited defaults act as data for systems that never create an instance of that class. The widget, sequencer and script families documented here are concrete descendants of this root.",
+      "baseClass": "UGameParameterBase",
+      "examples": [],
+      "fields": [],
+      "tables": [],
+      "evidence": [
+        "Config/DefaultGame.ini:29",
+        "Source/Abrams/Public/GameParameterBase.h:6",
+        "Source/Abrams/Public/GameParameterBase.h:7",
+        "Source/Abrams/Private/GameWidgetManager.cpp:202",
+        "Source/Abrams/Private/GameWidgetManager.cpp:209",
+        "Source/Abrams/Private/GameWidgetManager.cpp:210",
+        "Source/Abrams/Private/AbramsAssetManager.cpp:5",
+        "Tools/layout/inventory.json:8477"
+      ],
+      "notes": [
+        "The base class itself declares no UPROPERTY; useful fields live in its subclasses and native structs.",
+        "The mod configuration adds /Game/Mods to the same Parameter scan (Config/Custom/JJKModCook/DefaultGame.ini:46); no mod asset is documented here.",
+        "No serialized defaults are reported: the class default object is the delivery mechanism, but its stored property values were not read from the cooked package."
+      ],
+      "kind": "settings"
+    },
+    {
+      "id": "widget-parameter-blueprints",
+      "title": "Widget parameter Blueprint defaults",
+      "overview": "These Blueprints hold the editable defaults that the UI manager reads when the game starts.",
+      "description": "AGameWidgetManager resolves nine named Blueprint classes under /Game/Widgets/Commons/ and stores their class default objects. Their properties feed the settings screens, key-repeat controller, font cache, dynamic icon lookup, image offsets, scrolling text, story-demo presentation and scene-capture trees. All nine descend from UGameWidgetParameterBase, which descends from UGameParameterBase. The scan also registers them as Parameter primary assets; no separate actor instance is spawned from these classes.",
+      "baseClass": "UGameWidgetParameterBase",
+      "examples": [
+        {
+          "name": "GameWidgetCharacterParameter_BP",
+          "path": "/Game/Widgets/Commons/GameWidgetCharacterParameter_BP",
+          "detail": "Widget settings for cursed-energy gauges and character model viewers."
+        },
+        {
+          "name": "GameWidgetConfigParameter_BP",
+          "path": "/Game/Widgets/Commons/GameWidgetConfigParameter_BP",
+          "detail": "Default values shown by the game's settings screens."
+        },
+        {
+          "name": "GameWidgetDynamicIconParameter_BP",
+          "path": "/Game/Widgets/Commons/GameWidgetDynamicIconParameter_BP",
+          "detail": "Icon, emblem, chat and input-guide image lookups."
+        },
+        {
+          "name": "GameWidgetExchangeImageParameter_BP",
+          "path": "/Game/Widgets/Commons/GameWidgetExchangeImageParameter_BP",
+          "detail": "Offsets for images that swap or exchange icons."
+        },
+        {
+          "name": "GameWidgetFontParameter_BP",
+          "path": "/Game/Widgets/Commons/GameWidgetFontParameter_BP",
+          "detail": "Font faces and per-use-case text styling defaults."
+        },
+        {
+          "name": "GameWidgetKeyRepeatParameter_BP",
+          "path": "/Game/Widgets/Commons/GameWidgetKeyRepeatParameter_BP",
+          "detail": "Repeat timing for each menu input key."
+        },
+        {
+          "name": "GameWidgetSceneCaptureParameter_BP",
+          "path": "/Game/Widgets/Commons/GameWidgetSceneCaptureParameter_BP",
+          "detail": "Root that points at character and capture-type capture Blueprints."
+        },
+        {
+          "name": "GameWidgetStoryDemoParameter_BP",
+          "path": "/Game/Widgets/Commons/GameWidgetStoryDemoParameter_BP",
+          "detail": "Story-demo character, background and effect defaults."
+        },
+        {
+          "name": "GameWidgetTextScrollParameter_BP",
+          "path": "/Game/Widgets/Commons/GameWidgetTextScrollParameter_BP",
+          "detail": "Material and motion values for scrolling text."
+        }
+      ],
+      "fields": [
+        {
+          "name": "CursedEnergyGaugeParameterMap",
+          "type": "TMap<EGameCursedEnergyGaugeType, FGameWidgetCursedEnergyGaugeParameter>",
+          "simple": "Per-gauge values for cursed-energy gauge display.",
+          "technical": "Blueprint-editable map on UGameWidgetCharacterParameter; GetCursedEnergyGaugeParameter returns its value for the requested gauge type or a static default when absent.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetCharacterParameter.h:14",
+            "Source/Abrams/Public/GameWidgetCharacterParameter.h:15",
+            "Source/Abrams/Public/GameWidgetCharacterParameter.h:22"
+          ]
+        },
+        {
+          "name": "CharaModelViewerParameterMap",
+          "type": "TMap<FName, FGameWidgetCharaModelViewerParameter>",
+          "simple": "Per-character model-viewer display values.",
+          "technical": "Blueprint-editable map keyed by FName character ID; GetCharaModelViewerParameter returns the entry or a static default.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetCharacterParameter.h:17",
+            "Source/Abrams/Public/GameWidgetCharacterParameter.h:18",
+            "Source/Abrams/Public/GameWidgetCharacterParameter.h:24"
+          ]
+        },
+        {
+          "name": "Brightness",
+          "type": "float",
+          "simple": "Starting brightness shown by the settings screen.",
+          "technical": "BlueprintReadWrite/EditAnywhere float on UGameWidgetConfigParameter; the config UI reads the parameter object as the defaults source.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:18",
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:19",
+            "Source/Abrams/Private/GameConfigBrightnessWidget.cpp:5"
+          ]
+        },
+        {
+          "name": "bMinimapRotateEnabled",
+          "type": "bool",
+          "simple": "Whether the minimap starts set to rotate.",
+          "technical": "EditAnywhere flag on UGameWidgetConfigParameter; GameConfigGameWidget passes it as the toggle's default while the saved player setting supplies the current state.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:21",
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:22",
+            "Source/Abrams/Private/GameConfigGameWidget.cpp:95",
+            "Source/Abrams/Private/GameConfigGameWidget.cpp:96"
+          ]
+        },
+        {
+          "name": "MasterVolume",
+          "type": "float",
+          "simple": "Starting master-volume slider value.",
+          "technical": "EditAnywhere float read from GetConfigParameter() as the slider default, separate from the value stored in AGameManager::Settings.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:39",
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:40",
+            "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:93",
+            "Source/Abrams/Private/GameConfigSoundVolumeWidget.cpp:94"
+          ]
+        },
+        {
+          "name": "Controller",
+          "type": "TMap<EGameInputKey, EInputKey>",
+          "simple": "Default gamepad bindings.",
+          "technical": "EditAnywhere map from game input actions to controller keys on UGameWidgetConfigParameter; this property lacks the BlueprintReadWrite specifier used by many of its neighbours.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:54",
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:55"
+          ]
+        },
+        {
+          "name": "Keyboard",
+          "type": "TMap<EGameInputKey, FKey>",
+          "simple": "Default keyboard bindings.",
+          "technical": "BlueprintReadWrite/EditAnywhere map from game input actions to FKey on UGameWidgetConfigParameter.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:57",
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:58"
+          ]
+        },
+        {
+          "name": "FrameRate",
+          "type": "EApplicationFrameRate",
+          "simple": "Frame-rate option offered as the default in graphics settings.",
+          "technical": "Enum property on UGameWidgetConfigParameter; GameConfigGraphicWidget looks up the matching label for this value as the defaults entry.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:63",
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:64",
+            "Source/Abrams/Private/GameConfigGraphicWidget.cpp:277",
+            "Source/Abrams/Private/GameConfigGraphicWidget.cpp:280"
+          ]
+        },
+        {
+          "name": "RenderQuality",
+          "type": "EGameRenderQuality",
+          "simple": "Render-quality option offered as the default in graphics settings.",
+          "technical": "Enum property read from the config parameter object when the graphics screen builds its option list's default entry.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:66",
+            "Source/Abrams/Public/GameWidgetConfigParameter.h:67",
+            "Source/Abrams/Private/GameConfigGraphicWidget.cpp:282",
+            "Source/Abrams/Private/GameConfigGraphicWidget.cpp:285"
+          ]
+        },
+        {
+          "name": "FontParameterMap",
+          "type": "TMap<EGameWidgetFontLanguageType, FGameWidgetFontLanguageParameter>",
+          "simple": "Font faces used for each language.",
+          "technical": "EditAnywhere map on UGameWidgetFontParameter. BootInitialize preloads each face in the map before text draws; GetFont resolves a language and style from it.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetFontParameter.h:17",
+            "Source/Abrams/Public/GameWidgetFontParameter.h:18",
+            "Source/Abrams/Public/GameWidgetFontParameter.h:32",
+            "Source/Abrams/Public/GameWidgetFontParameter.h:39",
+            "Source/Abrams/Private/GameWidgetManager.cpp:770",
+            "Source/Abrams/Private/GameWidgetManager.cpp:771"
+          ]
+        },
+        {
+          "name": "FontSettingsMap",
+          "type": "TMap<EGameWidgetFontUseCaseType, FGameWidgetFontSettingsLanguageType>",
+          "simple": "Text styles for named UI use cases.",
+          "technical": "EditAnywhere map consulted by GetFontSettings; None, Unique and missing entries use defaults rather than a map value.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetFontParameter.h:20",
+            "Source/Abrams/Public/GameWidgetFontParameter.h:21",
+            "Source/Abrams/Public/GameWidgetFontParameter.h:42",
+            "Source/Abrams/Private/GameWidgetManagerFont.cpp:68",
+            "Source/Abrams/Private/GameWidgetManagerFont.cpp:74"
+          ]
+        },
+        {
+          "name": "KeyRepeatParameterMap",
+          "type": "TMap<EGameInputKey, FKeyRepeatParameter>",
+          "simple": "How quickly each menu input repeats when held.",
+          "technical": "BlueprintReadWrite/EditAnywhere map passed wholesale to UGameKeyRepeatController::Initialize. Each FKeyRepeatParameter carries FirstRepeatTime and AfterSecondRepeatTime floats.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetKeyRepeatParameter.h:12",
+            "Source/Abrams/Public/GameWidgetKeyRepeatParameter.h:13",
+            "Source/Framework/Public/KeyRepeatParameter.h:9",
+            "Source/Framework/Public/KeyRepeatParameter.h:13",
+            "Source/Abrams/Private/GameWidgetManager.cpp:864"
+          ]
+        },
+        {
+          "name": "ImageOffsetParameterMap",
+          "type": "TMap<EGameWidgetExchangeImageType, FGameWidgetExchangeImageOffsetParameterArray>",
+          "simple": "Position offsets for exchange-image icons.",
+          "technical": "EditAnywhere map on UGameWidgetExchangeImageParameter; GetImageOffset finds the offset for an id inside the array selected by EGameWidgetExchangeImageType.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetExchangeImageParameter.h:13",
+            "Source/Abrams/Public/GameWidgetExchangeImageParameter.h:14",
+            "Source/Abrams/Public/GameWidgetExchangeImageParameter.h:18",
+            "Source/Abrams/Public/GameWidgetExchangeImageParameter.h:19"
+          ]
+        },
+        {
+          "name": "ChatParameterMap",
+          "type": "TMap<EGameCommonChatIconCategory, FGameWidgetChatParameter>",
+          "simple": "Chat icons for common chat categories.",
+          "technical": "EditAnywhere map on UGameWidgetDynamicIconParameter; FindChatParameter and FindChatIconSprite return its category entry or a static default with a null sprite.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetDynamicIconParameter.h:55",
+            "Source/Abrams/Public/GameWidgetDynamicIconParameter.h:56",
+            "Source/Abrams/Public/GameWidgetDynamicIconParameter.h:89",
+            "Source/Abrams/Private/GameWidgetManager.cpp:1478"
+          ]
+        },
+        {
+          "name": "OperationParameterMap",
+          "type": "TMap<EGameChatInputKey, FGameWidgetOperationParameter>",
+          "simple": "Operation button images for chat input keys.",
+          "technical": "EditAnywhere map on UGameWidgetDynamicIconParameter; FindOperationParameter returns the entry for a key or a static default.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetDynamicIconParameter.h:58",
+            "Source/Abrams/Public/GameWidgetDynamicIconParameter.h:59",
+            "Source/Abrams/Public/GameWidgetDynamicIconParameter.h:70",
+            "Source/Abrams/Private/GameWidgetManager.cpp:1447"
+          ]
+        },
+        {
+          "name": "StoryDemoParameter",
+          "type": "FGameStoryDemoParameter",
+          "simple": "Shared story-demo presentation defaults.",
+          "technical": "BlueprintReadWrite/EditAnywhere struct on UGameWidgetStoryDemoParameter; AGameWidgetManager returns this value through GetStoryDemoParameter.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetStoryDemoParameter.h:15",
+            "Source/Abrams/Public/GameWidgetStoryDemoParameter.h:16",
+            "Source/Abrams/Private/GameWidgetManager.cpp:543",
+            "Source/Abrams/Private/GameWidgetManager.cpp:545"
+          ]
+        },
+        {
+          "name": "CharacterParameterMap",
+          "type": "TMap<FName, FGameStoryDemoCharacterParameter>",
+          "simple": "Per-character story-demo values.",
+          "technical": "Blueprint-editable map keyed by FName; GetCharacterParameter returns the entry or a default-constructed value.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetStoryDemoParameter.h:18",
+            "Source/Abrams/Public/GameWidgetStoryDemoParameter.h:19",
+            "Source/Abrams/Private/GameWidgetManager.cpp:555",
+            "Source/Abrams/Private/GameWidgetManager.cpp:557"
+          ]
+        },
+        {
+          "name": "ScrollMaterial",
+          "type": "UMaterialInstance*",
+          "simple": "Material used by scrolling text.",
+          "technical": "BlueprintReadWrite/EditAnywhere pointer; GameWidgetTextScroll creates a dynamic material instance from it for the text and outline fonts.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetTextScrollParameter.h:14",
+            "Source/Abrams/Public/GameWidgetTextScrollParameter.h:15",
+            "Source/Abrams/Private/GameWidgetTextScroll.cpp:108",
+            "Source/Abrams/Private/GameWidgetTextScroll.cpp:112"
+          ]
+        },
+        {
+          "name": "ScrollSpeed",
+          "type": "FVector2D",
+          "simple": "Horizontal and vertical scroll speed.",
+          "technical": "Blueprint-editable 2D vector read by FGameWidgetTextScroll when advancing scrolled text.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetTextScrollParameter.h:17",
+            "Source/Abrams/Public/GameWidgetTextScrollParameter.h:18",
+            "Source/Abrams/Private/GameWidgetTextScroll.cpp:139"
+          ]
+        },
+        {
+          "name": "ScrollWaitTime",
+          "type": "float",
+          "simple": "Pause before and after a scroll.",
+          "technical": "Blueprint-editable float read as WaitTime by the text-scroll update path.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetTextScrollParameter.h:20",
+            "Source/Abrams/Public/GameWidgetTextScrollParameter.h:21",
+            "Source/Abrams/Private/GameWidgetTextScroll.cpp:140"
+          ]
+        },
+        {
+          "name": "ScrollEndOffset",
+          "type": "FVector2D",
+          "simple": "Extra distance added at the end of a scroll.",
+          "technical": "Blueprint-editable 2D vector added to the overflow extent before applying the widget geometry scale.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetTextScrollParameter.h:23",
+            "Source/Abrams/Public/GameWidgetTextScrollParameter.h:24",
+            "Source/Abrams/Private/GameWidgetTextScroll.cpp:142",
+            "Source/Abrams/Private/GameWidgetTextScroll.cpp:143"
+          ]
+        }
+      ],
+      "tables": [],
+      "evidence": [
+        "Config/DefaultGame.ini:29",
+        "Source/Abrams/Private/GameWidgetManager.cpp:205",
+        "Source/Abrams/Private/GameWidgetManager.cpp:209",
+        "Source/Abrams/Private/GameWidgetManager.cpp:210",
+        "Source/Abrams/Private/GameWidgetManager.cpp:207",
+        "Source/Abrams/Private/GameWidgetManager.cpp:770",
+        "Source/Abrams/Private/GameWidgetManager.cpp:773",
+        "Source/Abrams/Private/GameWidgetManager.cpp:774",
+        "Source/Abrams/Private/GameWidgetManager.cpp:856",
+        "Source/Abrams/Private/GameWidgetManager.cpp:857",
+        "Source/Abrams/Private/GameWidgetManager.cpp:858",
+        "Source/Abrams/Private/GameWidgetManager.cpp:864",
+        "Source/Abrams/Private/GameWidgetManager.cpp:869",
+        "Source/Abrams/Private/GameWidgetManager.cpp:870",
+        "Source/Abrams/Private/GameWidgetManager.cpp:871",
+        "Source/Abrams/Public/GameWidgetParameterBase.h:6",
+        "Tools/layout/inventory.json:13050"
+      ],
+      "notes": [
+        "Only the nine named class paths are loaded by AGameWidgetManager; other similarly named native classes without such a loader are not given a page here.",
+        "Property types come from native headers. The edited values in each Blueprint's class default object were not serialized or inferred.",
+        "Find* helpers in these classes return static default-constructed values when a map key is missing, so absence of an entry is not the same as a zero value."
+      ],
+      "kind": "settings"
+    },
+    {
+      "id": "scene-capture-parameter-blueprints",
+      "title": "Character and capture-type scene-capture parameters",
+      "overview": "These Blueprints supply the camera, light and character-presentation defaults used by UI character captures.",
+      "description": "GameWidgetSceneCaptureParameter_BP is the root parameter Blueprint loaded by AGameWidgetManager. Its native class holds maps pointing to per-capture-type and per-character parameter Blueprints under /Game/Widgets/Commons/Parameters/, plus an array of render targets. Those referenced Blueprints derive from UGameWidgetSceneCaptureTypeParameter or UGameWidgetCharacterSceneCaptureParameter. GameWidgetManager resolves the maps through the root object's class default object and passes the resulting structs into the character-capture actor; it never spawns an instance of the parameter classes themselves.",
+      "baseClass": "UGameWidgetSceneCaptureParameter",
+      "examples": [
+        {
+          "name": "GameWidgetSceneCaptureParameter_BP",
+          "path": "/Game/Widgets/Commons/GameWidgetSceneCaptureParameter_BP",
+          "detail": "Root parameter Blueprint with maps to the per-character and per-capture-type assets."
+        },
+        {
+          "name": "GameWidgetCharacterSceneCapture_CP_010_BP",
+          "path": "/Game/Widgets/Commons/Parameters/GameWidgetCharacterSceneCapture_CP_010_BP",
+          "detail": "Per-character Blueprint; its package name table imports native class GameWidgetCharacterSceneCaptureParameter."
+        },
+        {
+          "name": "GameWidgetCharacterSceneCapture_CN_041_BP",
+          "path": "/Game/Widgets/Commons/Parameters/GameWidgetCharacterSceneCapture_CN_041_BP",
+          "detail": "Another per-character Blueprint in the same Parameters folder."
+        },
+        {
+          "name": "GameWidgetSceneCaptureType_VsEnemy_BP",
+          "path": "/Game/Widgets/Commons/Parameters/GameWidgetSceneCaptureType_VsEnemy_BP",
+          "detail": "Capture-type Blueprint; its package name table imports GameWidgetSceneCaptureTypeParameter and GameWidgetCharacterCaptureBG_BP."
+        },
+        {
+          "name": "GameWidgetSceneCaptureType_Customize_BP",
+          "path": "/Game/Widgets/Commons/Parameters/GameWidgetSceneCaptureType_Customize_BP",
+          "detail": "Capture-type Blueprint listed by the root asset's name table."
+        }
+      ],
+      "fields": [
+        {
+          "name": "CaptureParameterMap",
+          "type": "TMap<EGameCharacterCaptureType, UGameWidgetSceneCaptureTypeParameter*>",
+          "simple": "Camera and light settings for each capture type.",
+          "technical": "Blueprint-editable pointer map on the root parameter class. GetCameraParameter and GetLightParameter read the referenced Blueprint's fields and fall back to static native defaults when the key is absent.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetSceneCaptureParameter.h:22",
+            "Source/Abrams/Public/GameWidgetSceneCaptureParameter.h:23",
+            "Source/Abrams/Public/GameWidgetSceneCaptureParameter.h:38",
+            "Source/Abrams/Public/GameWidgetSceneCaptureParameter.h:42"
+          ]
+        },
+        {
+          "name": "CharacterParameterMap",
+          "type": "TMap<FName, UGameWidgetCharacterSceneCaptureParameter*>",
+          "simple": "Per-character capture values keyed by character id.",
+          "technical": "Blueprint-editable pointer map. The manager queries it through GetCharacterCommonParameter and GetCharacterVariationParameter with a capture type and costume type.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetSceneCaptureParameter.h:25",
+            "Source/Abrams/Public/GameWidgetSceneCaptureParameter.h:26",
+            "Source/Abrams/Public/GameWidgetSceneCaptureParameter.h:44",
+            "Source/Abrams/Private/GameWidgetManager.cpp:1582",
+            "Source/Abrams/Private/GameWidgetManager.cpp:1590"
+          ]
+        },
+        {
+          "name": "CaptureRenderTargetArray",
+          "type": "TArray<FGameWidgetCaptureRenderTargetParameter>",
+          "simple": "Render targets assigned to capture types.",
+          "technical": "Blueprint-editable array copied into the caller's array by GetCaptureRenderTargets. Each element pairs EGameCharacterCaptureType with a UGameTextureRenderTarget2D pointer.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetSceneCaptureParameter.h:28",
+            "Source/Abrams/Public/GameWidgetSceneCaptureParameter.h:29",
+            "Source/Abrams/Public/GameWidgetSceneCaptureParameter.h:34",
+            "Source/Abrams/Public/GameWidgetCaptureRenderTargetParameter.h:12",
+            "Source/Abrams/Public/GameWidgetCaptureRenderTargetParameter.h:16"
+          ]
+        },
+        {
+          "name": "CameraParameter",
+          "type": "FGameWidgetCameraCaptureParameter",
+          "simple": "Where the capture camera sits and how it renders.",
+          "technical": "Blueprint-editable struct on UGameWidgetSceneCaptureTypeParameter. Its members include CameraFov (float), Transform (FTransform), ImageSize (FIntPoint), PanelActorBP (TSubclassOf<AGameCharacterCapturePanelActor>), PanelTransform (FTransform) and CaptureSource (TEnumAsByte<ESceneCaptureSource>).",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetSceneCaptureTypeParameter.h:12",
+            "Source/Abrams/Public/GameWidgetSceneCaptureTypeParameter.h:13",
+            "Source/Abrams/Public/GameWidgetCameraCaptureParameter.h:15",
+            "Source/Abrams/Public/GameWidgetCameraCaptureParameter.h:31"
+          ]
+        },
+        {
+          "name": "LightParameter",
+          "type": "FGameWidgetLightCaptureParameter",
+          "simple": "Lighting used for a capture type.",
+          "technical": "Blueprint-editable struct with Transform (FTransform), bUsePointLight (bool), PointLightAttenuation (FVector) and PointLightColor (FLinearColor). Its constructor copies static native defaults.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetSceneCaptureTypeParameter.h:15",
+            "Source/Abrams/Public/GameWidgetSceneCaptureTypeParameter.h:16",
+            "Source/Abrams/Public/GameWidgetLightCaptureParameter.h:12",
+            "Source/Abrams/Public/GameWidgetLightCaptureParameter.h:22",
+            "Source/Abrams/Public/GameWidgetSceneCaptureTypeParameter.h:30"
+          ]
+        },
+        {
+          "name": "ParameterMap",
+          "type": "TMap<EGameWidgetCaptureType, FGameWidgetCharacterSceneCaptureTypeParameter>",
+          "simple": "Per-capture settings inside one character Blueprint.",
+          "technical": "EditAnywhere map on UGameWidgetCharacterSceneCaptureParameter; the root class indexes it by the widget capture type before reading common or costume variation values.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetCharacterSceneCaptureParameter.h:12",
+            "Source/Abrams/Public/GameWidgetCharacterSceneCaptureParameter.h:13",
+            "Source/Abrams/Public/GameWidgetSceneCaptureParameter.h:44"
+          ]
+        },
+        {
+          "name": "CommonParameter",
+          "type": "FGameWidgetCharacterCaptureCommonParameter",
+          "simple": "Shared outline, mask and transform values for a character capture.",
+          "technical": "Blueprint-editable struct containing fields such as OutlineWidth, TranslucentScale, DecalDissolvePattern (int32), DecalDissolveWeight, CharacterLightShadowColor (FLinearColor), Transform, ShikigamiTransform, AnimationWeaponTransformMap (TMap<FName,FTransform>), MaskRange and MaskEdgeFalloff (FVector4).",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetCharacterSceneCaptureTypeParameter.h:12",
+            "Source/Abrams/Public/GameWidgetCharacterSceneCaptureTypeParameter.h:13",
+            "Source/Abrams/Public/GameWidgetCharacterCaptureCommonParameter.h:12",
+            "Source/Abrams/Public/GameWidgetCharacterCaptureCommonParameter.h:55"
+          ]
+        },
+        {
+          "name": "VariationParameterMap",
+          "type": "TMap<EGameWidgetCharacterCostumeType, FGameWidgetCharacterCaptureVariationParameter>",
+          "simple": "Costume-specific overrides for a character capture.",
+          "technical": "EditAnywhere map inside FGameWidgetCharacterSceneCaptureTypeParameter. Values carry MaterialPattern (int32), BackgroundColor (EGameWidgetCaptureBackgroundColor), BackgroundColorDetails, ToneCurveAmount, AlphaExp, Mask, CutOffMax and CutOffMin floats.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetCharacterSceneCaptureTypeParameter.h:15",
+            "Source/Abrams/Public/GameWidgetCharacterSceneCaptureTypeParameter.h:16",
+            "Source/Abrams/Public/GameWidgetCharacterCaptureVariationParameter.h:11",
+            "Source/Abrams/Public/GameWidgetCharacterCaptureVariationParameter.h:33"
+          ]
+        }
+      ],
+      "tables": [],
+      "evidence": [
+        "Config/DefaultGame.ini:29",
+        "Source/Abrams/Private/GameWidgetManager.cpp:857",
+        "Source/Abrams/Private/GameWidgetManager.cpp:1582",
+        "Source/Abrams/Private/GameWidgetManager.cpp:1584",
+        "Source/Abrams/Private/GameWidgetManager.cpp:1588",
+        "Source/Abrams/Private/GameWidgetManager.cpp:1590",
+        "Source/Abrams/Private/GameWidgetManager.cpp:1619",
+        "Source/Abrams/Private/GameWidgetManager.cpp:1620",
+        "Source/Abrams/Public/GameWidgetSceneCaptureParameter.h:17",
+        "Source/Abrams/Public/GameWidgetSceneCaptureParameter.h:18",
+        "Source/Abrams/Public/GameWidgetSceneCaptureTypeParameter.h:8",
+        "Source/Abrams/Public/GameWidgetCharacterSceneCaptureParameter.h:8",
+        "Content/Widgets/Commons/GameWidgetSceneCaptureParameter_BP.uasset",
+        "Content/Widgets/Commons/Parameters/GameWidgetCharacterSceneCapture_CP_010_BP.uasset",
+        "Content/Widgets/Commons/Parameters/GameWidgetSceneCaptureType_VsEnemy_BP.uasset"
+      ],
+      "notes": [
+        "The reference relationships were observed in the root Blueprint package name table, which lists the per-character and capture-type package paths; their stored map values were not decoded.",
+        "No catalog data-table group was established as the backing store for this Blueprint tree; the CharacterCapture* catalog groups describe separate row data.",
+        "The per-character parameter packages name their native parent class but do not expose a generated _C class string in their name tables; they are described from the native parent and their location in the Parameter scan."
+      ],
+      "kind": "settings"
+    },
+    {
+      "id": "sequencer-parameter-blueprints",
+      "title": "Sequencer loading and offset parameters",
+      "overview": "These Blueprints tell the sequencer which level sequences to collect and how to shift global positions.",
+      "description": "AGameSequencerManager's BootInitialize loads two named Parameter Blueprints from /Game/Sequences/Commons/ with the same soft-class-to-CDO pattern used by the widget manager. GameSequencerLoadingParameter_BP owns an array of per-sequence file descriptors used when collecting animation, decal, texture and NPC assets. GameSequencerOffsetParameter_BP owns a name-keyed map of global offset locations. Both are Blueprintable UGameParameterBase descendants and are scanned by the Parameter primary asset type.",
+      "baseClass": "UGameSequencerLoadingParameter",
+      "examples": [
+        {
+          "name": "GameSequencerLoadingParameter_BP",
+          "path": "/Game/Sequences/Commons/GameSequencerLoadingParameter_BP",
+          "detail": "Array of per-sequence file parameters read during boot and sequence collection."
+        },
+        {
+          "name": "GameSequencerOffsetParameter_BP",
+          "path": "/Game/Sequences/Commons/GameSequencerOffsetParameter_BP",
+          "detail": "Name-to-offset map queried by the sequencer manager."
+        }
+      ],
+      "fields": [
+        {
+          "name": "FileParameters",
+          "type": "TArray<FGameSequencerLoadingFileParameter>",
+          "simple": "One entry per level sequence the game may load.",
+          "technical": "BlueprintReadWrite/EditAnywhere array on UGameSequencerLoadingParameter. Each element has ID and Filename (FName), bKeepLighting and bKeepFacial (bool), BindingSupportCharacterIdMap and BindingWeaponIdMap (TMap<FName,FName>), and arrays of animation, decal, texture and NPC reference structs.",
+          "evidence": [
+            "Source/Abrams/Public/GameSequencerLoadingParameter.h:12",
+            "Source/Abrams/Public/GameSequencerLoadingParameter.h:13",
+            "Source/Abrams/Public/GameSequencerLoadingFileParameter.h:13",
+            "Source/Abrams/Public/GameSequencerLoadingFileParameter.h:43",
+            "Source/Abrams/Private/GameSequencerManager.cpp:388"
+          ]
+        },
+        {
+          "name": "SettingsMap",
+          "type": "TMap<FName, FGameSequencerGlobalOffsetParameter>",
+          "simple": "Offsets for named sequence locations.",
+          "technical": "BlueprintReadWrite/EditAnywhere map on UGameSequencerOffsetParameter. FindGlobalOffsetLocation looks up a name and returns the entry's OffsetLocation, or nullptr for an unknown key; the caller does not null-test the resulting pointer.",
+          "evidence": [
+            "Source/Abrams/Public/GameSequencerOffsetParameter.h:11",
+            "Source/Abrams/Public/GameSequencerOffsetParameter.h:12",
+            "Source/Abrams/Private/GameSequencerManager.cpp:1156",
+            "Source/Abrams/Private/GameSequencerManager.cpp:1160"
+          ]
+        },
+        {
+          "name": "OffsetLocation",
+          "type": "FVector",
+          "simple": "World-space displacement for a named offset.",
+          "technical": "Sole property of FGameSequencerGlobalOffsetParameter, exposed BlueprintReadWrite/EditAnywhere.",
+          "evidence": [
+            "Source/Abrams/Public/GameSequencerGlobalOffsetParameter.h:10",
+            "Source/Abrams/Public/GameSequencerGlobalOffsetParameter.h:11"
+          ]
+        }
+      ],
+      "tables": [],
+      "evidence": [
+        "Config/DefaultGame.ini:29",
+        "Source/Abrams/Private/GameSequencerManager.cpp:236",
+        "Source/Abrams/Private/GameSequencerManager.cpp:240",
+        "Source/Abrams/Private/GameSequencerManager.cpp:244",
+        "Source/Abrams/Private/GameSequencerManager.cpp:247",
+        "Source/Abrams/Private/GameSequencerManager.cpp:257",
+        "Source/Abrams/Private/GameSequencerManager.cpp:258",
+        "Source/Abrams/Private/GameSequenceNameBuilder.cpp:47",
+        "Source/Abrams/Private/GameSequenceNameBuilder.cpp:50",
+        "Source/Abrams/Private/GameSequenceNameBuilder.cpp:297",
+        "Source/Abrams/Private/GameSequenceNameBuilder.cpp:349",
+        "Source/Abrams/Private/GameSequenceNameBuilder.cpp:368",
+        "Source/Abrams/Public/GameSequencerLoadingParameter.h:7",
+        "Source/Abrams/Public/GameSequencerOffsetParameter.h:7",
+        "Tools/layout/inventory.json:9587",
+        "Tools/layout/inventory.json:9630"
+      ],
+      "notes": [
+        "The page covers two distinct native roots; baseClass names the loading parameter class because it has the larger editable structure.",
+        "UGameSequencerRetargetingParameter is Blueprintable in native code but no matching Blueprint package was observed locally, so it is not given an example here.",
+        "Sequence file descriptors are not the same assets as the Script primary asset type or the catalog's sequence-related data-table groups; no table group is asserted for these parameters."
+      ],
+      "kind": "settings"
+    },
+    {
+      "id": "script-parameter-blueprint",
+      "title": "Script playback parameter Blueprint",
+      "overview": "This single Blueprint controls timing and audio ducking defaults for scripted scenes.",
+      "description": "GameScriptPlayer loads /Game/Scripts/Commons/GameScriptParameter_BP as a UGameScriptParameter class and shares its class default object with the script context. Script commands read its auto-wait times and ducking values directly when showing messages, waiting for input and starting BGM ducking. The Blueprint is a Parameter primary asset; it is distinct from the Script primary asset type, which uses non-Blueprint UGameScriptData assets for the script content itself.",
+      "baseClass": "UGameScriptParameter",
+      "examples": [
+        {
+          "name": "GameScriptParameter_BP",
+          "path": "/Game/Scripts/Commons/GameScriptParameter_BP",
+          "detail": "Only parameter Blueprint observed in /Game/Scripts/Commons; loaded by GameScriptPlayer."
+        }
+      ],
+      "fields": [
+        {
+          "name": "DefaultAutoWaitTime",
+          "type": "float",
+          "simple": "How long a script step waits when no other timing is given.",
+          "technical": "Blueprint-editable float exposed by GetDefaultAutoWaitTime; WaitInput::Start and message steps read it as their initial remaining time.",
+          "evidence": [
+            "Source/Abrams/Public/GameScriptParameter.h:12",
+            "Source/Abrams/Public/GameScriptParameter.h:13",
+            "Source/Abrams/Public/GameScriptParameter.h:35",
+            "Source/Abrams/Public/GameScriptParameter.h:36",
+            "Source/Abrams/Private/GameScriptCommands.cpp:307",
+            "Source/Abrams/Private/GameScriptCommands.cpp:1110"
+          ]
+        },
+        {
+          "name": "MessageAutoWaitTime",
+          "type": "float",
+          "simple": "Extra wait after a message line.",
+          "technical": "Blueprint-editable float read by message commands as MessageWaitTime.",
+          "evidence": [
+            "Source/Abrams/Public/GameScriptParameter.h:15",
+            "Source/Abrams/Public/GameScriptParameter.h:16",
+            "Source/Abrams/Public/GameScriptParameter.h:39",
+            "Source/Abrams/Private/GameScriptCommands.cpp:1111"
+          ]
+        },
+        {
+          "name": "VoiceAutoWaitTime",
+          "type": "float",
+          "simple": "Wait used while a voice line plays.",
+          "technical": "Blueprint-editable float chosen instead of the default wait when a command has voices.",
+          "evidence": [
+            "Source/Abrams/Public/GameScriptParameter.h:18",
+            "Source/Abrams/Public/GameScriptParameter.h:19",
+            "Source/Abrams/Public/GameScriptParameter.h:40",
+            "Source/Abrams/Private/GameScriptCommands.cpp:1110"
+          ]
+        },
+        {
+          "name": "DuckingVolume",
+          "type": "float",
+          "simple": "BGM level during scripted ducking.",
+          "technical": "Blueprint-editable float multiplied by the current BGM volume when starting a duck.",
+          "evidence": [
+            "Source/Abrams/Public/GameScriptParameter.h:21",
+            "Source/Abrams/Public/GameScriptParameter.h:22",
+            "Source/Abrams/Public/GameScriptParameter.h:41",
+            "Source/Abrams/Private/GameScriptCommands.cpp:1137"
+          ]
+        },
+        {
+          "name": "DuckingFadeTime",
+          "type": "float",
+          "simple": "How long the BGM duck takes.",
+          "technical": "Blueprint-editable float used as the ducking duration and also compared with the script's delay.",
+          "evidence": [
+            "Source/Abrams/Public/GameScriptParameter.h:24",
+            "Source/Abrams/Public/GameScriptParameter.h:25",
+            "Source/Abrams/Public/GameScriptParameter.h:42",
+            "Source/Abrams/Private/GameScriptCommands.cpp:1089",
+            "Source/Abrams/Private/GameScriptCommands.cpp:1134"
+          ]
+        },
+        {
+          "name": "DuckingEasingType",
+          "type": "TEnumAsByte<EEasingFunc::Type>",
+          "simple": "Easing curve used for the volume duck.",
+          "technical": "Blueprint-editable enum property passed into the BGM ducking start call.",
+          "evidence": [
+            "Source/Abrams/Public/GameScriptParameter.h:27",
+            "Source/Abrams/Public/GameScriptParameter.h:28",
+            "Source/Abrams/Public/GameScriptParameter.h:43",
+            "Source/Abrams/Private/GameScriptCommands.cpp:1137"
+          ]
+        },
+        {
+          "name": "DuckingBlendExp",
+          "type": "float",
+          "simple": "Exponent for the ducking easing curve.",
+          "technical": "Blueprint-editable float passed as the blend exponent when the ducking helper starts.",
+          "evidence": [
+            "Source/Abrams/Public/GameScriptParameter.h:30",
+            "Source/Abrams/Public/GameScriptParameter.h:31",
+            "Source/Abrams/Public/GameScriptParameter.h:44",
+            "Source/Abrams/Private/GameScriptCommands.cpp:1137"
+          ]
+        }
+      ],
+      "tables": [],
+      "evidence": [
+        "Config/DefaultGame.ini:29",
+        "Config/DefaultGame.ini:30",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:321",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:324",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:328",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:331",
+        "Source/Abrams/Private/GameScriptCommands.cpp:307",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1110",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1137",
+        "Source/Abrams/Public/GameScriptParameter.h:7",
+        "Tools/layout/inventory.json:9521"
+      ],
+      "notes": [
+        "The Script primary asset type scans UGameScriptData assets under /Game/Scripts (Config/DefaultGame.ini:30), not this Blueprint; the two are loaded through different paths.",
+        "No script-data content is treated as a property default of this Blueprint."
+      ],
+      "kind": "settings"
+    },
+    {
+      "id": "rich-text-decorator-blueprint",
+      "title": "Rich-text image decorator Blueprint",
+      "overview": "This Blueprint gives inline <img> tags in game text their pictures.",
+      "description": "The TextDecorator primary asset type scans Blueprint classes derived from UGameWidgetRichTextBlockDecoratorBase in /Game/Widgets/Commons/. The observed BP_RichTextBlockdecorator derives from UGameWidgetRichTextBlockDecorator and assigns a DataTable as CustomImageSet. When rich text encounters an <img id=...> tag, FindImageBrush uses the tag or id directly as a row name and returns that row's Slate brush. This is a Blueprint-backed decorator object, not a UGameParameterBase settings Blueprint.",
+      "baseClass": "UGameWidgetRichTextBlockDecoratorBase",
+      "examples": [
+        {
+          "name": "BP_RichTextBlockdecorator",
+          "path": "/Game/Widgets/Commons/RichText/BP_RichTextBlockdecorator",
+          "detail": "Decorator Blueprint whose package imports GameWidgetRichTextBlockDecorator and RichTextBlockImageDataTable."
+        }
+      ],
+      "fields": [
+        {
+          "name": "CustomImageSet",
+          "type": "UDataTable*",
+          "simple": "Table that maps image tags to pictures.",
+          "technical": "Protected BlueprintReadWrite/EditAnywhere pointer on UGameWidgetRichTextBlockDecorator. FindImageBrush calls FindRow<FGameWidgetRichTextBlockImageRow>(TagOrId, FString(), false) on it and returns the row's Brush or nullptr.",
+          "evidence": [
+            "Source/Abrams/Public/GameWidgetRichTextBlockDecorator.h:14",
+            "Source/Abrams/Public/GameWidgetRichTextBlockDecorator.h:15",
+            "Source/Abrams/Private/GameWidgetRichTextBlockDecorator.cpp:7",
+            "Source/Abrams/Private/GameWidgetRichTextBlockDecorator.cpp:12",
+            "Source/Abrams/Private/GameWidgetRichTextBlockDecorator.cpp:13"
+          ]
+        }
+      ],
+      "tables": [
+        "GameWidgetRichTextBlockImageRow"
+      ],
+      "evidence": [
+        "Config/DefaultGame.ini:32",
+        "Source/Abrams/Public/GameWidgetRichTextBlockDecoratorBase.h:10",
+        "Source/Abrams/Public/GameWidgetRichTextBlockDecoratorBase.h:11",
+        "Source/Abrams/Public/GameWidgetRichTextBlockDecorator.h:9",
+        "Source/Abrams/Public/GameWidgetRichTextBlockDecorator.h:10",
+        "Content/Widgets/Commons/RichText/BP_RichTextBlockdecorator.uasset",
+        "Content/Widgets/Commons/RichText/RichTextBlockImageDataTable.uasset",
+        "Tools/layout/inventory.json:13139"
+      ],
+      "notes": [
+        "The configured scan base is the abstract UGameWidgetRichTextBlockDecoratorBase; the observed Blueprint's direct native parent is the concrete UGameWidgetRichTextBlockDecorator.",
+        "Only the discussed table/row relationship is asserted; no default brush values were decoded from the Blueprint or its DataTable."
+      ],
+      "kind": "settings"
+    },
+    {
+      "id": "character-blueprints",
+      "title": "Character actor Blueprints",
+      "overview": "These Blueprints set up the fighter actors the game spawns, including their meshes, collisions, and controllers.",
+      "description": "AssetManager scans Character primary assets from GameCharacter_BP and the listed character folders with bHasBlueprintClasses=True. A data-table row supplies FileName_BP, which is turned into a Character primary asset id; the loaded UClass is then spawned as an AGameCharacter. Their native class exposes mesh, collision and controller references, so the Blueprint's edited values configure an actor instance rather than a CDO-only settings object.",
+      "baseClass": "AGameCharacter",
+      "examples": [
+        {
+          "name": "GameCharacter_BP",
+          "path": "/Game/Characters/GameCharacter_BP",
+          "detail": "Base Blueprint whose generated class is the Character primary asset base class."
+        },
+        {
+          "name": "CP_010_00_BP",
+          "path": "/Game/Characters/CP_010/CP_010_00_BP",
+          "detail": "Character Blueprint in a scanned folder; its package imports GameCharacter_BP_C."
+        }
+      ],
+      "fields": [
+        {
+          "name": "Mesh",
+          "type": "USkeletalMeshComponent*",
+          "simple": "Skeletal mesh used by the fighter.",
+          "technical": "BlueprintReadWrite/EditAnywhere/Instanced component declared on AGameCharacter.",
+          "evidence": [
+            "Source/Abrams/Public/GameCharacter.h:130",
+            "Source/Abrams/Public/GameCharacter.h:131"
+          ]
+        },
+        {
+          "name": "CapsuleComponent",
+          "type": "UGameCapsuleComponent*",
+          "simple": "Main collision capsule.",
+          "technical": "Blueprint-editable instanced component used for character collision.",
+          "evidence": [
+            "Source/Abrams/Public/GameCharacter.h:133",
+            "Source/Abrams/Public/GameCharacter.h:134"
+          ]
+        },
+        {
+          "name": "InputData",
+          "type": "UGameCharacterInputData*",
+          "simple": "Input configuration for the fighter.",
+          "technical": "EditAnywhere object pointer on AGameCharacter.",
+          "evidence": [
+            "Source/Abrams/Public/GameCharacter.h:142",
+            "Source/Abrams/Public/GameCharacter.h:143"
+          ]
+        },
+        {
+          "name": "ActionController",
+          "type": "UGameCharacterActionController*",
+          "simple": "Action logic object assigned to this character.",
+          "technical": "EditAnywhere controller pointer on AGameCharacter.",
+          "evidence": [
+            "Source/Abrams/Public/GameCharacter.h:157",
+            "Source/Abrams/Public/GameCharacter.h:158"
+          ]
+        },
+        {
+          "name": "Brain",
+          "type": "UGameCharacterBrain*",
+          "simple": "AI brain assigned to this character.",
+          "technical": "EditAnywhere pointer on AGameCharacter.",
+          "evidence": [
+            "Source/Abrams/Public/GameCharacter.h:181",
+            "Source/Abrams/Public/GameCharacter.h:182"
+          ]
+        },
+        {
+          "name": "AttackCollisionKeeper",
+          "type": "UGameCollisionKeeper*",
+          "simple": "Attack hitbox collection.",
+          "technical": "EditAnywhere collision keeper on AGameCharacter, alongside damage and clashing keepers.",
+          "evidence": [
+            "Source/Abrams/Public/GameCharacter.h:190",
+            "Source/Abrams/Public/GameCharacter.h:191"
+          ]
+        }
+      ],
+      "tables": [
+        "CharacterVariationDataTable"
+      ],
+      "evidence": [
+        "Config/DefaultGame.ini:15",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:699",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:704",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:705",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:713",
+        "Source/Abrams/Public/GameCharacter.h:130",
+        "Content/Characters/GameCharacter_BP.uasset",
+        "Content/Characters/CP_010/CP_010_00_BP.uasset",
+        "Tools/layout/inventory.json:5163"
+      ],
+      "notes": [
+        "This entry is included to separate actor Blueprints from Parameter CDO defaults; it does not claim that character Blueprints are tabular data.",
+        "Only a small representative set of native properties is listed; no per-character Blueprint values were decoded."
+      ],
+      "kind": "actor"
+    },
+    {
+      "id": "shikigami-blueprints",
+      "title": "Shikigami actor Blueprints",
+      "overview": "These Blueprints set up summoned shikigami, including their meshes, animations, and action controllers.",
+      "description": "The Shikigami primary asset type scans native-derived Blueprints under the CN character folders with GameShikigami_BP_C as the base class. Shikigami data-table rows supply FileName_BP, which is resolved through AssetManager and spawned as an actor by the level-sequencer and character-capture paths. Their native fields describe components and controllers rather than a Blueprint-held settings table.",
+      "baseClass": "AGameShikigami",
+      "examples": [
+        {
+          "name": "GameShikigami_BP",
+          "path": "/Game/Characters/GameShikigami_BP",
+          "detail": "Base Blueprint named by the Shikigami primary asset type."
+        },
+        {
+          "name": "CN_010_00_BP",
+          "path": "/Game/Characters/CN_010/CN_010_00_BP",
+          "detail": "Derived Blueprint in a scanned CN folder; its package imports GameShikigami_BP."
+        }
+      ],
+      "fields": [
+        {
+          "name": "Mesh",
+          "type": "USkeletalMeshComponent*",
+          "simple": "Skeletal mesh for the shikigami.",
+          "technical": "BlueprintReadWrite/EditAnywhere/Instanced component on AGameShikigami.",
+          "evidence": [
+            "Source/Abrams/Public/GameShikigami.h:90",
+            "Source/Abrams/Public/GameShikigami.h:91"
+          ]
+        },
+        {
+          "name": "CapsuleComponent",
+          "type": "UGameCapsuleComponent*",
+          "simple": "Shikigami collision capsule.",
+          "technical": "EditAnywhere instanced component.",
+          "evidence": [
+            "Source/Abrams/Public/GameShikigami.h:93",
+            "Source/Abrams/Public/GameShikigami.h:94"
+          ]
+        },
+        {
+          "name": "AnimInstance",
+          "type": "UGameShikigamiAnimInstance*",
+          "simple": "Animation instance for the shikigami.",
+          "technical": "EditAnywhere pointer on AGameShikigami.",
+          "evidence": [
+            "Source/Abrams/Public/GameShikigami.h:96",
+            "Source/Abrams/Public/GameShikigami.h:97"
+          ]
+        },
+        {
+          "name": "StatusController",
+          "type": "UGameShikigamiStatusController*",
+          "simple": "Status controller assigned to the actor.",
+          "technical": "EditAnywhere pointer on AGameShikigami.",
+          "evidence": [
+            "Source/Abrams/Public/GameShikigami.h:99",
+            "Source/Abrams/Public/GameShikigami.h:100"
+          ]
+        },
+        {
+          "name": "ActionController",
+          "type": "UGameShikigamiActionController*",
+          "simple": "Action controller assigned to the actor.",
+          "technical": "EditAnywhere pointer on AGameShikigami.",
+          "evidence": [
+            "Source/Abrams/Public/GameShikigami.h:105",
+            "Source/Abrams/Public/GameShikigami.h:106"
+          ]
+        },
+        {
+          "name": "AttackCollisionKeeper",
+          "type": "UGameCollisionKeeper*",
+          "simple": "Attack hitbox collection.",
+          "technical": "EditAnywhere collision keeper alongside a damage keeper.",
+          "evidence": [
+            "Source/Abrams/Public/GameShikigami.h:120",
+            "Source/Abrams/Public/GameShikigami.h:121"
+          ]
+        }
+      ],
+      "tables": [
+        "ShikigamiDataTable",
+        "CharacterShikigamiDataTable"
+      ],
+      "evidence": [
+        "Config/DefaultGame.ini:21",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:759",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:763",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:765",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:452",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:455",
+        "Source/Abrams/Public/GameShikigami.h:90",
+        "Content/Characters/GameShikigami_BP.uasset",
+        "Content/Characters/CN_010/CN_010_00_BP.uasset",
+        "Tools/layout/inventory.json:9671"
+      ],
+      "notes": [
+        "CN_010_00_BP is a Shikigami Blueprint even though it shares the CN character naming convention; the observed package imports GameShikigami_BP.",
+        "No Blueprint-edited values were decoded from the derived assets."
+      ],
+      "kind": "actor"
+    },
+    {
+      "id": "trap-blueprints",
+      "title": "Trap actor Blueprints",
+      "overview": "These Blueprints set up traps, including their appearance and collision components.",
+      "description": "The Trap primary asset type scans Blueprint classes derived from GameTrap_BP_C under /Game/Traps/. AGameTrapManager builds a Trap primary asset id directly from a FileName_BP name, resolves the UClass through AssetManager and spawns or pools an AGameTrap. The native class holds mesh, action/material controllers and collision keepers; those are component wiring on an actor, unlike the CDO-only parameter Blueprints.",
+      "baseClass": "AGameTrap",
+      "examples": [
+        {
+          "name": "GameTrap_BP",
+          "path": "/Game/Traps/GameTrap_BP",
+          "detail": "Base Blueprint named by the Trap primary asset type."
+        },
+        {
+          "name": "TR_010_00_BP",
+          "path": "/Game/Traps/TR_010/TR_010_00_BP",
+          "detail": "Derived trap Blueprint in the scanned folder; its package imports GameTrap_BP_C."
+        }
+      ],
+      "fields": [
+        {
+          "name": "Mesh",
+          "type": "UMeshComponent*",
+          "simple": "Visible mesh for the trap.",
+          "technical": "BlueprintReadWrite/EditAnywhere/Instanced component on AGameTrap.",
+          "evidence": [
+            "Source/Abrams/Public/GameTrap.h:21",
+            "Source/Abrams/Public/GameTrap.h:22"
+          ]
+        },
+        {
+          "name": "ActionController",
+          "type": "UGameTrapActionController*",
+          "simple": "Trap action logic object.",
+          "technical": "EditAnywhere pointer assigned on the actor class.",
+          "evidence": [
+            "Source/Abrams/Public/GameTrap.h:30",
+            "Source/Abrams/Public/GameTrap.h:31"
+          ]
+        },
+        {
+          "name": "MaterialController",
+          "type": "UGameTrapMaterialController*",
+          "simple": "Material controller for the trap.",
+          "technical": "EditAnywhere pointer on AGameTrap.",
+          "evidence": [
+            "Source/Abrams/Public/GameTrap.h:33",
+            "Source/Abrams/Public/GameTrap.h:34"
+          ]
+        },
+        {
+          "name": "AttackCollisionKeeper",
+          "type": "UGameCollisionKeeper*",
+          "simple": "Attack collision collection.",
+          "technical": "EditAnywhere keeper, with separate damage and damage-nullifying keepers.",
+          "evidence": [
+            "Source/Abrams/Public/GameTrap.h:36",
+            "Source/Abrams/Public/GameTrap.h:43"
+          ]
+        }
+      ],
+      "tables": [
+        "TrapDataTable"
+      ],
+      "evidence": [
+        "Config/DefaultGame.ini:18",
+        "Source/Abrams/Private/GameTrapManager.cpp:185",
+        "Source/Abrams/Private/GameTrapManager.cpp:187",
+        "Source/Abrams/Public/GameTrap.h:21",
+        "Content/Traps/GameTrap_BP.uasset",
+        "Content/Traps/TR_010/TR_010_00_BP.uasset",
+        "Tools/layout/inventory.json:11068"
+      ],
+      "notes": [
+        "Included only to distinguish Blueprint-backed actor assets from data Blueprint defaults.",
+        "The trap data-table group is identified from the row-to-asset filename path in GameTrapManager; trap Blueprint property values were not read."
+      ],
+      "kind": "actor"
+    },
+    {
+      "id": "effect-blueprints",
+      "title": "Effect actor Blueprints",
+      "overview": "These Blueprints set up visual effects and their movement and collision components.",
+      "description": "The Effect primary asset type scans Blueprint classes derived from GameEffect_BP_C under /Game/Effects/. GameEffectManager converts a FileName_BP from effect data into a primary asset id, resolves the UClass and spawns or pools an AGameEffect. Its native fields wire Niagara components, movement and collision keepers into the spawned actor; the Blueprint's edited component setup is not a settings CDO.",
+      "baseClass": "AGameEffect",
+      "examples": [
+        {
+          "name": "GameEffect_BP",
+          "path": "/Game/Effects/GameEffect_BP",
+          "detail": "Base Blueprint named by the Effect primary asset type."
+        },
+        {
+          "name": "FX_CN_000_01001_BP",
+          "path": "/Game/Effects/FX_CN_000/FX_CN_000_01/FX_CN_000_01001_BP",
+          "detail": "Derived effect Blueprint in the scanned folder; its package imports GameEffect_BP_C and a Niagara system."
+        }
+      ],
+      "fields": [
+        {
+          "name": "NiagaraComponentArray",
+          "type": "TArray<UNiagaraComponent*>",
+          "simple": "Niagara components attached to the effect.",
+          "technical": "BlueprintReadWrite/EditAnywhere/Instanced array on AGameEffect.",
+          "evidence": [
+            "Source/Abrams/Public/GameEffect.h:88",
+            "Source/Abrams/Public/GameEffect.h:89"
+          ]
+        },
+        {
+          "name": "EffectMovement",
+          "type": "UGameEffectMovementController*",
+          "simple": "Movement controller for the effect.",
+          "technical": "EditAnywhere pointer on the actor class.",
+          "evidence": [
+            "Source/Abrams/Public/GameEffect.h:91",
+            "Source/Abrams/Public/GameEffect.h:92"
+          ]
+        },
+        {
+          "name": "AttackCollisionKeeper",
+          "type": "UGameCollisionKeeper*",
+          "simple": "Attack collision collection.",
+          "technical": "EditAnywhere keeper, with separate damage and damage-nullifying keepers.",
+          "evidence": [
+            "Source/Abrams/Public/GameEffect.h:94",
+            "Source/Abrams/Public/GameEffect.h:101"
+          ]
+        }
+      ],
+      "tables": [
+        "EffectDataTable"
+      ],
+      "evidence": [
+        "Config/DefaultGame.ini:19",
+        "Source/Abrams/Private/GameEffectManager.cpp:195",
+        "Source/Abrams/Private/GameEffectManager.cpp:198",
+        "Source/Abrams/Private/GameEffectManager.cpp:199",
+        "Source/Abrams/Public/GameEffect.h:88",
+        "Content/Effects/GameEffect_BP.uasset",
+        "Content/Effects/FX_CN_000/FX_CN_000_01/FX_CN_000_01001_BP.uasset",
+        "Tools/layout/inventory.json:7074"
+      ],
+      "notes": [
+        "Included only to distinguish Blueprint-backed actor assets from data Blueprint defaults.",
+        "No Niagara or collision values were decoded from the derived Blueprint."
+      ],
+      "kind": "actor"
+    },
+    {
+      "id": "weapon-blueprints",
+      "title": "Weapon actor Blueprints",
+      "overview": "These Blueprints set up the weapon actors attached to characters and previews.",
+      "description": "The Weapon primary asset type scans Blueprint classes derived from GameWeapon_BP_C. Weapon data-table rows supply FileName_BP, which is resolved through AssetManager when the game attaches a weapon to a character or capture slot. The native class exposes only a mesh component and material controller as editable properties; those configure the weapon actor rather than a shared settings object.",
+      "baseClass": "AGameWeapon",
+      "examples": [
+        {
+          "name": "GameWeapon_BP",
+          "path": "/Game/Weapons/GameWeapon_BP",
+          "detail": "Base Blueprint named by the Weapon primary asset type."
+        },
+        {
+          "name": "WP_010_00_BP",
+          "path": "/Game/Weapons/WP_010/WP_010_00_BP",
+          "detail": "Derived weapon Blueprint in a scanned folder."
+        }
+      ],
+      "fields": [
+        {
+          "name": "Mesh",
+          "type": "UMeshComponent*",
+          "simple": "Visible mesh for the weapon.",
+          "technical": "BlueprintReadWrite/EditAnywhere/Instanced component on AGameWeapon.",
+          "evidence": [
+            "Source/Abrams/Public/GameWeapon.h:15",
+            "Source/Abrams/Public/GameWeapon.h:16"
+          ]
+        },
+        {
+          "name": "MaterialController",
+          "type": "UGameWeaponMaterialController*",
+          "simple": "Material controller for the weapon.",
+          "technical": "EditAnywhere pointer on AGameWeapon.",
+          "evidence": [
+            "Source/Abrams/Public/GameWeapon.h:18",
+            "Source/Abrams/Public/GameWeapon.h:19"
+          ]
+        }
+      ],
+      "tables": [
+        "WeaponDataTable"
+      ],
+      "evidence": [
+        "Config/DefaultGame.ini:20",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:692",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:693",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:703",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:704",
+        "Source/Abrams/Public/GameWeapon.h:15",
+        "Content/Weapons/GameWeapon_BP.uasset",
+        "Content/Weapons/WP_010/WP_010_00_BP.uasset",
+        "Tools/layout/inventory.json:12209"
+      ],
+      "notes": [
+        "Included only to distinguish Blueprint-backed actor assets from data Blueprint defaults.",
+        "No weapon-material or mesh values were decoded from the derived Blueprint."
+      ],
+      "kind": "actor"
+    },
+    {
+      "id": "decal-blueprints",
+      "title": "Decal actor Blueprints",
+      "overview": "These Blueprints set up decals the game places in the scene.",
+      "description": "The Decal primary asset type scans Blueprint classes derived from GameDecalActor_BP_C under /Game/Decals/. Decal data-table rows supply a filename that is resolved to a UClass and spawned by AGameRenderManager. The native class exposes a mobile material override; the Blueprint's component setup configures the spawned actor rather than holding a parameter CDO.",
+      "baseClass": "AGameDecalActor",
+      "examples": [
+        {
+          "name": "GameDecalActor_BP",
+          "path": "/Game/Decals/GameDecalActor_BP",
+          "detail": "Base Blueprint named by the Decal primary asset type."
+        },
+        {
+          "name": "DCL_00100_BP",
+          "path": "/Game/Decals/DCL_00/DCL_001/DCL_00100_BP",
+          "detail": "Derived decal Blueprint whose package imports GameDecalActor_BP_C and material instances."
+        }
+      ],
+      "fields": [
+        {
+          "name": "MobileMaterial",
+          "type": "UMaterialInterface*",
+          "simple": "Material override used on mobile.",
+          "technical": "BlueprintReadWrite/EditAnywhere pointer on AGameDecalActor.",
+          "evidence": [
+            "Source/Abrams/Public/GameDecalActor.h:14",
+            "Source/Abrams/Public/GameDecalActor.h:15"
+          ]
+        }
+      ],
+      "tables": [
+        "DecalDataTable"
+      ],
+      "evidence": [
+        "Config/DefaultGame.ini:22",
+        "Source/Abrams/Private/GameRenderManager.cpp:435",
+        "Source/Abrams/Private/GameRenderManager.cpp:448",
+        "Source/Abrams/Private/GameRenderManager.cpp:451",
+        "Source/Abrams/Public/GameDecalActor.h:14",
+        "Content/Decals/GameDecalActor_BP.uasset",
+        "Content/Decals/DCL_00/DCL_001/DCL_00100_BP.uasset",
+        "Tools/layout/inventory.json:6895"
+      ],
+      "notes": [
+        "Included only to distinguish Blueprint-backed actor assets from data Blueprint defaults.",
+        "No decal material values were decoded from the derived Blueprint."
+      ],
+      "kind": "actor"
+    }
+  ]
+}

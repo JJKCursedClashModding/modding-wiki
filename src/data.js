@@ -1,7 +1,15 @@
 import catalog from '../content/catalog.json';
-import enums from '../content/enums.json';
+import enumCatalog from '../content/enums.json';
+import engineEnums from '../content/engine-enums.json';
+import tableLinks from '../content/table-links.json';
+import blueprintCatalog from '../content/data-blueprints.json';
 
 const research = import.meta.glob('../content/research/*.json', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+});
+const enumResearch = import.meta.glob('../content/enum-research/*.json', {
   eager: true,
   query: '?raw',
   import: 'default',
@@ -19,6 +27,45 @@ export const slugFor = (id) => id.toLowerCase();
 export const fieldAnchor = (name) => 'field-' + name.toLowerCase().replaceAll('[]', '-array').replaceAll('.', '--');
 export const fieldParentName = (name) => name.slice(0, name.lastIndexOf('.')).replace(/\[\]$/, '').toLowerCase();
 export const hrefFor = (id) => `${import.meta.env.BASE_URL}tables/${slugFor(id)}/`;
+export const enumHref = (id) => `${import.meta.env.BASE_URL}enums/${slugFor(id)}/`;
+export const valueAnchor = (name) => `value-${name.toLowerCase()}`;
+export const blueprintHref = (id) => `${import.meta.env.BASE_URL}data-blueprints/${id}/`;
+
+export const referenceSections = [
+  { id: 'tables', label: 'DataTables', description: 'Settings that control combat, characters, missions, and more.' },
+  { id: 'enums', label: 'Enums', description: 'What each named choice means and where the game uses it.' },
+  { id: 'data-blueprints', label: 'Data Blueprints', description: 'Blueprint assets that supply settings and defaults to the game.' },
+];
+
+function readResearch(files, path) {
+  const raw = files[path];
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw.replace(/^\uFEFF/, ''));
+  } catch (error) {
+    const message = `Invalid research JSON in ${path}: ${error.message}`;
+    if (!import.meta.env.DEV) throw new Error(message, { cause: error });
+    console.warn(message);
+    return {};
+  }
+}
+
+export const enums = Object.entries({ ...enumCatalog, ...engineEnums }).map(([id, schema]) => {
+  const article = readResearch(enumResearch, `../content/enum-research/${id}.json`);
+  return {
+    ...schema,
+    id,
+    overview: article.overview,
+    notes: article.notes ?? [],
+    values: schema.values.map(([name, value]) => ({ ...article.values?.[name], name, value })),
+    usedBy: [],
+  };
+}).sort((a, b) => a.id.localeCompare(b.id));
+
+const enumsByName = new Map(enums.map((entry) => [entry.id, entry]));
+export const blueprints = blueprintCatalog.entries;
+export const blueprintOverview = blueprintCatalog.overview;
+export const blueprintNotes = blueprintCatalog.notes;
 
 const exportTypes = {
   str: 'JSON string', int: 'JSON integer', float: 'JSON number',
@@ -36,18 +83,9 @@ const componentExplanations = {
 };
 
 export const groups = catalog.map((entry) => {
-  const raw = research[`../content/research/${entry.id}.json`];
-  let article = {};
-  if (raw) {
-    try {
-      article = JSON.parse(raw.replace(/^\uFEFF/, ''));
-    } catch (error) {
-      const message = `Invalid research JSON for ${entry.id}: ${error.message}`;
-      if (!import.meta.env.DEV) throw new Error(message);
-      console.warn(message);
-    }
-  }
+  const article = readResearch(research, `../content/research/${entry.id}.json`);
   const annotations = new Map(Object.entries(article.fields ?? {}).map(([key, item]) => [key.toLowerCase(), item]));
+  const links = new Map(Object.entries(tableLinks[entry.id] ?? {}).map(([name, targets]) => [name.toLowerCase(), targets]));
   const fields = entry.fields.map((field) => {
     let annotation = annotations.get(field.name.toLowerCase());
     if (!annotation && field.componentOf) {
@@ -69,12 +107,14 @@ export const groups = catalog.map((entry) => {
       }
     }
     const type = field.type ?? annotation?.type ?? field.exportKinds.map((kind) => exportTypes[kind] ?? kind).join(' | ');
-    const enumName = type.match(/\bE\w+\b/)?.[0];
+    const enumType = enumsByName.get(type.match(/\bE\w+\b/)?.[0]);
+    enumType?.usedBy.push({ table: entry.id, field: field.name });
     return {
       ...field,
       ...annotation,
       type,
-      enum: enums[enumName],
+      enumId: enumType?.id,
+      links: links.get(field.name.toLowerCase()) ?? [],
       status: annotation?.status ?? 'pending',
     };
   });
@@ -88,6 +128,13 @@ export const groups = catalog.map((entry) => {
     assetRowCount: entry.variants.reduce((sum, asset) => sum + asset.rows, 0),
   };
 }).sort((a, b) => a.id.localeCompare(b.id));
+
+export const referencedBy = new Map(groups.map((group) => [group.id, []]));
+for (const group of groups) {
+  for (const field of group.fields) {
+    for (const link of field.links) referencedBy.get(link.table)?.push({ table: group.id, field: field.name });
+  }
+}
 
 export const categories = Object.entries(categoryNames).map(([id, label]) => ({
   id, label, groups: groups.filter((group) => group.category === id),
