@@ -17,6 +17,7 @@ export const categoryNames = {
 
 export const slugFor = (id) => id.toLowerCase();
 export const fieldAnchor = (name) => 'field-' + name.toLowerCase().replaceAll('[]', '-array').replaceAll('.', '--');
+export const fieldParentName = (name) => name.slice(0, name.lastIndexOf('.')).replace(/\[\]$/, '').toLowerCase();
 export const hrefFor = (id) => `${import.meta.env.BASE_URL}tables/${slugFor(id)}/`;
 
 const exportTypes = {
@@ -51,7 +52,7 @@ export const groups = catalog.map((entry) => {
     let annotation = annotations.get(field.name.toLowerCase());
     if (!annotation && field.componentOf) {
       const [container, component] = field.name.split('.');
-      const parent = annotations.get(container.replace(/\[\]$/, '').toLowerCase());
+      const parent = annotations.get(fieldParentName(field.name));
       if (field.exportOnly) {
         annotation = {
           simple: ['A short text code for this color in the exported file.', parent?.simple].filter(Boolean).join(' '),

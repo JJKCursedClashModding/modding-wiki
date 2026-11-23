@@ -1,7 +1,7 @@
 ---
 import Reference from '../../layouts/Reference.astro';
 import InlineText from '../../layouts/InlineText.astro';
-import { categoryNames, fieldAnchor, groups, slugFor } from '../../data.js';
+import { categoryNames, fieldAnchor, fieldParentName, groups, slugFor } from '../../data.js';
 
 export function getStaticPaths() {
   return groups.map((group) => ({ params: { slug: slugFor(group.id) }, props: { group } }));
@@ -17,6 +17,20 @@ const statuses = {
 };
 const formatCount = (value) => value.toLocaleString('en-US');
 const refs = Object.entries(group.references);
+const fieldGroups = new Map(group.fields.map((field) => [field.name.toLowerCase(), { field, components: [] }]));
+for (const field of group.fields) {
+  const parent = field.componentOf && fieldGroups.get(fieldParentName(field.name));
+  if (parent) {
+    parent.components.push(field);
+    fieldGroups.delete(field.name.toLowerCase());
+  }
+}
+const fieldColumns = [
+  ['.field-heading a', 'Name'],
+  ['.field-type', 'Type'],
+  ['.simple', 'Description'],
+];
+const componentCount = group.fields.length - fieldGroups.size;
 ---
 <Reference title={group.id} description={group.overview ?? group.description ?? `Unreal schema for ${group.id}.`} current={group.id}>
   <div class="doc-grid">
@@ -37,49 +51,78 @@ const refs = Object.entries(group.references);
       </details>
 
       <section id="fields" class="doc-section">
-        <h2>Settings</h2>
+        <h2 id="fields-heading">Settings</h2>
         <div class="field-tools">
           <input class="filter" type="search" id="field-filter" aria-label="Filter settings" placeholder="Filter by name, type, or description" autocomplete="off" />
-          <p class="field-count" id="field-count" role="status">{formatCount(group.fields.length)} settings</p>
+          <p class="field-count" id="field-count" role="status">{formatCount(fieldGroups.size)} {fieldGroups.size === 1 ? 'setting' : 'settings'}{componentCount > 0 && ` · ${formatCount(componentCount)} ${componentCount === 1 ? 'component' : 'components'}`}</p>
         </div>
-        <div class="field-columns" aria-hidden="true"><span>Setting</span><span>What it does</span></div>
-        <p id="field-empty" class="field-empty" hidden>No settings match this filter.</p>
-        <dl class="field-list">
-          {group.fields.map((field) => (
-            <div class="field" id={fieldAnchor(field.name)}>
-              <dt class="field-heading"><a href={`#${fieldAnchor(field.name)}`}><code>{field.name}</code></a></dt>
-              <dd class="field-body">
-                <p class="simple"><InlineText value={field.simple ?? 'Definition pending review.'} /></p>
-                <details class="field-details">
-                  <summary>Technical details</summary>
-                  <div class="field-type"><code>{field.type || 'Type unknown'}</code>
-                    <span class:list={['badge', field.status]}>{statuses[field.status] ?? field.status}</span>
-                    {field.nativeName && field.nativeName !== field.name && !field.name.includes('.') && <span>Unreal property <code>{field.nativeName}</code></span>}
-                    {!field.exportKinds.length && <span>Declaration only</span>}
-                    {field.exportOnly && <span>Export representation</span>}
-                    {field.seenInVariants > 0 && field.seenInVariants < group.variants.length && (
-                      <span>Present in {field.seenInVariants} of {group.variants.length} exports</span>
-                    )}
-                  </div>
-                  {field.technical && <p class="technical"><InlineText value={field.technical} /></p>}
-                  {field.enum && (
-                    <details class="field-evidence">
-                      <summary>Enum values{field.enum.underlying ? ` · ${field.enum.underlying}` : ''}</summary>
-                      <ul class="enum-values">{field.enum.values.map(([name, value]) => <li><code>{name}</code> <span>{value}</span></li>)}</ul>
-                      <p><code>{field.enum.source}</code></p>
-                    </details>
-                  )}
-                  {(field.source || field.evidence?.length) && (
-                    <details class="field-evidence">
-                      <summary>Evidence</summary>
-                      <ul>{[...new Set([field.source, ...(field.evidence ?? [])].filter(Boolean))].map((ref) => <li><code>{ref}</code></li>)}</ul>
-                    </details>
-                  )}
-                </details>
-              </dd>
-            </div>
+        <table class="field-table" role="table" aria-labelledby="fields-heading">
+          <colgroup><col class="field-name-column" /><col class="field-type-column" /><col /></colgroup>
+          <thead role="rowgroup">
+            <tr role="row">
+              {fieldColumns.map(([selector, label], index) => (
+                <th scope="col" role="columnheader" aria-sort={index === 0 ? 'ascending' : undefined}>
+                  <button type="button" class="field-sort" data-sort={selector}>
+                    {label}<span class="sort-arrow" aria-hidden="true"></span>
+                  </button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          {[...fieldGroups.values()].map(({ field: parent, components }) => (
+            <tbody class="field-group" role="rowgroup">
+              {[parent, ...components].map((field) => {
+                const child = field !== parent;
+                const label = child ? field.name.split('.').at(-1) : field.name;
+                return (
+                  <tr class:list={['field', { 'field-component': child }]} id={fieldAnchor(field.name)} role="row" data-field-name={field.name}>
+                    <th scope="row" role="rowheader" class="field-heading">
+                      <a href={`#${fieldAnchor(field.name)}`} aria-label={child ? field.name : undefined} title={child ? field.name : undefined}><code>{label}</code></a>
+                      {!child && components.length > 0 && (
+                        <button type="button" class="component-toggle" hidden
+                          aria-expanded="false" aria-controls={components.map((item) => fieldAnchor(item.name)).join(' ')}
+                          aria-label={`${components.length} components of ${parent.name}`}>
+                          {components.length} components
+                        </button>
+                      )}
+                    </th>
+                    <td class="field-type" role="cell"><code>{field.type || 'Unknown'}</code></td>
+                    <td class="field-body" role="cell">
+                      <p class="simple"><InlineText value={field.simple ?? 'Definition pending review.'} /></p>
+                      <details class="field-details">
+                        <summary>Technical details</summary>
+                        <div class="field-metadata">
+                          <span class:list={['badge', field.status]}>{statuses[field.status] ?? field.status}</span>
+                          {field.nativeName && field.nativeName !== field.name && !field.name.includes('.') && <span>Unreal property <code>{field.nativeName}</code></span>}
+                          {!field.exportKinds.length && <span>Declaration only</span>}
+                          {field.exportOnly && <span>Export representation</span>}
+                          {field.seenInVariants > 0 && field.seenInVariants < group.variants.length && (
+                            <span>Present in {field.seenInVariants} of {group.variants.length} exports</span>
+                          )}
+                        </div>
+                        {field.technical && <p class="technical"><InlineText value={field.technical} /></p>}
+                        {field.enum && (
+                          <details class="field-evidence">
+                            <summary>Enum values{field.enum.underlying ? ` · ${field.enum.underlying}` : ''}</summary>
+                            <ul class="enum-values">{field.enum.values.map(([name, value]) => <li><code>{name}</code> <span>{value}</span></li>)}</ul>
+                            <p><code>{field.enum.source}</code></p>
+                          </details>
+                        )}
+                        {(field.source || field.evidence?.length) && (
+                          <details class="field-evidence">
+                            <summary>Evidence</summary>
+                            <ul>{[...new Set([field.source, ...(field.evidence ?? [])].filter(Boolean))].map((ref) => <li><code>{ref}</code></li>)}</ul>
+                          </details>
+                        )}
+                      </details>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
           ))}
-        </dl>
+        </table>
+        <p id="field-empty" class="field-empty" hidden>No settings match this filter.</p>
       </section>
 
       <section id="variants" class="doc-section">
@@ -134,27 +177,83 @@ const refs = Object.entries(group.references);
     const fieldFilter = document.querySelector('#field-filter');
     const fieldCount = document.querySelector('#field-count');
     const fieldEmpty = document.querySelector('#field-empty');
-    const fields = [...document.querySelectorAll('.field-list .field')];
+    const table = document.querySelector('.field-table');
+    const fields = [...table.querySelectorAll('.field')];
+    const fieldText = new Map(fields.map((row) => [row, `${row.dataset.fieldName} ${row.textContent}`.toLowerCase()]));
+    const fieldGroups = [...table.tBodies].map((body) => {
+      const [parent, ...components] = body.rows;
+      return { body, parent, components, toggle: parent.querySelector('.component-toggle'), expanded: false, filteredExpansion: null };
+    });
     const unfilteredCount = fieldCount.textContent;
+    const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+
     function filterFields() {
       const query = fieldFilter.value.trim().toLowerCase();
-      let visible = 0;
-      for (const field of fields) {
-        field.hidden = !field.textContent.toLowerCase().includes(query);
-        if (!field.hidden) visible++;
+      const matches = (row) => !query || fieldText.get(row).includes(query);
+      let count = 0;
+      for (const group of fieldGroups) {
+        const parentMatches = matches(group.parent);
+        const matchedComponents = new Set(group.components.filter(matches));
+        group.body.hidden = !parentMatches && !matchedComponents.size;
+        const expanded = query ? (group.filteredExpansion ?? true) : group.expanded;
+        if (group.toggle) {
+          group.toggle.hidden = !!query && !matchedComponents.size;
+          group.toggle.setAttribute('aria-expanded', String(expanded && matchedComponents.size > 0));
+        }
+        for (const row of group.components) row.hidden = !expanded || !matchedComponents.has(row);
+        count += Number(parentMatches) + matchedComponents.size;
       }
-      fieldCount.textContent = query ? `${visible} of ${fields.length} settings` : unfilteredCount;
-      fieldEmpty.hidden = visible > 0;
+      fieldCount.textContent = query ? `${count} ${count === 1 ? 'match' : 'matches'}` : unfilteredCount;
+      fieldEmpty.hidden = count > 0;
     }
-    fieldFilter.addEventListener('input', filterFields);
-    window.addEventListener('hashchange', () => {
+
+    fieldFilter.addEventListener('input', () => {
+      for (const group of fieldGroups) group.filteredExpansion = null;
+      filterFields();
+    });
+    for (const group of fieldGroups) {
+      group.toggle?.addEventListener('click', () => {
+        const expanded = group.toggle.getAttribute('aria-expanded') === 'true';
+        if (fieldFilter.value.trim()) group.filteredExpansion = !expanded;
+        else group.expanded = !expanded;
+        filterFields();
+      });
+    }
+
+    function revealLinkedField() {
       const target = document.getElementById(location.hash.slice(1));
-      if (target?.hidden && target.classList.contains('field')) {
+      const group = target?.classList.contains('field') && fieldGroups.find(({ body }) => body === target.parentElement);
+      if (group && (target.hidden || group.body.hidden)) {
         fieldFilter.value = '';
+        if (target !== group.parent) group.expanded = true;
         filterFields();
         target.scrollIntoView();
       }
-    });
+    }
+    window.addEventListener('hashchange', revealLinkedField);
+
+    function sortFields(button, direction) {
+      const selector = button.dataset.sort;
+      const values = new Map(fieldGroups.map(({ parent }) => [parent, parent.querySelector(selector).textContent.trim()]));
+      fieldGroups.sort((a, b) => direction * collator.compare(values.get(a.parent), values.get(b.parent))
+        || collator.compare(a.parent.dataset.fieldName, b.parent.dataset.fieldName));
+      table.append(...fieldGroups.map(({ body }) => body));
+    }
+
+    const sortButtons = [...table.querySelectorAll('.field-sort')];
+    for (const button of sortButtons) {
+      button.addEventListener('click', () => {
+        const header = button.closest('th');
+        const descending = header.getAttribute('aria-sort') === 'ascending';
+        table.querySelector('th[aria-sort]')?.removeAttribute('aria-sort');
+        header.setAttribute('aria-sort', descending ? 'descending' : 'ascending');
+        sortFields(button, descending ? -1 : 1);
+      });
+    }
+
+    sortFields(sortButtons[0], 1);
+    filterFields();
+    revealLinkedField();
 
     const browser = document.querySelector('.key-browser');
     if (browser) enableKeyBrowser(browser);
