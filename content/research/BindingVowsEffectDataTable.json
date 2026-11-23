@@ -1,0 +1,110 @@
+{
+  "description": "Concrete binding-vow effects: an effect-type discriminator, type-dependent numeric parameters, and the battle-text ID used to describe the effect in UI.",
+  "fields": {
+    "Id": {
+      "simple": "Binding-vow effect row key.",
+      "technical": "FName row key in BindingVowsEffectDataTable; export label ID. Resolved from BindingVowsDataTable.Id_BindingVowsEffect by GameBindingVows_GetEffectRows (first matching table wins, None skipped) and by DTM_FindBindingVowsEffectRow in the VsEnemy selection UI. The row pointer is stored in FGameCharacterBindingVowsEffectState::Effect for subsequent type/value queries.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:252",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:260",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:317",
+        "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:80",
+        "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:157",
+        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVowsEffect.h:11"
+      ],
+      "status": "verified"
+    },
+    "EffectType": {
+      "simple": "Which gameplay/stat effect this row applies.",
+      "technical": "EGameBindingVowsEffectType (uint8; None default, Invalid=255; ~80 named cases such as ForceGaugeMax, HitPointMax, CursedEnergyRecover, MoveSpeed, DashGaugeMax, SendAttackDamage, ReceiveDamage, DeadPenalty and mission rewards). It is filtered by GameBindingVows_GetEffectRowsOfType and switched on by status/UI consumers; it also drives the widget category grouping (hit point / movement / attack / cursed energy / other) and MissionOrder/MissionTask effect-type exclusions during PvE vow selection. Several accesses of array values are valid only for particular effect types.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameBindingVowsEffectType.h:6",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:281",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:320",
+        "Source/Abrams/Private/GameBindingVowsWidget.cpp:46",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:647",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:665",
+        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVowsEffect.h:15"
+      ],
+      "status": "verified"
+    },
+    "EffectValue": {
+      "simple": "Type-dependent numeric parameters; usually a chance/threshold followed by a magnitude.",
+      "technical": "TArray<float> (all exported rows have two entries, but consumers select indices per EffectType). [0] is variously an additive modifier (ForceGaugeMax summed and clamped to at least 1), a battle-log threshold/required count (JumpCount, GuardCount, SpecialTagComboCount, DeadKillWithTime, DeadPenalty, DeadSendGuard, HitPointOnce), or a 0..1 chance multiplied by 100 for RollChance kind 2 (HitPointWhenJustGuard and other probability effects). [1] is typically the applied magnitude, e.g. HitPointWhenJustGuard adds HitPointMax * [1], while HitPointOnce adds int32([1] * HitPointMax). Some queries use only [0] via Sum/Max. Index 1 is read unguarded by consumers when the type expects it; do not treat the array as a generic scalar list.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:322",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:328",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:334",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2212",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2225",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2241",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3989",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3991",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4002",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4499",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4509",
+        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVowsEffect.h:18"
+      ],
+      "status": "verified"
+    },
+    "Id_BattleText": {
+      "simple": "Battle-text row ID used to render the vow effect description.",
+      "technical": "FName key resolved through the BattleText system by SetTextIdWithParameters. UGameVsEnemyBindingVowsSelectWidget::OnVowFocused requires the effect's EffectValue.Num() >= 2, supplies VALUE = EffectValue[0] and VALUE2 = EffectValue[1] as text parameters, then shows either the debuff ([0] of the vow) or buff ([1]) text. No other direct reader of this BindingVowsEffect property was identified in the reconstructed source.",
+      "evidence": [
+        "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:157",
+        "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:158",
+        "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:162",
+        "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:164",
+        "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:175",
+        "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:177",
+        "Source/AbramsDataTable/Public/GameDataTableRow_BindingVowsEffect.h:21"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "AGameDataTableManager::Tick resolves only BindingVowsEffectDataTable into BindingVowsEffectDataTables (Source/Abrams/Private/GameDataTableManager.cpp:291, Source/Abrams/Public/GameDataTableManager.h:202).",
+    "The row is reached almost entirely through BindingVowsDataTable.Id_BindingVowsEffect joins: GameBindingVows_GetEffectRows and GameBindingVows_GetEffectRowsOfType are the central accessors used by status, PvE selection and UI code.",
+    "EffectValue's meaning is not uniform. Index roles were read directly from type-specific consumers; do not infer units for all rows from a single exported sample. Chance values are represented as 0..1 fractions before the *100 conversion in RollChance calls.",
+    "An unrelated structure, EquipmentItemEffect, has fields with the same names; the GameItemDescriptionTextWidget.cpp hits for EffectValue/Id_BattleText are for that type and are deliberately not used as evidence here.",
+    "Reconstructed static C++ only; partial Content means additional Blueprint/uncooked consumers cannot be excluded."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:241",
+      "detail": "GameBindingVows_GetEffectRows joins vow IDs to these rows, skipping None IDs and taking the first table match."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:273",
+      "detail": "GameBindingVows_GetEffectRowsOfType filters joined rows by EffectType for status queries and UI records."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:301",
+      "detail": "GetBindingVowsRecords builds current/required battle-log progress from EffectType and EffectValue[0]."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2212",
+      "detail": "ForceGaugeMax sums EffectValue[0] over active vows and clamps the result."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:3982",
+      "detail": "HitPointWhenJustGuard rolls EffectValue[0]*100 and then adds HitPointMax*EffectValue[1]."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBindingVowsWidget.cpp:38",
+      "detail": "Maps EffectType to the vow icon's hit-point/movement/attack/cursed-energy/other category."
+    },
+    {
+      "source": "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:141",
+      "detail": "Formats the debuff/buff descriptions with Id_BattleText and both EffectValue parameters."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:604",
+      "detail": "Mission vow selection excludes candidates whose effect types are forbidden by mission orders or tasks."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:291",
+      "detail": "Load/registry path for BindingVowsEffectDataTable."
+    }
+  ]
+}

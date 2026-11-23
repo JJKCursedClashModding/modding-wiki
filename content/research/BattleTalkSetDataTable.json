@@ -1,0 +1,69 @@
+{
+  "description": "A story-battle talk group referenced by a mission wave: a list of talk rows and parallel arrays that gate the group on battle-log conditions, plus cue sheets to preload.",
+  "fields": {
+    "Id": {
+      "simple": "Row key / battle-talk-set ID.",
+      "technical": "FName key looked up in BattleTalkSetDataTables (+0xB30). StoryMissionWave.Id_BattleTalkSet supplies lookup IDs; None entries are skipped. The same Id is passed to NotifyBattleTalkEnd when all talks in the set finish. Export spells it ID (case-insensitive generator match).",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:15", "Source/Abrams/Private/GameBattleStoryStates.cpp:180", "Source/Abrams/Private/GameBattleStoryStates.cpp:186", "Source/Abrams/Private/GameBattleSystems_A.cpp:1976"],
+      "status": "verified"
+    },
+    "CueSheetName": {
+      "simple": "Cue sheets whose audio should be preloaded for this set.",
+      "technical": "Parallel TArray<FName>; each non-None entry is appended to the story phase's collected preload names. These are not the voice row IDs themselves and are independent of Id_BattleTalk. Exported rows include None placeholders, which the consumer filters.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:19", "Source/Abrams/Private/GamePhase_BattleStory.cpp:602", "Source/Abrams/Private/GamePhase_BattleStory.cpp:604", "Source/Abrams/Private/GameDataTableManager.cpp:309"],
+      "status": "verified"
+    },
+    "Id_BattleTalk": {
+      "simple": "Ordered list of BattleTalkDataTable rows to play.",
+      "technical": "TArray<FName>; None entries are skipped. QueueBattleTalkSet clears the playback queue, then resolves each ID to the first BattleTalk row across DTM.BattleTalkDataTables (+0xB40); unresolved IDs are dropped. The queue order is the array order; an empty resolved queue aborts playback setup.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:22", "Source/Abrams/Private/GameBattleSystems_A.cpp:2010", "Source/Abrams/Private/GameBattleSystems_A.cpp:2012", "Source/Abrams/Private/GameBattleSystems_A.cpp:2016", "Source/Abrams/Private/GameBattleSystems_A.cpp:2025", "Source/Abrams/Private/GamePhase_BattleStory.cpp:652"],
+      "status": "verified"
+    },
+    "ValueType": {
+      "simple": "Battle-log statistic (or None for unconditional) for each condition slot.",
+      "technical": "TArray of EGameBattleLogValueType, indexed in lockstep with TargetType/PassiveType/Value/ConditionType. On entering a story fight, a set is queued immediately unless any element is non-None; on later ticks, non-None entries are evaluated. EvaluateLog rejects None/Invalid, maps TargetType to the player/ally/enemy character set, and sums the log values.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:25", "Source/Abrams/Private/GameBattleStoryStates.cpp:192", "Source/Abrams/Private/GameBattleStoryStates.cpp:274", "Source/Abrams/Private/GameBattleSystems_B.cpp:437", "Source/Abrams/Private/GameBattleSystems_B.cpp:441", "Source/Abrams/Private/GameBattleSystems_B.cpp:453"],
+      "status": "verified"
+    },
+    "TargetType": {
+      "simple": "Whose log value is measured: ally, self, enemy, or None.",
+      "technical": "TArray<EGameBattleLogTargetType> read at the same index as ValueType and passed to EvaluateLog. Ally collects the player's team, Myself only the player, Enemy the rival team; unrecognized/None produces no candidate characters and the condition fails.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:28", "Source/Abrams/Private/GameBattleStoryStates.cpp:277", "Source/Abrams/Private/GameBattleSystems_B.cpp:451", "Source/Abrams/Private/GameBattleSystems_B.cpp:454", "Source/Abrams/Private/GameBattleSystems_B.cpp:461", "Source/Abrams/Private/GameBattleSystems_B.cpp:478"],
+      "status": "verified"
+    },
+    "PassiveType": {
+      "simple": "Whether the measured value was sent or received by the target.",
+      "technical": "TArray<EGameBattleLogPassiveType> forwarded to EvaluateLog with ValueType/TargetType. Enum values are None, Send and Receive; SumLogValues selects the corresponding send or receive log block before summing.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:31", "Source/Abrams/Private/GameBattleStoryStates.cpp:277", "Source/Abrams/Private/GameBattleSystems_B.cpp:419", "Source/Abrams/Private/GameBattleSystems_B.cpp:437"],
+      "status": "verified"
+    },
+    "Value": {
+      "simple": "Numeric threshold compared against the measured log value.",
+      "technical": "TArray<float> compared with the float OutValue produced by EvaluateLog. Success_GreaterThanEquals requires Value >= array element; Success_LessThanEquals requires Value <= element. Units follow the chosen log statistic (damage, count, rate, elapsed time, etc.); there is no per-row unit field. Exported conditional rows should be checked per condition, not treated as a single global threshold.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:34", "Source/Abrams/Private/GameBattleStoryStates.cpp:283", "Source/Abrams/Private/GameBattleStoryStates.cpp:288", "Source/Abrams/Private/GameBattleSystems_B.cpp:440"],
+      "status": "verified"
+    },
+    "ConditionType": {
+      "simple": "Comparison operator that decides whether a condition passes.",
+      "technical": "TArray<EGameBattleLogConditionType> read only after EvaluateLog succeeds. Only Success_GreaterThanEquals and Success_LessThanEquals increment Held in the reconstructed consumer; None and the Failure_* enum members fall through to default (no credit). A set fires only when Conditions > 0 and Conditions <= Held, i.e. every non-None condition passed.",
+"evidence": ["Source/AbramsDataTable/Public/EGameBattleLogConditionType.h:10", "Source/Abrams/Private/GameBattleStoryStates.cpp:279", "Source/Abrams/Private/GameBattleStoryStates.cpp:281", "Source/Abrams/Private/GameBattleStoryStates.cpp:293"],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The five condition arrays are parallel, not nested structs: consumers index them by the same integer and take Set->ValueType.Num() as the condition count. Mismatched array lengths in an asset could therefore produce out-of-bounds reads; no validation was observed.",
+    "Two queueing paths exist: unconditional sets (all ValueType == None) are queued once on entering the fight state; conditional sets are checked each tick while IsBattleTalkEnabled and queued once when all conditions hold.",
+    "ConditionType's Failure_GreaterThanEquals / Failure_LessThanEquals values are declared in the reconstructed enum but have no case in the observed consumer; whether retail treats them differently is unresolved.",
+    "StoryMissionWave.Id_BattleTalkSet is the join from mission content into this table; CueSheetName joins only to preloading, not to VoiceDataTable.",
+    "Loaded as a 'DataTable' primary asset named BattleTalkSetDataTable into DTM.BattleTalkSetDataTables (+0xB30). Source is reconstructed from retail code; Content is partial, so retail completeness and Blueprint uses are not asserted."
+  ],
+  "usages": [
+    {"source": "Source/Abrams/Private/GameDataTableManager.cpp:309", "detail": "Resolves BattleTalkSetDataTable into DTM.BattleTalkSetDataTables."},
+    {"source": "Source/Abrams/Private/GameDataTableManager.cpp:482", "detail": "Requests the BattleTalkSetDataTable primary asset."},
+    {"source": "Source/Abrams/Private/GameBattleStoryStates.cpp:186", "detail": "Fight enter: finds unconditional sets and queues them once."},
+    {"source": "Source/Abrams/Private/GameBattleStoryStates.cpp:266", "detail": "Fight tick: finds sets and evaluates their parallel condition arrays."},
+    {"source": "Source/Abrams/Private/GameBattleSystems_A.cpp:2004", "detail": "QueueBattleTalkSet resolves Id_BattleTalk rows into the ordered playback queue."},
+    {"source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:597", "detail": "Story phase reads CueSheetName to collect preload names."},
+    {"source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:647", "detail": "Story phase reads Id_BattleTalk to collect portrait texture names."}
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "description": "Per-wave story battle setup: allied MissionCharacter rows, playable-character slot, generic wave id and battle-talk sets.",
+  "fields": {
+    "ID": {
+      "simple": "Story mission wave row id, normally the mission id.",
+      "technical": "FName key in StoryMissionWaveDataTables (DTM +0x8E0), reached via StoryMission.Id_StoryMissionWave[WaveIndex]. Exported rows are mostly named after their mission, with one row per wave variant; the row is cached on the battle task system as StoryMissionWave / StoryMissionWaves.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryMissionWave.h:11",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:655",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:720",
+        "Source/Abrams/Public/GameBattleSystems_B.h:207",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:590"
+      ],
+      "status": "verified"
+    },
+    "Id_MissionCharacter_Ally": {
+      "simple": "Allied MissionCharacter rows taking part in this wave.",
+      "technical": "TArray<FName> (three exported slots). None entries are skipped when filtering for the playable-character count, when inserting the playable ally at the front of a wave's list, and when deduplicating across waves. The launch path indexes the array by PlayableCharacterIndex to set the player's battle character slot.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryMissionWave.h:15",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:678",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:680",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:732",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:739",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:457",
+        "Source/Abrams/Private/GamePhase_StoryCharacterSelect.cpp:233"
+      ],
+      "status": "verified"
+    },
+    "PlayableCharacterIndex": {
+      "simple": "Index in Id_MissionCharacter_Ally that the player controls.",
+      "technical": "int32 (row +0x20), constructor default 0; exported values are -2, -1, 0 and 1. If > -1 it is returned directly by Story_GetPlayableCharacterIndex. Otherwise a single non-None ally yields 0 and zero/multiple allies yield -1. Story_HasPlayableCharacterIndex tests > -2, and Story_GetBattleLayout treats <= -2 as a single ally for layout purposes. The launch path uses the value to index the ally array without another bounds check.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryMissionWave.h:18",
+        "Source/AbramsDataTable/Private/GameDataTableRow_StoryMissionWave.cpp:3",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:672",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:684",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:685",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:705",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:398",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:441"
+      ],
+      "status": "verified"
+    },
+    "Id_MissionWave": {
+      "simple": "Generic MissionWave row for enemy/order data.",
+      "technical": "FName (row +0x24). Story_GetBattleLayout and Story_GetDemoMissionTask resolve it in MissionWaveDataTables (DTM +0x9A0), from which enemy ids, mission-task lottery and mission order are read; a missing row returns 255/no task or aborts that lookup.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryMissionWave.h:21",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:46",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:383",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:576"
+      ],
+      "status": "verified"
+    },
+    "Id_BattleTalkSet": {
+      "simple": "Battle-talk sets attached to this wave.",
+      "technical": "TArray<FName> (row +0x30, ten exported slots). The current wave's array is walked in the story battle fight state: unconditional sets (all ValueType None) are queued on entry, and conditional sets are queued once each when their conditions hold. Battle-story phase helpers also resolve the sets to preload cue sheets and battle-talk lines; None ids are skipped.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryMissionWave.h:24",
+        "Source/Abrams/Public/GameBattleSystems_B.h:208",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:180",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:186",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:264",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:595",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:645"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "PlayableCharacterIndex -2 is exported but is not a documented distinct semantic: it is treated as 'no explicit playable index' by the same branches as -1 (Story_HasPlayableCharacterIndex false; layout falls back to one ally).",
+    "All four exported arrays/slots are used positionally; None is the empty sentinel rather than shortening the array.",
+    "93 exported rows; no numbered shards or localization variants found.",
+    "Evidence is from the reconstructed C++ in Source/ (row shape/counts from the exported table); status/ records byte matches for some owner TUs, but this file does not claim a retail byte comparison for every function or exhaustive Blueprint/runtime coverage."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:658",
+      "detail": "Story_GetPlayableCharacterIndex resolves the mission's first wave and its playable ally index."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:708",
+      "detail": "Collects ally MissionCharacter rows across waves, putting the playable one first."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:371",
+      "detail": "Battle layout lookup from wave allies and the linked MissionWave's enemies."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:570",
+      "detail": "Mission-task lookup walks StoryMissionWave -> MissionWave -> MissionTaskLottery."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:173",
+      "detail": "Queues wave battle talks in the fight state."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:587",
+      "detail": "Preloads battle-talk cue sheets and lines for the wave."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:430",
+      "detail": "Fills the player's battle character slot from the wave's playable ally."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:272",
+      "detail": "Loads StoryMissionWaveDataTable into StoryMissionWaveDataTables."
+    }
+  ]
+}

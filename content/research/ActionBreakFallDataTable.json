@@ -1,0 +1,101 @@
+{
+  "description": "Per-character break-fall timing: when knock-down/blow actions may be cancelled into a break-fall, and how long the recovery is protected by collision lock 6.",
+  "fields": {
+    "Id": {
+      "simple": "Character action row key, normally the character ID (for example CP_010).",
+      "technical": "Unreal DataTable row name. After the CharacterDataTable row resolves ActionDataTable, ActionDataTable.Id_ActionBreakFall is used as the FindRow key against ActionBreakFallDataTables; the table is loaded under the exact name ActionBreakFallDataTable. The exported table contains one row, CP_010.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:551",
+        "Source/Abrams/Private/GameDataTableManager.cpp:226",
+        "Source/Abrams/Private/GameDataTableManager.cpp:386"
+      ],
+      "status": "verified"
+    },
+    "Down_CancelInput_Time": {
+      "simple": "Earliest time a knocked-down character can break-fall.",
+      "technical": "Seconds. FGameCharacterAction_Down::CanBreakFall passes this to BlowCancelInputElapsed; a value >= 0 enables the test and cancel is allowed only once Elapsed >= value. A negative value permanently disables the cancel. C++ constructor default is 0.0f; exported CP_010 uses -1.0 (disabled).",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:74",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:316",
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionBreakFall.cpp:4"
+      ],
+      "status": "verified"
+    },
+    "Blow_CancelInput_Time": {
+      "simple": "Earliest time a blown-away character can break-fall.",
+      "technical": "Seconds, using the same BlowCancelInputElapsed rule as Down_CancelInput_Time; negative disables. Blow additionally refuses if the owner is defeated or wall-bound. Constructor default 0.0f; exported CP_010 is 1.1.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:74",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:292",
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionBreakFall.cpp:5"
+      ],
+      "status": "verified"
+    },
+    "BlowSmall_CancelInput_Time": {
+      "simple": "Earliest time after a small blow can be cancelled into break-fall.",
+      "technical": "Seconds, same >= 0 threshold/negative-disables rule and defeated/wall-bound guards as Blow_CancelInput_Time. Constructor default 0.0f; exported CP_010 is 0.8.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:74",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:356",
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionBreakFall.cpp:6"
+      ],
+      "status": "verified"
+    },
+    "BlowLarge_CancelInput_Time": {
+      "simple": "Earliest time after a large blow can be cancelled into break-fall.",
+      "technical": "Seconds, same >= 0 threshold/negative-disables rule and defeated/wall-bound guards. Constructor default 0.0f; exported CP_010 is 2.0.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:74",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:372",
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionBreakFall.cpp:7"
+      ],
+      "status": "verified"
+    },
+    "Invincible_Time": {
+      "simple": "Invulnerability applied when break-fall ends.",
+      "technical": "Seconds. FGameCharacterAction_BreakFall::End only calls SetCollisionLock(6, true, Invincible_Time) when the value is > 0; zero/negative means no lock. Constructor default 0.0f; exported CP_010 is 0.0.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Jump.cpp:410",
+        "Source/Abrams/Private/GameCharacterAction_Jump.cpp:414",
+        "Source/Abrams/Private/GameCharacterAction_Jump.cpp:416",
+        "Source/AbramsDataTable/Private/GameDataTableRow_ActionBreakFall.cpp:8"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "One exported asset was available (CP_010); the source has no variant/localization copies of this table. Do not generalise the exported values to every character.",
+    "C++ evidence comes from the reconstructed Abrams source, not a claim of retail byte-match; only the listed direct consumers were identifiable in the available Source/Plugins.",
+    "The export writes the row key as ID while the reconstructed USTRUCT property is Id; consumers use it as a FindRow key rather than reading a separate value field."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:551",
+      "detail": "ResolveDataRows looks up ActionBreakFallDataTables with ActionDataTable.Id_ActionBreakFall and stores the row on the character."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Blow.cpp:74",
+      "detail": "Shared BlowCancelInputElapsed helper: negative times disable the cancel; otherwise the cancel opens at Elapsed >= threshold."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Blow.cpp:292",
+      "detail": "Blow break-fall eligibility uses Blow_CancelInput_Time, with defeated/wall-bound guards."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Blow.cpp:316",
+      "detail": "Down break-fall eligibility uses Down_CancelInput_Time."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Blow.cpp:356",
+      "detail": "BlowSmall break-fall eligibility uses BlowSmall_CancelInput_Time, with defeated/wall-bound guards."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Blow.cpp:372",
+      "detail": "BlowLarge break-fall eligibility uses BlowLarge_CancelInput_Time, with defeated/wall-bound guards."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Jump.cpp:414",
+      "detail": "BreakFall::End tests Invincible_Time > 0 before applying collision lock 6 for that duration."
+    }
+  ]
+}

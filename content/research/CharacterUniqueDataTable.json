@@ -1,0 +1,60 @@
+{
+  "description": "Sharded, character-specific numeric parameter tables (five shards with a common row schema). Rows are referenced in order by Character::Id_CharacterUnique and read as untyped float slots through IGameActorInterface by character-specific action code.",
+  "fields": {
+    "ID": {
+      "simple": "Row key for a character or a character-specific technique/variant.",
+      "technical": "FName primary key (ImportKeyField=Id in each shard); examples include CP_050 (character-wide) and CP_050_ATTACKG / CP_020_ATTACKA_... (per-technique). Character::Id_CharacterUnique lists the IDs; ResolveDataRows resolves each with an optional finder over the merged CharacterUniqueDataTables array and preserves array order (including null placeholders) in AGameCharacter::UniqueRows (+0x420).",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:560",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Public/GameCharacter.h:245",
+        "Source/Abrams/Private/GameDataTableManager.cpp:220"
+      ],
+      "status": "verified"
+    },
+    "FloatValue": {
+      "simple": "Ordered array of untyped numeric tuning values for that character/technique.",
+      "technical": "TArray<float>, 14 entries in every exported row (unused trailing slots are 0.0). AGameCharacter::GetCharacterUniqueFloatValue(ValueIndex, RowIndex) returns UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds checks; character-specific controllers/actions call it with their own hard-coded index pairs for distances, durations, scales, speeds, shot counts, hit counts, angles and other one-off parameters. The meaning of each index is defined only by the consuming character code, not by a shared schema; zeros commonly mean 'unused' for a given row.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUnique.h:15",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Source/Abrams/Public/GameCharacter.h:1012",
+        "Source/Abrams/Private/CN_050_ActionController.cpp:227",
+        "Source/Abrams/Private/CN_070_Actions.cpp:142",
+        "Source/Abrams/Private/CN_122_ActionController.cpp:2378",
+        "Source/Abrams/Private/CN_010_Actions.cpp:603"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Exported shards: CharacterUniqueDataTable1 (30 rows), 2 (24), 3 (60), 4 (55), 5 (26); all rows have 14 FloatValue entries. The manager loads all five primary assets and appends them into one CharacterUniqueDataTables array (DTM +0x570), so lookups search the shards in order and duplicate IDs would resolve to the first match.",
+    "The row index passed to GetCharacterUniqueFloatValue is the index into Character::Id_CharacterUnique / AGameCharacter::UniqueRows, not the data-table shard number. A missing row leaves a null pointer in that array, so consumers assume the character's row list is complete.",
+    "Indices are per-character: e.g. CN_070 uses indices 0..10 of row 1 for shot count/beam scale/range, CN_050 uses row 1 indices 0..3 for dash tangents and timings, CN_122 uses rows 0,3,4,5,6 for position/distance/timing parameters. No generic meaning can be assigned to a slot across characters.",
+    "No localization variants exist for these numeric tables; no claim about additional retail rows absent from the partial Content export or about Blueprint-only readers.",
+    "Reconstructed source with cited retail RVAs; both array indices are unchecked in the accessor, matching retail behavior."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:220",
+      "detail": "Loads CharacterUniqueDataTable1-5 into the merged CharacterUniqueDataTables array."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:560",
+      "detail": "Character setup walks Id_CharacterUnique and caches each resolved row in UniqueRows."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:1759",
+      "detail": "GetCharacterUniqueFloatValue selects UniqueRows[RowIndex]->FloatValue[ValueIndex]."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_050_ActionController.cpp:227",
+      "detail": "One consumer uses specific float slots as dash tangent magnitudes."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_070_Actions.cpp:142",
+      "detail": "Another uses slots as shot count, beam scale and maximum range."
+    }
+  ]
+}

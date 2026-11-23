@@ -1,0 +1,53 @@
+{
+  "description": "Catalog of background music tracks: their CRI cue-sheet/row names, gallery labels, track length, and whether the music is unlocked from the start.",
+  "fields": {
+    "Id": {
+      "simple": "Row key / BGM ID used by game phases and the sequencer.",
+      "technical": "FName primary key. Game phases look it up from request/story-chapter/mission-wave IDs; the gallery uses it to test the user's heard-BGM set; DTM_CollectBattleBgmRows filters rows by an case-insensitive 'BATTLE' substring and returns this Id to random battle selection. The sequencer's PlayBgm resolves a row then forwards Row->Id to SoundManager.PlayBgm, which uses it as the BGM loader/cue-sheet name. Export spells it ID.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:11", "Source/Abrams/Private/GameDataTableManager.cpp:569", "Source/Abrams/Private/GamePhase_BattleFree.cpp:58", "Source/Abrams/Private/GameCollectionSoundWidget.cpp:35", "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:379", "Source/Abrams/Private/GameSoundManager.cpp:392"],
+      "status": "verified"
+    },
+    "CueSheetName": {
+      "simple": "CRI Atom cue sheet to play for the track.",
+      "technical": "FString, default empty (inline constructor). Battle and level-sequencer/debug paths construct an FName from this string and pass it to PlayBgm; an empty string becomes an empty FName. BattleBase/MissionBase return it as the battle BGM name, falling back to an empty name (or literal BGM_BATTLE_01 when no row exists). Exported rows generally repeat the row ID, but the field is independent and must be read from the row.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:15", "Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:26", "Source/Abrams/Private/GamePhase_BattleBase.cpp:1060", "Source/Abrams/Private/GamePhase_BattleMissionBase.cpp:194", "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:867", "Source/Abrams/Private/LevelSequencerDebugRemainder.cpp:112"],
+      "status": "verified"
+    },
+    "Id_SoundText": {
+      "simple": "Localized text ID shown as the track title in the sound collection.",
+      "technical": "FName. UGameCollectionSoundListItem::GetTitleTextId returns this row value; the collection item widget displays it for unlocked entries and a locked placeholder for unheard music. It is also used as the display string for free-battle BGM option boxes, where an extra Random option is appended and SetUseTextId is enabled.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:18", "Source/Abrams/Private/GameCollectionSoundListItem.cpp:11", "Source/Abrams/Private/GameCollectionSoundItemWidget.cpp:42", "Source/Abrams/Private/GameFreeBattleRuleSelectWidget.cpp:391", "Source/Abrams/Private/GameFreeBattleRuleSelectWidget.cpp:394"],
+      "status": "verified"
+    },
+    "Duration": {
+      "simple": "Track length in seconds.",
+      "technical": "float, default 0.0f. The credit scroll uses the BGM_DEMO_07 row minus 3.5 s and the BGM_DEMO_01 row directly as ease durations. The collection slider sets its maximum to Duration, substituting 1.0f when abs(Duration) <= UE_SMALL_NUMBER. Exported values are whole-number seconds, but the field itself is a float.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:21", "Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:26", "Source/Abrams/Private/GameCreditWidget.cpp:22", "Source/Abrams/Private/GameCreditWidget.cpp:55", "Source/Abrams/Private/GameCreditWidget.cpp:63", "Source/Abrams/Private/GameCollectionSoundItemWidget.cpp:29", "Source/Abrams/Private/GameCollectionSoundItemWidget.cpp:30"],
+      "status": "verified"
+    },
+    "bInitialReleaseEnabled": {
+      "simple": "Whether the track is unlocked before the player has heard it.",
+      "technical": "bool, default false. At startup, every row with this flag true is inserted into GameManager.UserInfo.StudioBgmNames_BE8; the collection widget's unlock state is then determined by membership in that same set. In the exported table only BGM_DEMO_10 is true, so the others start locked unless encountered in play.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:24", "Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:26", "Source/Abrams/Private/GameManager.cpp:402", "Source/Abrams/Private/GameManager.cpp:404", "Source/Abrams/Private/GameCollectionSoundWidget.cpp:35"],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Loaded as a 'DataTable' primary asset named BgmDataTable into DTM.BgmDataTables (+0x720); Status_FindBgmRow walks tables in order and, with bCheckNone=true, rejects None IDs.",
+    "Two playback paths exist and must not be conflated: battle/menu phases pass row.CueSheetName to SoundManager.PlayBgm, while the sequencer sound module resolves a row by SoundId and passes row.Id. Both ultimately reach the BGM loader in AGameSoundManager::PlayBgm.",
+    "DTM_CollectBattleBgmRows selects rows whose Id contains BATTLE case-insensitively from the start of the string; this is a naming convention, not a dedicated flag.",
+    "The credit widget reads BGM_DEMO_07 without a null check, so a missing row would crash; no defensive fallback was observed there.",
+    "Source is reconstructed retail code; exported assets are partial. Only 28 BGM rows are present in the companion export, so retail completeness and all Blueprint references cannot be asserted."
+  ],
+  "usages": [
+    {"source": "Source/Abrams/Private/GameDataTableManager.cpp:244", "detail": "Resolves BgmDataTable into DTM.BgmDataTables."},
+    {"source": "Source/Abrams/Private/GameDataTableManager.cpp:416", "detail": "Requests BgmDataTable as a primary asset."},
+    {"source": "Source/Abrams/Private/GameDataTableManager.cpp:565", "detail": "Collects rows whose Id contains BATTLE for random battle BGM selection."},
+    {"source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:1053", "detail": "Looks up the requested battle BGM and returns CueSheetName."},
+    {"source": "Source/Abrams/Private/GamePhase_BattleMissionBase.cpp:181", "detail": "Falls back from wave BGM to request BGM and returns CueSheetName."},
+    {"source": "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:375", "detail": "Sequencer PlayBgm resolves the row and plays using Row.Id."},
+    {"source": "Source/Abrams/Private/GameCollectionSoundWidget.cpp:29", "detail": "Builds the sound-collection list from all Bgm rows."},
+    {"source": "Source/Abrams/Private/GameManager.cpp:399", "detail": "Grants initially enabled BGMs at startup."},
+    {"source": "Source/Abrams/Private/GameCreditWidget.cpp:21", "detail": "Uses Duration of fixed BGM IDs to drive the credit scroll."}
+  ]
+}

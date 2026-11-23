@@ -1,0 +1,71 @@
+{
+  "description": "Trap setup catalog: maps trap IDs to a spawnable trap Blueprint and the AI/behaviour action type selected when the trap is initialized.",
+  "fields": {
+    "ID": {
+      "simple": "Trap row ID.",
+      "technical": "FName row key used by Trap_FindTrapRow / inline FindRow over TrapDataTables (+0x670); NAME_None is rejected by the shared finder. Constants used in C++ include TR_030_00 (PlantRootMove), TR_031_00/TR_031_10 (PlantWall variants), TR_050_00 (Uzumaki); effects can request traps by EffectRow.Id_Trap_Background[i]. Export contains 15 rows (TR_010_00/01/02, TR_020_00, TR_030_00, TR_031_00/10, TR_040_00/10, TR_050_00, TR_060_00/10/20, TR_061_00, ...).",
+      "evidence": [
+        "Source/Abrams/Private/GameDataTableManager.cpp:671",
+        "Source/Abrams/Private/CP_150_ActionController.cpp:716",
+        "Source/Abrams/Private/CP_150_ActionController.cpp:837",
+        "Source/Abrams/Private/GameEffect.cpp:1372"
+      ],
+      "status": "verified"
+    },
+    "FileName_BP": {
+      "simple": "Trap actor Blueprint asset name.",
+      "technical": "FName passed to AGameTrapManager::SpawnPooled to create the pooled AGameTrap (retail 0x1414C32D0). The row pointer is also cached on the spawned trap at +0x300 by InitializeTrap (0x1414C7AE0). Multiple rows may share one Blueprint: the exported TR_010_00/01/02 rows all point at TR_010_00_BP, with different ActionType values. Layout pin: row+0x10 is read as the spawn asset argument in retail 0x1414C2DE0.",
+      "evidence": [
+        "Source/Abrams/Private/GameTrapManager.cpp:99",
+        "Source/Abrams/Private/GameTrapManager.cpp:269",
+        "Source/Abrams/Private/GameTrapManager.cpp:263",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Trap.h:29"
+      ],
+      "status": "verified"
+    },
+    "ActionType": {
+      "simple": "Trap behaviour/action class discriminant.",
+      "technical": "EGameTrapActionType (0 None, 1 VolcanoHoming, 2 VolcanoOneShot, 3 VolcanoTrigger, 4 FlowerMachineGun, 5 PlantRootMove, 6 PlantWall, 7 BodyRepel, 8 Uzumaki, 9 IceWall, 255 Invalid). InitializeTrap passes row+0x18 to UGameTrapActionController::SetTrapActionType (0x1414ACD30), which reuses the current FGameTrapAction when its type matches, otherwise constructs the per-type behaviour object and initializes it with the owner trap. CP_150 additionally branches on this field: FlowerMachineGun replaces the active trap and resets shot state; PlantWall/FlowerMachineGun affect how finished traps are forgotten. Layout pin: row+0x18.",
+      "evidence": [
+        "Source/Abrams/Private/GameTrapManager.cpp:109",
+        "Source/Abrams/Private/GameTrapActionController.cpp:54",
+        "Source/Abrams/Public/GameTrapActionController.h:46",
+        "Source/Abrams/Private/CP_150_ActionController.cpp:1015",
+        "Source/Abrams/Private/CP_150_ActionController.cpp:1064",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Trap.h:30"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Loader: GameDataTableManager.cpp:233 registers/resolves 'TrapDataTable' to TrapDataTables (+0x670); CharacterTrapDataTable (+0x4E0) is a separate per-character selection table and is joined before this table in battle preload.",
+    "The FGameTrapAction subclasses and their concrete effects are marked as untranscribed in the reconstruction (Wave-10/Wave-11 TRAP records); the enum-to-factory mapping and consumer branches are decomp-backed, but full runtime behaviour of each trap type is not available in this source tree.",
+    "Spawning is null-safe on missing rows in the effect/capture paths; InitializeTrap also clears owner/row when inputs are null. Trap spawn does three passes of overlap resolution and ground placement unless bSkipGroundPlace is set; those parameters come from the caller, not the data row."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:671",
+      "detail": "Trap_FindTrapRow performs the shared first-match row lookup over the TrapDataTables array (retail 0x14109A180)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTrapManager.cpp:263",
+      "detail": "SpawnTrap spawns FileName_BP from the pool at the requested transform and optionally ground-places it."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTrapManager.cpp:99",
+      "detail": "InitializeTrap stores the row on the trap, enables collision keepers and propagates ActionType to the trap's action controller."
+    },
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:152",
+      "detail": "Battle preload joins CharacterTrap -> Trap rows and collects their FileName_BP assets."
+    },
+    {
+      "source": "Source/Abrams/Private/GameEffect.cpp:1360",
+      "detail": "Effect rows' Id_Trap_Background[] entries are resolved to Trap rows; the trap is swept/spawned at the first matching background hit."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_150_ActionController.cpp:1015",
+      "detail": "Character CP_150 tracks spawned FlowerMachineGun traps and branches trap cleanup by ActionType."
+    }
+  ]
+}

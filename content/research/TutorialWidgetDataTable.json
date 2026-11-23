@@ -1,0 +1,98 @@
+{
+  "description": "Stores the pages of the in-game tutorial/help popup: which tutorial flow each page belongs to, its heading and message keys, and the explanation images (including keyboard/controller-specific variants) shown beside the text.",
+  "fields": {
+    "Id": {
+      "simple": "Tutorial-page row identifier.",
+      "technical": "FName row key collected from all TutorialWidgetDataTables. ShowTutorialTypes does not filter by this ID; it filters by TutorialWidgetType and appends matching rows in table/row-name order, which becomes the page sequence. The ID is therefore a unique row key rather than a runtime selection key in the reconstructed consumer.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:11",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:35",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:78"
+      ],
+      "status": "verified"
+    },
+    "TutorialWidgetType": {
+      "simple": "Tutorial flow/category this page belongs to.",
+      "technical": "EGameTutorialWidgetType (None, Move=1 through Adapt=45, Invalid=255). ShowTutorial(Type) calls ShowTutorialTypes with one type; the latter scans all rows for each requested type in the supplied type-list order and appends them to the displayed page array. Exported rows use 38 distinct types, with some types contributing several pages.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameTutorialWidgetType.h:6",
+        "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:16",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:69",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:81",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:86"
+      ],
+      "status": "verified"
+    },
+    "Id_TutorialLabel": {
+      "simple": "Localized heading shown at the top of the page.",
+      "technical": "FName passed directly to HeaderText->SetTextIdOnly on every SetPage call.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:19",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:145",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:146"
+      ],
+      "status": "verified"
+    },
+    "Id_TutorialMessage": {
+      "simple": "Localized body text for the tutorial page.",
+      "technical": "FName passed to ExplanationText_1 or ExplanationText_2 depending on whether the page has images. A hard-coded legacy key TUT_OUTGAME_MESSAGE_1301 is rewritten to TUT_OUTGAME_MESSAGE_1304 at display time; all other keys are passed through unchanged.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:22",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:175",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:177",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:182"
+      ],
+      "status": "verified"
+    },
+    "TutorialTextureName": {
+      "simple": "Ordered list of explanation image names for the page.",
+      "technical": "TArray<FName>. Names are split into WidgetTexture primary-asset loaders or Win64 platform-streamed loads according to the parallel switch array. None entries are skipped while loading. SetPage reads indices 0 and 1 unchecked to decide between the image layout and text-only layout; ApplyPageTextures later maps non-None names in order onto ExplanationImages and shows each loaded texture.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:25",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:100",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:156",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:246",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:257"
+      ],
+      "status": "verified"
+    },
+    "bSwitchPlatformTutorialTexture": {
+      "simple": "Parallel flags selecting input-device-specific image variants.",
+      "technical": "TArray<bool> aligned with TutorialTextureName by index; retail indexes it unchecked. True names are loaded as /Game/Widgets/StreamingAssets/Tutorial/Win64/<Name>_Win64_Keyboard and <Name>_Win64_Controller; false names go through GamePrimaryAssetType_WidgetTexture. ApplyPageTextures strips '_Win64' and selects the Keyboard or Controller variant based on the active EGameWidgetInputGuideType before applying it to the page image.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:28",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:107",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:121",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:127",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:131",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:223",
+        "Source/Abrams/Private/GameTutorialWidget.cpp:224"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The export contains 54 rows. Most rows have two image names; the arrays must stay the same length because SetPage/loader code indexes both arrays positionally, and indices 0/1 are read unguarded.",
+    "Only one table consumer is identified: UGameTutorialWidget. Callers supply one or more EGameTutorialWidgetType values; the table itself does not encode prerequisites or ordering beyond table/row order.",
+    "The platform-specific suffix and Win64 directory are hard-coded in the reconstructed retail flow; no other platform path is assumed.",
+    "Only the supplied retail export and partial Content are available; no claim is made about all Blueprint or editor-tool uses."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:311",
+      "detail": "Loads TutorialWidgetDataTable into TutorialWidgetDataTables."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTutorialWidget.cpp:75",
+      "detail": "Collects all rows, keeps those matching the requested tutorial types in order, and starts the appropriate texture loads."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTutorialWidget.cpp:142",
+      "detail": "SetPage applies the row's label/message keys, chooses image vs text-only layout, and updates page navigation buttons."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTutorialWidget.cpp:203",
+      "detail": "ApplyPageTextures attaches the current page's loaded normal/platform image textures to the explanation image widgets."
+    }
+  ]
+}

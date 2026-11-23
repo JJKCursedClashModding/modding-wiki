@@ -1,0 +1,126 @@
+{
+  "description": "Per-character finisher wiring: damage IDs for solo and tag-team super attacks, multi-hit behavior, linked domain expansion and the character-specific super-attack ranking record.",
+  "fields": {
+    "Id": {
+      "simple": "Character ID used as the row key.",
+      "technical": "Unreal DataTable row name. ResolveDataRows resolves it from CharacterDataTable.Id_CharacterSpecialAttack, with FStudioBattleCharacterOverrides::SpecialAttackIdOverride taking priority when set. The row is required; failure aborts character row resolution. Asset collectors and battle phases independently look up the same row by the character's Id_CharacterSpecialAttack.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:506",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:346",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:267"
+      ],
+      "status": "verified"
+    },
+    "Id_GlossaryText_Name": {
+      "simple": "Name-text ID field on the special-attack row; no direct use was found.",
+      "technical": "FName serialized on every exported row, with all 42 exported values set to None. No consumer of SpecialAttackRow.Id_GlossaryText_Name exists in the available Source/Plugins. The numerous Id_GlossaryText_Name hits belong to the distinct CharacterDataTable field (row +0x10) and must not be attributed here.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSpecialAttack.h:16",
+        "Source/Abrams/Private/GameCharacter.cpp:900"
+      ],
+      "status": "unresolved"
+    },
+    "Id_Damage_SpecialTagCombo": {
+      "simple": "Damage row used for the tag-team special combo finisher.",
+      "technical": "FName key into DamageDataTables. State 6 reads it from Performers[0] both for lethal-damage prediction (IsLethalSequenceDamage with bIgnoreStock=false) and for the actual ApplySequenceDamage on the target after the sequence. ApplySequenceDamage resolves the Damage row and sends a multi-hit request with flags 0x23.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleState_06.cpp:368",
+        "Source/Abrams/Private/GameBattleState_06.cpp:397",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:292",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:325"
+      ],
+      "status": "verified"
+    },
+    "Id_Damage_SoloSpecialAttack": {
+      "simple": "Damage row used for the solo super-attack finisher.",
+      "technical": "FName key into DamageDataTables. State 5 reads the finisher's value to predict lethality (with bIgnoreStock=true) while accumulating team costs, and applies it once per knocked-out character at sequence end. Missing damage rows make the lethal check return false and the damage request carry a null DamageRow.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleState_05.cpp:136",
+        "Source/Abrams/Private/GameBattleState_05.cpp:428",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:295",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:333"
+      ],
+      "status": "verified"
+    },
+    "bMultiHitSoloSpecialAttack": {
+      "simple": "Whether the solo super hits every listed victim instead of one chosen target.",
+      "technical": "Bool. AGameCharacter::IsMultiHitSoloSpecialAttackEnabled returns this field unchecked via interface slot 168. The battle knockout collector uses it: when true, all alive victims become KnockedOut and the search breaks; when false, it narrows to one victim by secondary/target selection. Constructor default false; exported CP_020 is the sole true row among 42.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:2368",
+        "Source/Abrams/Public/GameCharacter.h:348",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2409",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterSpecialAttack.cpp:4"
+      ],
+      "status": "verified"
+    },
+    "Id_DomainExpansion": {
+      "simple": "Domain-expansion row tied to the character's super.",
+      "technical": "FName key into DomainExpansionDataTables. ResolveDataRows resolves it optionally into DomainExpansionRow; battle assets and GamePhase_BattleBase use it to reach DomainExpansion.Id_Map and preload that map's MiniMapFileName. State 7 uses it to select the domain-transformation area transform, falling back to the tag-combo transform when the row or Id_Map is absent. None is allowed and means no domain link.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:558",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:351",
+        "Source/Abrams/Private/GameBattleState_07.cpp:511",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:269"
+      ],
+      "status": "verified"
+    },
+    "RankingRecord": {
+      "simple": "Which numbered super-attack ranking record this character can earn.",
+      "technical": "EGameRankingRecord enum. EvaluateRankingRecords compares the player's SpecialAttackRow->RankingRecord against each RankingRecordDataTable row for the numbered SuperCursedEnergyAttack_01..27 records; on a match and a SuperCursedEnergyAttack_Hit battle-log threshold it appends the enum byte to earned records. Constructor default None; 14 exported rows are None.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleManager.cpp:1079",
+        "Source/Abrams/Private/GameBattleManager.cpp:1135",
+        "Source/Abrams/Private/GameBattleManager.cpp:1139",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CharacterSpecialAttack.cpp:5"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The exported table has 42 rows; available Content is partial, so this is not a claim about every retail character or Blueprint reference.",
+    "Id_GlossaryText_Name on this row is distinct from CharacterDataTable.Id_GlossaryText_Name; no direct consumer of the special-attack copy was identifiable. All exported values are None.",
+    "Source evidence is reconstructed C++; locations with retail RVAs in comments are provenance hints, not a byte-match verdict."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:506",
+      "detail": "Resolves the required SpecialAttack row from CharacterDataTable.Id_CharacterSpecialAttack, honoring the studio override, and caches it in SpecialAttackRow."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_05.cpp:136",
+      "detail": "Uses Id_Damage_SoloSpecialAttack to decide whether each knocked-out opponent constitutes a team defeat."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_05.cpp:428",
+      "detail": "Applies Id_Damage_SoloSpecialAttack to every loser at the end of the solo super sequence."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_06.cpp:368",
+      "detail": "Uses Id_Damage_SpecialTagCombo for lethal prediction before applying tag-combo damage."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_06.cpp:397",
+      "detail": "Applies Id_Damage_SpecialTagCombo from the first performer to the target."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:2368",
+      "detail": "Exposes bMultiHitSoloSpecialAttack through IGameActorInterface for the knockout collector."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:2409",
+      "detail": "Branches knockout collection to all victims when multi-hit solo special is enabled."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_07.cpp:511",
+      "detail": "Resolves Id_DomainExpansion to choose the domain-expansion transform versus the tag-combo fallback."
+    },
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:351",
+      "detail": "Joins SpecialAttack -> DomainExpansion -> Map to collect the domain map's minimap texture."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1135",
+      "detail": "Matches the character's RankingRecord against earned numbered super-attack ranking records."
+    }
+  ]
+}

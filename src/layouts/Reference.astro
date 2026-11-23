@@ -1,0 +1,159 @@
+---
+import { categories, hrefFor } from '../data.js';
+import '../styles.css';
+
+const { title, description, current } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href={`${base}icon.svg`} type="image/svg+xml" />
+    <title>{title} · JJK CC DataTables</title>
+  </head>
+  <body data-base={base}>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="topbar">
+      <a class="brand" href={base}>
+        <span class="brand-icon" aria-hidden="true">呪</span>
+        <span><strong>JJK CC</strong><small>DataTable reference</small></span>
+      </a>
+      <button class="search-trigger" type="button" data-search-trigger aria-haspopup="dialog">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/></svg>
+        <span>Search tables and fields</span>
+        <kbd>/</kbd>
+      </button>
+    </header>
+    <div class="shell">
+      <aside class="sidebar">
+        <details class="nav-shell" open>
+          <summary>Browse DataTables</summary>
+          <nav aria-label="DataTables">
+            <a class="nav-home" href={base} aria-current={current ? undefined : 'page'}>Overview</a>
+            {categories.map(({ label, groups }) => (
+              <details class="nav-category" open={groups.some((item) => item.id === current)}>
+                <summary><span>{label}</span><span class="nav-count">{groups.length}</span></summary>
+                <ul>
+                  {groups.map(({ id }) => (
+                    <li><a href={hrefFor(id)} aria-current={id === current ? 'page' : undefined}>{id}</a></li>
+                  ))}
+                </ul>
+              </details>
+            ))}
+          </nav>
+        </details>
+      </aside>
+      <main id="main" class="main">
+        <slot />
+        <footer class="footer">Schema and exports from the <a href="https://github.com/JJKCursedClashModding/DataTables">JJK Cursed Clash modding community</a>. Names and stubs attributed to the <a href="https://github.com/JJKCursedClashModding/UE5-Mod-Kit">community UE5 Mod Kit</a>.</footer>
+      </main>
+    </div>
+    <dialog class="search-dialog" aria-labelledby="search-label">
+      <form method="dialog" class="search-top">
+        <label id="search-label" for="search-input">Search reference</label>
+        <button type="submit" aria-label="Close search">Close</button>
+      </form>
+      <input id="search-input" type="search" placeholder="Try Attack, FName, or cursed energy" autocomplete="off" />
+      <p class="search-status" role="status"></p>
+      <ol class="search-results"></ol>
+    </dialog>
+    <script>
+      const nav = document.querySelector('.nav-shell');
+      if (nav instanceof HTMLDetailsElement && matchMedia('(max-width: 820px)').matches) nav.open = false;
+
+      const dialog = document.querySelector('.search-dialog');
+      const input = document.querySelector('#search-input');
+      const status = document.querySelector('.search-status');
+      const list = document.querySelector('.search-results');
+      const base = document.body.dataset.base;
+      let index;
+      let updateId = 0;
+
+      function openSearch() {
+        if (!dialog.open) dialog.showModal();
+        input.focus();
+        input.select();
+        showResults();
+      }
+
+      document.querySelector('[data-search-trigger]').addEventListener('click', openSearch);
+      document.addEventListener('keydown', (event) => {
+        const editable = event.target instanceof Element && event.target.closest('input, textarea, [contenteditable]');
+        if (((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') ||
+            (event.key === '/' && !editable)) {
+          event.preventDefault();
+          openSearch();
+        }
+      });
+      dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) dialog.close();
+      });
+      list.addEventListener('click', (event) => {
+        if (event.target instanceof Element && event.target.closest('a')) dialog.close();
+      });
+      input.addEventListener('input', showResults);
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown' || event.key === 'Enter') {
+          const firstResult = list.querySelector('a');
+          if (firstResult) {
+            event.preventDefault();
+            if (event.key === 'Enter') firstResult.click();
+            else firstResult.focus();
+          }
+        }
+      });
+
+      const normalize = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+      async function showResults() {
+        const id = ++updateId;
+        const query = normalize(input.value);
+        list.replaceChildren();
+        if (!query) {
+          status.textContent = 'Enter a table, asset variant, field, type, or topic.';
+          return;
+        }
+        status.textContent = 'Searching…';
+        try {
+          index ??= fetch(base + 'search-index.json').then((response) => {
+            if (!response.ok) throw new Error('Search index unavailable');
+            return response.json();
+          });
+          const entries = await index;
+          if (id !== updateId) return;
+          const terms = query.split(' ');
+          const matches = entries.flatMap((entry) => {
+            const name = normalize(entry[0]);
+            const context = normalize(entry[1] + ' ' + entry[3]);
+            if (!terms.every((term) => name.includes(term) || context.includes(term))) return [];
+            const score = (name === query ? 100 : name.startsWith(query) ? 40 : name.includes(query) ? 25 : 0)
+              + terms.filter((term) => name.includes(term)).length * 8 + (entry[2].includes('#') ? 0 : 5);
+            return [{ entry, score }];
+          }).sort((a, b) => b.score - a.score);
+          status.textContent = matches.length
+            ? `${matches.length} result${matches.length === 1 ? '' : 's'}${matches.length > 16 ? ' · showing the first 16' : ''}`
+            : 'No matches. Try a shorter query.';
+          for (const { entry } of matches.slice(0, 16)) {
+            const item = document.createElement('li');
+            const link = document.createElement('a');
+            const label = document.createElement('strong');
+            const context = document.createElement('small');
+            link.href = entry[2];
+            label.textContent = entry[0];
+            context.textContent = entry[1];
+            link.append(label, context);
+            item.append(link);
+            list.append(item);
+          }
+        } catch {
+          index = undefined;
+          if (id === updateId) status.textContent = 'Search is unavailable. You can still browse the reference.';
+        }
+      }
+    </script>
+  </body>
+</html>

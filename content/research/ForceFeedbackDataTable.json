@@ -1,0 +1,66 @@
+{
+  "description": "Named gamepad vibration pulse presets (channel, strength and duration) requested by battle damage/events.",
+  "fields": {
+    "ID": {
+      "simple": "Row key/name of the force-feedback preset.",
+      "technical": "FName row key; the battle system takes the manager's ForceFeedbackDataTables array (+0x7C0) and finds the first table containing this exact name. NAME_None is rejected before the lookup. Export rows include NormalAttack, NormalAttack_Blow, CursedEnergyAttack_1..3, TagCombo and Attacker_Small.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:63",
+        "Source/Abrams/Private/GameBattleDamage.cpp:73",
+        "Source/Abrams/Private/GameDataTableManager.cpp:254",
+        "Source/Abrams/Private/GameDataTableManager.cpp:427"
+      ],
+      "status": "verified"
+    },
+    "ForceFeedbackChannel": {
+      "simple": "Which rumble motors the pulse targets.",
+      "technical": "EGameForceFeedbackChannel enum (None=0, Left=1, Right=2, All=3, Invalid=255). Passed to AGameInputManager::PlayForceFeedbackPulse: Left clears the right-small/right-large flags, Right clears the left-small/left-large flags, and every other value leaves the default FForceFeedbackChannelDetails flags untouched. All exported retail rows use All; the struct constructor default is None.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:78",
+        "Source/Abrams/Private/GameInputManager.cpp:1085",
+        "Source/AbramsDataTable/Public/EGameForceFeedbackChannel.h:6",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:24"
+      ],
+      "status": "verified"
+    },
+    "Power": {
+      "simple": "Vibration amplitude of the pulse.",
+      "technical": "Float rumble strength; installed verbatim as both keys of a two-point FRichCurve at times 0 and Duration (a constant curve), with no interpolation or scaling in the consumer. Export values range 0.2 (TagCombo) to 1.0 (CursedEnergyAttack_3); constructor default 0.0.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:78",
+        "Source/Abrams/Private/GameInputManager.cpp:1102",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:24"
+      ],
+      "status": "verified"
+    },
+    "Duration": {
+      "simple": "How long the vibration pulse lasts.",
+      "technical": "Float seconds used as the second key's time in the rumble FRichCurve (first key is at 0). Passed together with Power to FForceFeedbackParameters() default parameters and player index 0 by FStudioBattleSystem2E0::PlayForceFeedback. Export values are 0.25-0.8; constructor default 0.0.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:78",
+        "Source/Abrams/Private/GameInputManager.cpp:1103",
+        "Source/Abrams/Private/GameInputManager.cpp:1102"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Retail function provenance: lookup 0x141028150, pulse builder 0x1353500, engine PlayForceFeedback 0xe174f0. The C++ names of the helpers are reconstruction names; the offsets and array slot +0x7C0 are decomp evidence.",
+    "Only 11 exported rows were available; all set ForceFeedbackChannel=All. No export row exercises the Left/Right switch arms, and no other consumers were identified in the available source/Blueprint-less content, so per-event call sites for these IDs are not enumerated here.",
+    "The row's Id member is a serialized FName but the lookup uses the row map key (export Name/ID), not a scan of that member."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:254",
+      "detail": "StartInitialLoading resolves the 'ForceFeedbackDataTable' primary asset and appends it to ForceFeedbackDataTables (+0x7C0); the same name is registered in the loader name list at line 427."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:63",
+      "detail": "FStudioBattleSystem2E0::PlayForceFeedback(Id) ignores NAME_None, iterates ForceFeedbackDataTables, finds the first exact row and forwards channel/power/duration plus player 0 to the input manager, then stops."
+    },
+    {
+      "source": "Source/Abrams/Private/GameInputManager.cpp:1085",
+      "detail": "PlayForceFeedbackPulse maps the channel enum to FForceFeedbackChannelDetails motor flags and builds a constant Power curve over Duration before calling engine PlayForceFeedback."
+    }
+  ]
+}

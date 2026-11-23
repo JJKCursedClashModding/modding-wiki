@@ -1,0 +1,53 @@
+{
+  "description": "Per-layout arrays of character spawn positions and rotations that override stage defaults for a mission wave.",
+  "fields": {
+    "Id": {
+      "simple": "Mission layout identifier.",
+      "technical": "FName import key/row name for FGameDataTableRow_MissionLayout. It is not chosen directly by gameplay: AGameBattleManager::GetCharacterStartTransform first finds the active Map row, indexes MapRow->Id_MissionLayout with the current MissionWave->MissionLayoutIndex, and then resolves that id against MissionLayoutDataTables (DTM+0x9B0).",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionLayout.h:13",
+        "Source/Abrams/Public/GameDataTableManager.h:196",
+        "Source/Abrams/Private/GameBattleManager.cpp:1487",
+        "Source/Abrams/Private/GameBattleManager.cpp:1491"
+      ],
+      "status": "observed"
+    },
+    "Location": {
+      "simple": "Spawn positions, indexed by battle character slot.",
+      "technical": "TArray<FVector>, default empty. If Layout->Location.IsValidIndex(Index), GetCharacterStartTransform replaces the translated component of the start transform with Location[Index]. The Z component is subsequently overwritten by GameBattle_TraceGroundHeight over the world, so the authoritative final height is ground-traced rather than the raw data value. No layout row is selected when MapRow->Id_MissionLayout is out of range or None.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionLayout.h:17",
+        "Source/Abrams/Private/GameBattleManager.cpp:1493",
+        "Source/Abrams/Private/GameBattleManager.cpp:1502",
+        "Source/Abrams/Private/GameBattleManager.cpp:1508"
+      ],
+      "status": "verified"
+    },
+    "Rotation": {
+      "simple": "Spawn rotations, indexed by battle character slot.",
+      "technical": "TArray<FRotator>, default empty. If Layout->Rotation.IsValidIndex(Index), the start transform's rotation is set from FQuat(Rotation[Index]). Unlike Location, the final rotation is not ground-adjusted; when the array does not contain the slot the transform from the battle area (or identity) is kept.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionLayout.h:20",
+        "Source/Abrams/Private/GameBattleManager.cpp:1496",
+        "Source/Abrams/Private/GameBattleManager.cpp:1504"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The exported asset contains 137 rows; its RowStruct is FGameDataTableRow_MissionLayout and the manager loads MissionLayoutDataTable into MissionLayoutDataTables (DTM+0x9B0).",
+    "Rows are reached through a cross-table join: MissionWave.MissionLayoutIndex -> Map.Id_MissionLayout[] -> MissionLayout row. This is the only consumer identified in the reconstructed source.",
+    "The spawn-transform function is reconstructed with retail RVA 0x1015dc0 in comments; the scoreboard should be consulted for its current byte/status state.",
+    "Only available C++ and the export were reviewed; not a claim about every retail or Blueprint use."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1471",
+      "detail": "GetCharacterStartTransform applies Location and Rotation for the active wave's layout row."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleArcade.cpp:220",
+      "detail": "Battle entry construction calls GetCharacterStartTransform for each character slot."
+    }
+  ]
+}

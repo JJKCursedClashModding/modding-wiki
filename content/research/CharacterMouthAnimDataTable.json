@@ -1,0 +1,49 @@
+{
+  "description": "Time-coded lip-sync keyframes attached to voice row IDs; the sequencer uses their last ApplyTiming to decide when a voice has finished speaking.",
+  "fields": {
+    "Id": {
+      "simple": "Unique key for one mouth-animation keyframe row.",
+      "technical": "FName row key; exported keys use the voice ID plus a two-digit cue index (for example VoBtl_CN_210_Intro_1_011010_00). No consumer in the available source looks these rows up by Id; the sequencer collects every row and groups by Id_Voice. Therefore this is a serialized/row-key field with no observed behavioral use beyond row identity.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthAnim.h:12", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:570", "JJKCCDatatables/datatables/CharacterMouthAnimDataTable.json"],
+      "status": "observed"
+    },
+    "Id_Voice": {
+      "simple": "Voice row this keyframe belongs to.",
+      "technical": "FName into VoiceDataTable. All rows are collected, then a subset is retained when Row->Id_Voice equals the selected voice ID. The selected ID is converted to an '_En' suffixed variant first when GameManager.Settings.StudioByte_371 is nonzero, so the row must match the localized ID actually played.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthAnim.h:16", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:565", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:571", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:576"],
+      "status": "verified"
+    },
+    "MouthType": {
+      "simple": "Mouth pose associated with the keyframe.",
+      "technical": "EGameCharacterFacialPartsMouth, constructor default None. Exported rows use Close_01, Open_01 and Open_02. No consumer of this member was found in the available source: the unique-pair evaluator builds its cycling mouth shapes from CharacterMouthPatternDataTable.MouthTypeArray instead. Its effect, if any, outside that evaluator is unresolved.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthAnim.h:19", "Source/AbramsDataTable/Private/GameDataTableRow_CharacterMouthAnim.cpp:4", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:602", "JJKCCDatatables/datatables/CharacterMouthAnimDataTable.json"],
+      "status": "observed"
+    },
+    "ApplyTiming": {
+      "simple": "Voice playback time in seconds at which this keyframe applies.",
+      "technical": "float, constructor default 0.0f. The unique-pair evaluator keeps the matching rows in table order; during UpdateLipSync it treats the voice as still talking while AtomComponent playback time is less than the last row's ApplyTiming. With no matching rows it treats the voice as talking indefinitely. Exported keyframes are spaced at sub-second intervals; no sorting is applied to the collected rows.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthAnim.h:22", "Source/AbramsDataTable/Private/GameDataTableRow_CharacterMouthAnim.cpp:5", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:576", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:620", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:621"],
+      "status": "verified"
+    },
+    "AnimationTime": {
+      "simple": "Per-keyframe animation duration in seconds.",
+      "technical": "float, constructor default 0.0f; exported values are fractions of a second (for example 0.083333336). No read of this member was found in the available consumers; the evaluator's easing duration comes from CharacterMouthPatternDataTable.AnimationTime instead. Serialized but behaviorally unresolved here.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthAnim.h:25", "Source/AbramsDataTable/Private/GameDataTableRow_CharacterMouthAnim.cpp:6", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:604", "JJKCCDatatables/datatables/CharacterMouthAnimDataTable.json"],
+      "status": "observed"
+    }
+  },
+  "notes": [
+    "Loaded as a 'DataTable' primary asset named CharacterMouthAnimDataTable into DTM.CharacterMouthAnimDataTables (+0x580); the evaluator collects all rows through FGameDataTableArray::GetRows.",
+    "This table and CharacterMouthPatternDataTable have complementary roles: anim rows bound the talking interval by voice ID, while pattern rows provide the per-character cycling mouth shapes and fade times.",
+    "The 4,447 companion-export rows are only the available content; they are not asserted to be the complete retail set.",
+    "The consumer FAbramsSequencerPlayVoiceForUniquePairEvaluate::UpdateLipSync is currently marked DIFF in status/verdicts.json:73124 (unmasked byte differences), so its exact retail behavior is not byte-proven; field roles above follow the reconstructed source and the observed linkage.",
+    "Blueprint uses cannot be ruled in or out from the partial Content tree."
+  ],
+  "usages": [
+    {"source": "Source/Abrams/Private/GameDataTableManager.cpp:217", "detail": "Resolves CharacterMouthAnimDataTable into DTM.CharacterMouthAnimDataTables."},
+    {"source": "Source/Abrams/Private/GameDataTableManager.cpp:365", "detail": "Requests the table as a primary asset."},
+    {"source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:570", "detail": "Collects all rows from DTM +0x580."},
+    {"source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:576", "detail": "Filters rows by Id_Voice of the selected (possibly _En) voice."},
+    {"source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:621", "detail": "Uses the last ApplyTiming as the end-of-talking threshold."}
+  ]
+}

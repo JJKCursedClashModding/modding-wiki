@@ -1,0 +1,43 @@
+{
+  "description": "Per-character lip-sync pattern: the ordered set of mouth poses to cycle during speech and the fade/open/close timings used by sequencer voice playback.",
+  "fields": {
+    "Id": {
+      "simple": "Character/model row key for the mouth pattern.",
+      "technical": "FName primary key. The unique-pair evaluator looks it up in DTM.CharacterMouthPatternDataTables (+0x590), trying in order BattleState07_CharacterModelName(AGameCharacter, true), AAbramsSequencerNPCActor::GetSequencerNPCId(true), and GameActor_ModelName(AGameNPC, true, true). The first matching row stops the search; no row means lip-sync setup returns early.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthPattern.h:12", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:426", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:584", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:589", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:593"],
+      "status": "verified"
+    },
+    "AnimationTime": {
+      "simple": "Seconds used for each mouth-shape transition while speaking.",
+      "technical": "float, constructor default 0.0f. Copied into the evaluator's MouthAnimationTime; MouthEase.Start uses it as the ease duration, and MouthModule.SetFacialType receives AnimationTime as its duration, 0.5x as one blend parameter and 0.25x as another. Exported rows commonly use 0.09 s.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthPattern.h:16", "Source/AbramsDataTable/Private/GameDataTableRow_CharacterMouthPattern.cpp:4", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:604", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:638", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:639"],
+      "status": "verified"
+    },
+    "EndAnimationTime": {
+      "simple": "Seconds used to close/settle the mouth after the voice ends.",
+      "technical": "float, constructor default 0.0f. Copied into MouthEndAnimationTime, passed to StopPlayingMontage as the blend-out duration and used as the 1->0 MouthEase duration once playback time reaches the last CharacterMouthAnim ApplyTiming. Exported rows commonly use 0.1 s.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthPattern.h:19", "Source/AbramsDataTable/Private/GameDataTableRow_CharacterMouthPattern.cpp:5", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:605", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:644", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:647"],
+      "status": "verified"
+    },
+    "MouthTypeArray": {
+      "simple": "Ordered pool of mouth poses cycled while the character speaks.",
+      "technical": "TArray<EGameCharacterFacialPartsMouth>; exported rows contain Open_01/Open_02/Close_01 plus trailing None placeholders. The evaluator appends the entire array to its persistent MouthTypes and removes None entries. While talking it advances an index modulo the remaining count and calls SetFacialType with uint8(MouthType); an empty array leaves the index at -1 and sets no facial type.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthPattern.h:22", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:602", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:603", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:625", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:635", "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:639"],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Loaded as a 'DataTable' primary asset named CharacterMouthPatternDataTable into DTM.CharacterMouthPatternDataTables (+0x590). Pattern lookup is by a model/NPC ID derived from the sequencer target, unlike CharacterMouthAnimDataTable, which groups by voice ID.",
+    "The reconstructed evaluator appends to MouthTypes without clearing it in this function, so repeated setups can accumulate poses; this is an observed implementation quirk, not a documented data rule.",
+    "The companion export has 29 pattern rows; availability does not prove all retail characters or Blueprint consumers are represented.",
+    "FAbramsSequencerPlayVoiceForUniquePairEvaluate::UpdateLipSync is marked DIFF in status/verdicts.json:73124, so exact retail byte equivalence of the consumer is not established."
+  ],
+  "usages": [
+    {"source": "Source/Abrams/Private/GameDataTableManager.cpp:218", "detail": "Resolves CharacterMouthPatternDataTable into DTM.CharacterMouthPatternDataTables."},
+    {"source": "Source/Abrams/Private/GameDataTableManager.cpp:366", "detail": "Requests the table as a primary asset."},
+    {"source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:426", "detail": "First-row finder over the pattern tables."},
+    {"source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:584", "detail": "Resolves the pattern for a character, sequencer NPC or regular NPC target."},
+    {"source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:602", "detail": "Copies mouth types and both timings into the evaluator."},
+    {"source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:638", "detail": "Applies mouth poses and timing during lip-sync updates."}
+  ]
+}

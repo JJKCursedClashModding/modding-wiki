@@ -1,0 +1,70 @@
+{
+  "description": "Localized predefined character chat / symbol-chat lines; CharacterChat rows point into this table by text id, and chat widgets resolve those ids through the GameText manager.",
+  "fields": {
+    "ID": {
+      "simple": "Predefined chat line id (row key), usually CP_<character>_<kind>_<n>.",
+      "technical": "FName ID of FGameDataTableRow_GameText, equal to the UDataTable row name used by FindRow. Consumers obtain it from FGameDataTableRow_CharacterChat::Id_ChatText (an array indexed by the Chat row's ChatLabel), from FGameChatMessageRequest.TextId, or from hard-coded ids in battle/result widgets. The table is loaded as ChatTextDataTable_<Language> in slot 5 of the 14-table GameText array and is searched by GetText/GetGameText/HasText for any non-SYS_ id.",
+      "evidence": [
+        "Source/Abrams/Public/GameDataTableRow_GameText.h:11",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterChat.h:15",
+        "Source/Abrams/Private/GameTextManager.cpp:55",
+        "Source/Abrams/Private/GameTextManager.cpp:554",
+        "Source/Abrams/Private/GameTextManager.cpp:597",
+        "Source/Abrams/Private/GameChatListItemData.cpp:10",
+        "Source/Abrams/Private/GameChatListItemData.cpp:17",
+        "Source/Abrams/Private/GameChatMessageWidget.cpp:350",
+        "Source/Abrams/Private/GameBattleSituationOverviewChatMessageContentWidget.cpp:56",
+        "Source/Abrams/Private/GameResultWidget.cpp:261"
+      ],
+      "status": "verified"
+    },
+    "Text": {
+      "simple": "The localized chat message shown in the chat bubble/list.",
+      "technical": "FString row text (+0x10) copied by GameText_RowText and formatted by FormatText before display. <GLO=...> tags resolve against the glossary map; <DYN=...> tags resolve against the request parameters (chat category 20 injects a TARGET text id pointing at the target character's glossary name). Unknown tags are left as-is when their key is missing. One Japanese-only line id, CP_270_UNIQUE_3, disables auto line breaking in UGameChatMessageContentWidget before the resolved text is applied. The En export has no empty rows and no tag markup, but the generic formatter still runs for all rows.",
+      "evidence": [
+        "Source/Abrams/Public/GameDataTableRow_GameText.h:15",
+        "Source/Abrams/Private/GameTextManager.cpp:667",
+        "Source/Abrams/Private/GameTextManager.cpp:681",
+        "Source/Abrams/Private/GameTextManager.cpp:683",
+        "Source/Abrams/Private/GameTextManager.cpp:742",
+        "Source/Abrams/Private/GameTextManager.cpp:753",
+        "Source/Abrams/Private/GameChatMessageContentWidget.cpp:44",
+        "Source/Abrams/Private/GameChatMessageContentWidget.cpp:46",
+        "Source/Abrams/Private/GameChatMessageContentWidget.cpp:54"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Same row struct and 11 identical language variants as the other GameText tables (1593 ids per variant in the companion export). Loaded as slot 5 by GameTextManager.cpp:555 during StartLanguageLoading/Tick; localization suffixes are EApplicationLanguage enum names and the cooked chunks are set in Config/DefaultGame.ini:35-45.",
+    "Two related non-text tables provide the ids: Chat rows carry category/label/availability flags and CharacterChat rows carry parallel Id_ChatText and Id_Voice arrays. UGameChatListItemData::GetChatTextId requires both rows, maps ChatLabel to an index, then returns the corresponding id (GameChatListItemData.cpp:12-17); other widgets index Id_ChatText directly with a validated slot.",
+    "No prefix-specific lookup exists. Text ids are resolved against the combined 14-table array in a fixed order (Glossary, Battle, Item, CommandList, Chat, ...), so a duplicate id in an earlier table would shadow this one.",
+    "Reconstruction caveat: several chat list-item classes are reconstructed with named slots and retail RVAs in comments; the text manager's lookup functions are behaviour-certified not byte-identical (status/functions.json 0x14af290 and 0x14c96f0; BEHAV BG03). Content is partial, so additional retail/Blueprint-only consumers are not asserted."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameChatListItemData.cpp:10",
+      "detail": "GetChatTextId joins the Chat row's ChatLabel with CharacterChat.Id_ChatText to produce the GameText id shown in a chat list item."
+    },
+    {
+      "source": "Source/Abrams/Private/GameChatListViewItemWidget.cpp:15",
+      "detail": "Reads the list item's GetChatTextId and applies it as the text id of the chat line widget."
+    },
+    {
+      "source": "Source/Abrams/Private/GameChatMessageWidget.cpp:342",
+      "detail": "Validates a text slot against CharacterChat.Id_ChatText and assigns it to FGameChatMessageRequest.TextId."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSituationOverviewChatMessageContentWidget.cpp:47",
+      "detail": "Bounds-checks Id_ChatText and sets the resulting id on the situation-overview chat message block."
+    },
+    {
+      "source": "Source/Abrams/Private/GameResultWidget.cpp:252",
+      "detail": "Selects an Id_ChatText entry for the post-battle chat message request."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:1845",
+      "detail": "Battle symbol chat picks the Id_ChatText slot for a Chat row and passes it to ShowSymbolChatMessage."
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "description": "Maps numeric rank points to the displayed rank class/grade and point band, with a loss floor.",
+  "fields": {
+    "Id": {
+      "simple": "Rank tier row id.",
+      "technical": "FName import key/row name for FGameDataTableRow_RankPoint. Rows are enumerated by GameRankPoint_FindRow and sorted by threshold Min for previous/next navigation, where Row->Id identifies the current tier; the result-change widget also compares CurrentRank->Id with PreviousRank->Id to decide up/down/no-change.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankPoint.h:13",
+        "Source/Abrams/Public/GameDataTableManager.h:97",
+        "Source/Abrams/Private/GameRankSystemGradeInfoWidget.cpp:31",
+        "Source/Abrams/Private/GameResultChangeRankPointWidget.cpp:53",
+        "Source/Abrams/Private/GameResultChangeRankPointWidget.cpp:194"
+      ],
+      "status": "verified"
+    },
+    "RankPointClass": {
+      "simple": "Rank class (tier group) shown in UI and used for matchmaking borders.",
+      "technical": "EGameRankPointClass, default None. UGamePlayerRankWidget::SetRankPoint and grade-info UI pass it to SetRank to choose the rank icon and spacer visibility; the result-change widget maps it to a localized rank label; online session helpers switch on it to compute rank borders. KPI telemetry records the numeric class.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankPoint.h:17",
+        "Source/Abrams/Private/GamePlayerRankWidget.cpp:38",
+        "Source/Abrams/Private/GameResultChangeRankPointWidget.cpp:163",
+        "Source/Abrams/Private/GameOnlineSessionHelper.cpp:104",
+        "Source/Abrams/Private/GameOnlineManager.cpp:548"
+      ],
+      "status": "verified"
+    },
+    "RankPointGrade": {
+      "simple": "Rank grade (subdivision) shown in rank UI.",
+      "technical": "EGameRankPointGrade, default None. Passed alongside RankPointClass to UGamePlayerRankWidget::SetRank and grade-info UI, where RankGrade->SetGrade(Grade) displays it. The rank-system manual also sorts class rows by RankPointGrade.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankPoint.h:20",
+        "Source/Abrams/Private/GamePlayerRankWidget.cpp:39",
+        "Source/Abrams/Private/GamePlayerRankWidget.cpp:48",
+        "Source/Abrams/Private/GameRankSystemGradeInfoWidget.cpp:43",
+        "Source/Abrams/Private/GameRankSystemManualWidget.cpp:62"
+      ],
+      "status": "verified"
+    },
+    "Id_GlobalThreshold": {
+      "simple": "Point band that defines this rank tier.",
+      "technical": "FName, default None. GameRankPoint_FindRow walks RankPointDataTables (DTM+0x380), resolves each Id_GlobalThreshold in GlobalThresholdDataTables and returns the row whose inclusive [Min, Max] contains the queried rank point; when no band matches it returns the first row as a fallback. UI widgets sort rows by the threshold Min and use neighbouring rows' Min values for progress bars; leaderboard card packing/recovering uses the row index to reconstruct a rank point from the threshold Min.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankPoint.h:23",
+        "Source/Abrams/Private/GamePlayerRankWidget.cpp:87",
+        "Source/Abrams/Private/GamePlayerRankWidget.cpp:88",
+        "Source/Abrams/Private/GameRankSystemGradeInfoWidget.cpp:28",
+        "Source/Abrams/Private/GameRankSystemGradeInfoWidget.cpp:45",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:608",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:662"
+      ],
+      "status": "verified"
+    },
+    "LoseLowerLimit": {
+      "simple": "Minimum rank-point delta after a loss.",
+      "technical": "int32, default 0. CalcRankPointDelta looks up the current RankPoint row for a losing player and applies FMath::Max(Points, LoseLowerLimit); a further clamp to >= 0 applies when an AI-controlled ally flag is present. Exported rows use 0, -5, -10, -20 and lower for higher tiers.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankPoint.h:26",
+        "Source/Abrams/Private/GameBattleManager.cpp:702",
+        "Source/Abrams/Private/GameBattleManager.cpp:704",
+        "Source/Abrams/Private/GameBattleManager.cpp:706"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The exported asset has 27 rows with FGameDataTableRow_RankPoint; the manager loads RankPointDataTable into RankPointDataTables (DTM+0x380). No localization variants or numbered shards were supplied.",
+    "GameRankPoint_FindRow is used widely: gameplay loss clamping, lobby/player-card/online UI, session matchmaking borders, shop gating and KPI telemetry. The same row can therefore affect both presentation and match rules.",
+    "The first-row fallback when no threshold matches is explicit in the reconstructed finder; consumers such as UGamePlayerRankWidget::SetRankPoint dereference the result without a null test.",
+    "Finder 0x13077a0 and navigation helper 0x1626350 are reconstructed; status/functions.json should be consulted for byte status. Content is partial and Blueprint uses were not exhaustively inspected."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GamePlayerRankWidget.cpp:76",
+      "detail": "GameRankPoint_FindRow maps a numeric rank point to a tier via Id_GlobalThreshold."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:702",
+      "detail": "CalcRankPointDelta clamps a loss to the row's LoseLowerLimit."
+    },
+    {
+      "source": "Source/Abrams/Private/GameRankSystemGradeInfoWidget.cpp:41",
+      "detail": "Displays the rank class/grade and threshold progress using neighbouring rows."
+    },
+    {
+      "source": "Source/Abrams/Private/GameResultChangeRankPointWidget.cpp:162",
+      "detail": "Result UI maps class to text and detects rank changes by row Id."
+    },
+    {
+      "source": "Source/Abrams/Private/GameOnlineSessionHelper.cpp:102",
+      "detail": "Online session filtering computes matchmaking borders from RankPointClass."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:608",
+      "detail": "Leaderboard card packing uses row order and threshold Min to encode/decode rank."
+    }
+  ]
+}

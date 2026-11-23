@@ -1,0 +1,86 @@
+{
+  "description": "Per-character battle/lobby symbol-chat text and voice line lists. Indexed by the EGameChatLabel of a ChatDataTable entry, they supply the localized text ID and the voice ID played when a character sends a predefined chat message.",
+  "fields": {
+    "ID": {
+      "simple": "Row key, normally the character ID (CP_xxx / CN_xxx).",
+      "technical": "FName primary key (ImportKeyField=Id in the export). GameCharacter::Setup resolves Character::Id_CharacterChat against CharacterChatDataTables (DTM +0x550) and caches the result as GameCharacter::ChatRow (+0x3E0); UI widgets also call the same finder directly with Character::Id_CharacterChat. A None/empty id fails the row lookup, leaving no chat row.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:522",
+        "Source/Abrams/Private/GameCustomizeChatWidget.cpp:269",
+        "Source/Abrams/Private/GameCustomizeProfileChatWidget.cpp:94"
+      ],
+      "status": "verified"
+    },
+    "Id_ChatText": {
+      "simple": "Text IDs for each predefined chat message, one per chat label.",
+      "technical": "TArray<FName> indexed by GameAnimNotify_TypeIndex(Chat->ChatLabel) = static_cast<int32>(Label) - 1, where ChatLabel is the EGameChatLabel on the ChatDataTable row (1-based enum starting at Greeting_1; the exported arrays have 58 entries, matching the label range). Values are text IDs (e.g. CP_010_GREETING_1) handed to IGameWidgetTextSettingInterface::SetTextIdOnly, ShowSymbolChatMessage or stored as FGameChatMessageRequest::TextId. Some consumers bounds-check the slot, others copy the array and index it unguarded. This table has no per-locale variants: localization is downstream through the text ID.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterChat.h:12",
+        "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:5",
+        "Source/Abrams/Private/GameBattleSituationOverviewChatMessageContentWidget.cpp:47",
+        "Source/Abrams/Private/GameBattleSituationOverviewChatMessageContentWidget.cpp:56",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1845",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1847",
+        "Source/Abrams/Private/GameChatMessageWidget.cpp:342",
+        "Source/Abrams/Private/GameChatMessageWidget.cpp:350",
+        "Source/Abrams/Private/GameResultWidget.cpp:252",
+        "Source/Abrams/Private/GameResultWidget.cpp:261",
+        "Source/Abrams/Private/GameCustomizeChatSelectWidget.cpp:277"
+      ],
+      "status": "verified"
+    },
+    "Id_Voice": {
+      "simple": "Voice IDs for the same predefined chat messages, parallel to Id_ChatText.",
+      "technical": "TArray<FName> indexed with the same Label-1 slot. When the slot is valid, AGameSoundManager::PlayVoiceById(Id_Voice[Slot], characterIndex) plays the line, with the character index used as the speaker/player index. Battle chat suppresses voice for characters in BlockedCommunicationCharacterIndices and for level-report labels can change the slot according to clamped cursed-energy level (0x21/0x22/0x23). Some consumers check IsValidIndex before playback; others do not. 58 entries in every exported row, paired with Id_ChatText.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterChat.h:18",
+        "Source/Abrams/Private/GameBattleSituationOverviewChatMessageContentWidget.cpp:51",
+        "Source/Abrams/Private/GameBattleSituationOverviewChatMessageContentWidget.cpp:53",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1859",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1861",
+        "Source/Abrams/Private/GameChatMessageWidget.cpp:351",
+        "Source/Abrams/Private/GameChatMessageWidget.cpp:353",
+        "Source/Abrams/Private/GameResultWidget.cpp:262",
+        "Source/Abrams/Private/GameResultWidget.cpp:264"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Export contains 27 rows; all have exactly 58 parallel Id_ChatText and Id_Voice entries.",
+    "The shared accessor GameAnimNotify_TypeIndex(Type) = Type - 1 maps the 1-based EGameChatLabel enum to the arrays; EGameChatLabel::None is 0 (index -1), so callers rely on a real Chat row label in 1..58.",
+    "The same cached Character::ChatRow is reused from battle symbol-chat playback, battle results, situation-overview chat bubbles, customize chat tile views and interval/PvE widgets; several of those paths have no null check.",
+    "No per-locale CharacterChatDataTable variants exist in the export; only the downstream text IDs are localization keys. No claim is made about additional retail rows or Blueprint-only uses.",
+    "Reconstructed C++ with cited retail RVAs; reconstruction does not by itself prove byte-identical matching."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:215",
+      "detail": "Loads CharacterChatDataTable into AGameDataTableManager::CharacterChatDataTables (DTM +0x550)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:522",
+      "detail": "Caches the row on AGameCharacter::ChatRow from Character::Id_CharacterChat."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSituationOverviewChatMessageContentWidget.cpp:47",
+      "detail": "Looks up text and voice by chat label and displays/voices the message."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:1830",
+      "detail": "Battle symbol-chat uses Id_ChatText for the message and Id_Voice for playback, including level-report slot remapping."
+    },
+    {
+      "source": "Source/Abrams/Private/GameChatMessageWidget.cpp:332",
+      "detail": "Direct table lookup and bounds-checked text/voice selection for chat messages."
+    },
+    {
+      "source": "Source/Abrams/Private/GameResultWidget.cpp:251",
+      "detail": "Result-screen chat bubbles use Speaker's cached CharacterChat row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCustomizeChatWidget.cpp:270",
+      "detail": "Customize chat list copies Id_ChatText and indexes by the selected Chat row's label."
+    }
+  ]
+}

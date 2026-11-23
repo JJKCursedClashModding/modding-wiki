@@ -1,0 +1,72 @@
+{
+  "description": "Localized shared words and names (character names, game terms) used both as normal text rows and as the <GLO=...> substitution dictionary for every other GameText table.",
+  "fields": {
+    "ID": {
+      "simple": "Glossary term id (row key), e.g. GLS_GAME_WORDS_....",
+      "technical": "FName ID of FGameDataTableRow_GameText. Besides ordinary FindRow lookup it has a second use: AGameTextManager::Tick iterates this table's rows and inserts Row->ID.ToString() as the key into GlossaryParameters (an FGameTextParameterMap of string parameters) for <GLO=KEY> substitution in FormatText. Character and other data rows point at GLS_ ids via Id_GlossaryText_Name; the glossary table itself is loaded twice into the manager: as slot 1 of TextDataTables and as the sole source of the glossary parameter map. The language-suffixed asset is GlossaryTextDataTable_<EApplicationLanguage name>.",
+      "evidence": [
+        "Source/Abrams/Public/GameDataTableRow_GameText.h:11",
+        "Source/Abrams/Public/GameTextManager.h:37",
+        "Source/Abrams/Private/GameTextManager.cpp:51",
+        "Source/Abrams/Private/GameTextManager.cpp:550",
+        "Source/Abrams/Private/GameTextManager.cpp:572",
+        "Source/Abrams/Private/GameTextManager.cpp:575",
+        "Source/Abrams/Private/GameTextManager.cpp:753",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Character.h:21",
+        "Source/Abrams/Private/GameCharacter.cpp:900",
+        "Source/Abrams/Private/GameSystemDialogWidget.cpp:112"
+      ],
+      "status": "verified"
+    },
+    "Text": {
+      "simple": "The localized word/name substituted for <GLO=ID> tags or displayed directly.",
+      "technical": "FString row text (+0x10). GetGameText returns it for direct GLS_ requests, and the Tick rebuild stores it as the glossary parameter value (no options). FormatText checks Tag.Type == 'GLO' and replaces the whole tag with the map value; unresolved keys leave the tag untouched. For DYN=FRIEND_WORD / DYN=FREND_LIST_WORD in Zh_Hant/Zh_Hans, FormatText injects text-id parameters pointing at GLS_GAME_WORDS_3000 / GLS_GAME_WORDS_3004, so those glossary rows are resolved recursively via GetText (nested lookup) rather than as plain strings. Empty glossary strings produce empty substitutions. The En export has 314 rows with 19 empty values (12 in Ko/Zh variants).",
+      "evidence": [
+        "Source/Abrams/Public/GameDataTableRow_GameText.h:15",
+        "Source/Abrams/Private/GameTextManager.cpp:667",
+        "Source/Abrams/Private/GameTextManager.cpp:575",
+        "Source/Abrams/Private/GameTextManager.cpp:752",
+        "Source/Abrams/Private/GameTextManager.cpp:753",
+        "Source/Abrams/Private/GameTextManager.cpp:786",
+        "Source/Abrams/Private/GameTextManager.cpp:803",
+        "Source/Abrams/Private/GameTextManager.cpp:764",
+        "Source/Abrams/Private/GameTextManager.cpp:767",
+        "Source/Abrams/Private/GameTextManager.cpp:771",
+        "Source/Abrams/Private/GameTextManager.cpp:810"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "All 11 exported language variants share the same 314 row ids. This group is special: it is both a normal GameText table (slot 1, so GLS_ ids can be requested directly) and the source of the global glossary parameter map rebuilt at culture load (GameTextManager.cpp:571-577) before OnCultureTextLoaded fires.",
+    "Cross-table joins are extensive: FGameDataTableRow_Character::Id_GlossaryText_Name is used for character display names in battle setup, online, lobby/select/result UI, chat TARGET parameters, reward text, etc.; GLO tags in BattleText, ItemText, CommandList and Tutorial text resolve through this table. Some widgets set the id directly and let the text block resolve it later (e.g. GameCharacterSelectPlayerInfoWidget.cpp:268), others call GetText/GetGameTextById eagerly (GameCharacter.cpp:900, GameOnlineManager.cpp:2752).",
+    "No separate SYS_ dispatch applies: GLS_ ids are non-system and go through the GameText path unless they appear inside a DYN parameter that itself resolves through GetText. The fixed table search order means a duplicate id in this first slot shadows all later tables.",
+    "Reconstruction caveat: the glossary rebuild is part of AGameTextManager::Tick, which is behaviour-certified rather than byte-identical (status/functions.json 0x14c96f0; BEHAV BG03); FormatText is byte-matched (0x14c4870). Only partial Content is available and Blueprint-only uses are not asserted."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:575",
+      "detail": "Rebuilds GlossaryParameters from every row: key = Row->ID.ToString(), value = Row->Text, options None."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:753",
+      "detail": "FormatText selects the glossary map for <GLO=...> tags (DYN uses request parameters instead)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:900",
+      "detail": "Resolves the character row's Id_GlossaryText_Name as the display name when no explicit name is supplied."
+    },
+    {
+      "source": "Source/Abrams/Private/GameOnlineManager.cpp:2752",
+      "detail": "Uses the active character's glossary id for the network-visible display name."
+    },
+    {
+      "source": "Source/Abrams/Private/GameChatMessageContentWidget.cpp:44",
+      "detail": "Adds a TARGET parameter as a text-id parameter pointing at the target character's glossary row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:764",
+      "detail": "Chinese-language special case maps DYN=FRIEND_WORD and DYN=FREND_LIST_WORD to GLS_GAME_WORDS_3000/3004."
+    }
+  ]
+}

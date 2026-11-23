@@ -1,0 +1,53 @@
+{
+  "description": "Unlockable alternate battle-voice packs for customizable characters: one row per character/category/variant, with the sample cues used for shop and customization preview.",
+  "fields": {
+    "Id": {
+      "simple": "Row key / custom-voice pack ID.",
+      "technical": "FName primary key. Item rows for EGameItemType::CustomVoice reference this Id through Item.VariableId; tiles, shop preview and game-save validation resolve the row by that value, and the selected row's Id is written back into the customization tile settings. Export spells it ID.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterCustomVoice.h:13", "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:33", "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:160", "Source/Abrams/Private/GameUserCustomizeInfo.cpp:63", "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:922"],
+      "status": "verified"
+    },
+    "Id_Character": {
+      "simple": "Character that owns this voice pack.",
+      "technical": "FName into CharacterDataTable. It is the first filter in CollectVoiceSamples, the customization tile filter, save-data validation and item description/icon logic. The icon path constructs \"<Id_Character>_00\" to find the CharacterImage row; the description path resolves the character to return its Id.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterCustomVoice.h:17", "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:71", "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:211", "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:121", "Source/Abrams/Private/GameItemIconWidget.cpp:189", "Source/Abrams/Private/GameUserCustomizeInfo.cpp:58"],
+      "status": "verified"
+    },
+    "Category": {
+      "simple": "Which attack voice set is customized: normal or cursed-energy attack.",
+      "technical": "EGameCustomVoiceCategory (None default, NormalAttack, CursedEnergyAttack, Invalid). It partitions tile views (NormalAttack/CursedEnergyAttack), chooses which sample map PreviewVoice consults, is combined with IndexType to tint the item icon background, and is checked against hard-coded category values 1/2 in save validation. The exported 162 rows split evenly across the two real categories.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterCustomVoice.h:20", "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCustomVoice.h:28", "Source/AbramsDataTable/Public/EGameCustomVoiceCategory.h:6", "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:166", "Source/Abrams/Private/GameItemIconWidget.cpp:205", "Source/Abrams/Private/GameUserCustomizeInfo.cpp:58", "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:919"],
+      "status": "verified"
+    },
+    "IndexType": {
+      "simple": "Variant slot inside the category: Default, TypeA or TypeB.",
+      "technical": "EGameCustomVoiceIndexType (None default, Default, TypeA, TypeB, Invalid). CollectVoiceSamples precreates a map entry for Default/TypeA/TypeB and appends this row's samples under its IndexType key. The same enum is mapped through GUnknownByteIntMap0 (None/Default=0, TypeA=1, TypeB=2) to the saved CharacterIntPair First/Second value, and selects the icon tint. Rows with None/Invalid would not be appended to the three sample buckets.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterCustomVoice.h:23", "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCustomVoice.h:28", "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:65", "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:73", "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:369", "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:909", "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:176"],
+      "status": "verified"
+    },
+    "Id_Voice_Sample": {
+      "simple": "Voice row IDs used to audition this pack.",
+      "technical": "TArray<FName> into VoiceDataTable. Collection appends samples from every row matching CharacterId+Category+IndexType and removes None entries. PreviewVoice picks Samples[SampleIndex] when valid (index 0 otherwise), resolves its Voice row, and, only if that row's cue sheet is already loaded, plays it via PlaySystemVoice and advances SampleIndex by 1. It is a preview list, not the in-battle rule for which line plays.",
+      "evidence": ["Source/AbramsDataTable/Public/GameDataTableRow_CharacterCustomVoice.h:26", "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:75", "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:79", "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:182", "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:184", "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:185", "Source/Abrams/Private/GameShopWidget.cpp:280"],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Loaded as a 'DataTable' primary asset named CharacterCustomVoiceDataTable into DTM.CharacterCustomVoiceDataTables (+0x560).",
+    "The row itself is a catalog entry; ownership is checked indirectly through ItemDataTable rows whose VariableId equals this row's Id. Save values are stored as an int pair (normal attack variant in First, cursed-energy variant in Second) and are reset to 0 if the matching row is missing or its item is not owned.",
+    "Category/IndexType are also visual metadata: GameItemIconWidget maps their combination to a background color from CustomVoiceBackgroundColor and uses a separate category sprite.",
+    "The exported table contains 27 characters x 2 categories x 3 variants in the available content; this is not proof of all retail rows or Blueprint consumers.",
+    "Source is reconstructed from retail code; retail RVAs are recorded in source comments."
+  ],
+  "usages": [
+    {"source": "Source/Abrams/Private/GameDataTableManager.cpp:216", "detail": "Resolves CharacterCustomVoiceDataTable into DTM.CharacterCustomVoiceDataTables."},
+    {"source": "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:23", "detail": "Collects all voice rows and builds the character/category/variant sample maps."},
+    {"source": "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:156", "detail": "PreviewVoice resolves a row and plays its next VoiceDataTable sample."},
+    {"source": "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:368", "detail": "Persists selected IndexType into the user's customization int pairs."},
+    {"source": "Source/Abrams/Private/GameCustomizeCharaViewWidget.cpp:917", "detail": "Restores tile settings by matching character, category and saved variant."},
+    {"source": "Source/Abrams/Private/GameUserCustomizeInfo.cpp:51", "detail": "Validates saved voice selections against table rows and owned items."},
+    {"source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:119", "detail": "Resolves an item's voice row to display its character."},
+    {"source": "Source/Abrams/Private/GameItemIconWidget.cpp:184", "detail": "Uses the row's character, category and variant for icon and background color."},
+    {"source": "Source/Abrams/Private/GameShopWidget.cpp:273", "detail": "Shop preview resolves rows and returns their sample lists."}
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "description": "Per-character ordered bundle of CharacterCaptureDataTable row IDs, used to select the capture configuration appropriate to each UI capture context.",
+  "fields": {
+    "ID": {
+      "simple": "Row key, normally the character ID that Character::Id_CharacterCapture points to.",
+      "technical": "FName primary key (ImportKeyField=Id in the export). FindCharacterCaptureRow reads Character::Id_CharacterCapture and calls FindRow<FGameDataTableRow_CharacterCaptureSet> on each table in CharacterCaptureSetDataTables (DTM +0x430), stopping at the first hit. A None id on the Character row means no set is resolved.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:116",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:120",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:121"
+      ],
+      "status": "verified"
+    },
+    "Id_CharacterCapture": {
+      "simple": "Ordered list of CharacterCapture row IDs for this character's capture contexts.",
+      "technical": "TArray<FName>, 8 slots in every exported row (commonly six populated context-specific IDs followed by None padding). The capture actor iterates the list in order; encountering a None entry returns no capture, otherwise each ID is resolved via FindRow<FGameDataTableRow_CharacterCapture> across CharacterCaptureDataTables (DTM +0x440) and the first row whose CaptureType equals the requested slot type is returned. A missing capture row also ends the walk. The array order therefore controls both search order and the early-abort behaviour on padding.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCaptureSet.h:15",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:129",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:131",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:135",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:143"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Export contains 45 rows, each with exactly eight Id_CharacterCapture slots; populated prefixes in the sample data are <character>_CHARACTER_SELECT, _STORYCHARACTER_SELECT, _VS_ALLY, _VS_ENEMY, _FREE_BATTLE and _CUSTOMIZE, followed by None padding.",
+    "The join is Character::Id_CharacterCapture -> CharacterCaptureSet row -> CharacterCapture row filtered by capture type; the result feeds asset loading, spawning and montage playback in AGameCharacterCaptureActor.",
+    "There is a single retail table registered as 'CharacterCaptureSetDataTable' and loaded into DTM +0x430; no numbered shards are present in the export.",
+    "Reconstructed source with retail RVA comments; no claim about Blueprint-only consumers or uncooked content."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:197",
+      "detail": "Loads CharacterCaptureSetDataTable into AGameDataTableManager::CharacterCaptureSetDataTables."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:113",
+      "detail": "FindCharacterCaptureRow resolves the set using Character::Id_CharacterCapture."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:129",
+      "detail": "Iterates Id_CharacterCapture, stopping on None or a missing character-capture row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:143",
+      "detail": "Returns the first capture row whose CaptureType matches the slot."
+    }
+  ]
+}

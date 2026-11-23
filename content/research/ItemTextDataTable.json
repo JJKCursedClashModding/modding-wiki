@@ -1,0 +1,76 @@
+{
+  "description": "Localized item names, descriptions, currency/quantity formats and unlock messages. Item/ItemSet/PlayerCard rows reference this table by Id_ItemText, and GameItem helpers add type-specific parameters before resolution.",
+  "fields": {
+    "ID": {
+      "simple": "Item text id (row key), e.g. ITM_MONEY_1001, ITM_COSTUME_1001.",
+      "technical": "FName ID in FGameDataTableRow_GameText, used as FindRow key. FGameDataTableRow_Item, ItemSet, PlayerCardTitle and PlayerCardNickname carry Id_ItemText FNames that feed GameItem_GetNameTextCore; that helper may replace the id with a cosmetic wrapper id (ITM_COSTUME_1001, ITM_CUSTOM_VOICE_1001, ITM_SITUATION_OVERVIEW_POSE_1001) or transform it via PlayerCard_MakeNicknameTextId for nickname top/bottom variants. Shop unlock text also calls GetGameText with hard-coded ITM_UNLOCK_MESSAGE_*. The table is loaded as ItemTextDataTable_<Language> in slot 3 of the combined GameText array.",
+      "evidence": [
+        "Source/Abrams/Public/GameDataTableRow_GameText.h:11",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Item.h:16",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ItemSet.h:15",
+        "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardTitle.h:18",
+        "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardNickname.h:22",
+        "Source/Abrams/Private/GameTextManager.cpp:53",
+        "Source/Abrams/Private/GameTextManager.cpp:552",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:165",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:184",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:199",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:214",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1838"
+      ],
+      "status": "verified"
+    },
+    "Text": {
+      "simple": "Localized item name/description/message, possibly with formatting placeholders and rich-text images.",
+      "technical": "FString row text (+0x10), copied by GetGameText and run through FormatText. In this group the En export uses <DYN=ITEM_VALUE> (integer with grouping/width options), <DYN=ITEM_NAME> and <DYN=CHARACTER_NAME> (nested text-id parameters) plus <GLO=...> glossary tags (492 GLO, 97 DYN occurrences in En). GameItem_GetNameTextCore supplies ITEM_VALUE for Money, ITEM_NAME + CHARACTER_NAME for Costume/CustomVoice/SituationOverviewPose, and redirects nickname ids. Rich-text markup such as <img id=\"Money_0001\"/> is parsed by GameWidgetRichTextBlock. With bWithValue=false, money bypasses the table id and formats the raw integer via GroupDigits instead. Empty rows are common in non-en/zh variants (e.g. 1974 empty Zh rows in the export), and HasGameTextContent tests for emptiness before using a title/nickname label.",
+      "evidence": [
+        "Source/Abrams/Public/GameDataTableRow_GameText.h:15",
+        "Source/Abrams/Private/GameTextManager.cpp:667",
+        "Source/Abrams/Private/GameTextManager.cpp:681",
+        "Source/Abrams/Private/GameTextManager.cpp:683",
+        "Source/Abrams/Private/GameTextManager.cpp:742",
+        "Source/Abrams/Private/GameTextManager.cpp:786",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:176",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:181",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:185",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:172",
+        "Source/Abrams/Private/GameWidgetRichTextBlock.cpp:59",
+        "Source/Abrams/Private/GameTextManager.cpp:675",
+        "Source/Abrams/Private/GameCustomizeCardTitleTileWidget.cpp:106"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "FGameDataTableRow_GameText with 11 language variants, 4817 identical ids each in the companion export. Slot 3 of the 14-table array; Config/DefaultGame.ini:35-45 cooks one variant per chunk.",
+    "Cross-table joins: ItemTypeId -> Item.Id_ItemText -> this table, with EquipmentItemEffect.BuffDebuff/FloatValue and Effect.Id_BattleText supplying DYN=VALUE for description templates (GameItemDescriptionTextWidget.cpp:218-271); PlayerCardTitle/Nickname Id_ItemText -> title/nickname labels (GamePlayerCardParameter.cpp:517-566); shop lineups append ITM_UNLOCK_MESSAGE_4050; free-battle/visual-lobby costume selectors map costumes to item text ids.",
+    "Some ids in this table are used only after transformation (nickname top/bottom by language) or as nested parameters, so the literal row name seen in a widget may differ from the exported id.",
+    "Reconstruction caveat: GameItem helpers and text manager GetText paths are byte-matched in status, while FindTextRow/Tick are behaviour-certified (0x14af290, 0x14c96f0; BG03). Partial Content only; no retail Blueprint-only usage claims."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:208",
+      "detail": "GameItem_GetNameText reads Item->Id_ItemText and delegates to the type-aware helper that builds the final GameTextRequest."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:165",
+      "detail": "GameItem_GetNameTextCore redirects ids for Money/Costume/CustomVoice/SituationOverviewPose/Nickname and adds ITEM_VALUE, ITEM_NAME, CHARACTER_NAME parameters."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemOwnership.cpp:611",
+      "detail": "GameItem_GetNameTextById resolves an item id to its Item row and then to ItemText via the same helper."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePlayerCardParameter.cpp:517",
+      "detail": "Builds a plain GameTextRequest from PlayerCardTitle/Nickname Id_ItemText and checks HasGameTextContent before use."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1836",
+      "detail": "Appends GetGameText of a lineup unlock id plus ITM_UNLOCK_MESSAGE_4050 for locked shop items."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCollectionArchiveTextListWidget.cpp:70",
+      "detail": "Calls GetGameText(GameItem_GetNameText(...)) and requires more than one character before displaying an archive text entry."
+    }
+  ]
+}

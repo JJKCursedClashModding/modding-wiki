@@ -1,0 +1,62 @@
+{
+  "description": "Thin catalog mapping weapon IDs to the Blueprint primary asset (weapon actor class) that implements each weapon.",
+  "fields": {
+    "ID": {
+      "simple": "Weapon catalog ID.",
+      "technical": "FName row key, e.g. WP_010_00. Consumers reach it through a cross-table join: CharacterVariation.Id_CharacterWeapon -> CharacterWeapon.Id_Weapon[i] -> WeaponDataTables (+0x6B0); NAME_None entries are skipped. Capture code also reaches it from SituationOverviewPose animation weapon IDs. The first matching table containing the key wins.",
+      "evidence": [
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:166",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:177",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:637",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:876",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:734"
+      ],
+      "status": "verified"
+    },
+    "FileName_BP": {
+      "simple": "Name of the weapon's Blueprint asset.",
+      "technical": "FName key of the Character/Weapon primary asset loader (export rows use <ID>_BP, e.g. WP_010_00_BP; 20 rows). Battle phase and capture code resolve it to a UClass and spawn an AGameWeapon at the socket from CharacterWeapon.SocketName[i]; the boot asset collector appends it to the preload list; the capture loader list uses FindChecked (missing asset is fatal). Capture preload also de-duplicates pose weapons by case-insensitive FileName_BP prefix. No per-field default beyond FName's NAME_None is set by the constructor.",
+      "evidence": [
+        "Source/AbramsDataTable/Private/GameDataTableRow_Weapon.cpp:3",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:179",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:890",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:743",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:703",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1182",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1187"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Asset registration: GameDataTableManager.cpp:237 resolves 'WeaponDataTable' into WeaponDataTables at +0x6B0; the loader name is registered at GameDataTableManager.cpp:409. CharacterWeaponDataTable (+0x4E0) is a separate table and owns socket/visibility data; WeaponDataTable only names the weapon Blueprint.",
+    "Only the two fields above exist in the reconstructed row struct and in all 20 exported rows. There are no behavioural parameters (damage, timing, motion) in this table; those live in other tables/Blueprints.",
+    "Available sources show four consumer families: battle boot asset preload, live battle spawn, level-sequence setup, and character capture/situation-overview setup. Unreal Blueprints are not available here, so their internal use of weapon classes is out of scope."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:237",
+      "detail": "Loads the WeaponDataTable asset into the manager's WeaponDataTables array (+0x6B0)."
+    },
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:152",
+      "detail": "BattleAssets_Weapons joins CharacterWeapon rows to Weapon rows and adds each FileName_BP to the preload output list (retail 0x12bd080)."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:876",
+      "detail": "Battle spawn path resolves WeaponRow.FileName_BP through StudioWeaponLoaders_900, spawns the weapon class at the configured socket, applies map lighting and initial active/hidden state."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:734",
+      "detail": "Cutscene/level-sequence setup resolves the same row through FindChecked, spawns the weapon and applies map lighting."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:692",
+      "detail": "Capture setup checks already-carried weapons, resolves the row's FileName_BP through the capture slot's WeaponLoaders and spawns the missing weapon."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1178",
+      "detail": "Capture preload gathers weapon loader names from pose rows, using FileName_BP prefixes to suppress duplicate weapon families."
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "description": "Weighted lists of story-room placements, selected from the current demo's room-condition id.",
+  "fields": {
+    "ID": {
+      "simple": "Room-condition id (e.g. ROOM_COND_0000).",
+      "technical": "FName row key in StoryRoomConditionDataTables (DTM +0x860). Story_PickRoomPlacement_13097C0 computes a condition id from demo progress (default ROOM_COND_0000) and resolves it here; exported values ROOM_COND_0000..0066 and StoryDemo.Id_StoryRoomCondition references them.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomCondition.h:11",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:247",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:254",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:288",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:293",
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryDemo.h:39"
+      ],
+      "status": "verified"
+    },
+    "Id_StoryRoomPlacement": {
+      "simple": "Candidate StoryRoomPlacement rows for this condition.",
+      "technical": "TArray<FName> (row +0x10, eight exported slots). The weighted picker walks entries from index 0 until the first None, stops, and returns the chosen id; a row with no non-None candidate returns NAME_None. This id is then stored in GameManager.StudioStoryRoomPlacementId_D18 and resolved to levels/actors.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomCondition.h:15",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:45",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:293",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:299",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:320",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:323"
+      ],
+      "status": "verified"
+    },
+    "Weights": {
+      "simple": "Selection weights parallel to Id_StoryRoomPlacement.",
+      "technical": "TArray<float> (row +0x20). Story_PickRoomPlacement sums the weights for the non-None candidate prefix, rolls StoryFRand() * total, then walks the weights subtracting until the roll falls inside a slot; the last slot is the fallback. Weights[i] is read without its own bounds check, so the array must stay aligned with the placement ids. All exported weights are 1.0, making the current data a uniform pick.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomCondition.h:18",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:46",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:298",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:301",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:307",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:312",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1485"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The condition id itself is chosen before this row is loaded: pending main demos in chapter 6 / CHAP_0007 use the last cleared demo's condition, an all-cleared state uses a uniform pick over all demo conditions (or keeps the saved placement when bPickWhenAllCleared is false). Source/Abrams/Private/StoryLaunchHelpers.cpp:218-290.",
+    "row constructor is empty; no default candidate or weight is inserted in C++ (Source/AbramsDataTable/Private/GameDataTableRow_StoryRoomCondition.cpp:3).",
+    "67 exported rows, all with eight placement slots and eight 1.0 weights; no numbered shards or locale variants.",
+    "Evidence is from the reconstructed C++ in Source/ (row shape/counts from the exported table); status/ records byte matches for some owner TUs, but this file does not claim a retail byte comparison for every function or exhaustive Blueprint/runtime coverage."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:218",
+      "detail": "Story_PickRoomPlacement computes the condition, then picks a weighted placement id from this table."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:434",
+      "detail": "Story_ResolveDemoLaunch stores the chosen placement in GameManager before building the phase request."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:341",
+      "detail": "Story_GetRoomPlacementLevels resolves the chosen placement to level names."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:264",
+      "detail": "Loads StoryRoomConditionDataTable into StoryRoomConditionDataTables."
+    }
+  ]
+}

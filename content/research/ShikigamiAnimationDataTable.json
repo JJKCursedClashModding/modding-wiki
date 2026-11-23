@@ -1,0 +1,61 @@
+{
+  "description": "Shikigami animation set rows: parallel arrays pairing animation keys (e.g. Idle, AttackA) with AnimMontage asset names.",
+  "fields": {
+    "ID": {
+      "simple": "Shikigami animation-set ID, e.g. CN_010 or CN_010_DAMAGE.",
+      "technical": "FName row key; ShikigamiDataTable.Id_ShikigamiAnimation[i] names the sets to use. Resolved with FindRow<T> over ShikigamiAnimationDataTables (+0x6E0) by battle preload, battle spawn, capture setup and level sequences; NAME_None entries are skipped by callers. 84 exported rows cover base, damage and per-attack animation sets.",
+      "evidence": [
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:221",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:931",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1266",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Shikigami.h:29"
+      ],
+      "status": "verified"
+    },
+    "Key": {
+      "simple": "Animation slot/key names (Idle, Run, DashBegin, AttackA...).",
+      "technical": "TArray<FName> parallel to FileName. Battle spawn walks Key.Num(), skips None keys and calls AnimInstance->SetAnimationAsset(Key[i], Montage, false) with the montage loaded from FileName[i]. Capture setup builds a Key->FileName map for the pose/character capture, filtering by the capture row's idle/enter keys; non-overview captures only keep those two keys. Export example CN_010 starts with Idle, Run, DashBegin, Dash, DashEnd, JumpBegin, JumpUp, JumpTop, Summon, SummonAir,...",
+      "evidence": [
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:942",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:950",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1269",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1286"
+      ],
+      "status": "verified"
+    },
+    "Filename": {
+      "simple": "AnimMontage asset names corresponding to Key[i].",
+      "technical": "TArray<FName> of montage primary-asset loader keys. Battle preload appends every non-None filename to the montage preload list; battle spawn resolves each through StudioAnimMontageLoaders_810 (0x13946d0) and installs it under the matching Key; capture uses the same names to play idle/pose montages (FileName[0] for the shikigami pose in the capture path). Export example: AM_CN_010_00_Idle_01 for Key 'Idle'. The code indexes FileName by Key.Num() without a length equality check, so malformed rows with fewer filenames than keys are unsafe.",
+      "evidence": [
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:223",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:947",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1273",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1425"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "ShikigamiAnimationDataTables is manager slot +0x6E0; registered at GameDataTableManager.cpp:412 and resolved at line 240.",
+    "The row is a pure parallel-array mapping; it has no timing, blending or state-machine data. Animation behaviour beyond which montage is installed for a key lives in the anim instance/Blueprint and C++ controllers (not available as Blueprint source here).",
+    "There are no localization variants or numbered shards of this table in the export; the 84 rows are different shikigami/attack sets distinguished by ID."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:209",
+      "detail": "Battle preload joins CharacterShikigami -> Shikigami.Id_ShikigamiAnimation[] -> this row and appends all FileName entries to the montage preload list (retail 0x12bd9b0)."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:931",
+      "detail": "Battle spawn resolves the montage assets and installs each FileName[i] into the shikigami anim instance under Key[i] via SetAnimationAsset."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1266",
+      "detail": "Character capture builds a Key->FileName animation map (all keys for SituationOverview, idle/enter keys otherwise)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1419",
+      "detail": "Capture pose playback loads FileName[0] from the shikigami montage loaders and plays it on the spawned shikigami."
+    }
+  ]
+}

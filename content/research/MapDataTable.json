@@ -1,0 +1,410 @@
+{
+  "description": "Per-stage master table: selects the level packages and map-local presentation for a battle/menu stage, including its display-text key, nested map effect and decal asset lists, character lighting/material grading, global effect/decal/blood colors, stage-select and mini-map textures, mission-layout IDs, reverb and ambient sound, and sequencer lighting/bloom overrides.",
+  "fields": {
+    "ID": {
+      "simple": "Stage/map id (e.g. MAP_01, VLM_01, CharacterCapture).",
+      "technical": "FName primary key/import key (native Id, export label ID); the lookup name, not normally a value read from the row. Status_FindMapRow returns the first row named Id in MapDataTables (DTM +0x3A0); sources include GameManager.StudioBattleLevelRequest_CA0.BattleLevel, DomainExpansion/StoryMission/Script/RoomPlacement Id_Map, hard-coded SDM_10/20/30/40, VLM_01 and CharacterCapture. Reads of the value forward MapRow->Id to BattleWidget -> HUD -> Radar SetMiniMap, key SequencerLightDataTables via FindSequencerLightRow(MapId, File->Filename), key SequencerCapture MapOverrideCaptureSource, and identify stage-select/random-map choices. MAP_00 is a synthetic UGameStageSelectWidget row, not a table row. Export has 30 unique rows: MAP_01..MAP_16 (including MAP_14_01/MAP_15_01), DEM_01..03, VLM_01, SDM_10..40, SRM_10..30 and CharacterCapture.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:11",
+        "Source/Abrams/Private/GameDataTableManager.cpp:691",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:354",
+        "Source/Abrams/Private/GameSequencerManager.cpp:1227",
+        "Source/AbramsSequencer/Private/AbramsSequencerCaptureAndSendFrameBufferEvaluate.cpp:53",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:362",
+        "Source/Abrams/Private/GameStageSelectWidget.cpp:100"
+      ],
+      "status": "verified"
+    },
+    "Id_MapText": {
+      "simple": "Glossary text id for the stage name.",
+      "technical": "FName text key such as GLS_NAME_MAP_01 (export values are GLS_NAME_* keys, not localized strings). UI consumers pass it straight to SetTextIdOnly (stage-select item and focused stage) or store it as the option label in FreeBattleRuleSelect's Id -> text StageOptions map. GameCharacterSelectWidget looks up a Map row to label the selected stage; GameShopSaleItemListItemDataBase returns it as the map-name label and falls back to ERROR when no row is found. UGameStageSelectWidget's synthetic MAP_00 row hard-codes GLS_NAME_MAP_00. DEM/VLM/SDM/SRM/CharacterCapture rows have their own GLS_NAME_* ids.",
+      "evidence": [
+        "Source/Abrams/Private/GameStageSelectListItemWidget.cpp:17",
+        "Source/Abrams/Private/GameStageSelectWidget.cpp:89",
+        "Source/Abrams/Private/GameStageSelectWidget.cpp:109",
+        "Source/Abrams/Private/GameFreeBattleRuleSelectWidget.cpp:354",
+        "Source/Abrams/Private/GameCharacterSelectWidget.cpp:1165",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1349"
+      ],
+      "status": "verified"
+    },
+    "Filename": {
+      "simple": "Ordered list of level packages that make up the map.",
+      "technical": "TArray<FName> (native FileName, row +0x18; constructor default empty). StartBattleLevelPreload and FStudioBattleSystem2D0::RequestStageLevels call RequestStreamLevel on each name without an IsNone guard. Most phase transitions either call PhaseTrans_RequestLevels(..., MapRow->FileName, ...) or copy the array into StudioRequestedLevelNames_F8 for the phase mailbox. Story helpers append StoryRoomPlacement.LevelDesignName after the map levels, return the list for a Script row, and Story_PrepareBattleRequest unguardedly copies the active map's array. Exported arrays are 4 names: base map, *_Environment, *_LevelDesign and an optional foliage/battle-area level or None; the CharacterCapture row contains only CharacterCapture.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:18",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:80",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:88",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2158",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2171",
+        "Source/Abrams/Private/PhaseTransitionHelpers.cpp:125",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:326",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:487"
+      ],
+      "status": "verified"
+    },
+    "Id_MapEffect": {
+      "simple": "Foreign key to the map's effect asset list.",
+      "technical": "FName; when non-None, BattleAssets_MapEffects_12BD820 resolves it in MapEffectDataTables (DTM +0x3B0) and appends the nested MapEffect row's FileName list to an Effect primary-asset loader batch. StartBattleAssetPreload uses StudioMapEffectLoaders_180; GamePhase_BattleBase uses StudioMapEffectLoaders_720. NAME_None and a missing row yield no effects. Export values are MAP_05, MAP_06, MAP_09, MAP_11, MAP_12, MAP_13, MAP_14, MAP_15 and MAP_16; every other row is None.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:22",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:280",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:287",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:291",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:140",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:280"
+      ],
+      "status": "verified"
+    },
+    "Id_MapDecal": {
+      "simple": "Foreign key to the map's decal asset list.",
+      "technical": "FName; when non-None, BattleAssets_MapDecals_12BD690 resolves it in MapDecalDataTables (DTM +0x3C0) and appends the nested MapDecal row's FileName list to a Decal primary-asset loader batch (StudioMapDecalLoaders_1D0 in preload, _770 in BattleBase). NAME_None and a missing row yield no decals. Export values are MAP_01, MAP_03, MAP_06, MAP_07 and MAP_13; all other rows are None.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:25",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:262",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:269",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:273",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:146",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:280"
+      ],
+      "status": "verified"
+    },
+    "CharacterLightColor": {
+      "simple": "Per-map lighting tint for characters.",
+      "technical": "FVector (row +0x38; constructor default ZeroVector). UGameActorMaterialController::ApplyMapCharacterLighting pushes it as material vector parameter 'Character Light Color'; AGameEffectManager::ApplyMapColors pushes the same vector to the world's MaterialParameterCollection instance as 'FXLightColor'. The lighting call fans out to every managed character's character/weapon/shikigami controllers, and sequencer evaluate paths apply it to the bound character, NPC, level object, shikigami or weapon; sequencer point lights use it as FLinearColor when a map row is selected. Character-capture actors use the CharacterCapture map row here and retain this parameter even though widget Common parameters later override shadow/grade parameters.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:28",
+        "Source/Abrams/Private/GameActorMaterialController.cpp:40",
+        "Source/Abrams/Private/GameEffectManager.cpp:187",
+        "Source/Abrams/Private/GameCharacterManager.cpp:153",
+        "Source/AbramsSequencer/Private/AbramsSequencerSetMapColorEvaluate.cpp:39",
+        "Source/AbramsSequencer/Private/AbramsSequencerSetPointLightParamEvaluate.cpp:162",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:442"
+      ],
+      "status": "verified"
+    },
+    "CharacterOverlayColor": {
+      "simple": "Secondary character lighting overlay tint.",
+      "technical": "FVector (constructor default ZeroVector). Its sole traced consumer is UGameActorMaterialController::ApplyMapCharacterLighting, which sets the material vector parameter 'Character Light OverlayColor' on character, weapon and shikigami material controllers (including sequencer-bound targets and the CharacterCapture map row for capture actors). It is not one of the parameters overwritten later by FGameWidgetCharacterCaptureCommonParameter.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:31",
+        "Source/Abrams/Private/GameActorMaterialController.cpp:41",
+        "Source/Abrams/Private/GameCharacter.cpp:384",
+        "Source/AbramsSequencer/Private/AbramsSequencerSetMapColorEvaluate.cpp:39"
+      ],
+      "status": "verified"
+    },
+    "CharacterShadowColor": {
+      "simple": "Per-map character shadow tint.",
+      "technical": "FVector (row +0x68; constructor default ZeroVector). ApplyMapCharacterLighting sets material vector parameter 'Character Light ShadowColor'; ApplyMapColors writes it to the MaterialParameterCollection parameter 'FXCharacterColor'. Capture actors first receive the CharacterCapture map row's value, then GameCharacterCaptureActor and AbramsSequencerSceneCaptureActor overwrite 'Character Light ShadowColor' with FGameWidgetCharacterCaptureCommonParameter.CharacterLightShadowColor (widget-capture data, not this table). Export values vary per map.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:34",
+        "Source/Abrams/Private/GameActorMaterialController.cpp:42",
+        "Source/Abrams/Private/GameEffectManager.cpp:186",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:837",
+        "Source/AbramsSequencer/Private/AbramsSequencerSceneCaptureActor.cpp:76"
+      ],
+      "status": "verified"
+    },
+    "CharacterContrast": {
+      "simple": "Map-specific character material contrast.",
+      "technical": "float (constructor default 0.0f). ApplyMapCharacterLighting sets scalar parameter 'Character Contrast' through the shared material controller; the fan-out reaches all managed characters' character/weapon/shikigami controllers and sequencer targets. For character capture the CharacterCapture map row supplies the initial value, after which the widget's FGameWidgetCharacterCaptureCommonParameter.CharacterContrast overrides it (default 1.0 in that struct). Export values include 0.9 (MAP_06) and 1.0 for most stages.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:37",
+        "Source/Abrams/Private/GameActorMaterialController.cpp:43",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:838",
+        "Source/Abrams/Public/GameWidgetCharacterCaptureCommonParameter.h:28"
+      ],
+      "status": "verified"
+    },
+    "CharacterSaturation": {
+      "simple": "Map-specific character material saturation.",
+      "technical": "float (constructor default 0.0f). Written as scalar parameter 'Character Saturation' by UGameActorMaterialController::ApplyMapCharacterLighting for every managed character/weapon/shikigami and sequencer-bound target. The CharacterCapture row value is initially applied to capture actors and then overwritten by FGameWidgetCharacterCaptureCommonParameter.CharacterSaturation (widget default 0.0). Export values range from -0.316 to 0.12.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:40",
+        "Source/Abrams/Private/GameActorMaterialController.cpp:44",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:839",
+        "Source/AbramsSequencer/Private/AbramsSequencerSceneCaptureActor.cpp:78"
+      ],
+      "status": "verified"
+    },
+    "CharacterLevelsWhite": {
+      "simple": "Character-material white-level grading value.",
+      "technical": "float (constructor default 0.0f). ApplyMapCharacterLighting sets scalar parameter 'Character LevelsWhite' on the character/weapon/shikigami controllers of managed and sequencer-bound actors. Capture actors get the CharacterCapture row's value first, then FGameWidgetCharacterCaptureCommonParameter.CharacterLevelsWhite (widget default 1.0) overwrites it. Export values include 0.8 (MAP_04) and 1.0 for most stages.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:43",
+        "Source/Abrams/Private/GameActorMaterialController.cpp:45",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:840",
+        "Source/Abrams/Private/GameWidgetCharacterCaptureCommonParameter.cpp:19"
+      ],
+      "status": "verified"
+    },
+    "CharacterLevelsMiddle": {
+      "simple": "Character-material midtone grading value.",
+      "technical": "float (constructor default 0.0f). ApplyMapCharacterLighting sets scalar parameter 'Character LevelsMiddle' across managed characters, their weapons/shikigami and sequencer-bound targets. Capture actors' initial map-row value is overwritten by FGameWidgetCharacterCaptureCommonParameter.CharacterLevelsMiddle (widget default 1.0). Export values include 0.85 (MAP_01), 0.88 (MAP_05) and 0.9 (MAP_06).",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:46",
+        "Source/Abrams/Private/GameActorMaterialController.cpp:46",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:841",
+        "Source/Abrams/Private/GameWidgetCharacterCaptureCommonParameter.cpp:20"
+      ],
+      "status": "verified"
+    },
+    "CharacterLevelsBlack": {
+      "simple": "Character-material black-level grading value.",
+      "technical": "float (constructor default 0.0f). ApplyMapCharacterLighting sets scalar parameter 'Character LevelsBlack' through the same material-controller fan-out as the other grading fields. Character capture first applies the CharacterCapture map row, then FGameWidgetCharacterCaptureCommonParameter.CharacterLevelsBlack (widget default 1.0) overwrites it. Export values include 0.45 (MAP_06) and 1.9 on one row, with many stages at 1.0.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:49",
+        "Source/Abrams/Private/GameActorMaterialController.cpp:47",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:842",
+        "Source/Abrams/Private/GameWidgetCharacterCaptureCommonParameter.cpp:21"
+      ],
+      "status": "verified"
+    },
+    "EffectColor": {
+      "simple": "Map-wide tint for spawned effects.",
+      "technical": "FVector (row +0x98; constructor default ZeroVector). AGameEffectManager::ApplyMapColors writes it to the world's MaterialParameterCollection instance as vector parameter 'Color'. ApplyMapColors is called from battle phase setup/results, battle states 05/07/08/10 and the studio level-sequencer cast spawn. This is distinct from FGameDataTableRow_MapGround.EffectColor, which AbramsSequencerSetEffectGroundColorEvaluate reads after a physical-surface trace. Export values include (1,1,1) and per-map tints such as MAP_01 (0.88,1,1) and DEM_02 (0.67,0.8,1).",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:52",
+        "Source/Abrams/Private/GameEffectManager.cpp:178",
+        "Source/Abrams/Private/GameEffectManager.cpp:185",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:519",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:350",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:690",
+        "Source/AbramsSequencer/Private/AbramsSequencerSetEffectGroundColorEvaluate.cpp:63"
+      ],
+      "status": "verified"
+    },
+    "DecalColor": {
+      "simple": "Map-wide tint for decals.",
+      "technical": "FVector (row +0xB0; constructor default ZeroVector). AGameEffectManager::ApplyMapColors writes it verbatim to the MaterialParameterCollection vector parameter 'DecalColor' alongside Color/FXCharacterColor/FXLightColor/BloodColor, using the same row selected by the battle or sequencer phase. Export values are dark per-map tints, e.g. MAP_01 (0.18,0.23,0.30).",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:55",
+        "Source/Abrams/Private/GameEffectManager.cpp:188",
+        "Source/Abrams/Public/GameEffectManager.h:116",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:690"
+      ],
+      "status": "verified"
+    },
+    "BloodColor": {
+      "simple": "Map-wide blood tint.",
+      "technical": "FVector (row +0xC8; constructor default ZeroVector). AGameEffectManager::ApplyMapColors writes it to the world's MaterialParameterCollection as 'BloodColor'. No separate sequencer or ground-surface field with this name is consumed; the row comes from the active BattleLevel or the studio sequencer's cached map row. Export is (1,1,1) for 29 rows and a single non-white row.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:58",
+        "Source/Abrams/Private/GameEffectManager.cpp:189",
+        "Source/Abrams/Public/GameEffectManager.h:119",
+        "Source/Abrams/Private/GameBattleState_08.cpp:140"
+      ],
+      "status": "verified"
+    },
+    "SequencerBloomIntensityOffset": {
+      "simple": "Bloom multiplier applied by sequencer post-process tracks.",
+      "technical": "float (constructor default 0.0f). FAbramsSequencerCopyPostProcessVolumeEvaluate reads it from MapModule->GetMapRow() (sequencer-manager row first, then BattleLevel row). Values nearly equal to 1.0 skip the write. Otherwise the target volume's copied BloomIntensity (CachedValueA) is compared: if the current value equals CachedValueB it is reset to CachedValueA * Scale (then B is updated); if it still equals A nothing happens; otherwise the current value is multiplied in place. OnSetup zeroes A/B; OnPreExecute copies the source volume's settings and initializes both to the copied bloom. Export values are 1.0 except 0.4 on MAP_14, MAP_14_01, MAP_16 and DEM_03.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:61",
+        "Source/AbramsSequencer/Private/AbramsSequencerCopyPostProcessVolumeEvaluate.cpp:68",
+        "Source/AbramsSequencer/Private/AbramsSequencerCopyPostProcessVolumeEvaluate.cpp:72",
+        "Source/AbramsSequencer/Private/AbramsSequencerCopyPostProcessVolumeEvaluate.cpp:80",
+        "Source/AbramsSequencer/Private/AbramsSequencerCopyPostProcessVolumeEvaluate.cpp:131",
+        "Source/AbramsSequencer/Private/AbramsSequencerMapDataModule.cpp:13"
+      ],
+      "status": "verified"
+    },
+    "MapSelectPlacementIndex": {
+      "simple": "Non-negative marks a stage as selectable in stage UI.",
+      "technical": "int32 (row +0xE4; constructor default 0). Every traced consumer only tests the sign: stage-select list, free-battle stage options, main-menu free-battle/PvE/PvP icon preloads and Story_PickRandomMapId keep rows with index >= 0 and skip negative ones. No consumer in the reconstructed source uses the numeric value as an array index or sort key; StageItemParameterMap is keyed by Id instead. Export indices are 0..11 for selectable MAP_ rows and -1 for MAP_14_01, MAP_15_01, DEM_*, VLM_01, SDM_*, SRM_* and CharacterCapture. UGameStageSelectWidget's synthetic MAP_00 row is hard-coded to 0.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:64",
+        "Source/Abrams/Private/GameStageSelectWidget.cpp:70",
+        "Source/Abrams/Private/GameFreeBattleRuleSelectWidget.cpp:342",
+        "Source/Abrams/Private/GamePhase_MainMenuFreeBattle.cpp:127",
+        "Source/Abrams/Private/GameStageSelectWidget.cpp:88",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:362"
+      ],
+      "status": "verified"
+    },
+    "MapSelectIconFileName": {
+      "simple": "Stage-select icon texture name.",
+      "technical": "FName (row +0xE8; default empty). Consumers add it to WidgetTexture primary-asset loader batches or call FindDynamicLoadTexture and set it as a brush/texture parameter. Main-menu FreeBattle/PvE/PvP and FreeBattleRuleSelect gate loading on MapSelectPlacementIndex >= 0; IntervalPvE and WidgetTest preload every row's icon; BattleSettingsBackgroundWidget, BattleSituationOverviewWidget, FreeBattleWidget, StageSelectWidget and StoryCharacterSelectWidget display it. Some callers fall back to hard-coded T_UI_Common_StageImage_MAP_00 for the synthetic MAP_00/random-stage case. Export is a T_UI_Common_StageImage_* name for selectable maps, T_UI_Lobby_* for VLM_01 and None for DEM_02/03, SDM_*, SRM_* and CharacterCapture.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:67",
+        "Source/Abrams/Private/GameStageSelectWidget.cpp:110",
+        "Source/Abrams/Private/GamePhase_MainMenuPvE.cpp:65",
+        "Source/Abrams/Private/GamePhase_MainMenuPvP.cpp:190",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:408",
+        "Source/Abrams/Private/GameBattleSettingsBackgroundWidget.cpp:92",
+        "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:605",
+        "Source/Abrams/Private/GameFreeBattleWidget.cpp:209"
+      ],
+      "status": "verified"
+    },
+    "MiniMapFileName": {
+      "simple": "Mini-map texture name shown in battle HUD.",
+      "technical": "FName (row +0xF0; default empty). GamePhase_BattleBase preloads the active map's value (retail unguarded) and also the map referenced by each character's DomainExpansion row; BattleAssets_DomainExpansionMiniMap performs the same nested CharacterSpecialAttack -> DomainExpansion -> Map join. UGameBattleRadarWidget::SetMiniMap resolves MapRow->Id, checks the name is not None, looks up the preloaded widget texture and sets the dynamic material's 'MiniMapTexture' parameter; missing row/texture leaves the old material. Export values are T_UI_MiniMap_* for MAP/DEM rows and None for VLM_01, SDM_*, SRM_* and CharacterCapture.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:70",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:345",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:358",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:271",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:285",
+        "Source/Abrams/Private/GameBattleHUDWidget.cpp:47",
+        "Source/Abrams/Private/GameBattleRadarWidget.cpp:101"
+      ],
+      "status": "verified"
+    },
+    "Id_MissionLayout": {
+      "simple": "Mission-layout ids indexed by the current wave.",
+      "technical": "TArray<FName> (default empty; 16 slots in every exported row). AGameBattleManager::GetCharacterStartTransform uses the active MissionWave->MissionLayoutIndex: if MapRow->Id_MissionLayout is valid at that index and the entry is not None, it resolves the id in MissionLayoutDataTables (DTM +0x9B0) and overrides the start transform's translation/rotation from Layout.Location[Index] / Layout.Rotation[Index] (each guarded by IsValidIndex). The final Z is then ground-traced, so the layout's Z is not authoritative. Export ids use per-map ST/DLC01 and PVE00..PVE05 naming, with None filling unused slots; story-only maps are all None.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:73",
+        "Source/Abrams/Private/GameBattleManager.cpp:1470",
+        "Source/Abrams/Private/GameBattleManager.cpp:1487",
+        "Source/Abrams/Private/GameBattleManager.cpp:1491",
+        "Source/Abrams/Private/GameBattleManager.cpp:1504",
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:15"
+      ],
+      "status": "verified"
+    },
+    "ReverbRate": {
+      "simple": "Reverb bus send amount for the stage.",
+      "technical": "float (row +0x108; constructor default 0.0f). GameBattle_ApplyStageMapRow and its inlined copies, battle phases/states and the studio level-sequencer cast spawn assign it to AGameSoundManager::ReverbBusSendLevel (+0x398). Every voice/SE player later receives Player->SetBusSendLevelByName(ReverbBusName, ReverbBusSendLevel), with ReverbBusName defaulting to 'Reverb'. Transition paths explicitly reset the manager value to 0 when leaving battle/sequencer stages. Export values are 0.0, 0.05, 0.1 and 0.15.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:76",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:355",
+        "Source/Abrams/Private/GameBattleState_08.cpp:144",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:524",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:819",
+        "Source/Abrams/Private/GameSoundManager.cpp:1195",
+        "Source/Abrams/Public/GameSoundManager.h:120"
+      ],
+      "status": "verified"
+    },
+    "Id_SoundEffect": {
+      "simple": "Ambient background sound id for the stage.",
+      "technical": "FName (row +0x10C; default empty). AGameBattleManager::PlayMapAmbientSe resolves it with Status_FindSoundEffectRow(SoundEffectDataTables DTM +0x730, bCheckNone=true) and calls GameSoundManager.PlayAmbientSe(Row->CueSheetName, Row->CueName, GameSoundDefaultPlayParameter); a missing row/None plays nothing. StartMapAmbientSe first prefers the map referenced by the finish target's DomainExpansion row and otherwise uses the active BattleLevel row. GameBattle_ApplyStageMapRow and battle states 07/08 call PlayMapAmbientSe after applying colors/reverb. Export values are SE_BG_* for MAP/DEM/VLM rows and None for SDM_*, SRM_* and CharacterCapture.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:79",
+        "Source/Abrams/Private/GameBattleManager.cpp:1653",
+        "Source/Abrams/Private/GameBattleManager.cpp:1678",
+        "Source/Abrams/Private/GameBattleManager.cpp:1682",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:356",
+        "Source/Abrams/Private/GameBattleState_08.cpp:146"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "MapDataTable is registered as primary asset name 'MapDataTable' in AGameDataTableManager::StartInitialLoading and resolved into MapDataTables (DTM +0x3A0) after all loaders complete. Status_FindMapRow returns the first table holding the row; the export contains a single table with 30 unique rows. Retail RVAs quoted in the reconstructed source are static-analysis provenance, not runtime verification.",
+    "Row selection is context-dependent: the common key is GameManager.StudioBattleLevelRequest_CA0.BattleLevel, but domain expansions, story missions/scripts/room placements and level-sequence ids select named rows instead. AGameSequencerManager caches a pointer in MapRow (+0xCB8) via SetMapRow (cleared by ResetSequencer); UAbramsSequencerMapDataModule::GetMapRow falls back to the BattleLevel lookup. MAP_00 is a synthetic stage-select row, not data.",
+    "GameBattle_ApplyStageMapRow is the shared battle hand-out: ApplyMapCharacterLighting, ApplyMapColors, SetMapRow, SetBattleLevelRequest(MapRow->Id), ReverbRate and PlayMapAmbientSe. Battle states 05/07/08/10 and battle phases contain inlined variants; for domain expansions, state 07 switches between the caster's DomainExpansion.Id_Map and the active battle level depending on bFinished.",
+    "ApplyMapCharacterLighting fans out through AGameCharacterManager to every managed character and then through character/weapon/shikigami controllers to their material controllers; sequencer SetMapColor can apply the same row to a bound character, NPC, sequencer level object, shikigami or weapon, caching AppliedMapRow by the EGameSequencerMapDataType channel (1 = current map, other values = enum-name row lookup). OnTearDown reapplies the current map's row.",
+    "Character-capture actors explicitly look up the 'CharacterCapture' row for lighting; their widget Common parameter struct subsequently overwrites CharacterLightShadowColor and all five scalar grade parameters, so only CharacterLightColor/OverlayColor from the map row remain authoritative at capture time. No launch or network was used; all statuses come from static consumer traces and the available export.",
+    "MapDataTable's colors/levels are per-stage and global/material-parameter based. They are distinct from MapGroundDataTable, whose surface-keyed rows drive footstep/bound effects and the sequencer's ground-color trace. Vector component fields (X/Y/Z) are omitted here because the renderer inherits the parent FVector annotation."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:188",
+      "detail": "Resolves MapDataTable into MapDataTables (+0x3A0) once all primary-asset loaders finish; registration is at line 336."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:691",
+      "detail": "Status_FindMapRow: first row with the requested Id in any Map table, with optional None check."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:80",
+      "detail": "Starts streaming every Filename level for the requested BattleLevel; also kicks off Id_MapEffect and Id_MapDecal nested asset preloads."
+    },
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:262",
+      "detail": "Id_MapDecal -> MapDecalDataTables -> FileName list; Id_MapEffect -> MapEffectDataTables -> FileName list at line 280."
+    },
+    {
+      "source": "Source/Abrams/Private/GameActorMaterialController.cpp:34",
+      "detail": "Writes all three Character* colors and five Character* scalar grades to material parameters; reached through character/weapon/shikigami/level-object controllers."
+    },
+    {
+      "source": "Source/Abrams/Private/GameEffectManager.cpp:178",
+      "detail": "ApplyMapColors writes EffectColor, CharacterShadowColor, CharacterLightColor, DecalColor and BloodColor into the world's MaterialParameterCollection instance."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSequenceState.cpp:342",
+      "detail": "Shared stage-row hand-out combines lighting, colors, sequencer cache, HUD map id, reverb and ambient SE."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_07.cpp:222",
+      "detail": "Domain-expansion flow chooses DomainExpansion.Id_Map before finishing and the active BattleLevel afterwards."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1471",
+      "detail": "MissionWave.MissionLayoutIndex indexes Id_MissionLayout; the resolved MissionLayout row overrides character start location/rotation before ground tracing."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1678",
+      "detail": "PlayMapAmbientSe resolves Id_SoundEffect against SoundEffectDataTables and plays its cue as ambient SE."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:2158",
+      "detail": "Battle system streams Filename packages and swaps the stream-level set when the map changes."
+    },
+    {
+      "source": "Source/Abrams/Private/PhaseTransitionHelpers.cpp:125",
+      "detail": "PhaseTrans_RequestLevels copies a map row's Filename array and phase request into the next phase's transition state."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:271",
+      "detail": "Preloads the map icon for a character's DomainExpansion map and the active map's MiniMapFileName; line 519 applies colors and reverb."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:689",
+      "detail": "Studio cast spawn finds the BattleLevel row, applies colors and lighting, caches it in the sequencer manager and reads ReverbRate."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSequencerManager.cpp:191",
+      "detail": "SetMapRow caches the row pointer (+0xCB8); line 1227 joins MapRow->Id with SequencerLightDataTables via current file parameter."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerMapDataModule.cpp:13",
+      "detail": "Sequencer map-row provider: cached sequencer row first, then a MapDataTables lookup of the BattleLevel name."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSetMapColorEvaluate.cpp:104",
+      "detail": "Byte channel selects current map (1) or an EGameSequencerMapDataType enum-named row; ApplyMapColor fans the row out to the bound actor's material controller."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerCopyPostProcessVolumeEvaluate.cpp:68",
+      "detail": "Reads SequencerBloomIntensityOffset and applies the deduplicating multiply to the copied post-process volume's BloomIntensity."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSetPointLightParamEvaluate.cpp:145",
+      "detail": "MapDataId 0 uses custom RGB values, 1 uses the current map row, and larger values look up an enum-named row; CharacterLightColor becomes the point light color."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerCaptureAndSendFrameBufferEvaluate.cpp:52",
+      "detail": "Uses MapRow->Id as the key for per-map capture-source overrides in the sequencer section."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStageSelectWidget.cpp:64",
+      "detail": "Builds the stage list from rows with MapSelectPlacementIndex >= 0, keys extras by Id, and appends a synthetic MAP_00 entry."
+    },
+    {
+      "source": "Source/Abrams/Private/GameFreeBattleRuleSelectWidget.cpp:342",
+      "detail": "Stage options use Id_MapText as the label and MapSelectPlacementIndex as the selectability filter."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleRadarWidget.cpp:101",
+      "detail": "Resolves the HUD's map id and applies MiniMapFileName's preloaded texture to the minimap material."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:442",
+      "detail": "Capture actors use the CharacterCapture map row for lighting; widget Common parameters later override the shadow/grade fields."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:334",
+      "detail": "Story room placement levels append LevelDesignName to Map->FileName; script levels and random-map selection are at lines 354 and 362."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1571",
+      "detail": "Hard-codes SDM_10/20/30/40 Map rows for four story level sequences and passes them to Sequencer.SetMapRow."
+    }
+  ]
+}

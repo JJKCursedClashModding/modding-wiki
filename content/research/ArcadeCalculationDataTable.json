@@ -1,0 +1,49 @@
+{
+  "description": "Scalar constants for Arcade mode result payouts, keyed by named money/evaluation rules.",
+  "fields": {
+    "Id": {
+      "simple": "Rule name that selects a payout constant.",
+      "technical": "FName import key/row name for FGameDataTableRow_ArcadeCalculation. Consumers do not read the member as data: they construct names such as MONEY_RESULT_EVALUATE_<rank>, MONEY_MISSION_TASK_CLEAR_BONUS and MONEY_MODE_CLEAR_RESULT_EVALUATE_<points> and look the row up over ArcadeCalculationDataTables (DTM+0x990). Default FName; no table is tested for null before dereferencing the returned row.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeCalculation.h:11",
+        "Source/Abrams/Public/GameDataTableManager.h:194",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:415",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:448"
+      ],
+      "status": "observed"
+    },
+    "Value": {
+      "simple": "Money amount awarded by the selected rule.",
+      "technical": "float, constructor default 0.0f. BattleArcade_BuildRewards reads row +0x10 through StoryFindRowOutOfLine and truncates it to int32. It is used only for a win: (1) MONEY_RESULT_EVALUATE_<evaluate> from the battle result key, (2) the fixed MONEY_MISSION_TASK_CLEAR_BONUS when completed-task count >= 1, and (3) MONEY_MODE_CLEAR_RESULT_EVALUATE_<sum> on the final mission, where sum is the mapped results plus the current result minus ContinueCount and negative sums are clamped to 0. The three values are returned as an int32 array for the result window; missing rows are not guarded.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeCalculation.h:15",
+        "Source/AbramsDataTable/Private/GameDataTableRow_ArcadeCalculation.cpp:4",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:424",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:444",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:455",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:459",
+        "Source/Abrams/Private/GameBattleStoryStates.cpp:478"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The exported asset has 21 rows and serializes Id/Value; the source row struct is FGameDataTableRow_ArcadeCalculation and the manager loads exactly ArcadeCalculationDataTable into ArcadeCalculationDataTables.",
+    "Retail RVAs are recorded in source comments (finder 0x1625310, reward builder 0x1628460). status/functions.json currently labels 0x1628460 behavioural, so this description documents the reconstructed behaviour rather than asserting byte-identical parity.",
+    "Only the reconstructed C++ consumers and the exported asset available here were inspected; partial Content and uninspected Blueprint/editor uses cannot be ruled out."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:283",
+      "detail": "Resolves the loaded ArcadeCalculationDataTable asset into the ArcadeCalculationDataTables array."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleStoryStates.cpp:444",
+      "detail": "BattleArcade_BuildRewards reads three named calculation rows and truncates Value into the Arcade result money array."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:780",
+      "detail": "Explicit out-of-line template instantiation for the ArcadeCalculation row finder."
+    }
+  ]
+}

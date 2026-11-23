@@ -1,0 +1,371 @@
+{
+  "description": "Per-step attack row used by AttackSetDataTable: animation, transition rules, cursed-energy cost, armor, timing and targeting metadata consumed by character attack actions.",
+  "fields": {
+    "Id": {
+      "simple": "Attack row key referenced by AttackSetDataTable.Id_Attack.",
+      "technical": "FName row key; export label ID. GetAttackRow bounds-checks SetRow->Id_Attack[Index], skips None, then scans AttackDataTables in order with FindRow<FGameDataTableRow_Attack>; Start uses the action start count as Index. The row pointer is cached in the attack action as AttackRow.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:20",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:870",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:874",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:197"
+      ],
+      "status": "verified"
+    },
+    "Id_ActionHoming": {
+      "simple": "ActionHoming row used for this attack.",
+      "technical": "FName passed through controller slot 132 ResolveActionHomingId before Action_FindActionHomingRow; controllers may override the resolver. The resulting homing row supplies movement and can override animations and armor flags.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:24",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:245",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:247",
+        "Source/Abrams/Public/GameCharacterActionController.h:333"
+      ],
+      "status": "verified"
+    },
+    "Id_CancelAttackActionHoming": {
+      "simple": "ActionHoming row used when cancelling from a previous attack action.",
+      "technical": "FName selected instead of Id_ActionHoming when bChangedFromAttackAction is true, then passed through ResolveActionHomingId and Action_FindActionHomingRow in the same lookup.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:27",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:245",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:246"
+      ],
+      "status": "verified"
+    },
+    "CharacterAnimation": {
+      "simple": "Main character animation for the attack.",
+      "technical": "FName played by PlayAnimation on activation. If homing is armed it is superseded by ActionHomingRow.CharacterAnimation except for Warp homing; if None in the no-homing path, activation returns without playing an animation but still applies row armor flags. Many character controllers also play it directly.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:30",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:322",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:327",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:913",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:925",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:686"
+      ],
+      "status": "verified"
+    },
+    "WeaponAnimation": {
+      "simple": "Weapon animation paired with the attack.",
+      "technical": "FName played by PlayWeaponAnimation alongside CharacterAnimation. A non-None value is also used on transition to AttackDefault to clear the previous weapon animation with a default-constructed None FName. Warp homing uses the attack row value rather than the homing row value.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:33",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:323",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:331",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:372",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:933",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:935"
+      ],
+      "status": "verified"
+    },
+    "AttackTransitionType": {
+      "simple": "When buffered attack requests may advance the combo.",
+      "technical": "EGameAttackTransitionType. Tick processes AttackRequests only for InputTiming while flag 158 is clear; AddRequest drops/auto-resolves requests for AutoHit*/Auto/OnGround; FilterRequests switches on it to require hit/cancel flags, guard/just-guard conditions, ground state or timing. CP_040/CP_070/CP_240 controllers also branch on it.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:36",
+        "Source/AbramsDataTable/Public/EGameAttackTransitionType.h:6",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:38",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:481",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:563",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:356",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1443"
+      ],
+      "status": "verified"
+    },
+    "AttackTransitionKind": {
+      "simple": "Allowed follow-up attack kinds for manual transitions.",
+      "technical": "TArray<EGameAttackTransitionKind>. AddRequest copies it, removes None, appends the current action mapped kind, and accepts a requested follow-up only when the requested type maps to a listed kind; otherwise non-combo attack requests are removed.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:39",
+        "Source/AbramsDataTable/Public/EGameAttackTransitionKind.h:6",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:515",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:542",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:550"
+      ],
+      "status": "verified"
+    },
+    "AutoTransitionKind": {
+      "simple": "Auto-combo follow-up kind at normal cursed-energy level.",
+      "technical": "EGameAttackTransitionKind passed as KindB to ResolveFollowUpAttackType when the buffered request matches GetAutoComboActionType() and the transition is not AutoHit*/Auto/OnGround. The resolved follow-up and its air variant inherit AutoComboFixedCursedEnergyLevel.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:42",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:494",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:497",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:504"
+      ],
+      "status": "verified"
+    },
+    "AutoTransitionKind_CursedEnergy": {
+      "simple": "Auto-combo follow-up kind at the cursed-energy combo level.",
+      "technical": "EGameAttackTransitionKind passed as KindA (with AutoTransitionKind as KindB) to ResolveFollowUpAttackType in AddRequest; same follow-up request path and fixed-level propagation.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:45",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:495",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:497",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:511"
+      ],
+      "status": "verified"
+    },
+    "AutoComboFixedCursedEnergyLevel": {
+      "simple": "Forces a specific cursed-energy level on auto-combo follow-up requests.",
+      "technical": "int32 copied into FGameCharacterActionRequest::FixedAutoComboCursedEnergyLevel for both the resolved follow-up and its mapped air variant. Exported values are 0 or 1; 0 is the normal case.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:48",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:504",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:511"
+      ],
+      "status": "verified"
+    },
+    "CharacterFacial": {
+      "simple": "Facial expression applied at attack start.",
+      "technical": "EGameCharacterFacial passed directly to FacialController->SetFacial on Start.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:51",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:278"
+      ],
+      "status": "verified"
+    },
+    "CursedEnergy_Add": {
+      "simple": "Signed cursed-energy gain/cost for this attack.",
+      "technical": "float gauge points. If ShouldCalculateCursedEnergy() is true, Start adds Owner.GetPassiveAttackRate() * CursedEnergy_Add to current cursed energy; GetNextCursedEnergyAdd returns the absolute scaled product for the next step, and controllers use the same product for affordability checks and refunds. Exported values are negative for costs.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:54",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:248",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:251",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:899",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:395",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1309"
+      ],
+      "status": "verified"
+    },
+    "CursedEnergyCalcType": {
+      "simple": "How the cursed-energy cost is enforced.",
+      "technical": "EGameCursedEnergyCalcType (None, CheckOnly, Force). StateCondition_IsCursedEnergyNotCheckOnly returns false for CheckOnly so ShouldCalculateCursedEnergy() skips the gauge addition; StateCondition_IsCursedEnergyNotForce returns false for Force. AI conditions and CP_240 pending refund also switch on it. Null rows pass as true.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:57",
+        "Source/AbramsDataTable/Public/EGameCursedEnergyCalcType.h:6",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:825",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:1298",
+        "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:1318",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1309"
+      ],
+      "status": "verified"
+    },
+    "BlendInTime_Idle": {
+      "simple": "Transition blend time when the next action is Idle.",
+      "technical": "float seconds used in MakeRequest only when the attack action BlendOutTime is negative and the requested type is Idle; otherwise BlendOutTime wins. Sampled exported rows use -1.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:60",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:700"
+      ],
+      "status": "verified"
+    },
+    "BlendInTime_Fall": {
+      "simple": "Transition blend time when the next action is Fall.",
+      "technical": "float seconds used like BlendInTime_Idle for the Fall request when BlendOutTime < 0.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:63",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:703"
+      ],
+      "status": "verified"
+    },
+    "ContinuousUseAttackVoiceType": {
+      "simple": "Voice type for repeated use of this attack.",
+      "technical": "EGameCharacterAttackVoiceType returned by GetContinuousUseAttackVoiceType (slot 107); CP_170 has an override that falls back to this row value. Invalid is returned when AttackRow is null.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:66",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:742",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:745",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:508"
+      ],
+      "status": "verified"
+    },
+    "Id_ParallelAttack": {
+      "simple": "Reference to a ParallelAttackDataTable row played alongside this attack.",
+      "technical": "FName. HasNextParallelAttack checks the next set step's row for a non-None ID; CP_030/CP_140/CP_160/CP_230/CP_240 action controllers resolve the row and play/stop its CharacterAnimation. None means no parallel animation.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:69",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:415",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:676",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:872",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:1153",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:1013"
+      ],
+      "status": "verified"
+    },
+    "bSuperArmorEnabled": {
+      "simple": "Whether the attacker has super armor during this attack.",
+      "technical": "bool copied into the attack action at activation (or from the ActionHoming row when homing is armed). IsSuperArmorEnabled returns the raw cached byte; a failed homing path clears it to 0. NormalAttack also exposes it through its own override.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:72",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:333",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:919",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:927",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:937",
+        "Source/Abrams/Public/GameCharacterAction_Attack.h:43"
+      ],
+      "status": "verified"
+    },
+    "bHyperArmorEnabled": {
+      "simple": "Whether the attacker has hyper armor during this attack.",
+      "technical": "bool copied like bSuperArmorEnabled at activation or from the ActionHoming row when homing is armed; IsHyperArmorEnabled returns the cached byte and failed homing clears it.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:75",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:334",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:920",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:928",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:938",
+        "Source/Abrams/Public/GameCharacterAction_Attack.h:44"
+      ],
+      "status": "verified"
+    },
+    "TargetChangeType": {
+      "simple": "When the secondary/homing target may change during the attack.",
+      "technical": "EGameTargetChangeType. Start copies the primary target into the secondary target for AttackActivate or Always; IsTargetChangeAlways returns true only for Always. Other values leave the existing secondary target unless the caller handles it.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:78",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:229",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:843"
+      ],
+      "status": "verified"
+    },
+    "bUpdateHomingLocation": {
+      "simple": "Whether the secondary target location is refreshed at attack start.",
+      "technical": "bool. After setting the secondary target, Start refreshes its stored location only when a previous attack action is transitioning and this flag is true, or when there was no previous attack action.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:81",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:233"
+      ],
+      "status": "verified"
+    },
+    "bTargetOnlyHitAttackTransitionEnabled": {
+      "simple": "Requires a secondary-target hit before hit-gated combo transitions.",
+      "technical": "bool. FilterRequests returns early when this is true, bChangeLastHitNotTargetEnabled is false, and bHitSecondaryTarget is false; applied to both InputHit* and AutoHit* transition groups. CP_040 mirrors the check.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:84",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:573",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:616",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:352"
+      ],
+      "status": "verified"
+    },
+    "bChangeLastHitNotTargetEnabled": {
+      "simple": "Restores the last hit target when leaving the attack and relaxes the secondary-target transition gate.",
+      "technical": "bool. When true and leaving to a non-AttackDefault action with no secondary-target hit and a valid LastHitTarget, Finish sets the secondary target back to LastHitTarget. It also disables the bTargetOnlyHitAttackTransitionEnabled early-return in both hit-gated transition groups. CP_040 mirrors both uses.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:87",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:368",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:573",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:616",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:352"
+      ],
+      "status": "verified"
+    },
+    "AttackActionType": {
+      "simple": "Broad attack category exposed to hit/AI logic.",
+      "technical": "EGameAttackActionType (None, Attack, Charge, UnblockableAttack, AroundAttack). GetAttackActionType (slot 93) returns this value or None when AttackRow is null.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:90",
+        "Source/AbramsDataTable/Public/EGameAttackActionType.h:6",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:672"
+      ],
+      "status": "verified"
+    },
+    "AttackTiming": {
+      "simple": "Elapsed attack time at which this step's active hit begins.",
+      "technical": "float seconds compared against the action's accumulated AttackTime by HasReachedAttackTiming (slot 79). Negative values (common in exports) make the check return false. This is the timing used by the attack base, not the DistanceDelay variant.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:93",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:392",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:395",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:399"
+      ],
+      "status": "verified"
+    },
+    "DistanceDelayAttackTiming": {
+      "simple": "Serialized distance-delay timing value with no identified consumer.",
+      "technical": "float, default 0.0 in the C++ constructor; exported shards use -1.0 for nearly all rows and 0.0 for one. No read of this property exists in the reconstructed Source/ or Plugins/ tree, so its units and interaction with AttackTiming are unverified. Marked observed rather than verified.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:96",
+        "Source/AbramsDataTable/Private/GameDataTableRow_Attack.cpp:22"
+      ],
+      "status": "observed"
+    },
+    "AttackAvoidType": {
+      "simple": "Avoid/evasion classification exposed by the attack.",
+      "technical": "EGameAttackAvoidType (None, Guard, DodgeStep, AwayStep, AwayDash, AwayDashJump). GetAttackAvoidType (slot 94) returns this value or None when AttackRow is null. The header notes the name is UNPROVEN, so do not infer more than the getter's return.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:99",
+        "Source/AbramsDataTable/Public/EGameAttackAvoidType.h:6",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:682",
+        "Source/Abrams/Public/GameCharacterAction.h:304"
+      ],
+      "status": "verified"
+    },
+    "SimpleDomainCounterReceiveType": {
+      "simple": "Whether a simple-domain counter can receive this attack.",
+      "technical": "EGameSimpleDomainCounterReceiveType (None, AttackActivate, Always). CanBeCountered checks counter-receive time first; when the timer is expired it returns false for None, the current active-hit flag for AttackActivate, or true for Always.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:102",
+        "Source/AbramsDataTable/Public/EGameSimpleDomainCounterReceiveType.h:6",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:154",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:156",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:158"
+      ],
+      "status": "verified"
+    },
+    "SimpleDomainCounterReceiveDelayTime": {
+      "simple": "Initial countdown before the attack can be simple-domain countered.",
+      "technical": "float seconds copied into CounterReceiveTime when ActivateAttack starts the active part; Tick decrements it by DeltaTime, and CanBeCountered consults the type only once the timer is <= 0.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Attack.h:105",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:906",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:154",
+        "Source/Abrams/Public/GameCharacterAction_Attack.h:108"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "AGameDataTableManager::Tick resolves five numbered shards AttackDataTable1..5 into AttackDataTables; lookups scan those arrays in order and return the first matching row (Source/Abrams/Private/GameDataTableManager.cpp:229, Source/Abrams/Public/GameDataTableManager.h:140). Exported shards share one row schema; no localization variants were identified.",
+    "AttackRow is reached through AttackSetDataTable.Id_Attack[Index] via GetAttackRow, then cached in the attack action. Character-specific CN_*/CP_* controllers override GetAttackSetRow and several getters, and may read the same row fields directly.",
+    "Two links to other tables are unproven at the consumer level here: Id_ParallelAttack is resolved by other action controllers (documented in ParallelAttackDataTable), while Id_ActionHoming/Id_CancelAttackActionHoming go through controller slot 132 before ActionHoming lookups.",
+    "DistanceDelayAttackTiming is the only field with no identified consumer; it is serialized/loaded only. All other fields have at least one direct substantive C++ consumer.",
+    "Evidence is reconstructed retail-behaviour source plus serialized export schema. Content is partial, so Blueprint/uncooked consumers cannot be excluded; exported values are not treated as semantic proof."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Attack.cpp:197",
+      "detail": "Start resolves AttackSetRow/AttackRow, applies facial, inertia, cursed-energy and range/cursed-attack tracking, then starts homing."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Attack.cpp:477",
+      "detail": "AddRequest uses transition type/kinds and auto-combo kinds to filter or resolve buffered follow-up attacks."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Attack.cpp:553",
+      "detail": "FilterRequests gates combo requests on transition type, hit targets, guard state and the two last-hit/target flags."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Attack.cpp:903",
+      "detail": "ActivateAttack plays CharacterAnimation/WeaponAnimation, applies row armor flags and seeds the simple-domain counter timer."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Attack.cpp:825",
+      "detail": "ShouldCalculateCursedEnergy delegates to CursedEnergyCalcType checks; Start and GetNextCursedEnergyAdd scale CursedEnergy_Add."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Attack.cpp:392",
+      "detail": "HasReachedAttackTiming compares AttackTiming against the running attack time."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Attack.cpp:152",
+      "detail": "CanBeCountered uses SimpleDomainCounterReceiveType after the delay countdown."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:229",
+      "detail": "Load/registry path for the five AttackDataTable shards."
+    }
+  ]
+}

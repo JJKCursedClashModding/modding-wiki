@@ -1,0 +1,189 @@
+---
+import Reference from '../../layouts/Reference.astro';
+import InlineText from '../../layouts/InlineText.astro';
+import { categoryNames, fieldAnchor, groups, slugFor } from '../../data.js';
+
+export function getStaticPaths() {
+  return groups.map((group) => ({ params: { slug: slugFor(group.id) }, props: { group } }));
+}
+
+const { group } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const statuses = {
+  verified: 'Consumer traced',
+  observed: 'Observed',
+  unresolved: 'Unresolved',
+  pending: 'Pending review',
+};
+const formatCount = (value) => value.toLocaleString('en-US');
+const refs = Object.entries(group.references);
+---
+<Reference title={group.id} description={group.description ?? `Unreal schema for ${group.id}.`} current={group.id}>
+  <div class="doc-grid">
+    <article class="doc">
+      <div class="breadcrumb"><a href={base}>Overview</a><span aria-hidden="true">/</span><a href={`${base}#${group.category}`}>{categoryNames[group.category]}</a></div>
+      <h1 class="table-title">{group.id}</h1>
+      <p class="lead"><InlineText value={group.description ?? 'Purpose is pending a review of the table’s runtime consumers.'} /></p>
+      <dl class="specs">
+        <div><dt>Unreal row struct</dt><dd><code>F{group.rowStruct}</code></dd></div>
+        <div><dt>Asset variants</dt><dd>{formatCount(group.variants.length)}</dd></div>
+        <div><dt>Distinct row keys</dt><dd>{formatCount(group.rowKeyCount)}</dd></div>
+      </dl>
+
+      <section id="fields" class="doc-section">
+        <div class="section-heading"><h2>Row fields</h2><span>{group.reviewed} of {group.fields.length} reviewed</span></div>
+        <p class="section-intro">Each field is shared by records that use this schema. Deep links open directly to a field.</p>
+        <label class="filter-label" for="field-filter">Filter fields</label>
+        <input class="filter" type="search" id="field-filter" placeholder="Field name, type, or definition" autocomplete="off" />
+        <p id="field-empty" class="muted" hidden>No fields match this filter.</p>
+        <div class="field-list">
+          {group.fields.map((field) => (
+            <article class="field" id={fieldAnchor(field.name)}>
+              <div class="field-heading">
+                <h3><a href={`#${fieldAnchor(field.name)}`}><code>{field.name}</code></a></h3>
+                <span class:list={['badge', field.status]}>{statuses[field.status] ?? field.status}</span>
+              </div>
+              <div class="field-type"><code>{field.type || 'Type unknown'}</code>
+                {field.nativeName && field.nativeName !== field.name && !field.name.includes('.') && <span>Unreal property <code>{field.nativeName}</code></span>}
+                {!field.exportKinds.length && <span>Declaration only</span>}
+                {field.exportOnly && <span>Export representation</span>}
+                {field.seenInVariants > 0 && field.seenInVariants < group.variants.length && (
+                  <span>Present in {field.seenInVariants} of {group.variants.length} exports</span>
+                )}
+              </div>
+              <p class="simple"><InlineText value={field.simple ?? 'Definition pending review.'} /></p>
+              {field.technical && <p class="technical"><InlineText value={field.technical} /></p>}
+              {field.enum && (
+                <details class="field-evidence">
+                  <summary>Enum values{field.enum.underlying ? ` · ${field.enum.underlying}` : ''}</summary>
+                  <ul class="enum-values">{field.enum.values.map(([name, value]) => <li><code>{name}</code> <span>{value}</span></li>)}</ul>
+                  <p><code>{field.enum.source}</code></p>
+                </details>
+              )}
+              {(field.source || field.evidence?.length) && (
+                <details class="field-evidence">
+                  <summary>Evidence</summary>
+                  <ul>{[...new Set([field.source, ...(field.evidence ?? [])].filter(Boolean))].map((ref) => <li><code>{ref}</code></li>)}</ul>
+                </details>
+              )}
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section id="variants" class="doc-section">
+        <h2>Assets & row keys</h2>
+        {group.variants.length ? <>
+        <p class="section-intro">{formatCount(group.assetRowCount)} records across the available variants. {group.repeatedKeys ? `${formatCount(group.repeatedKeys)} row keys recur in multiple variants.` : ''}</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th scope="col">Asset</th><th scope="col">Rows</th><th scope="col">Import key</th></tr></thead>
+          <tbody>{group.variants.map(({ name, rows, importKey }) => <tr><td><code>{name}</code></td><td>{formatCount(rows)}</td><td><code>{importKey ?? '—'}</code></td></tr>)}</tbody>
+        </table></div>
+        <details class="key-browser" data-key-file={`${base}row-keys/${slugFor(group.id)}.json`} data-variants={JSON.stringify(group.variants.map(({ name }) => name))}>
+          <summary>Browse {formatCount(group.rowKeyCount)} row keys</summary>
+          <label class="filter-label" for="key-filter">Find a row key</label>
+          <input class="filter" type="search" id="key-filter" placeholder="Row key" autocomplete="off" />
+          <p class="key-status muted" role="status"></p>
+          <ul class="key-results"></ul>
+        </details>
+        </> : <p class="section-intro">The native consumer defines this table’s schema. The available exports contain no matching asset.</p>}
+      </section>
+
+      <section id="usage" class="doc-section">
+        <h2>Code usage</h2>
+        {group.usages.length ? <ul class="usage-list">{group.usages.map(({ source, detail }) => (
+          <li><p><InlineText value={detail} /></p><code>{source}</code></li>
+        ))}</ul> : <p class="section-intro">A technical summary of the consumers is pending review.</p>}
+        {refs.length > 0 && (
+          <details class="reference-files">
+            <summary>Source reference index · {refs.length} files</summary>
+            <p class="muted">Matches for asset names, row structs, and known accessors. The index includes declarations and setup.</p>
+            <ul>{refs.map(([file, symbols]) => <li>
+              <code>{file}</code>
+              <ul>{Object.entries(symbols).map(([symbol, lines]) => <li><code>{symbol}</code> <span>· {Array.from(new Set(lines)).join(', ')}</span></li>)}</ul>
+            </li>)}</ul>
+          </details>
+        )}
+      </section>
+
+      <section id="notes" class="doc-section">
+        <h2>Notes</h2>
+        {group.notes.length ? <ul class="notes">{group.notes.map((note) => <li><InlineText value={note} /></li>)}</ul> : <p class="section-intro">Additional findings are pending review.</p>}
+      </section>
+    </article>
+    <nav class="toc" aria-label="On this page">
+      <strong>On this page</strong>
+      <a href="#fields">Row fields</a>
+      <a href="#variants">Assets & row keys</a>
+      <a href="#usage">Code usage</a>
+      <a href="#notes">Notes</a>
+    </nav>
+  </div>
+  <script>
+    const fieldFilter = document.querySelector('#field-filter');
+    const fields = [...document.querySelectorAll('.field-list .field')];
+    fieldFilter.addEventListener('input', () => {
+      const query = fieldFilter.value.trim().toLowerCase();
+      let visible = 0;
+      for (const field of fields) {
+        field.hidden = !field.textContent.toLowerCase().includes(query);
+        if (!field.hidden) visible++;
+      }
+      document.querySelector('#field-empty').hidden = visible > 0;
+    });
+    window.addEventListener('hashchange', () => {
+      const target = document.getElementById(location.hash.slice(1));
+      if (target?.hidden && target.classList.contains('field')) {
+        fieldFilter.value = '';
+        fieldFilter.dispatchEvent(new Event('input'));
+        target.scrollIntoView();
+      }
+    });
+
+    const browser = document.querySelector('.key-browser');
+    if (browser) enableKeyBrowser(browser);
+
+    function enableKeyBrowser(browser) {
+      const keyStatus = browser.querySelector('.key-status');
+      const keyResults = browser.querySelector('.key-results');
+      const keyFilter = browser.querySelector('#key-filter');
+      const variants = JSON.parse(browser.dataset.variants);
+      let keyData;
+      let request;
+
+      function renderKeys() {
+        if (!keyData) return;
+        const query = keyFilter.value.trim().toLowerCase();
+        const matches = keyData.filter(([key]) => key.toLowerCase().includes(query));
+        keyResults.replaceChildren();
+        keyStatus.textContent = `${matches.length.toLocaleString()} matches${matches.length > 50 ? ' · showing the first 50' : ''}`;
+        for (const [key, indices] of matches.slice(0, 50)) {
+          const item = document.createElement('li');
+          const name = document.createElement('code');
+          const assets = document.createElement('small');
+          name.textContent = key;
+          assets.textContent = indices.map((index) => variants[index]).join(', ');
+          item.append(name, assets);
+          keyResults.append(item);
+        }
+      }
+
+      browser.addEventListener('toggle', async () => {
+        if (!browser.open || keyData || request) return;
+        keyStatus.textContent = 'Loading row keys…';
+        try {
+          request = fetch(browser.dataset.keyFile);
+          const response = await request;
+          if (!response.ok) throw new Error('Row keys unavailable');
+          keyData = await response.json();
+          renderKeys();
+        } catch {
+          keyStatus.textContent = 'Row keys could not load. Reopen this section to retry.';
+        } finally {
+          request = undefined;
+        }
+      });
+      keyFilter.addEventListener('input', renderKeys);
+    }
+  </script>
+</Reference>

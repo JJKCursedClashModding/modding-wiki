@@ -1,0 +1,74 @@
+{
+  "description": "Lottery group of voice IDs used when a game event should randomly choose one of several spoken lines.",
+  "fields": {
+    "Id": {
+      "simple": "Row key / voice-group ID.",
+      "technical": "FName primary key. IDs come from CharacterVoiceGroup.Id_VoiceGroup, ShikigamiVoiceGroup.Id_VoiceGroup, CharacterSound.Id_VoiceGroup, mission-task voice text arrays, sequencer section IDs and explicit CP call literals. The typed finder walks DTM.VoiceGroupDataTables (+0x750), rejects None when requested, and returns the first row with this Id. Export spells it ID.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_VoiceGroup.h:12",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3031",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3044",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2500",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:103",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:346"
+      ],
+      "status": "verified"
+    },
+    "Id_Voice": {
+      "simple": "Voice IDs in the random-pick pool.",
+      "technical": "TArray<FName>, parallel to no weight array. Consumers filter None entries and pick by weighted index, random stream, or shuffle, depending on subsystem: sound voice player gives each non-None entry weight 1; battle task voices shuffle non-None candidates while excluding a specified entry and optionally the last played line; CP_240 and the unique-pair evaluator remove the previously picked voice when at least two candidates remain. Every chosen ID is then resolved against VoiceDataTable.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_VoiceGroup.h:15",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:107",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:112",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2513",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2515",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2526",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:722",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:731",
+        "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:347"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Loaded as a DataTable primary asset named VoiceGroupDataTable into DTM.VoiceGroupDataTables (+0x750).",
+    "This is the second layer of the usual voice join: action/system data selects a VoiceGroup row, and this array selects one VoiceDataTable row to play.",
+    "None placeholders are common and are generally filtered. The shikigami consumer counts non-None entries but then indexes the original array with the fraction of that count, so a None entry in the middle could still be selected; this is an observed implementation quirk, not a data rule.",
+    "The companion export is partial; no claim is made about all retail rows or Blueprint-only references. Source is reconstructed retail C++ with retail RVAs recorded inline."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:247",
+      "detail": "Resolves VoiceGroupDataTable into DTM.VoiceGroupDataTables."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:3031",
+      "detail": "Shared typed voice-group row finder used by action voice playback."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:3298",
+      "detail": "Action controller resolves the group selected by CharacterVoiceGroup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSoundVoicePlayer.cpp:103",
+      "detail": "CharacterSound voice group path uses a uniform lottery over non-None entries."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:2500",
+      "detail": "Battle task voice shuffles candidates and avoids immediate repeats."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_240_ActionController.cpp:712",
+      "detail": "CP_240 removes the last picked variant before random selection."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigamiActionController.cpp:499",
+      "detail": "Shikigami voice group random pick."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerPlayVoiceForUniquePairEvaluate.cpp:341",
+      "detail": "Unique-pair common fallback collects non-None group voices."
+    }
+  ]
+}

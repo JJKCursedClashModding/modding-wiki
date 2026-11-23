@@ -1,0 +1,94 @@
+{
+  "description": "Named rotational camera-shake presets applied by battle damage (duration, blend times, pitch/yaw oscillation).",
+  "fields": {
+    "ID": {
+      "simple": "Camera shake preset name, e.g. NormalBlow_N.",
+      "technical": "FName row key. FStudioBattleSystem2E0::PlayCameraShakes iterates the ShakeIds arrays supplied by a Damage row (Id_CameraShake_Attacker / Id_CameraShake_Receiver), skips NAME_None, and finds the first row named Id in CameraShakeDataTables (+0x7B0). 48 exported rows including TEST and NormalStumble_*/NormalBlow_* variants.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:218",
+        "Source/Abrams/Private/GameBattleDamage.cpp:232",
+        "Source/Abrams/Private/GameBattleDamage.cpp:614",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Damage.h:231"
+      ],
+      "status": "verified"
+    },
+    "OscillationDuration": {
+      "simple": "How long the shake oscillates.",
+      "technical": "Float seconds copied to UGameCameraShake::OscillationDuration in the AddCameraShake initializer lambda (row +0x10 in the struct after Id). Export values include 0.2 s for TEST/NormalStumble/NormalBlow rows.",
+      "evidence": [
+        "Source/Abrams/Private/GameCameraManager.cpp:261",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CameraShake.cpp:4"
+      ],
+      "status": "verified"
+    },
+    "OscillationBlendInTime": {
+      "simple": "Ease-in time of the shake.",
+      "technical": "Float seconds copied to UGameCameraShake::OscillationBlendInTime. Export commonly 0.05 s.",
+      "evidence": [
+        "Source/Abrams/Private/GameCameraManager.cpp:262"
+      ],
+      "status": "verified"
+    },
+    "OscillationBlendOutTime": {
+      "simple": "Ease-out time of the shake.",
+      "technical": "Float seconds copied to UGameCameraShake::OscillationBlendOutTime. Export is 0.05 for TEST and 0.1 for NormalStumble/NormalBlow rows.",
+      "evidence": [
+        "Source/Abrams/Private/GameCameraManager.cpp:263"
+      ],
+      "status": "verified"
+    },
+    "RotOscillation_Pitch_Amplitude": {
+      "simple": "Pitch shake amplitude.",
+      "technical": "Float written verbatim to GameShake->RotOscillation.Pitch.Amplitude (row +0x24). Directional variants zero this field to make a yaw-only shake (e.g. NormalStumble_H); constructor default 0.0.",
+      "evidence": [
+        "Source/Abrams/Private/GameCameraManager.cpp:264",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CameraShake.cpp:4"
+      ],
+      "status": "verified"
+    },
+    "RotOscillation_Pitch_Frequency": {
+      "simple": "Pitch shake frequency.",
+      "technical": "Float written verbatim to GameShake->RotOscillation.Pitch.Frequency; values in the export are commonly 60 (engine FOscillator frequency units).",
+      "evidence": [
+        "Source/Abrams/Private/GameCameraManager.cpp:265"
+      ],
+      "status": "verified"
+    },
+    "RotOscillation_Yaw_Amplitude": {
+      "simple": "Yaw shake amplitude.",
+      "technical": "Float written verbatim to GameShake->RotOscillation.Yaw.Amplitude. Directional variants zero it for pitch-only shakes (e.g. NormalStumble_V); constructor default 0.0.",
+      "evidence": [
+        "Source/Abrams/Private/GameCameraManager.cpp:266",
+        "Source/AbramsDataTable/Private/GameDataTableRow_CameraShake.cpp:4"
+      ],
+      "status": "verified"
+    },
+    "RotOscillation_Yaw_Frequency": {
+      "simple": "Yaw shake frequency.",
+      "technical": "Float written verbatim to GameShake->RotOscillation.Yaw.Frequency (commonly 60 in the export).",
+      "evidence": [
+        "Source/Abrams/Private/GameCameraManager.cpp:267"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "AGameCameraManager::PlayCameraShake (retail 0x105d9a0) requires a non-null row, a cached camera-shake modifier, Scale > 0 and bCameraShakeEnabled; battle calls pass Scale 1.0. The array index of the ShakeIds entry selects between UGameCameraShake_01 and UGameCameraShake_02 classes, so only two simultaneous shakes can be started from one Damage row.",
+    "The row fields are applied in an initializer delegate on the newly created shake; no roll oscillation, location oscillation or per-shake asset reference exists in this row struct or the 48 exported rows.",
+    "CameraShakeDataTables is manager slot +0x7B0; registered at GameDataTableManager.cpp:426 and resolved at line 253. Only the damage system was found to look rows up in this table in the available source."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:253",
+      "detail": "Resolves 'CameraShakeDataTable' into CameraShakeDataTables (+0x7B0)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:218",
+      "detail": "PlayCameraShakes resolves each Damage-row shake ID to a row over +0x7B0 and calls the camera manager with the row, ShakeIds index and scale 1.0 (retail 0x102b3a0)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCameraManager.cpp:249",
+      "detail": "PlayCameraShake transfers all seven numeric fields to the spawned UGameCameraShake and adds it through the cached modifier."
+    }
+  ]
+}

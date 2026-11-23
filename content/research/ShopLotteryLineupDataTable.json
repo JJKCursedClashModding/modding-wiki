@@ -1,0 +1,105 @@
+{
+  "description": "Defines the finite prize pool for the shop lottery: each possible prize's item set, rarity, draw weight, and how many times it can be won before it sells out.",
+  "fields": {
+    "Id": {
+      "simple": "Lottery lineup/prize row identifier.",
+      "technical": "FName row key and draw-pool entry name. Per-row draw counts are stored in GameManager::UserInfo::Shop::StudioNameInts_A58 keyed by this ID. The weighted pool is built from row IDs, one uniform random index is chosen, and the selected ID is resolved back to its row before granting. UI item data also uses this ID to read the drawn count.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShopLotteryLineup.h:11",
+        "Source/Abrams/Private/GameShopLotteryWidget.cpp:100",
+        "Source/Abrams/Private/GameShopLotteryWidget.cpp:356",
+        "Source/Abrams/Private/GameShopLotteryWidget.cpp:365",
+        "Source/Abrams/Private/GameShopLotteryLineupListItemData.cpp:39"
+      ],
+      "status": "verified"
+    },
+    "Id_ItemSet": {
+      "simple": "ItemSet granted when this prize is drawn.",
+      "technical": "FName resolved through GameShop_GetItemSetItems / GameShop_GetItemSetNameText to build preview item type, character name, set name, thumbnail and result dialog. On a normal draw GameShop_AddItemSetOnce grants this set. If the first set item is already at PossessionMax, the draw is flagged bReplaced and a rarity-specific ITM_SET_SHOP_LOTTERY_REPLACE_* point set is granted instead.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShopLotteryLineup.h:16",
+        "Source/Abrams/Private/GameShopLotteryLineupListItemData.cpp:22",
+        "Source/Abrams/Private/GameShopLotteryLineupWidget.cpp:40",
+        "Source/Abrams/Private/GameShopLotteryWidget.cpp:376",
+        "Source/Abrams/Private/GameShopLotteryWidget.cpp:396",
+        "Source/Abrams/Private/GameShopLotteryResultDialogWidget.cpp:70"
+      ],
+      "status": "verified"
+    },
+    "Weight": {
+      "simple": "Relative draw weight of this prize.",
+      "technical": "float at row offset 0x18, default 0. For the actual draw, each row that has not reached ContainsCount contributes FloorToInt(Weight) copies of its ID to a flat pool; a uniform RNG index selects the winner, so fractional weight is truncated and a weight below 1 contributes no entries. For display, RefreshLineup sums Weight over non-sold-out rows, divides each row's Weight by max(TotalWeight, 1.0f), and formats the rate as a percent with three decimals. Rows are sorted by that displayed rate and then by item-set SortingOrder.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShopLotteryLineup.h:19",
+        "Source/Abrams/Private/GameShopLotteryWidget.cpp:342",
+        "Source/Abrams/Private/GameShopLotteryWidget.cpp:356",
+        "Source/Abrams/Private/GameShopLotteryWidget.cpp:365",
+        "Source/Abrams/Private/GameShopLotteryLineupListWidget.cpp:24",
+        "Source/Abrams/Private/GameShopLotteryLineupListItemData.cpp:50"
+      ],
+      "status": "verified"
+    },
+    "Rariry": {
+      "simple": "Rarity tier of the prize (the property is spelled 'Rariry' in retail data and source).",
+      "technical": "EGameShopLotteryRarityType at row offset 0x1C (None, Bronze=1, Silver=2, Gold=3, Invalid=255), default None. It groups the prize list into Gold -> Silver -> Bronze with sold-out entries last, chooses the header color by static_cast<int32>(Rariry)-1, selects the replacement point set, and drives the result animation through PlayResult(Rariry).",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameShopLotteryRarityType.h:6",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShopLotteryLineup.h:22",
+        "Source/Abrams/Private/GameShopLotteryLineupListWidget.cpp:47",
+        "Source/Abrams/Private/GameShopLotteryLineupListItemWidget.cpp:45",
+        "Source/Abrams/Private/GameShopLotteryWidget.cpp:386",
+        "Source/Abrams/Private/GameShopLotteryWidget.cpp:406"
+      ],
+      "status": "verified"
+    },
+    "ContainsCount": {
+      "simple": "Maximum number of times this prize can be drawn.",
+      "technical": "int32 at row offset 0x20, default 0. The save-data drawn count is compared with it to exclude sold-out rows from the draw pool, label the prize sold out/dim it, and compute remaining lottery boxes (sum of ContainsCount - drawn). It is also shown as MAX in the COUNT/MAX text. Exported values are 1 or 3.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShopLotteryLineup.h:25",
+        "Source/Abrams/Private/GameShopLotteryWidget.cpp:101",
+        "Source/Abrams/Private/GameShopLotteryWidget.cpp:351",
+        "Source/Abrams/Private/GameShopLotteryLineupListWidget.cpp:28",
+        "Source/Abrams/Private/GameShopLotteryLineupListItemData.cpp:55",
+        "Source/Abrams/Private/GameShopLotteryLineupWidget.cpp:109"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The export contains 421 rows (291 Bronze, 98 Silver, 32 Gold). The export's Rariry spelling matches the actual UPROPERTY name; do not 'correct' it to Rarity in generated field keys.",
+    "Each draw costs Global::ShopLotteryPrice times the draw count; that price is not stored in this table.",
+    "A draw selects from a flat ID pool built once from eligible rows; the implementation appends floor(Weight) entries per eligible row, not a number scaled by the remaining ContainsCount. The display-time weight rate uses a separate total over non-sold-out rows.",
+    "Multiple ShopLotteryLineupDataTable shards are supported and consumers use first-match row lookups. Only the supplied retail export and partial Content are available."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:307",
+      "detail": "Loads ShopLotteryLineupDataTable into ShopLotteryLineupDataTables."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopLotteryWidget.cpp:85",
+      "detail": "Collects every lineup row from all tables."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopLotteryWidget.cpp:93",
+      "detail": "Computes remaining available draws from ContainsCount and per-row drawn counts."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopLotteryWidget.cpp:341",
+      "detail": "Builds the weighted pool, draws a row ID, resolves the row, and grants its prize or rarity replacement."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopLotteryLineupListWidget.cpp:20",
+      "detail": "Computes displayed weight rates and groups/sorts prizes by rarity, weight and sold-out state."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopLotteryLineupListItemData.cpp:18",
+      "detail": "Builds preview text and per-row drawn/remaining display data."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopLotteryResultDialogWidget.cpp:34",
+      "detail": "Shows the drawn prize or the rarity-specific replacement result."
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "description": "Localized dialogue for DLC story demos, shipped as two numbered language-sharded tables (DlcStoryDemoTextDataTable1_<Lang> and ...2_<Lang>) with a common GameText row schema; both shards are loaded into the same combined text array.",
+  "fields": {
+    "ID": {
+      "simple": "DLC demo message id (row key), e.g. STDM_0809001_0010 or STDM_0909501_0010.",
+      "technical": "FName ID in FGameDataTableRow_GameText, used as the FindRow key and discovered by FindTextIdsContaining(prefix derived from the script id). Both numbered shards are loaded consecutively as slots 13 and 14 of the 14-table TextDataTables array; DLC-ness is decided by GameScript_IsDlcScript (Script row for the script name plus its StoryDemo row's chapter flag), not by id prefix, and the DLC voice join uses DlcStoryDemoVoiceDataTables (itself the concatenation of voice shards 1 and 2). Because no per-shard dispatch exists, a duplicate id in shard 1 would win over shard 2; IDs in the companion export are disjoint (STDM_08... in shard 1, STDM_09... in shard 2).",
+      "evidence": [
+        "Source/Abrams/Public/GameDataTableRow_GameText.h:11",
+        "Source/Abrams/Private/GameTextManager.cpp:63",
+        "Source/Abrams/Private/GameTextManager.cpp:64",
+        "Source/Abrams/Private/GameTextManager.cpp:562",
+        "Source/Abrams/Private/GameTextManager.cpp:563",
+        "Source/Abrams/Private/GameTextManager.cpp:597",
+        "Source/Abrams/Private/GameTextManager.cpp:651",
+        "Source/Abrams/Private/GameScriptCommands.cpp:867",
+        "Source/Abrams/Private/GameScriptCommands.cpp:886",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1022",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:260",
+        "Source/Abrams/Private/GameDataTableManager.cpp:251"
+      ],
+      "status": "verified"
+    },
+    "Text": {
+      "simple": "One localized DLC story-demo dialogue line.",
+      "technical": "FString row text (+0x10), retrieved by GetGameTextById in UGameStoryDemoMultiRichTextBlockWidget::DisplayMessage, formatted by AGameTextManager::FormatText (<GLO=...>/<DYN=...> and modifiers) and parsed into rich-text display lines. Missing rows give an empty string. Companion exports for both shards have no empty rows and no tag markup in En, but the generic formatter and markup parser still apply. Shard 2 has 8 empty strings in each Chinese variant.",
+      "evidence": [
+        "Source/Abrams/Public/GameDataTableRow_GameText.h:15",
+        "Source/Abrams/Private/GameTextManager.cpp:667",
+        "Source/Abrams/Private/GameTextManager.cpp:681",
+        "Source/Abrams/Private/GameTextManager.cpp:687",
+        "Source/Abrams/Private/GameTextManager.cpp:683",
+        "Source/Abrams/Private/GameScriptCommands.cpp:1165",
+        "Source/Abrams/Private/GameStoryDemoMultiRichTextBlockWidget.cpp:115"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "This documentation group covers two numbered table shards with the same row struct: DlcStoryDemoTextDataTable1_<Lang> (219 rows per language in the export) and DlcStoryDemoTextDataTable2_<Lang> (956 rows). All 11 language variants of each shard share their row-id sets. StartLanguageLoading creates loaders for the two base names separately (GameTextManager.cpp:63-64), and Tick appends both, so consumers see one combined pool.",
+    "DLC classification is data-driven: GameScript_IsDlcScript first finds a Script row with matching ScriptFileName, then a StoryDemo row whose pre/post-battle script id matches, then returns Story_IsDemoInProgressFlagChapter of that demo (GameScriptCommands.cpp:867-891). This affects voice-table selection and message display timing but not the text lookup itself.",
+    "GameScript_GetStoryTextId still applies its A->01/B->03 rewrite to DLC script ids before FindTextIdsContaining, so a shard row id may not equal the raw script asset name plus a suffix.",
+    "Reconstruction caveat: the table-array assembly (Tick) and FindTextRow are behaviour-certified, not byte-identical (status/functions.json 0x14af290, 0x14c96f0; BEHAV BG03); GetGameTextById is byte-matched. Only partial Content is present; no claim about all retail or Blueprint-only uses."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:63",
+      "detail": "Creates the primary-asset loader for DlcStoryDemoTextDataTable1_<Language>."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:64",
+      "detail": "Creates the primary-asset loader for DlcStoryDemoTextDataTable2_<Language>."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:562",
+      "detail": "Appends shard 1 to the combined GameText table array."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:563",
+      "detail": "Appends shard 2 immediately after shard 1, establishing duplicate-id precedence."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptPlayer.cpp:262",
+      "detail": "For DLC scripts, finds the voice cue sheet via the concatenated DlcStoryDemoVoiceDataTables using the discovered message ids."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:1022",
+      "detail": "ParseVoice matches message ids to DlcStoryDemoVoice rows for timed playback during ShowMessage commands."
+    }
+  ]
+}

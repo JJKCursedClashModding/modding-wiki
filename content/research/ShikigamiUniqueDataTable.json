@@ -1,0 +1,57 @@
+{
+  "description": "Per-shikigami/per-attack numeric tuning vectors read through GetCharacterUniqueFloatValue by character-specific action logic.",
+  "fields": {
+    "ID": {
+      "simple": "Unique tuning row ID (e.g. CN_010, CN_010_AttackA_01).",
+      "technical": "FName row key. AGameShikigami::ApplyCharacterSetup resolves every ShikigamiDataTable.Id_ShikigamiUnique[i] over ShikigamiUniqueDataTables (+0x700) into the UniqueRows array; the array index (RowIndex) is then used by consumers. Shikigami_FindRow skips None IDs (the shared finder rejects None), but a missing non-None row is added as null and a later read would be unchecked. 36 exported rows.",
+      "evidence": [
+        "Source/Abrams/Private/GameShikigami.cpp:870",
+        "Source/Abrams/Private/GameShikigami.cpp:874",
+"Source/AbramsDataTable/Public/GameDataTableRow_Shikigami.h:85",
+        "Source/Abrams/Private/GameDataTableManager.cpp:242"
+      ],
+      "status": "verified"
+    },
+    "FloatValue": {
+      "simple": "Indexed floating-point tuning values.",
+      "technical": "TArray<float> (13 entries in every exported row). AGameShikigami::GetCharacterUniqueFloatValue(ValueIndex, RowIndex) returns UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds checks (interface slot 155, retail 0x141482C80). The meaning of an index is per-character: e.g. CP_180 reads index 3 as boost-dash gauge cost and index 4 as per-second gauge drain from row 0; CP_270 reads index 1 of row 0 as an attack cancellation energy cost. The generic character status controller also uses these rows for gauge recovery/rate calculations keyed by effect type.",
+      "evidence": [
+        "Source/Abrams/Private/GameShikigami.cpp:1253",
+        "Source/Abrams/Public/GameShikigami.h:349",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:510",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:518",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:153",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:657"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "ShikigamiUniqueDataTables is manager slot +0x700; the loader name is registered at GameDataTableManager.cpp:414 and resolved at line 242. ShikigamiVoiceGroupDataTables occupies the separate +0x6F0 slot.",
+    "There is no shared index-to-meaning map in the data: the same FloatValue slot has different meanings for different characters/actions. Consumers often annotate the index in comments; those annotations are the most specific evidence available.",
+    "The accessor is unchecked on both indices, so callers must supply a RowIndex present in Id_ShikigamiUnique and a ValueIndex within the array. Exported arrays are uniformly 13 floats.",
+    "Not to be confused with CharacterUniqueDataTable (per-character variants) or the character's own GetCharacterUniqueFloatValue path on AGameCharacter, which uses its own UniqueRows."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:870",
+      "detail": "ApplyCharacterSetup resolves the Shikigami row's Id_ShikigamiUnique list into the shikigami's UniqueRows (retail 0x1485870)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShikigami.cpp:1253",
+      "detail": "GetCharacterUniqueFloatValue(ValueIndex, RowIndex) performs the direct double-index array read (retail 0x141482C80)."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_180_ActionController.cpp:510",
+      "detail": "CP_180 boost dash reads row 0 index 3 for normal-dash gauge cost and index 4 for drain rate."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_270_ActionController.cpp:153",
+      "detail": "CP_270 cancellation logic reads row 0 index 1 as an energy cost per cancelled attack."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:657",
+      "detail": "Generic status rate calculations add FloatValue entries (indexes 0,1,2,4,8-derived) to recovery/scaling rates."
+    }
+  ]
+}

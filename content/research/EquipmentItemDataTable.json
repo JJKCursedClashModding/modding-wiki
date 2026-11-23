@@ -1,0 +1,63 @@
+{
+  "description": "Maps each equippable cursed-tool/object/extras item's VariableId to its equipment grade and the ordered list of equipment-effect rows that define its gameplay bonuses.",
+  "fields": {
+    "Id": {
+      "simple": "Equipment/item-variant row identifier.",
+      "technical": "FName row key. Equipment lookups do not use the owning Item row's Id: they resolve FGameDataTableRow_Item::VariableId across all EquipmentItemDataTables and find this row by that name. Exported IDs include a base ID plus _10/_20 suffixed upgraded variants. The first matching table wins; a missing row yields no effects.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItem.h:11",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2261",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:76",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4394"
+      ],
+      "status": "verified"
+    },
+    "Grade": {
+      "simple": "Upgrade/equipment grade of this variant.",
+      "technical": "int32 with constructor default 0; exported rows use 0, 1, and 2, matching base and two upgraded ID suffixes. No identified C++ consumer reads this field in the available Source, so the precise gameplay or sorting effect of each grade is not established.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItem.h:15",
+        "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItem.h:20"
+      ],
+      "status": "observed"
+    },
+    "Id_EquipmentItemEffect": {
+      "simple": "Ordered list of effect rows applied by this equipment variant.",
+      "technical": "TArray<FName>. Battle setup walks the array, skips None entries, resolves each effect ID in EquipmentItemEffectDataTables (first matching table), and adds the effect rows to the status-controller effect list. Item description uses the same array at index 0 and 1 to populate two description lines, returning an empty request for an invalid index or None entry. The status controller also keeps an effect-index counter used for one-use item consumption.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItem.h:18",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2266",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2274",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:73",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:81",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4399",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:407"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The export contains 211 rows. Multiple table shards are supported and consumers stop at the first matching row per table array, so duplicate IDs across shards can shadow later rows.",
+    "This table is a thin join: ItemDataTable::VariableId points here, and this table's effect-name array points into EquipmentItemEffectDataTable. Item text and battle stat calculations both rely on that chain.",
+    "No source consumer for Grade was found; only its serialized type/default and the exported 0/1/2 pattern are evidence. Do not infer an exact grade bonus from the number alone.",
+    "Only the supplied retail export and partial Content are available; no claim is made about all Blueprint or editor-tool uses."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:182",
+      "detail": "Loads EquipmentItemDataTable into EquipmentItemDataTables."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2250",
+      "detail": "GameEquipment_GetEffectRows resolves an Item's VariableId to this row, then resolves every named effect row for battle stat setup."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:4379",
+      "detail": "Revives once-only equipment effects from the player's equipped Item IDs, keyed by effect array index."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:73",
+      "detail": "Finds the effect at a requested description index for cursed tools, cursed objects, and extras."
+    }
+  ]
+}

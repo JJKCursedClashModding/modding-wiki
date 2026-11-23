@@ -1,0 +1,157 @@
+{
+  "description": "Costume/variation records indexed by Character::Id_CharacterVariation. Each row joins a specific character model Blueprint to its material pattern, weapon set, sound, UI images and the in-game Item that unlocks it.",
+  "fields": {
+    "ID": {
+      "simple": "Variation/costume row ID (character ID plus costume/color suffix).",
+      "technical": "FName primary key (ImportKeyField=Id in the export), e.g. CP_010_00. Character::Id_CharacterVariation is an ordered list of these IDs; the selected VariationIndex is used across battle setup, preload, capture, item ownership and UI to resolve the row through CharacterVariationDataTables (DTM +0x400).",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:495",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:74",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:257",
+        "Source/Abrams/Private/GameItemOwnership.cpp:461"
+      ],
+      "status": "verified"
+    },
+    "FileName_BP": {
+      "simple": "Character-primary asset name of the variation's model/actor Blueprint.",
+      "technical": "FName (row +0x10), e.g. CP_010_00_BP. Battle preload and phase setup turn it into Character-primary loaders (StudioCharacterLoaders) and spawn the loaded AActor class; capture loading does the same through slot CharacterLoaders. GameCharacter_GetFileNameCostumeIndex/ColorIndex parse the costume and color digits from this name, and the select list rejects a variation whose FileName_BP is None. The naming convention is a trailing '_<costume><colour>_BP' pattern.",
+      "evidence": [
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:74",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:264",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:712",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:523",
+        "Source/Abrams/Private/GameCharacterSelectWidget.cpp:392",
+        "Source/Abrams/Public/GameItemOwnership.h:109"
+      ],
+      "status": "verified"
+    },
+    "Id_CharacterMaterial": {
+      "simple": "CharacterMaterialDataTable row holding this costume's material pattern set.",
+      "technical": "FName joined to CharacterMaterialDataTables (DTM +0x490). UGameCharacterMaterialController::SetMaterialPattern, when called without an explicit row, resolves the owner's current variation and then this row; a None value skips the material-pattern change. See CharacterMaterialDataTable documentation.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:18",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:90",
+        "Source/Abrams/Private/GameCharacterMaterialController.cpp:93"
+      ],
+      "status": "verified"
+    },
+    "Id_CharacterWeapon": {
+      "simple": "CharacterWeaponDataTable row defining which weapons this variation carries.",
+      "technical": "FName (row +0x20), joined to CharacterWeaponDataTables (DTM +0x4E0). Battle asset collectors expand the weapon set into Weapon FileName_BP preload names; BattleBase, LevelSequencer and capture spawn/attach those weapons. CP_040 explicitly compares this ID to CP_040_50 for a character-specific variation branch. None skips weapon handling.",
+      "evidence": [
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:162",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:166",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:876",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:634",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:152"
+      ],
+      "status": "verified"
+    },
+    "Id_CharacterSound": {
+      "simple": "CharacterSoundDataTable row holding this variation's voice/SE IDs.",
+      "technical": "FName joined to CharacterSoundDataTables (DTM +0x510). ResolveDataRows resolves it into AGameCharacter::SoundRow with Overrides.SoundIdOverride; battle preload and voice-player code use it for cue sheets/voices, and GamePvESettings copies the value as the default override. Note that the same-named field on Shikigami rows is resolved separately.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:514",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:332",
+        "Source/Abrams/Private/GameSoundVoicePlayer.cpp:96",
+        "Source/Abrams/Private/GamePvESettings.cpp:234"
+      ],
+      "status": "verified"
+    },
+    "Id_CharacterImage": {
+      "simple": "CharacterImageDataTable row with this variation's portraits and sprites.",
+      "technical": "FName (row +0x30) joined to CharacterImageDataTables (DTM +0x480). GameCharacter_FindImageRow resolves it for character/variation-based UI image lookups; battle-talk, story preload and arcade interval setup use the same join. None means the variation has no image row and UI falls back or omits the art.",
+      "evidence": [
+        "Source/Abrams/Private/GameItemOwnership.cpp:672",
+        "Source/Abrams/Private/GameItemOwnership.cpp:676",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:52",
+        "Source/Abrams/Private/GameBattleTalkWidget.cpp:117"
+      ],
+      "status": "verified"
+    },
+    "Id_CharacterUniqueImage": {
+      "simple": "Intended link to a CharacterUniqueImageDataTable row; no consumer found.",
+      "technical": "FName (row +0x38) serialized in the variation row and present in the export (usually None, with CP_270 variations pointing at CP_270_00/CP_270_10). No reconstructed consumer reads this field: CharacterUniqueImageDataTable is not loaded by AGameDataTableManager's loader/tick lists, and no code references the field name beyond the row declaration. Its meaning is therefore limited to the identifier-level association; no UI or asset behavior is asserted.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:30",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUniqueImage.h:15",
+        "Source/Abrams/Private/GameDataTableManager.cpp:342"
+      ],
+      "status": "observed"
+    },
+    "Id_Item": {
+      "simple": "Item ID that unlocks/represents this costume in the shop/inventory.",
+      "technical": "FName (row +0x40), e.g. ITM_COSTUME_CP_010_00. GameItem_IsVariationAvailable checks None = free, else unlocked + in-stock; item/icon widgets find the variation whose Id_Item matches an Item row; select and visual-lobby costume lists derive costume/color indices from FileName_BP after checking the item. Distinct from Character::Id_Item, which gates the base character.",
+      "evidence": [
+        "Source/Abrams/Private/GameItemOwnership.cpp:77",
+        "Source/Abrams/Private/GameItemOwnership.cpp:79",
+        "Source/Abrams/Private/GameItemOwnership.cpp:83",
+        "Source/Abrams/Private/GameItemIconWidget.cpp:138",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1086"
+      ],
+      "status": "verified"
+    },
+    "ImageFileName": {
+      "simple": "Costume image texture name shown for the corresponding Item.",
+      "technical": "FName (row +0x48), e.g. T_UI_Item_Costume_CP_010_00. For Costume-type Item rows, GameItem_GetImageFileName/GameItem_GetThumbnailFileName iterate variation rows matching Id_Item and return this (or ThumbnailImageFileName) as the item art; item icon code picks between them based on bShowThumbnail. No per-locale suffix is added here.",
+      "evidence": [
+        "Source/Abrams/Private/GameItemOwnership.cpp:242",
+        "Source/Abrams/Private/GameItemIconWidget.cpp:149",
+        "Source/Abrams/Private/GameItemThumbnailWidget.cpp:58"
+      ],
+      "status": "verified"
+    },
+    "ThumbnailImageFileName": {
+      "simple": "Small/thumbnail version of the costume image texture name.",
+      "technical": "FName (row +0x50), e.g. T_UI_ItemThumbnail_Costume_CP_010_00. Returned by GameItem_GetThumbnailFileName for Costume items whose Id_Item matches, and used by item icon widgets when bShowThumbnail is true.",
+      "evidence": [
+        "Source/Abrams/Private/GameItemOwnership.cpp:286",
+        "Source/Abrams/Private/GameItemIconWidget.cpp:149",
+        "Source/Abrams/Public/GameItemOwnership.h:79"
+      ],
+      "status": "verified"
+    },
+    "FreeBattleImageFileName": {
+      "simple": "Character-selection image used for this variation in Free Battle.",
+      "technical": "FName (row +0x58), e.g. T_UI_FreeBattleImage_CP_010_00. GameFreeBattleCharacterIndexContentWidget resolves the character's selected variation and requests this texture as a widget texture loader for the team character panel; the access is unguarded in retail reconstruction.",
+      "evidence": [
+        "Source/Abrams/Private/GameFreeBattleCharacterIndexContentWidget.cpp:125",
+        "Source/Abrams/Private/GameFreeBattleCharacterIndexContentWidget.cpp:130"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Export contains 437 rows; row IDs follow the character's variation list on Character rows, with costume/color digit suffixes encoded in FileName_BP.",
+    "CharacterVariation is the join point between a character's ordered variation index and concrete assets/items: model BP, material pattern, weapons, sound, images and item ownership.",
+    "Id_CharacterUniqueImage is the only field without an identifiable consumer; its paired table is also absent from the manager's load list. This is documented as an observed serialized link, not a guessed feature.",
+    "Single table asset 'CharacterVariationDataTable' loaded into DTM +0x400; no numbered shards or localization variants in the export.",
+    "Reconstructed source with cited retail RVAs; some indexed accesses (e.g. Character::Id_CharacterVariation[VariationIndex]) are unchecked in retail. No claim about Blueprint-only consumers or byte-identical matching."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:194",
+      "detail": "Loads CharacterVariationDataTable into AGameDataTableManager::CharacterVariationDataTables."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:495",
+      "detail": "ResolveDataRows resolves the selected variation row by index."
+    },
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:66",
+      "detail": "FindVariation plus the collectors turn the variation into model/weapon/sound/image asset lists."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterMaterialController.cpp:89",
+      "detail": "Material pattern selection resolves Id_CharacterMaterial from the current variation."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemOwnership.cpp:77",
+      "detail": "Variation availability and item-image helpers use Id_Item, ImageFileName and ThumbnailImageFileName."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:523",
+      "detail": "Capture loading creates a Character-primary loader from FileName_BP."
+    }
+  ]
+}

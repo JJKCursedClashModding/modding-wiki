@@ -1,0 +1,129 @@
+{
+  "description": "Defines each purchasable shop listing: which ItemSet is sold, its price and shop category, and the progression conditions that unlock and describe the listing.",
+  "fields": {
+    "Id": {
+      "simple": "Shop lineup/listing identifier.",
+      "technical": "FName row key used across shop UI item data, sorting, purchase confirmation, unlock-state maps, and preview helpers. GameShop_UnlockNewLineups adds IDs to StudioShopLineupNewFlags_A08 once their conditions and item set are unlocked; purchase dialogs re-resolve the row by this ID before granting and charging.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:12",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:55",
+        "Source/Abrams/Private/GameShopSaleItemList.cpp:92",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:158",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1158",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1192"
+      ],
+      "status": "verified"
+    },
+    "Id_ItemSet": {
+      "simple": "ItemSet sold by this listing.",
+      "technical": "FName used by GameShop_GetItemSetItems, the item-set name text, shop category filtering, unlock checks, sorting (via the set's first item's SortingOrder), and the actual purchase grant. Shop listings are dropped from category lists when the referenced set is locked; purchase requires a non-empty item list and grants Count copies of the set's contents.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:17",
+        "Source/Abrams/Private/GameShopItemDescriptionTextWidget.cpp:28",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:167",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:336",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:423",
+        "Source/Abrams/Private/GameShopSaleItemList.cpp:51"
+      ],
+      "status": "verified"
+    },
+    "Price": {
+      "simple": "Cost of one purchase of this listing.",
+      "technical": "int32 at row offset 0x18, default 0. The purchase dialog copies it to its local Price, shows it as a VALUE parameter on SYS_COMMON_LABEL_0116, and computes PurchaseCount * Price for the money display, affordability check (UserInfo.Header.UserMoney), and AddUserMoney(-Total). Shop list item data also exposes GetPrice for the listing's displayed price.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:20",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:173",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:193",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:226",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:316",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1256"
+      ],
+      "status": "verified"
+    },
+    "CategoryType": {
+      "simple": "Shop tab/category this listing belongs to.",
+      "technical": "EGameItemType at row offset 0x1C, default None. GameShop_GetLineupRows keeps only rows matching the requested category. The purchase dialog uses it to choose title text (SYS_SHOP_MODE_MESSAGE_0002 vs Extras' _0004), show/hide owned-and-quantity controls, and select the open-system-voice variant; the main shop widget also reads it directly from the lineup row.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:23",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:423",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:198",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:229",
+        "Source/Abrams/Private/GameShopWidget.cpp:441"
+      ],
+      "status": "verified"
+    },
+    "UnlockConditionsType": {
+      "simple": "Kind of milestone that makes the listing available.",
+      "technical": "EGameItemUnlockConditionsType at row offset 0x1D, default None; Default (1) means immediately available. The same condition interpreter used by ProgressRewardDataTable converts the three condition fields into (current, required) progress pairs. GameShop_UnlockNewLineups requires all pairs reached and the item set unlocked before adding the listing to the on-sale map; Default listings are marked not-new. The enum also selects the ITM_UNLOCK_MESSAGE_* text shown for locked listings.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:26",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:463",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1148",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1184",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1317"
+      ],
+      "status": "verified"
+    },
+    "UnlockConditionsValue": {
+      "simple": "Numeric thresholds/counts for the listing's unlock condition.",
+      "technical": "TArray<float> at row offset 0x20; thresholds use FMath::CeilToInt. Index 0 is usually the required count/level/rank, and some rank-threshold conditions also use index 1. The values are passed unchanged to GameItem_GetUnlockProgress and to the unlock-message text formatter; exported rows usually have three floats with trailing zeroes.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:29",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:471",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1005",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1164",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1375"
+      ],
+      "status": "verified"
+    },
+    "UnlockConditionsValueStr": {
+      "simple": "Name parameters (character/stage/mission/rank IDs) for the listing's unlock condition.",
+      "technical": "TArray<FName> at row offset 0x30. Interpreted according to UnlockConditionsType: for example a demo ID for StoryMissionClearRank, character IDs for relate/level/multi-character conditions, a map ID for StageSelectCount, or a RankPoint ID for PvPRankPointMax. The same names are substituted into ITM_UNLOCK_MESSAGE_* text requests. Exported rows typically use three entries with None padding.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:32",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:475",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:498",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:622",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:711",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1376"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The export contains 1009 listings. UnlockConditionsType, UnlockConditionsValue, and UnlockConditionsValueStr are a shared, type-discriminated condition schema also used by ProgressRewardDataTable; the numeric/name arrays have no single universal meaning.",
+    "Shop listing visibility has two gates: the item set itself must be unlocked, and the listing's progression condition must be satisfied. A listing becomes 'new' when its condition type is not Default.",
+    "Purchase count is bounded by the first set item's PossessionMax; Extras listings show the owned/quantity controls while other category types hide them.",
+    "Multiple ShopLineupDataTable shards are supported and consumers take the first matching row. Only the supplied retail export and partial Content are available."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:306",
+      "detail": "Loads ShopLineupDataTable into ShopLineupDataTables."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:423",
+      "detail": "Builds category-specific shop item lists from rows whose item set is unlocked."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1148",
+      "detail": "Unlocks new listings once their progress conditions and item-set gate pass."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemList.cpp:40",
+      "detail": "Sorts listings by the first contained item's SortingOrder."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:158",
+      "detail": "Uses Price, CategoryType, and Id_ItemSet to configure and execute a purchase."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1317",
+      "detail": "Builds the unlock requirement text from the condition fields."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopItemDescriptionTextWidget.cpp:28",
+      "detail": "Resolves the listing's ItemSet for the description widget."
+    }
+  ]
+}

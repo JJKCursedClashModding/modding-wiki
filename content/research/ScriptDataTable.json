@@ -1,0 +1,82 @@
+{
+  "description": "Defines playable story scripts: the asset id to load, the BGM to play, and the map whose level list the script runs in.",
+  "fields": {
+    "ID": {
+      "simple": "Script row id (same as script name in the export).",
+      "technical": "FName key in ScriptDataTables (DTM +0xA50). UGamePhase_StoryDemoBase looks it up with GetScriptId() and uses the row's Id for the credit/movie widget lists; Story_FindScriptRow uses the same key. The exported rows' ScriptFileName equals ID, but the code treats them as separate fields.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Script.h:11",
+        "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:91",
+        "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:95",
+        "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:118",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:521"
+      ],
+      "status": "verified"
+    },
+    "ScriptFileName": {
+      "simple": "Primary asset name of the script cue-sheet data.",
+      "technical": "FName. Story-demo prepare passes it to UGameScriptPlayer::SetScript, which builds FPrimaryAssetId(\"Script\", ScriptFileName). GameScript_IsDlcScript scans every Script row and compares this field to the running script name before checking the StoryDemo progress flag. Retail dereferences the found row unguarded.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Script.h:15",
+        "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:112",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:56",
+        "Source/Abrams/Private/GameScriptPlayer.cpp:60",
+        "Source/Abrams/Private/GameScriptCommands.cpp:869",
+        "Source/Abrams/Private/GameScriptCommands.cpp:873"
+      ],
+      "status": "verified"
+    },
+    "Id_Bgm": {
+      "simple": "BGM to play while the script phase runs.",
+      "technical": "FName (row +0x18). Story-demo prepare stops BGM with 0 fade when None, otherwise PlayBgm(Id, 0.0f, 0.5f, true). Retail reads it without a null-row check.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Script.h:18",
+        "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:29",
+        "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:103",
+        "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:109",
+        "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:34"
+      ],
+      "status": "verified"
+    },
+    "Id_Map": {
+      "simple": "Map row whose level names become the script's levels.",
+      "technical": "FName (row +0x20). Story_GetScriptLevels_1307AE0 looks up this Script row, then resolves the Map row with a None check and returns Map.FileName; no level list is returned when either row is missing. Callers include battle-story, credits, collection, main-menu story and story character-select phase transitions.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Script.h:21",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:62",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:345",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:349",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:354",
+        "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:260"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Constructor leaves all fields at FName() defaults (Source/AbramsDataTable/Private/GameDataTableRow_Script.cpp:3).",
+    "Only a minority of exported rows set Id_Map; scripts without one get an empty level list from Story_GetScriptLevels_1307AE0 rather than a random map (random-map fallback exists only for StoryMission.Id_Map).",
+    "No numbered shards or localization variants were found in the exported set. Consumer source is reconstructed; no claim of exhaustive Blueprint usage is made."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GamePhase_StoryDemoBase.cpp:86",
+      "detail": "Prepare state 0 reads Id_Bgm, ScriptFileName and Id (credit/movie script lists)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptPlayer.cpp:56",
+      "detail": "Turns ScriptFileName into the PrimaryAssetId used by the script loader."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:345",
+      "detail": "Resolves Id_Map into the Map row's FileName list."
+    },
+    {
+      "source": "Source/Abrams/Private/GameScriptCommands.cpp:864",
+      "detail": "DLC-script test: ScriptFileName match followed by StoryDemo pre/post script and chapter progress-flag check."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:295",
+      "detail": "Loads ScriptDataTable into ScriptDataTables."
+    }
+  ]
+}

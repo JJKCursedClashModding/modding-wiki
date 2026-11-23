@@ -1,0 +1,877 @@
+{
+  "description": "One row defines the complete payload and reaction of a single hit: base damage and gauge drain, hit/stun/knockback behavior, target and direction rules, hit effects and feedback, and buff/debuff or collision overrides. Five shards (DamageDataTable1-5) load into the shared DamageDataTables array; attacks, passives, traps, shikigami, effects, binding vows and animation notifies resolve a row by its Id and put it into a battle damage request.",
+  "fields": {
+    "ID": {
+      "simple": "Damage row key, exported as ID and stored natively as Id.",
+      "technical": "Unreal DataTable row name and the first field used by Status_FindDamageRow when it scans DamageDataTables in load order. Attack collision notifies pass an animation Id through ResolveAttackDamageId (CP_270 remaps first-hit ids to _1.._4 variants when its stack count is positive); direct-damage notifies, passives and binding vows look up literal ids. Several controllers branch on exact ids, including CP_130_PASSIVE / CP_130_PASSIVE_DE, CP_250_PASSIVE, BINDING_VOWS_DEAD, CN_240_ATTACKI_01_01 and CP_070_ATTACKG_01_01_1..3.",
+      "evidence": [
+        "Source/Abrams/Private/GameDataTableManager.cpp:231",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3237",
+        "Source/Abrams/Private/GameAnimNS_AttackCollision.cpp:78",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1438"
+      ],
+      "status": "verified"
+    },
+    "AttackType": {
+      "simple": "Attack class used for equipment, passives and battle-log branches.",
+      "technical": "EGameAttackType. Debuff rows are excluded from the receiver hit-response pass, tag-combo partner search and normal hit-slow application; ApplyArmorAndDownDamage also skips a Debuff row whose DamageType is None. NormalAttack adds the receiver to the attacker normal-hit list and enables NormalAttack-specific equipment buffs/curses. CursedEnergyAttack_1/2 drive hit-effect aura colors and cursed-energy equipment effects; SuperCursedEnergyAttack and SpecialTagCombo unlock character-specific passives, binding-vow bonuses and knockout voice branches. BindingVows is present in the exports for BINDING_VOWS_DEAD.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:333",
+        "Source/Abrams/Private/GameBattleDamage.cpp:700",
+        "Source/Abrams/Private/GameBattleManager.cpp:1994",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2868"
+      ],
+      "status": "verified"
+    },
+    "Damage": {
+      "simple": "Base damage coefficient for the hit.",
+      "technical": "Character hits compute BaseDamage = attacker GAISlot141(row, receiver) * Damage * Request.Rate58 * Ally_DamageRate-or-1; the final value is CalcReceivedDamage(attackRate * BaseDamage + attackBonus, row, ...) before HP is reduced. Shikigami hits use the same base product with only the attack-rate multiplier. BattleSequenceState uses attacker GAISlot141 * Damage without request rates. Zero is a non-damaging/status hit; exports contain many zeros and values such as 20, 50 and 150.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:400",
+        "Source/Abrams/Private/GameBattleDamage.cpp:626",
+        "Source/Abrams/Private/GameBattleDamage.cpp:876",
+        "Source/Abrams/Private/GameBattleSequenceState.cpp:300"
+      ],
+      "status": "verified"
+    },
+    "Ally_DamageRate": {
+      "simple": "Damage multiplier applied when attacker and receiver are on the same team.",
+      "technical": "TeamRate = DamageRow.Ally_DamageRate when attacker GAISlot001 equals receiver GAISlot001, otherwise 1.0. It multiplies the base damage in both character and shikigami damage paths. Exported rows are 0.0 except one 1.0 row, so friendly hits are normally suppressed.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:399",
+        "Source/Abrams/Private/GameBattleDamage.cpp:875"
+      ],
+      "status": "verified"
+    },
+    "CN_240_DamageRate": {
+      "simple": "Character-specific damage-rate field present in the row schema and exports.",
+      "technical": "Declared on FGameDataTableRow_Damage and defaulted to 0.0 by the reconstructed constructor; all 1201 exported rows carry a nonzero value (1200 rows 1.0, one row 0.6). No C++ consumer of this member was found in the reconstructed source, so its retail formula cannot be claimed; it is a schema/data observation only.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Damage.h:35",
+        "Source/AbramsDataTable/Private/GameDataTableRow_Damage.cpp:7"
+      ],
+      "status": "observed"
+    },
+    "Armor_Damage": {
+      "simple": "Amount subtracted from the receiver armor value.",
+      "technical": "ApplyArmorAndDownDamage sets ArmorValue -= attacker GetArmorDamageRate(row) * Armor_Damage. The field also has a threshold use: IsDamageActionSlot80ClearBelowArmorDamage returns true only when the damage-layer action flag is clear and Armor_Damage < 100. Exports are 100.0 for 1189 rows, so most hits do not clear that gate.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleManager.cpp:1999",
+        "Source/Abrams/Private/GameCharacter.cpp:3243",
+        "Source/Abrams/Public/GameCharacter.h:720"
+      ],
+      "status": "verified"
+    },
+    "Down_Damage": {
+      "simple": "Amount removed from the receiver down gauge.",
+      "technical": "DownScale = attacker GetDownDamageRateScale(row) * Down_Damage; ApplyArmorAndDownDamage then subtracts DownScale * receiver GetDownDamageRate(row) from DownValue. CanHitReceiver uses the same product to predict the post-hit down value, and shikigami knockdown subtracts the raw field when their damage action cannot be resolved. Brain AI adds it to its hit-value score. Seconds are not involved; values compare directly with down gauges.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:293",
+        "Source/Abrams/Private/GameBattleManager.cpp:2409",
+        "Source/Abrams/Private/GameBattleDamage.cpp:907",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:390"
+      ],
+      "status": "verified"
+    },
+    "GuardDurability_Damage": {
+      "simple": "Guard gauge damage dealt by a blocked hit.",
+      "technical": "On a guarded hit, DurabilityDamage = attacker GetSendGuardDurabilityDamageRate(row) * GuardDurability_Damage * Request.Rate60. The receiver then multiplies by its own GetGuardDurabilityDamageRate and subtracts the result from CurrentGuardDurability. Cursed-energy attack effects can force the gauge to zero; reaching <= 0 requests the guard-break action.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:569"
+      ],
+      "status": "verified"
+    },
+    "Destructible_Attack": {
+      "simple": "Attack strength used against destructible objects and decals.",
+      "technical": "A positive value marks an attack collision for CollectDestructibleAttackBounds. On a destructible object the value is multiplied by attacker GetDestructibleAttackRate(row); a negative value skips handling, and a value below the object Defence blocks the break. For destructible decals it gates effect spawning and scales the attack before comparison.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:3521",
+        "Source/Abrams/Private/GameDestructibleObject.cpp:368",
+        "Source/Abrams/Private/GameDestructibleDecal.cpp:115"
+      ],
+      "status": "verified"
+    },
+    "CursedEnergyExp_Add_Attacker": {
+      "simple": "Cursed-energy experience granted to the attacker.",
+      "technical": "OnDamageDealt grants GetCursedEnergyExpRate(row, receiver) * this value * Rate and adds equipment bonuses, but returns early for same-team receivers. CP_040 additionally uses a positive value as the gate for its Hairpin/Resonance passive icon on an opponent.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2963",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:173"
+      ],
+      "status": "verified"
+    },
+    "CursedEnergyExp_Add_Receiver": {
+      "simple": "Cursed-energy experience granted to the receiver.",
+      "technical": "Only on unguarded character hits: receiver Status.AddCursedEnergyExp(receiver ActionUnknownSlot116 * attacker GetCursedEnergyExpAddReceiverRate(row) * this value).",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:610"
+      ],
+      "status": "verified"
+    },
+    "CursedEnergy_Add_Attacker": {
+      "simple": "Cursed energy granted directly to the attacker.",
+      "technical": "OnDamageDealt adds GetActionSlot117(receiver) * this value to the attacker CursedEnergy. NormalAttack rows also receive the CursedEnergyWhenNormalAttack equipment bonus.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2970"
+      ],
+      "status": "verified"
+    },
+    "TensionGauge_Add_Attacker": {
+      "simple": "Tension gauge granted to the attacker.",
+      "technical": "OnDamageDealt sets TensionGauge += GetDealtTensionGaugeGainRate(row, receiver) * this value for enemy hits.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2967"
+      ],
+      "status": "verified"
+    },
+    "HitSlow_Attacker": {
+      "simple": "Hit-stop rate applied to the attacker.",
+      "technical": "When > 0, RequestTimeDilation is called on the instigator with HitSlow_Attacker and HitSlow_Time_Attacker on non-Debuff character hits and shikigami hits. Guarded non-just-guard hits use the separate HitSlow_Guard_Attacker pair; an intercepted hit can copy the row rate into the response when the receiver response requests it.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:338",
+        "Source/Abrams/Private/GameBattleDamage.cpp:562",
+        "Source/Abrams/Private/GameBattleDamage.cpp:705",
+        "Source/Abrams/Private/GameBattleDamage.cpp:862"
+      ],
+      "status": "verified"
+    },
+    "HitSlow_Time_Attacker": {
+      "simple": "Duration of the attacker hit-stop.",
+      "technical": "Passed as the time argument to RequestTimeDilation alongside HitSlow_Attacker in the unguarded, guarded and shikigami paths, and for an intercepted response that opts into the row rate.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:341",
+        "Source/Abrams/Private/GameBattleDamage.cpp:562",
+        "Source/Abrams/Private/GameBattleDamage.cpp:862"
+      ],
+      "status": "verified"
+    },
+    "HitSlow_Guard_Attacker": {
+      "simple": "Attacker hit-stop rate for a normal blocked hit.",
+      "technical": "After a non-just-guard block, > 0 triggers RequestTimeDilation on the instigator with this rate and HitSlow_Time_Guard_Attacker. Just guard uses Global row rates instead, except for per-character overrides.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:562"
+      ],
+      "status": "verified"
+    },
+    "HitSlow_Time_Guard_Attacker": {
+      "simple": "Duration of guarded attacker hit-stop.",
+      "technical": "Time argument paired with HitSlow_Guard_Attacker in the normal guard branch.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:562"
+      ],
+      "status": "verified"
+    },
+    "HitSlow_Receiver": {
+      "simple": "Hit-stop rate applied to the receiver.",
+      "technical": "On unguarded character hits > 0 triggers RequestTimeDilation on the receiver; its duration is multipled by receiver GetActionUnknownSlot109Rate(row), which can return zero when hyper armor blocks the hit. Shikigami hits use the raw rate/time pair. Non-Debuff rows gate these character calls.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:710",
+        "Source/Abrams/Private/GameBattleDamage.cpp:864"
+      ],
+      "status": "verified"
+    },
+    "HitSlow_Time_Receiver": {
+      "simple": "Duration of the receiver hit-stop.",
+      "technical": "Paired with HitSlow_Receiver on character and shikigami hits. Character unguarded hits multiply it by GetActionUnknownSlot109Rate(row); shikigami hits pass it unmodified and also reuse it for the ApplyHitSlow call with the Guard_Receiver rate.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:713",
+        "Source/Abrams/Private/GameBattleDamage.cpp:866",
+        "Source/Abrams/Private/GameBattleDamage.cpp:869"
+      ],
+      "status": "verified"
+    },
+    "HitSlow_Guard_Receiver": {
+      "simple": "Receiver hit-stop rate on a blocked hit.",
+      "technical": "When > 0 on a normal guard, RequestTimeDilation is called on the receiver with this rate and HitSlow_Time_Guard_Receiver. Shikigami hits also forward it to ApplyHitSlow.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:565",
+        "Source/Abrams/Private/GameBattleDamage.cpp:869"
+      ],
+      "status": "verified"
+    },
+    "HitSlow_Time_Guard_Receiver": {
+      "simple": "Duration of guarded receiver hit-stop.",
+      "technical": "Time argument paired with HitSlow_Guard_Receiver in the normal guard branch.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:565"
+      ],
+      "status": "verified"
+    },
+    "HitInterval": {
+      "simple": "Per-victim cooldown between repeated hits.",
+      "technical": "Seconds. FGameCollisionParameter::CanHit blocks while the victim timer is positive; RecordHit adds this value to that timer and TickHitIntervals decrements it by the owner-dilated delta. FStudioBattleSystem2F0 uses HitInterval together with HitMax to drive repeat damage requests from animation/direct-damage notifies; CP_130 implements its own sweep-based interval. 0 disables interval gating.",
+      "evidence": [
+        "Source/Abrams/Private/GameCollisionParameterInterface.cpp:114",
+        "Source/Abrams/Private/GameCollisionParameterInterface.cpp:157",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1073",
+        "Source/Abrams/Private/CP_130_ActionController.cpp:169"
+      ],
+      "status": "verified"
+    },
+    "HitMax": {
+      "simple": "Maximum number of hits recorded per victim.",
+      "technical": "When > 0, FGameCollisionParameter::CanHit rejects a victim once HitCounts reaches this value and RecordHit increments the count. Multi-hit requests only repeat while HitMax > HitCount. 0 means no count cap. Exports use 0 for 1076 rows and small counts such as 1-8 for the rest.",
+      "evidence": [
+        "Source/Abrams/Private/GameCollisionParameterInterface.cpp:122",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:1076",
+        "Source/Abrams/Private/CP_130_ActionController.cpp:232"
+      ],
+      "status": "verified"
+    },
+    "bHitOnce": {
+      "simple": "Disables the hit collision group after the first contact.",
+      "technical": "When a character or shikigami receives a hit callback with this row flag set and a valid HitComponent, GAISlot115 calls AttackCollisionKeeper.ApplyCollisions(false, HitComponent.ComponentTags), preventing further hits from that tagged group.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:1221",
+        "Source/Abrams/Private/GameShikigami.cpp:2470"
+      ],
+      "status": "verified"
+    },
+    "Knockback_Damage": {
+      "simple": "Knockback impulse for an unguarded hit.",
+      "technical": "Passed as the magnitude to MovementController.StartKnockback with Knockback_Damage_Time; the z/air flag is false only for DamageType NormalAir and true otherwise. Used in the absorbed-armor, normal reaction and shikigami knockdown paths.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:797",
+        "Source/Abrams/Private/GameBattleDamage.cpp:811",
+        "Source/Abrams/Private/GameBattleDamage.cpp:916"
+      ],
+      "status": "verified"
+    },
+    "Knockback_Damage_Time": {
+      "simple": "Duration of unguarded knockback.",
+      "technical": "Time argument paired with Knockback_Damage in StartKnockback across character and shikigami paths.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:797",
+        "Source/Abrams/Private/GameBattleDamage.cpp:916"
+      ],
+      "status": "verified"
+    },
+    "Knockback_Guard": {
+      "simple": "Knockback impulse for a blocked hit.",
+      "technical": "After a non-guard-broken block, StartKnockback is called with this magnitude and Knockback_Guard_Time (always with the z flag true); the same pair is forwarded to Agent ActionUnknownSlot237.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:597"
+      ],
+      "status": "verified"
+    },
+    "Knockback_Guard_Time": {
+      "simple": "Duration of guarded knockback.",
+      "technical": "Time argument paired with Knockback_Guard in the guard branch.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:597"
+      ],
+      "status": "verified"
+    },
+    "Guard_Rigidity_Time": {
+      "simple": "Guard rigidity duration set after a blocked hit.",
+      "technical": "Used only when the guard stiffness action slot is active and the hit is not flagged as bit 8: Status.SetGuardRigidityTime(row.Guard_Rigidity_Time) before guarded knockback starts.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:596"
+      ],
+      "status": "verified"
+    },
+    "bAutoHomingZDisabled": {
+      "simple": "Turns off vertical auto-homing after this hit.",
+      "technical": "On a non-projectile attack hit where the owner is the instigator, FGameCharacterAction_AttackBase::OnAttackHit sets the movement controller bAutoHomingZEnabled to 0 when this flag is true. Many character-specific OnAttackHit overrides repeat the same gate for shikigami or special attack hits. The row flag is binary; default false.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:92",
+        "Source/Abrams/Private/CN_122_ActionController.cpp:96",
+        "Source/Abrams/Private/CP_020_ActionController.cpp:51"
+      ],
+      "status": "verified"
+    },
+    "bBoundEnabled": {
+      "simple": "Allows ground/wall bound handling after a blow or down hit.",
+      "technical": "Blow, Down and BlowGroundRestraint CanGroundBound checks require this row flag, a positive phase, sufficient move speed (1500 in the first two) and a downward HitDirection.Z; wall bound also reads it. When the flag is false, DownBase.LandDown uses GroundBoundEffectScale for the landing effect and spawns Id_GroundBoundDecal instead of the normal path. 876 exported rows set it true.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:298",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:652",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:460"
+      ],
+      "status": "verified"
+    },
+    "bCancelCasualDamageActionCorrect": {
+      "simple": "Cancels casual-action damage correction for this hit.",
+      "technical": "In FStudioBattleSystem2E0::ApplyDamageReactionSpeed, when the row does not force casual correction, a receiver in a casual damage action normally gets RequestFlags bit 4; that is cancelled when the last attacker is this attacker and this flag is true. In AGameCharacter::GetReceivedDamageRate it also prevents the GlobalCorrect Combo_Casual multiplier while a casual action is active. False leaves casual correction in force.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:119",
+        "Source/Abrams/Private/GameCharacter.cpp:2674",
+        "Source/Abrams/Private/GameCharacter.cpp:2856"
+      ],
+      "status": "verified"
+    },
+    "bCasualDamageActionCorrectEnabled": {
+      "simple": "Forces casual-action damage correction for this hit.",
+      "technical": "ApplyDamageReactionSpeed initializes bCasualCorrection from this flag; when true it sets RequestFlags bit 4 regardless of the receiver casual state or last attacker, bypassing the bCancelCasualDamageActionCorrect test.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:116"
+      ],
+      "status": "verified"
+    },
+    "bGuardBuffDebuffAddEnabled": {
+      "simple": "Allows Id_BuffDebuff_Add to apply on a blocked hit.",
+      "technical": "The guard branch copies Id_BuffDebuff_Add into a local list, calls attacker CollectAttackBuffDebuffIds(DamageRow, GuardDamage, list) and applies it to the receiver only when this flag is true and the receiver action accepts it (ActionUnknownSlot176). Unguarded hits apply the list without this flag.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:527"
+      ],
+      "status": "verified"
+    },
+    "bIgnoreComboCorrect": {
+      "simple": "Skips the global combo count damage correction.",
+      "technical": "AGameCharacter::GetReceivedDamageRate normally multiplies by max(GlobalCorrect.Combo_Base ^ comboCount, GlobalCorrect.Combo_Min); this flag skips that multiplication. The combo count source is the flagged or ordinary received combo counter depending on the request flag.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:2843"
+      ],
+      "status": "verified"
+    },
+    "bIgnoreDamageActionCorrect": {
+      "simple": "Skips the active damage action damage-rate correction.",
+      "technical": "Normally GetReceivedDamageRate multiplies by ActionController.GetDamageComboRate(row); this flag skips it unless ShouldApplyTechniqueDamageCorrection(row) returns true for the controller.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:2848"
+      ],
+      "status": "verified"
+    },
+    "bIgnoreDamageDirectionPitch": {
+      "simple": "Flattens the computed hit direction before pitch adjustment.",
+      "technical": "In CalcHitDirection, after choosing the direction from DamageDirectionType, setting this flag zeroes Z and renormalizes before DamageDirectionAdjustPitch/Yaw are applied.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:194"
+      ],
+      "status": "verified"
+    },
+    "bIgnoreGuard": {
+      "simple": "Makes the hit bypass the receiver guard state.",
+      "technical": "IsReceiverGuarding returns false when this flag is true even if ShouldShowGuardEffect is set, so the unguarded damage path runs. It also makes IsHitBlockedBySuperArmor return false and is consulted by CP_240 and CP_250 passive/guard logic; BINDING_VOWS_DEAD exports it true.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleManager.cpp:2660",
+        "Source/Abrams/Private/GameCharacter.cpp:3197",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:208"
+      ],
+      "status": "verified"
+    },
+    "bIgnoreHyperArmor": {
+      "simple": "Bypasses hyper armor protection.",
+      "technical": "IsHitBlockedByHyperArmor returns false for this row when true unless the action controller resists armor ignore; that allows callbacks and reactions to proceed against limitless/hyper armor targets. CP_050/051 use it together with bNullifiesCursedTechniquesEnabled to reject passive technique hits, and several character controllers alter reactions when it is set.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:3173",
+        "Source/Abrams/Private/GameBattleDamage.cpp:458",
+        "Source/Abrams/Private/CP_050_ActionController.cpp:110"
+      ],
+      "status": "verified"
+    },
+    "bIgnoreSuperArmor": {
+      "simple": "Bypasses super armor for Normal/NormalAir hits.",
+      "technical": "IsHitBlockedBySuperArmor returns false when this flag is true (unless armor-ignore resistance applies); without it, only DamageType Normal or NormalAir can be blocked by an active super armor state. Throwing, SimpleDomainCounterStun and bIgnoreGuard already bypass the check.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:3203"
+      ],
+      "status": "verified"
+    },
+    "bNullifiesCursedTechniquesEnabled": {
+      "simple": "Marks the hit as a cursed-technique nullifier.",
+      "technical": "The damage apply path still runs attacker callbacks through limitless/hyper armor when this flag or bIgnoreHyperArmor is set. CP_050/051 treat such rows as non-passive hits. Traps require the flag on channel 18, then call OnCursedTechniqueNullified on the source and spawn FX_CP_200_00121. On an unguarded hit, a receiver response flag can also force this nullification effect.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:458",
+        "Source/Abrams/Private/GameBattleDamage.cpp:687",
+        "Source/Abrams/Private/GameTrap.cpp:407",
+        "Source/Abrams/Private/CP_050_ActionController.cpp:110"
+      ],
+      "status": "verified"
+    },
+    "bUnkillable": {
+      "simple": "Floors receiver HP at one instead of allowing a knockout.",
+      "technical": "In the lethal-hit preview and the real unguarded path, a predicted HP <= 1 is clamped to 1 when this flag is true (or attacker and receiver share a team). The same check applies to shikigami HP. It prevents the hit from killing, not from dealing damage.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:438",
+        "Source/Abrams/Private/GameBattleDamage.cpp:637",
+        "Source/Abrams/Private/GameBattleDamage.cpp:886"
+      ],
+      "status": "verified"
+    },
+    "DamageAdaptType": {
+      "simple": "Which adaptation buff this hit counts toward.",
+      "technical": "EGameDamageAdaptType. Receiver controllers map CursedEnergyAttack_1, CursedEnergyAttack_2 and ExtraAttack to matching Adapt_* buff stacks; CN_240 zeroes incoming damage when the attacker has the matching stack, and tallies successful positive damage per attacker by this type. The generic IsDamageAdaptApplied gate returns false for request flag 1 and otherwise tests the owner buff. None/Invalid are excluded from the CN_240 tally.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterActionController.cpp:2011",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:435",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:865"
+      ],
+      "status": "verified"
+    },
+    "DamageDirectionAdjustPitch": {
+      "simple": "Pitch rotation applied to the chosen hit direction.",
+      "technical": "Degrees. CalcHitDirection rotates the direction by -DamageDirectionAdjustPitch around the rotation Y axis after any bIgnoreDamageDirectionPitch flattening. If the result ends near straight up/down, the flattened picked direction is tilted by direction.Z * -89.9 degrees before yaw is reapplied.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:205",
+        "Source/Abrams/Private/GameBattleDamage.cpp:209"
+      ],
+      "status": "verified"
+    },
+    "DamageDirectionAdjustYaw": {
+      "simple": "Yaw rotation applied to the chosen hit direction.",
+      "technical": "Degrees. Applied around the rotation Z axis in CalcHitDirection after the pitch adjustment and again in the straight-up/down fallback. Exported values include 180 degrees, which can reverse a blow direction.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:206",
+        "Source/Abrams/Private/GameBattleDamage.cpp:213"
+      ],
+      "status": "verified"
+    },
+    "DamageDirectionType": {
+      "simple": "Selects the base direction vector for knockback and reactions.",
+      "technical": "EGameDamageDirectionType. None leaves the zero direction; AttackerDirection and ReceiverDirection use facing forward; ActorDirection uses the instigator actor forward; MovementDirection uses normalized attacker move delta. AttackerToReceiver and ActorToReceiver normalize source-to-receiver, with a fallback that includes the source facing (or subtracts receiver facing) when the result is vertical or nearly zero.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:141"
+      ],
+      "status": "verified"
+    },
+    "DamageGravity": {
+      "simple": "Gravity used during the damage reaction launch.",
+      "technical": "For normal-size receivers, ApplyDamageReactionSpeed and the shikigami damage path use this value when > 0 and otherwise fall back to the first Global row Gravity. The request stores it in FGameCharacterActionRequest.DamageGravity and blow actions pass it to StartBlowLaunch/GetLaunchGravity. Large-character receivers use Global LargeCharacterDamageGravity instead of the row.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:92",
+        "Source/Abrams/Private/GameBattleDamage.cpp:114",
+        "Source/Abrams/Private/GameBattleDamage.cpp:958",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:638"
+      ],
+      "status": "verified"
+    },
+    "DamageKind": {
+      "simple": "Melee/projectile/throwing classification of the hit.",
+      "technical": "EGameDamageKind. Projectile rows skip target lock and Z auto-homing in OnAttackHit, skip the custom just-guard attacker hit-slow, change guard damage-action flags and affect several character-specific callbacks; Throwing rows enter the dedicated throw path in ApplyCharacterDamage and bypass super armor. Damage reaction direction also treats projectiles differently.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:469",
+        "Source/Abrams/Private/GameBattleDamage.cpp:538",
+        "Source/Abrams/Private/GameCharacter.cpp:3197",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:92"
+      ],
+      "status": "verified"
+    },
+    "DamageSpeed_Blend_Exp": {
+      "simple": "Blend exponent for damage reaction speed interpolation.",
+      "technical": "Passed as the BlendExp argument of FGameFloatEaseInterpolator.Start for both characters and shikigami, together with the converted DamageSpeed_EasingType. It is ignored when both row speed endpoints are <= 0 and the Global row supplies the interpolation instead. Exports are mostly 2.0.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:107",
+        "Source/Abrams/Private/GameBattleDamage.cpp:949"
+      ],
+      "status": "verified"
+    },
+    "DamageSpeed_EasingType": {
+      "simple": "Easing function for damage reaction speed interpolation.",
+      "technical": "EGameEasingType is converted by ShikigamiMovement_ToEasingFunc before FGameFloatEaseInterpolator.Start. All 1201 exported damage rows currently specify None, so the row path still starts an interpolator with the converted None function. Large characters use the corresponding Global easing instead of the row.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:107",
+        "Source/Abrams/Private/GameBattleDamage.cpp:946"
+      ],
+      "status": "verified"
+    },
+    "DamageSpeed_End": {
+      "simple": "Final speed of the damage reaction interpolation.",
+      "technical": "Character requests call Interp38.Start(row Start, row End, ...). Shikigami multiply both row endpoints by Receiver.GetDamageSpeedScale(row) before starting. If both row endpoints are <= 0 the Global speed pair is used; the OR test means a positive End activates the row pair even when Start is zero.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:104",
+        "Source/Abrams/Private/GameBattleDamage.cpp:947"
+      ],
+      "status": "verified"
+    },
+    "DamageSpeed_InterpolateTime": {
+      "simple": "Duration of damage reaction speed interpolation.",
+      "technical": "Seconds passed as the Time argument to FGameFloatEaseInterpolator.Start in the character and shikigami reaction paths; taken from Global when the row speed endpoints are both <= 0.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:106",
+        "Source/Abrams/Private/GameBattleDamage.cpp:949"
+      ],
+      "status": "verified"
+    },
+    "DamageSpeed_Start": {
+      "simple": "Initial speed of the damage reaction interpolation.",
+      "technical": "Character requests call Interp38.Start(row Start, row End, ...). Shikigami multiply Start by Receiver.GetDamageSpeedScale(row); CN_110 uses both endpoints to decide whether a 0.5 or 1.0 animation-rate adjustment applies. When both endpoints are <= 0 the Global pair is used.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:104",
+        "Source/Abrams/Private/GameBattleDamage.cpp:948",
+        "Source/Abrams/Private/CN_110_ActionController.cpp:27"
+      ],
+      "status": "verified"
+    },
+    "DamageType": {
+      "simple": "Reaction family: normal, blow, restraint, projection sorcery or tag combo.",
+      "technical": "EGameDamageType. GetDamageReactionAction switches on it to choose the receiver action (Down, Blow variants, Coercion/Jugon/Centipede/Crimson/SimpleDomain receives, ProjectionSorcery, Freezing, TagCombo variants, DamageAir), usually falling back to Down when the receiver is already defeated. Large-character receivers remap several blow/tag-combo values to simpler types. Throwing damage uses the dedicated throw path, and DamageType Normal/NormalAir are the types blockable by super armor.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleManager.cpp:2317",
+        "Source/Abrams/Private/GameBattleManager.cpp:2343",
+        "Source/Abrams/Private/GameBattleDamage.cpp:294",
+        "Source/Abrams/Private/GameBattleDamage.cpp:469"
+      ],
+      "status": "verified"
+    },
+    "DamageVoiceType": {
+      "simple": "Receiver damage voice category.",
+      "technical": "EGameCharacterDamageVoiceType passed as voice id 6 by the damage action start path. BlowSpin promotes values 0..2 to Blow (5); BlowGroundRestraint and ordinary damage reactions pass the row value through. The special voice id 7 wins instead when SpecialDamageVoiceType is set and the damage-voice timer is not active.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Damage.cpp:141",
+        "Source/Abrams/Private/GameCharacterAction_Damage.cpp:247",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:388",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:192"
+      ],
+      "status": "verified"
+    },
+    "GuardDirectionAdjustYaw": {
+      "simple": "Yaw adjustment applied to guarded hit direction and damage adaptation.",
+      "technical": "Degrees. After a non-broken guard the knockback HitDirection is rotated by this value around world up; the same rotation is applied to the direction passed to PlayDamageAdaptEffect on an unguarded hit. JustGuard start adds it to GuardLookAtDirectionAdjustYaw (summed as row +0x9C +0xA0) to orient the guard effect.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:590",
+        "Source/Abrams/Private/GameBattleDamage.cpp:691",
+        "Source/Abrams/Private/GameCharacterAction_Guard.cpp:321"
+      ],
+      "status": "verified"
+    },
+    "GuardLookAtDirectionAdjustYaw": {
+      "simple": "Yaw used when the guard action turns toward the attacker.",
+      "technical": "Degrees. The guard action rotates the negated incoming direction by this value around world up before starting its rotation ease; JustGuard uses the sum of this and GuardDirectionAdjustYaw. It does not change the damage knockback direction itself.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Guard.cpp:72",
+        "Source/Abrams/Private/GameCharacterAction_Guard.cpp:321"
+      ],
+      "status": "verified"
+    },
+    "GroundBoundDecalScale": {
+      "simple": "Scale of the landing decal spawned for a ground-bounded hit.",
+      "technical": "Passed to AGameEffect.SpawnDecal together with Id_GroundBoundDecal when a down/blow lands and bBoundEnabled is false. Every exported row is 1.0.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:465"
+      ],
+      "status": "verified"
+    },
+    "GroundBoundEffectScale": {
+      "simple": "Scale of the landing effect for a ground-bounded hit.",
+      "technical": "DownBase.LandDown multiplies the MapGround effect transform by this value (and the map-ground effect scale) when the row exists, bFlag16B is false and bBoundEnabled is false; another blow path applies it without the bBoundEnabled test. Exports are 1.0 except three 1.5 rows.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:460",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1061"
+      ],
+      "status": "verified"
+    },
+    "RestraintTime": {
+      "simple": "Hold time for restraint and bound hit actions.",
+      "technical": "Seconds. Blow/down, restraint, projection-sorcery receipt, guard and shikigami damage actions compare their elapsed time against this row value to end a phase or start a follow-up. DamageReaction montages set play rate to Duration / (RestraintTime + Duration) when it is positive; guard actions default to 0.5 s only if no row is present.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1308",
+        "Source/Abrams/Private/GameCharacterAction_Damage.cpp:233",
+        "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:350",
+        "Source/Abrams/Private/GameCharacterAction_Guard.cpp:63"
+      ],
+      "status": "verified"
+    },
+    "SoundEffectPitchOffset": {
+      "simple": "Pitch offset for the row hit sound.",
+      "technical": "Used as FGameSoundPlayParameter.Pitch when PlaySe3D plays the SoundEffect row cue resolved from Id_SoundEffect for characters and shikigami. The other play parameters are infinite. Most exports are 0.0; nonzero examples are -150 and -300.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterActionController.cpp:220",
+        "Source/Abrams/Private/GameShikigami.cpp:2531"
+      ],
+      "status": "verified"
+    },
+    "SpecialDamageVoiceType": {
+      "simple": "Special character damage voice variant.",
+      "technical": "EGameCharacterSpecialDamageVoiceType passed with DamageVoiceType to ActionController_PlayDamageVoice. When it is not None and the owner DamageVoiceTimer is not positive, voice id 7 and this enum value are played instead of the normal id 6 voice.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Damage.cpp:141",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:192"
+      ],
+      "status": "verified"
+    },
+    "HitEffectDirection": {
+      "simple": "Direction mode for the hit effect.",
+      "technical": "EGameHitEffectDirection copied into FGameEffectSpawnParams.Direction by BuildHitEffectSpawnParams, and also by destructible decal/object spawn paths. Exports are overwhelmingly AttackerDirection, with a few ActorDirection/MovementDirection/None rows.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleManager.cpp:2581",
+        "Source/Abrams/Private/GameDestructibleObject.cpp:382",
+        "Source/Abrams/Private/GameDestructibleDecal.cpp:108"
+      ],
+      "status": "verified"
+    },
+    "HitEffectLocationType": {
+      "simple": "Chooses where the hit effect is spawned.",
+      "technical": "BuildHitEffectSpawnParams switches on EGameHitEffectLocationType: ImpactPoint/None/default uses Request.Location; HitComponent uses the hit component location; Receiver uses the receiver mesh waist bone location, falling back to the receiver actor location when the mesh or bone is missing. It does not choose which effect to spawn; that is Id_Effect_Hit.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleManager.cpp:2551"
+      ],
+      "status": "verified"
+    },
+    "HitEffectRotation": {
+      "simple": "Rotator offset applied to the spawned hit effect.",
+      "technical": "FRotator copied into FGameEffectSpawnParams.RotationOffset for ordinary hit effects and for destructible hit effects/decals. It is combined with the effect direction by the effect system; the exported Pitch/Yaw/Roll components are inherited from this parent field.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleManager.cpp:2580",
+        "Source/Abrams/Private/GameDestructibleObject.cpp:383",
+        "Source/Abrams/Private/GameDestructibleDecal.cpp:109"
+      ],
+      "status": "verified"
+    },
+    "HitTargetType": {
+      "simple": "Team filter for collision with characters, effects, traps and shikigami.",
+      "technical": "EGameHitTargetType read from the collision parameter Damage row. In character, trap and shikigami collision helpers, AllyOnly requires equal teams, All accepts any team, and the default (including None/EnemyOnly) rejects equal teams. The reconstructed AGameEffect helper currently implements the opposite AllyOnly/ default tests, so verify that consumer separately before changing effect-vs-effect rows. Exports use None for 1184 rows and All for 17.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:1042",
+        "Source/Abrams/Private/GameTrap.cpp:480",
+        "Source/Abrams/Private/GameEffect.cpp:394",
+        "Source/Abrams/Private/GameShikigami.cpp:2014"
+      ],
+      "status": "verified"
+    },
+    "Id_BuffDebuff_Add": {
+      "simple": "Buff/debuff rows applied to the receiver after a hit.",
+      "technical": "The array is copied to a local list; attacker and status CollectAttackBuffDebuffIds append equipment/character-specific ids (for example CP_230 slow debuffs), then ApplyReceiverBuffDebuffs resolves each non-None id in BuffDebuffDataTables and applies the first matching row with the attacker as source. Unguarded hits apply it when the receiver accepts (ActionUnknownSlot176); guarded hits additionally require bGuardBuffDebuffAddEnabled.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:529",
+        "Source/Abrams/Private/GameBattleDamage.cpp:680",
+        "Source/Abrams/Private/GameBattleManager.cpp:2638"
+      ],
+      "status": "verified"
+    },
+    "Id_BuffDebuff_Remove": {
+      "simple": "Buff/debuff rows removed from the receiver when a hit lands.",
+      "technical": "RemoveReceiverBuffDebuffs runs in both the hit-response path and the ordinary hit path before damage is applied. Each non-None id resolves to the first BuffDebuff row in the manager arrays and calls Status.RemoveBuffDebuffsOfType(row.BuffDebuff, attacker).",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:355",
+        "Source/Abrams/Private/GameBattleDamage.cpp:387",
+        "Source/Abrams/Private/GameBattleManager.cpp:2612"
+      ],
+      "status": "verified"
+    },
+    "Id_CameraShake_Attacker": {
+      "simple": "Camera shake rows played for a player attacker.",
+      "technical": "When Attackers.IsPlayerCharacter() is true, PlayCameraShakes walks this array, skips None ids, finds each row in CameraShakeDataTables and calls CameraManager.PlayCameraShake(row, index, 1.0). Used in both character and shikigami unguarded hit paths. The reconstructed helper does not null-check the resolved row before the call.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:614",
+        "Source/Abrams/Private/GameBattleDamage.cpp:872",
+        "Source/Abrams/Private/GameBattleDamage.cpp:218"
+      ],
+      "status": "verified"
+    },
+    "Id_CameraShake_Receiver": {
+      "simple": "Camera shake rows played for a player receiver.",
+      "technical": "When the receiver is the player character rather than the attacker, the same PlayCameraShakes path uses this array instead of the attacker array.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:620",
+        "Source/Abrams/Private/GameBattleDamage.cpp:218"
+      ],
+      "status": "verified"
+    },
+    "Id_CollisionModify": {
+      "simple": "Optional CollisionModify row aliased onto an attack collision.",
+      "technical": "FGameCollisionParameter::Setup resolves this FName through CollisionModifyDataTables and caches the row on the collision parameter. The row supplies Size/Size_WaitTime/Size_Time, Location/Location_WaitTime/Location_Time/bLocation_AbsoluteRotation and Life_Time, which drive collision shape/location ticks and the eventual collision disable. None leaves default timing.",
+      "evidence": [
+        "Source/Abrams/Private/GameCollisionParameterInterface.cpp:38",
+        "Source/Abrams/Private/GameCollisionParameterInterface.cpp:65",
+        "Source/Abrams/Private/GameCollisionParameterInterface.cpp:189"
+      ],
+      "status": "verified"
+    },
+    "Id_Effect_Destructible_Hit": {
+      "simple": "Effect row spawned when the hit strikes a destructible object.",
+      "technical": "GameDestructibleObject.ColParamSlot3 uses this separate id (not Id_Effect_Hit) when the object has positive Defence and Destructible_Attack is non-negative; it resolves the row in EffectDataTables and spawns it with the hit impact point/normal plus HitEffectDirection and HitEffectRotation.",
+      "evidence": [
+        "Source/Abrams/Private/GameDestructibleObject.cpp:371"
+      ],
+      "status": "verified"
+    },
+    "Id_Effect_Hit": {
+      "simple": "Primary VFX row spawned at the receiver.",
+      "technical": "SpawnHitEffect resolves this id in EffectDataTables, builds spawn parameters from the row and calls the effect manager; the attacker can then apply hit-effect aura colors based on AttackType. Guarded hits replace the id with FX_CP_000_11501 (or None when request bit 8 is set), while technique nullification spawns FX_CP_200_00121. Destructible decals also spawn this effect when their row id is set.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:327",
+        "Source/Abrams/Private/GameBattleDamage.cpp:489",
+        "Source/Abrams/Private/GameBattleManager.cpp:2597",
+        "Source/Abrams/Private/GameDestructibleDecal.cpp:96"
+      ],
+      "status": "verified"
+    },
+    "Id_ForceFeedback_Attacker": {
+      "simple": "Force-feedback pulse played for a player attacker.",
+      "technical": "On unguarded hits where the attacker is the player, PlayForceFeedback resolves this single FName in ForceFeedbackDataTables and calls PlayForceFeedbackPulse(Row.ForceFeedbackChannel, Row.Power, Row.Duration, 0). None returns without a table scan.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:616",
+        "Source/Abrams/Private/GameBattleDamage.cpp:65"
+      ],
+      "status": "verified"
+    },
+    "Id_ForceFeedback_Receiver": {
+      "simple": "Force-feedback pulse played for a player receiver.",
+      "technical": "Used instead of the attacker id when the receiver is the player and the attacker is not. Resolution and pulse parameters are the same as the attacker path.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleDamage.cpp:621",
+        "Source/Abrams/Private/GameBattleDamage.cpp:65"
+      ],
+      "status": "verified"
+    },
+    "Id_GroundBoundDecal": {
+      "simple": "Decal spawned when a downed/blown receiver hits the ground.",
+      "technical": "In DownBase.LandDown and the related blow path, when this id is not None and bBoundEnabled is false, the spawned landing effect calls SpawnDecal(Id_GroundBoundDecal, GroundBoundDecalScale).",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:463",
+        "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1063"
+      ],
+      "status": "verified"
+    },
+    "Id_SoundEffect": {
+      "simple": "Hit sound row key.",
+      "technical": "GetDamageSoundEffectId returns this FName; PlayDamageHitSoundEffect resolves it through SoundEffectDataTables and plays Row.CueName as a 3D sound at the hit/receiver location with SoundEffectPitchOffset. CP_040 can remap two ids to weapon-variation cues for its CP_040_50 variation.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterActionController.cpp:179",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:211",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:134",
+        "Source/Abrams/Private/GameShikigami.cpp:2522"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The exported group has five shards with 359/181/288/281/92 rows (1201 unique keys, no duplicates). AGameDataTableManager resolves and concatenates DamageDataTable1-5 into DamageDataTables in that fixed order.",
+    "Status_FindDamageRow scans DamageDataTables in order and returns the first row whose struct matches and whose row map contains the requested Id; bCheckNone callers skip None ids.",
+    "All evidence here is reconstructed C++ in the local project plus the read-only JSON exports. It describes the implemented consumer paths, not a verified retail binary claim.",
+    "CN_240_DamageRate has data but no traced C++ consumer; no formula is asserted for it.",
+    "Direction and guard yaw fields are degrees; HitInterval, DamageSpeed_InterpolateTime, HitSlow_*Time, Guard_Rigidity_Time and RestraintTime are seconds. Armor/down/guard/damage numbers are raw table units multiplied by attacker and receiver rates.",
+    "Hit-stop pairs are only applied when the rate > 0. The receiver duration can be scaled by an action-controller rate, and just guard substitutes Global row values.",
+    "Exported easing for every damage row is None while speed endpoints are often nonzero, so the row speed interpolation still runs with the None-to-engine easing conversion.",
+    "Shards are interleaved by character: DamageDataTable1 is mostly CP rows plus BINDING_VOWS_DEAD, table 5 is entirely CN rows, and the other tables mix CP/CN keys. Loading order is fixed and the exports have no duplicate row keys.",
+    "Id-based special cases exist throughout the code, not just data: CP_130_PASSIVE(_DE) and CP_250_PASSIVE are passive damage rows; BINDING_VOWS_DEAD is sent by binding-vow completion; CN_240_ATTACKI_01_01 only damages the CursedSpirits group; CP_070_ATTACKG_01_01_1..3 chain to _02 rows and different effects; CP_230 adds slow debuffs for its listed attack ids.",
+    "CP_270 resolves animation attack ids to _1.._4 row variants while its ProjectionSorceryCancelCount stack is positive. CP_040 remaps two damage sound ids for the CP_040_50 weapon variation.",
+    "Camera-shake and effect lookups resolve through their own table arrays; a missing/short-lived resource id may produce no effect (or an unchecked call in the reconstructed camera helper). Check the referenced Effect/CameraShake/ForceFeedback/SoundEffect/BuffDebuff/CollisionModify pages for those row semantics.",
+    "The exports are observations only: they show how values are authored (for example CN_240_DamageRate 1.0 on 1200 rows and DamageSpeed_EasingType None on all rows) but do not prove retail runtime code beyond the traced reconstructed consumers listed above."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:231",
+      "detail": "Loads DamageDataTable1-5 into the shared DamageDataTables array used by all finders."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:3237",
+      "detail": "Status_FindDamageRow searches the ordered shards for a row Id and honors bCheckNone."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:269",
+      "detail": "ApplyCharacterDamage is the central character-hit consumer of the row fields."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:829",
+      "detail": "ApplyShikigamiDamage applies the same row to summoned entities with a smaller field subset."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1991",
+      "detail": "ApplyArmorAndDownDamage subtracts the row armor/down values and can restart down recovery."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:2317",
+      "detail": "Selects the receiver damage/restraint reaction action from DamageType."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:141",
+      "detail": "Computes hit direction from DamageDirectionType, pitch/yaw adjustments and ignore flags."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:85",
+      "detail": "Applies damage speed, gravity, casual flags and damage-type request bits to the reaction request."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCollisionParameterInterface.cpp:24",
+      "detail": "Binds a Damage row to an attack collision, resolving Id_CollisionModify and tracking HitInterval/HitMax."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterAction_Blow.cpp:298",
+      "detail": "Uses bBoundEnabled and ground-bound scales/decal ids for blow/down landing behavior."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:188",
+      "detail": "Turns DamageVoiceType and SpecialDamageVoiceType into character voice requests."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimNS_AttackCollision.cpp:78",
+      "detail": "Attack-collision notifies resolve the row through ResolveAttackDamageId before enabling a collision."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimNotify_DirectDamage.cpp:31",
+      "detail": "Direct-damage anim notifies look up a row by Id_Damage and queue a hit on the current target."
+    },
+    {
+      "source": "Source/Abrams/Private/GameAnimNS_DirectDamage.cpp:31",
+      "detail": "Stateful direct damage begins a multi-hit request and ends it in NotifyEnd."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSequenceState.cpp:294",
+      "detail": "Battle sequences resolve a configured Damage id and apply its base damage through CalcReceivedDamage."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:3265",
+      "detail": "Buff/debuff ticks send named damage rows as delayed damage-over-time requests."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:1053",
+      "detail": "System2F0 repeats queued hits every HitInterval up to HitMax."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:2546",
+      "detail": "BuildHitEffectSpawnParams maps HitEffectLocationType/Direction/Rotation into effect spawn parameters."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:2612",
+      "detail": "RemoveReceiverBuffDebuffs resolves Id_BuffDebuff_Remove ids in the BuffDebuff tables."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:2638",
+      "detail": "ApplyReceiverBuffDebuffs resolves the augmentable Id_BuffDebuff_Add list."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:218",
+      "detail": "PlayCameraShakes resolves attacker/receiver shake arrays and starts each camera shake."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:65",
+      "detail": "PlayForceFeedback resolves attacker/receiver ids and calls the input manager pulse."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterActionController.cpp:211",
+      "detail": "Plays the resolved hit sound with the row pitch offset."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDestructibleObject.cpp:367",
+      "detail": "Uses Destructible_Attack, Id_Effect_Destructible_Hit and effect direction/rotation on destructible hits."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDestructibleDecal.cpp:95",
+      "detail": "Uses Id_Effect_Hit and Destructible_Attack for destructible decal hits."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_130_ActionController.cpp:911",
+      "detail": "Selects CP_130_PASSIVE or CP_130_PASSIVE_DE by finish target and queues repeat passive damage."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_250_ActionController.cpp:760",
+      "detail": "Queues the CP_250_PASSIVE damage row for its passive hit counting."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_B.cpp:1019",
+      "detail": "Uses BINDING_VOWS_DEAD as the lethal binding-vow damage row."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_230_ActionController.cpp:1311",
+      "detail": "Uses the row Id to add level-scaled slow debuffs for CP_230 slowing attacks."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_020_ActionController.cpp:757",
+      "detail": "CP_020_ATTACKC_01_01 spawns a special ground effect in OnBlowHit."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_070_ActionController.cpp:232",
+      "detail": "CP_070_ATTACKG_01_01_1..3 map to follow-up damage rows and distinct effects."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_240_ActionController.cpp:454",
+      "detail": "CN_240_ATTACKI_01_01 deals zero damage to characters outside the CursedSpirits group."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_270_ActionController.cpp:1438",
+      "detail": "Remaps attack damage ids to stack-specific row variants while ProjectionSorceryCancelCount is positive."
+    }
+  ]
+}

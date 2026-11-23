@@ -1,0 +1,73 @@
+{
+  "description": "Per-row mapping from animation state keys to AnimMontage primary-asset names, used to install montages on character anim instances and to build capture maps.",
+  "fields": {
+    "Id": {
+      "simple": "Animation group row key (character or specialized group such as facial parts).",
+      "technical": "Unreal DataTable row name (exported as ID). CharacterAnimationSet.Id_CharacterAnimation entries and several capture/pose rows use this name to find the row in CharacterAnimationDataTables. The export contains 1125 groups; targets include base character rows and suffixed groups such as CP_010_FACIAL and CP_010_ATTACKA.",
+      "evidence": [
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:96",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:758",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1216"
+      ],
+      "status": "verified"
+    },
+    "Key": {
+      "simple": "Parallel list of animation state names that a montage gets bound to.",
+      "technical": "TArray<FName>, 35 entries in every exported row, with trailing None slots. Consumers iterate Key.Num() and pair Key[Index] with FileName[Index]; None keys are skipped. BattleBase passes the key to UGameCharacterAnimInstance::SetAnimationAsset(Key, Montage, bDuplicate), with Idle/Fall_01 flagged as duplicates; capture actors build a TMap<Key, FileName>, optionally filtered to idle/enter keys. No separate length check against FileName is performed, so arrays must be parallel.",
+      "evidence": [
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:764",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:766",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:775",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1220",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1224",
+        "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:664"
+      ],
+      "status": "verified"
+    },
+    "FileName": {
+      "simple": "Parallel list of AnimMontage primary-asset names paired with Key.",
+      "technical": "TArray<FName> serialized as Filename in the export. BattleAsset collectors append non-None FileName entries to the AnimMontage preload name list; battle/sequencer code looks up StudioAnimMontageLoaders by FileName, resolves the loaded UAnimMontage and installs it at the matching Key. Capture code maps Key -> FileName and plays the montage at FileName[0] for situation-overview poses. None entries are skipped where the loop checks them, but FileName[0] is indexed directly in the pose playback path.",
+      "evidence": [
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:96",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:98",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:767",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:773",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1222",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1405"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Key and FileName are positional pairs; all 1125 exported rows have 35 entries in each array, with trailing None placeholders. Consumers index both arrays by the same loop index without a bounds comparison beyond Key.Num().",
+    "No localization variants of this table were exported. The available Content is partial and the export does not prove every retail animation group.",
+    "Evidence is reconstructed C++; montage loaders are primary-asset loaders keyed by FileName, not direct object paths stored in the table.",
+    "The export label is Filename while the USTRUCT property and source consumers use FileName."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:96",
+      "detail": "Finds an animation group and appends all FileName entries to the battle asset preload list."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:286",
+      "detail": "Resolves each character's animation set, then uses BattleAssets_AnimMontages_12BC030 to collect montage names for primary-asset loading."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleBase.cpp:758",
+      "detail": "Installs each loaded montage on the spawned character's anim instance at the matching Key, flagging duplicate Idle/Fall_01 bindings."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_LevelSequencer.cpp:660",
+      "detail": "Installs set-provided montages into studio characters spawned for sequencer scenes."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1220",
+      "detail": "Builds a Key -> FileName map for captures, filtered to idle/enter keys for non-situation-overview captures."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1405",
+      "detail": "Plays FileName[0] of the situation-overview pose's animation row as a montage."
+    }
+  ]
+}

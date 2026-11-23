@@ -1,0 +1,47 @@
+{
+  "description": "Per-map list of ambient/effect Blueprint assets that are preloaded when a battle on that map starts.",
+  "fields": {
+    "ID": {
+      "simple": "Map ID that owns the effect list.",
+      "technical": "FName row key, normally the MAP_xx key used by MapDataTable. Battle preload resolves the current map row's Id_MapEffect against MapEffectDataTables (+0x3B0) (retail 0x12bd820); NAME_None skips the join. 9 exported rows; most map rows in MapDataTable have Id_MapEffect=None, so only the maps with ambient effects have rows here.",
+      "evidence": [
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:280",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:291",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:141",
+        "Source/Abrams/Private/GameDataTableManager.cpp:189"
+      ],
+      "status": "verified"
+    },
+    "Filename": {
+      "simple": "Effect Blueprint asset names used by this map.",
+      "technical": "Serialized C++ property TArray<FName> FileName (16 slots in every exported row, trailing NAME_None entries). BattleAssets_MapEffects appends the array to the preload names; GamePrimaryAssetLoader_CreateLoaders creates Effect-type primary asset loaders keyed by these names into StudioMapEffectLoaders_180. Export examples for MAP_05: FX_OB_000_90111_BP, FX_OB_000_90112_BP, FX_OB_000_90311_BP. These are asset names (the _BP suffix is retained), not EffectDataTable row IDs.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MapEffect.h:16",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:293",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:143",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:144",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:170"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "MapEffectDataTables is manager slot +0x3B0; 'MapEffectDataTable' is registered/resolved at GameDataTableManager.cpp:189 and line 337.",
+    "The only direct consumer found for this row struct is battle preload (0x12bd820). The loader gate at GamePhase_BattlePreload.cpp:170 waits for these effect assets before battle startup. No available code spawns them directly; their placement/activation may be in map levels or Blueprints, which are not part of this evidence set.",
+    "Export key 'Filename' corresponds to C++ FileName (case-insensitive generator match)."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:280",
+      "detail": "BattleAssets_MapEffects resolves Map.Id_MapEffect and appends the row's FileName list (retail 0x12bd820)."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:141",
+      "detail": "Preload looks up the current battle map row before collecting its effect assets."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:144",
+      "detail": "Creates Effect primary asset loaders for the collected names into StudioMapEffectLoaders_180; load completion is checked at line 170."
+    }
+  ]
+}

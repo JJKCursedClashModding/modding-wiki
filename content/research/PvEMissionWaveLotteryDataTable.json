@@ -1,0 +1,92 @@
+{
+  "description": "Rank-qualified weighted wave pools for a PvE mission, including evaluation bounds and boss-wave flags.",
+  "fields": {
+    "Id": {
+      "simple": "Wave lottery row id.",
+      "technical": "FName import key/row name for FGameDataTableRow_PvEMissionWaveLottery. PvEMission rows supply Id_PvEMissionWaveLottery ids, which are resolved over PvEMissionWaveLotteryDataTables (DTM+0x920); the member is not otherwise read by the picker.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionWaveLottery.h:12",
+        "Source/Abrams/Public/GameDataTableManager.h:187",
+        "Source/Abrams/Private/GamePvESettings.cpp:584",
+        "Source/Abrams/Private/GamePvESettings.cpp:587"
+      ],
+      "status": "observed"
+    },
+    "Id_MissionWave": {
+      "simple": "Candidate mission-wave ids.",
+      "technical": "TArray<FName>, default empty. Each non-None entry is paired with the same-index Weights, EvaluationMin, EvaluationMax and bBoss into a wave candidate. Picked ids are written into the PvE wave list; exported rows pad unused slots with None, which are skipped.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionWaveLottery.h:16",
+        "Source/Abrams/Private/GamePvESettings.cpp:601",
+        "Source/Abrams/Private/GamePvESettings.cpp:612",
+        "Source/Abrams/Private/GamePvESettings.cpp:616"
+      ],
+      "status": "verified"
+    },
+    "Weights": {
+      "simple": "Relative chance of selecting each candidate wave.",
+      "technical": "TArray<float>, default empty. Candidates with Weight <= 0 are dropped; a wave id already present in PreviousWaves has its weight multiplied by 0.5. Each pick calls GamePvE_PickWeightedIndex over the remaining candidate weights, then removes the chosen candidate. The output list is initially three PVE_X_WAVE_0000 placeholders and is sized to min(candidate count, 3).",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionWaveLottery.h:19",
+        "Source/Abrams/Private/GamePvESettings.cpp:613",
+        "Source/Abrams/Private/GamePvESettings.cpp:617",
+        "Source/Abrams/Private/GamePvESettings.cpp:625",
+        "Source/Abrams/Private/GamePvESettings.cpp:627"
+      ],
+      "status": "verified"
+    },
+    "EvaluationMin": {
+      "simple": "Lower bound on player evaluation for this wave candidate.",
+      "technical": "TArray<EGameBattleResultEvaluation>, default empty. Cast to uint8 and used with the same-index EvaluationMax: when both are non-zero and Rank is not 255, the candidate is skipped unless Rank lies within the inclusive [Min, Max] range. A zero (None) bound means that side imposes no restriction; rank 255 bypasses the filter entirely.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionWaveLottery.h:22",
+        "Source/Abrams/Private/GamePvESettings.cpp:605",
+        "Source/Abrams/Private/GamePvESettings.cpp:606",
+        "Source/Abrams/Private/GamePvESettings.cpp:607"
+      ],
+      "status": "verified"
+    },
+    "EvaluationMax": {
+      "simple": "Upper bound on player evaluation for this wave candidate.",
+      "technical": "TArray<EGameBattleResultEvaluation>, default empty. Paired with EvaluationMin for the inclusive rank test described above; exported rows use None, C and S values to create rank bands.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionWaveLottery.h:25",
+        "Source/Abrams/Private/GamePvESettings.cpp:606",
+        "Source/Abrams/Private/GamePvESettings.cpp:607"
+      ],
+      "status": "verified"
+    },
+    "bBoss": {
+      "simple": "Marks a candidate wave as the boss wave.",
+      "technical": "TArray<bool>, default empty. When a boss candidate is picked it is written to Out.Last() and all boss candidates are removed from the remaining pool; non-boss picks fill earlier indices. This forces at most one boss wave at the end of the selected list.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionWaveLottery.h:28",
+        "Source/Abrams/Private/GamePvESettings.cpp:614",
+        "Source/Abrams/Private/GamePvESettings.cpp:630",
+        "Source/Abrams/Private/GamePvESettings.cpp:631",
+        "Source/Abrams/Private/GamePvESettings.cpp:635"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The exported asset has 614 rows with FGameDataTableRow_PvEMissionWaveLottery; the manager loads PvEMissionWaveLotteryDataTable into PvEMissionWaveLotteryDataTables (DTM+0x920).",
+    "All candidate arrays are parallel and indexed directly by the same loop index; exported rows pad unused slots with None/zero/false.",
+    "Survival mode (GameMode == 2) does not use this table; it selects sequential PVE_SURVIVAL_WAVE_LOTTERY ids from the mission instead.",
+    "Picker 0x1306fe0 is reconstructed; status/functions.json should be consulted for byte status. Content is partial and Blueprint uses were not exhaustively inspected."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:578",
+      "detail": "GamePvE_PickMissionWaves resolves PvEMission's wave-lottery ids into rows."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:601",
+      "detail": "Builds rank-qualified wave candidates from the parallel arrays."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:625",
+      "detail": "Performs weighted picks with previous-wave penalties and boss-last placement."
+    }
+  ]
+}

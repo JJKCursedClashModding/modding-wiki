@@ -1,0 +1,47 @@
+{
+  "description": "Per-map list of decal Blueprint assets that are preloaded when a battle on that map starts.",
+  "fields": {
+    "ID": {
+      "simple": "Map ID that owns the decal list.",
+      "technical": "FName row key, generally the same MAP_xx as MapDataTable.ID. The current map row's Id_MapDecal is resolved against MapDecalDataTables (+0x3C0) in battle preload (retail 0x12bd690); NAME_None skips the join. Export has 5 such rows (e.g. MAP_01).",
+      "evidence": [
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:262",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:273",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:147",
+        "Source/Abrams/Private/GameDataTableManager.cpp:190"
+      ],
+      "status": "verified"
+    },
+    "Filename": {
+      "simple": "Decal Blueprint asset names used by this map.",
+      "technical": "Serialized C++ property TArray<FName> FileName (16 slots in every exported row, unused slots are NAME_None). BattleAssets_MapDecals appends all entries, including None, to the preload name list; GamePrimaryAssetLoader_CreateLoaders then creates Decal-type loaders keyed by these names, stored in StudioMapDecalLoaders_1D0 until the preload gate is satisfied. Export examples: DCL_01310_BP ... DCL_01370_BP for MAP_01. The field is a Blueprint asset name list, not a list of DecalDataTable row IDs, although the prefixes often correspond.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MapDecal.h:16",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:275",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:149",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:150",
+        "Source/Abrams/Private/GamePhase_BattlePreload.cpp:174"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "MapDecalDataTables is manager slot +0x3C0; the 'MapDecalDataTable' name is registered as a primary asset loader at GameDataTableManager.cpp:338 and resolved at line 190.",
+    "Only one direct consumer of this row type exists in the available source: battle preload (0x12bd690). No gameplay code in this tree spawns these decals itself; spawning would go through the generic DecalDataTable/AGameRenderManager path after the assets are loaded. Blueprint content is unavailable, so no additional uses are claimed.",
+    "Export key 'Filename' maps to the case-different C++ property FileName."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:262",
+      "detail": "BattleAssets_MapDecals resolves the map's Id_MapDecal row and appends its FileName list to the requested asset names (retail 0x12bd690)."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:147",
+      "detail": "Battle preload looks up the current battle map row and calls the collector for map decals."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePreload.cpp:150",
+      "detail": "Creates Decal primary asset loaders from the collected names and stores them in StudioMapDecalLoaders_1D0; lines 170-175 gate battle start on all loaders completing."
+    }
+  ]
+}

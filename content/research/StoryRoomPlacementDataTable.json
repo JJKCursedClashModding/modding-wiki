@@ -1,0 +1,142 @@
+{
+  "description": "Concrete story-room layout: map and camera to load plus five parallel slots describing which characters, variations, materials, animations and spawn tags to use.",
+  "fields": {
+    "ID": {
+      "simple": "Room placement id (e.g. ROOM_0000).",
+      "technical": "FName row key in StoryRoomPlacementDataTables (DTM +0x850). Selected by Story_PickRoomPlacement and passed as FStudioPhaseRequest.Name5C / GameManager.StudioStoryRoomPlacementId_D18; MainMenuStory prepare resolves exactly this id to build the room.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:11",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:347",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:320",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:381",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:383"
+      ],
+      "status": "verified"
+    },
+    "Id_Map": {
+      "simple": "Map row used for the room's base level and lighting.",
+      "technical": "FName (row +0x10). Story_GetRoomPlacementLevels resolves it through Status_FindMapRow with no None pre-check and appends Map.FileName plus LevelDesignName. MainMenuStory also resolves it into RoomMapRow for ApplyMapCharacterLighting. Exported values are SRM_10/20/30.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:15",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:45",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:351",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:352",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:389"
+      ],
+      "status": "verified"
+    },
+    "LevelDesignName": {
+      "simple": "Extra level-design package appended to the map levels.",
+      "technical": "FName (row +0x18). Story_GetRoomPlacementLevels appends it after all Map.FileName entries, so the returned level list is Map.FileName followed by this single package.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:18",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:47",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:350"
+      ],
+      "status": "verified"
+    },
+    "CameraName": {
+      "simple": "Tag used to find the story-room camera actor.",
+      "technical": "FName (row +0x20). MainMenuStory's room setup calls GetAllActorsOfClassWithTag(AGameStoryRoomCamera, CameraName); the first match is used as the view target with a constrained aspect ratio. An empty match leaves the previous view target.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:21",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:722",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:723",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:729"
+      ],
+      "status": "verified"
+    },
+    "Id_Character": {
+      "simple": "Character ids placed in the room.",
+      "technical": "TArray<FName> (row +0x28, five exported slots). MainMenuStory iterates it to build RoomSpawnEntries; entries with None character id, VariationIndex -1 or None PlacementName are skipped. Each id is resolved in CharacterDataTables before spawning.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:24",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:529",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:532",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:537",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:541"
+      ],
+      "status": "verified"
+    },
+    "VariationIndex": {
+      "simple": "Index of the character variation to spawn.",
+      "technical": "TArray<int32> parallel to Id_Character. -1 disables a slot; otherwise it indexes Character.Id_CharacterVariation, whose id is resolved in CharacterVariationDataTables to get the character blueprint file to preload. Exported values are 0, 5, 10 and 12.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:27",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:533",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:537",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:550",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:561"
+      ],
+      "status": "verified"
+    },
+    "MaterialPattern": {
+      "simple": "Material pattern index applied to the spawned character.",
+      "technical": "TArray<int32> parallel to Id_Character (exported values 0 and 1). Copied into FStoryRoomSpawnEntry and passed to Character->GetMaterialController()->SetMaterialPattern after spawning.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:30",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:536",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:704"
+      ],
+      "status": "verified"
+    },
+    "CharacterAnimation": {
+      "simple": "Idle animation asset name for each placed character.",
+      "technical": "TArray<FName> parallel to Id_Character. Added to the AnimMontage primary-asset loader names; after spawning, the loaded montage is installed via AnimInstance->SetAnimationAsset and played with PlayAnimationAsset using this name as the animation key.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:33",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:534",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:562",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:566",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:680",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:683",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:702"
+      ],
+      "status": "verified"
+    },
+    "PlacementName": {
+      "simple": "Actor tag of the spawn point for each character.",
+      "technical": "TArray<FName> parallel to Id_Character. A None tag disables the slot; otherwise the spawned level actors are searched with ActorHasTag(PlacementName) and the matching actor's transform becomes the spawn transform (identity if no match). Also copied into the spawn entry itself.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:36",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:535",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:537",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:686",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:691"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The five character arrays are strictly index-parallel; the consumer assumes equal lengths and uses None / -1 as slot sentinels (Source/Abrams/Private/GamePhase_MainMenuStory.cpp:529-563).",
+    "Row constructor is empty (Source/AbramsDataTable/Private/GameDataTableRow_StoryRoomPlacement.cpp:3). 67 exported rows; no shards or locale variants found.",
+    "This table is reached only after StoryRoomCondition's weighted pick; the placement id is stored on the phase request before MainMenuStory builds the room.",
+    "Evidence is from the reconstructed C++ in Source/ (row shape/counts from the exported table); status/ records byte matches for some owner TUs, but this file does not claim a retail byte comparison for every function or exhaustive Blueprint/runtime coverage."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:341",
+      "detail": "Resolves a placement id into the map's level names plus LevelDesignName."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:381",
+      "detail": "Prepare state resolves the incoming placement id and its Map row."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:521",
+      "detail": "Builds spawn entries and preload lists from the five parallel character arrays."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:676",
+      "detail": "Spawns characters with the loaded animation/material/placement settings."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:721",
+      "detail": "Finds and locks onto the tagged story-room camera."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:263",
+      "detail": "Loads StoryRoomPlacementDataTable into StoryRoomPlacementDataTables."
+    }
+  ]
+}

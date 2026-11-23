@@ -1,0 +1,78 @@
+{
+  "description": "Catalog of obtainable in-battle ranking achievements, their unlock thresholds and leaderboard display priority.",
+  "fields": {
+    "Id": {
+      "simple": "Ranking record row id.",
+      "technical": "FName import key/row name for FGameDataTableRow_RankingRecord. Consumers enumerate all rows rather than looking up by id; no direct member read was identified, so the row name only identifies the record in the exported asset.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankingRecord.h:12",
+        "Source/Abrams/Public/GameDataTableManager.h:96",
+        "Source/Abrams/Private/GameBattleManager.cpp:1066",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2259"
+      ],
+      "status": "observed"
+    },
+    "RankingRecord": {
+      "simple": "Enum identifying which ranking achievement this row represents.",
+      "technical": "EGameRankingRecord, default None. EvaluateRankingRecords switches on it: damage/debuff/hit records are checked against the player's total battle-log value, bonus-based records against EGameResultScore bonus entries, FirstDown against the first-down character, Scorer against the evaluation rank, and SpecialAttack_* variants against the character's current special attack row. PvE result code also finds rows by this enum for NoRecovery, BindingVowsWelcome and AnnihilationKing, and sorts leaderboard record ids by the corresponding rows.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankingRecord.h:16",
+        "Source/AbramsDataTable/Private/GameDataTableRow_RankingRecord.cpp:4",
+        "Source/Abrams/Private/GameBattleManager.cpp:1079",
+        "Source/Abrams/Private/GameBattleManager.cpp:1135",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2262",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2304"
+      ],
+      "status": "verified"
+    },
+    "PrizeThreshold": {
+      "simple": "Value needed to earn the record.",
+      "technical": "int32, default 0. For log-based records the player's total log value is cast to int32 and compared with >= PrizeThreshold; Scorer compares the evaluation rank directly to it. In PvE result tallying, NoRecoveryCount, BindingVowCountTotal and total defeated enemies must be >= the respective row's threshold. Exported values vary widely (for example 1000 for SendDamage and 1 for AceAttacker).",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankingRecord.h:19",
+        "Source/AbramsDataTable/Private/GameDataTableRow_RankingRecord.cpp:5",
+        "Source/Abrams/Private/GameBattleManager.cpp:1073",
+        "Source/Abrams/Private/GameBattleManager.cpp:1106",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2264",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2281"
+      ],
+      "status": "verified"
+    },
+    "Priority": {
+      "simple": "Ordering weight for leaderboard display.",
+      "technical": "int32, default 0. When the top three ranking records are written to an online score entry, the record-count map is key-sorted by comparing the corresponding rows' Priority in descending order (larger Priority sorts first), then stably by count descending. Rows with no matching record fall back to raw enum ordering.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankingRecord.h:22",
+        "Source/AbramsDataTable/Private/GameDataTableRow_RankingRecord.cpp:6",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2294",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2310",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2314"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The exported asset has 51 rows with FGameDataTableRow_RankingRecord; the manager loads RankingRecordDataTable into RankingRecordDataTables (DTM+0x370).",
+    "The same table drives two distinct phases: in-battle achievement detection (GameBattleManager::EvaluateRankingRecords) and post-battle online leaderboard ordering (PvE result helpers).",
+    "The battle evaluator enumerates every row, so adding a row can add an achievement without changing consumer code; enum mapping in the switch determines which data drives it.",
+    "Collectors 0x1049de0 and related helpers are reconstructed; consult status/functions.json for byte status. Content is partial and Blueprint uses were not exhaustively inspected."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1064",
+      "detail": "Collects all ranking rows and evaluates battle-log/bonus conditions."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleManager.cpp:1106",
+      "detail": "Uses PrizeThreshold for Scorer rank comparisons."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2258",
+      "detail": "PvE tally looks up special record rows by RankingRecord and checks their thresholds."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2300",
+      "detail": "Sorts the three displayed online records by Priority and count."
+    }
+  ]
+}

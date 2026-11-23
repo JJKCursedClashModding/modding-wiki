@@ -1,0 +1,66 @@
+{
+  "description": "Per-map, per-level-sequence override for whether sequencer lights cast shadows while a cinematic plays.",
+  "fields": {
+    "ID": {
+      "simple": "Row name (exported e.g. SQ_CONSOLE_PARAM_140_001).",
+      "technical": "Serialized FName row key. FindSequencerLightRow (retail 0x143cad0) does not look rows up by name: it iterates every row of every SequencerLightDataTables table (+0xB80) and compares Id_Map and LevelSequenceFileName against the active map/sequence. No consumer of the row's Id member was found; 276 exported rows.",
+      "evidence": [
+        "Source/Abrams/Private/GameSequencerManager.cpp:1227",
+        "Source/Abrams/Private/GameSequencerManager.cpp:1238",
+        "Source/AbramsDataTable/Public/GameDataTableRow_SequencerLight.h:10"
+      ],
+      "status": "observed"
+    },
+    "Id_Map": {
+      "simple": "Map ID this override applies to.",
+      "technical": "FName compared to AGameSequencerManager::MapRow->Id (the current MapDataTable row id). Both Id_Map and LevelSequenceFileName must match for the row to be selected; first match across all tables wins, otherwise no shadow override is applied.",
+      "evidence": [
+        "Source/Abrams/Private/GameSequencerManager.cpp:1234",
+        "Source/Abrams/Private/GameSequencerManager.cpp:1240",
+        "Source/Abrams/Public/GameSequencerManager.h:264"
+      ],
+      "status": "verified"
+    },
+    "LevelSequenceFileName": {
+      "simple": "Level sequence asset/file name this override applies to.",
+      "technical": "FName compared with FindCurrentFileParameter()->Filename (the file parameter of the sequencer's currently loading entry for the active map). The exact-match pair (Id_Map, LevelSequenceFileName) identifies which cinematic receives the shadow setting. Export example: SQ_Appearance_CP_010_CP_040 on MAP_14.",
+      "evidence": [
+        "Source/Abrams/Private/GameSequencerManager.cpp:1231",
+        "Source/Abrams/Private/GameSequencerManager.cpp:1240",
+        "Source/Abrams/Private/GameSequenceNameBuilder.cpp:45"
+      ],
+      "status": "verified"
+    },
+    "bDirectionalLightCastShadows": {
+      "simple": "Whether the cinematic's lights should cast shadows.",
+      "technical": "Bool. On sequence start, every AGameRenderManager::SequencerLights component gets SetCastShadows(this value) and the prior CastShadows bit is saved in LightCastShadows. On stop, each light is restored from the saved bit, or from !bDirectionalLightCastShadows if it was not in the map. Constructor default false; the field name says 'Directional' but the loop applies it to all registered sequencer lights.",
+      "evidence": [
+        "Source/Abrams/Private/GameSequencerManager.cpp:726",
+        "Source/Abrams/Private/GameSequencerManager.cpp:732",
+        "Source/Abrams/Private/GameSequencerManager.cpp:765",
+        "Source/Abrams/Private/GameSequencerManager.cpp:770",
+        "Source/AbramsDataTable/Public/GameDataTableRow_SequencerLight.h:22"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Loader: GameDataTableManager.cpp:314 resolves 'SequencerLightDataTable' into SequencerLightDataTables (+0xB80), registered at line 487.",
+    "Only one direct consumer exists in the available source: AGameSequencerManager. It finds the row both at sequence start and stop; the start path saves per-light shadow state so stop can restore it, with an inverted default when no saved state exists.",
+    "No other per-sequence light settings (intensity, color, light type) are present in this row struct or the 276 exported rows. Id is present but unused by the finder."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameSequencerManager.cpp:1227",
+      "detail": "FindSequencerLightRow scans all SequencerLight rows for an exact (Map.Id, current file parameter Filename) match (retail 0x143cad0)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSequencerManager.cpp:726",
+      "detail": "Sequence start applies bDirectionalLightCastShadows to all registered sequencer lights and records their previous state."
+    },
+    {
+      "source": "Source/Abrams/Private/GameSequencerManager.cpp:765",
+      "detail": "Sequence stop restores the saved shadow state, falling back to the inverse of the row value."
+    }
+  ]
+}

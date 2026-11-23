@@ -1,0 +1,125 @@
+{
+  "description": "Defines a PvE mission stage: map fallback, wave/binding-vow lotteries, and the named calculation rows used for risk, money and experience payouts.",
+  "fields": {
+    "Id": {
+      "simple": "PvE mission identifier.",
+      "technical": "FName import key/row name for FGameDataTableRow_PvEMission. Mission ids are produced by GamePvE_PickMission (survival sequence or weighted lottery) and resolved through PvEMissionDataTables (DTM+0x900). The member is also read as data at result time: the id is appended to PvESettings.PlayedMissionIds and written into the online result KPI row.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:11",
+        "Source/Abrams/Public/GameDataTableManager.h:185",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2359",
+        "Source/Abrams/Private/GameOnlineManager.cpp:544"
+      ],
+      "status": "verified"
+    },
+    "Id_Map": {
+      "simple": "Preferred map for the mission.",
+      "technical": "FName, default None. GamePvE_GetMissionMapId takes the row's Id_Map and, when it is None or the mission row is missing, substitutes Story_PickRandomMapId_12FD510. Exported survival rows use None, so they rely on the random fallback; other rows use ids such as MAP_01.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:15",
+        "Source/Abrams/Private/GamePvESettings.cpp:206",
+        "Source/Abrams/Private/GamePvESettings.cpp:212",
+        "Source/Abrams/Private/GamePvESettings.cpp:214"
+      ],
+      "status": "verified"
+    },
+    "Id_PvEMissionWaveLottery": {
+      "simple": "Wave lottery rows available to this mission.",
+      "technical": "TArray<FName>, default empty. GamePvE_PickMissionWaves resolves each id against PvEMissionWaveLotteryDataTables (DTM+0x920), collects the rows and builds rank-qualified wave candidates. Survival missions reference a survival wave lottery; other missions may list several pools.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:18",
+        "Source/Abrams/Private/GamePvESettings.cpp:585",
+        "Source/Abrams/Private/GamePvESettings.cpp:587",
+        "Source/Abrams/Private/GamePvESettings.cpp:601"
+      ],
+      "status": "verified"
+    },
+    "Id_PvECalculation_RiskValue": {
+      "simple": "Named risk multiplier for this mission.",
+      "technical": "FName, default None. GamePvE_CalcResultRiskValue multiplies the accumulated risk by this row's Value when the lookup succeeds; the final risk is floored to int32 and forced to 0 below max risk or on a loss.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:21",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:95",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:116",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:119"
+      ],
+      "status": "verified"
+    },
+    "Id_PvECalculation_Money": {
+      "simple": "Named money multiplier for this mission.",
+      "technical": "FName, default None. GamePvE_CalcResultMoney multiplies max(battle bonus sum, 0) by this calculation row's Value. It is also mapped through GMoneyMissionDifficultyMap to build the difficulty sum used by whole-run mode-clear money bonuses.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:24",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:154",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:156",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:360"
+      ],
+      "status": "verified"
+    },
+    "Id_PvECalculation_Experience": {
+      "simple": "Named experience multiplier for this mission.",
+      "technical": "FName, default None. GamePvE_CalcResultExperience multiplies the evaluation-row value by this calculation row's Value (when present), then applies task/vow/help factors. It is also mapped through GExperienceMissionDifficultyMap for mode-clear experience bonuses.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:27",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:221",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:224",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:396"
+      ],
+      "status": "verified"
+    },
+    "Id_BindingVowsLottery": {
+      "simple": "Binding-vow lottery pools offered for this mission.",
+      "technical": "TArray<FName>, default empty. PvE interval setup iterates this array in parallel with Weights, skips None entries, resolves each id in BindingVowsLotteryDataTables and then applies additional order/task exclusions before weighted vow picking.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:30",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:611",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:613",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:622"
+      ],
+      "status": "verified"
+    },
+    "Weights": {
+      "simple": "Weights for choosing among the binding-vow lotteries.",
+      "technical": "TArray<float>, default empty. Each same-index value is paired with a non-None Id_BindingVowsLottery entry, and GameSound_PickWeightedIndex selects one pool. Exported rows use 1.0 for enabled slots; no repeat penalty is applied at this stage, unlike mission/wave picking.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:33",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:615",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:620",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:622"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The exported asset has 1073 rows with FGameDataTableRow_PvEMission; the manager loads PvEMissionDataTable into PvEMissionDataTables (DTM+0x900). No localization variants or numbered shards were supplied for this table.",
+    "This row is a hub joining PvEMissionWaveLottery, PvECalculation and BindingVowsLottery. The active row is also cached in FStudioBattleMissionTaskSystem and read by online KPI and result-state code via AGameBattleManager::GetPvEMission.",
+    "The Id_BindingVowsLottery/Weights arrays and Id_PvEMissionWaveLottery arrays are parallel to their targets; exported rows pad with None/zero. Consumers generally check the id but not the array length of the companion weight array.",
+    "Finders 0x12fb320 and 0x1625810 are reconstructed (behavioural in status/functions.json); this is not a byte-parity claim. Content is partial and Blueprint uses were not exhaustively inspected."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:190",
+      "detail": "GamePvE_FindMissionRow resolves mission ids against PvEMissionDataTables."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:211",
+      "detail": "GamePvE_GetMissionMapId reads Id_Map and falls back to a random map."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:578",
+      "detail": "GamePvE_PickMissionWaves resolves the mission's wave lotteries."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:611",
+      "detail": "Binds Id_BindingVowsLottery and Weights into the pre-battle vow lottery."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:116",
+      "detail": "Result calculations consume the three Id_PvECalculation_* fields."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:490",
+      "detail": "Battle setup resolves the mission row and passes it, its waves and tasks to SetupPvEMission."
+    }
+  ]
+}

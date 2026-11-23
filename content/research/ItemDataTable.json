@@ -1,0 +1,166 @@
+{
+  "description": "Central catalog of all player-visible inventory items (money, costumes, player-card parts, equipment, voice/pose unlocks, characters and story extras), defining their display text, type, cross-table link, stock rules, ordering, and progress unlock gate.",
+  "fields": {
+    "Id": {
+      "simple": "Inventory item row identifier.",
+      "technical": "FName row key used by stock counts, shop purchases, unlock checks, reward grants, and inventory-wide row collection. Consumers search all ItemDataTables and use the first matching row. Many joins go the other way too: CharacterVariation::Id_Item, ItemSet::Id_Item, and shop set contents name this ID. The export includes MONEY and ITM_* keys.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Item.h:11",
+        "Source/Abrams/Private/GameItemOwnership.cpp:35",
+        "Source/Abrams/Private/GameItemOwnership.cpp:46",
+        "Source/Abrams/Private/GameItemOwnership.cpp:172",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:277",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1204"
+      ],
+      "status": "verified"
+    },
+    "Id_ItemText": {
+      "simple": "Localized name/text key for the item.",
+      "technical": "FName passed through GameItem_GetNameTextCore with the row's ItemType. Most types use the key directly; Costume/CustomVoice/SituationOverviewPose substitute fixed template keys and pass this key as an ITEM_NAME text parameter, while Nickname keys are rewritten for the current language's TOP/BOTTOM suffix. None yields an empty/invalid name request in several UI paths. Some title/nickname player-card rows also read the parallel tables' Id_ItemText for labels.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Item.h:16",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:165",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:208",
+        "Source/Abrams/Private/GameItemOwnership.cpp:620",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:260",
+        "Source/Abrams/Private/GameFreeBattleTeamCharacterSelectWidget.cpp:316"
+      ],
+      "status": "verified"
+    },
+    "ItemType": {
+      "simple": "Inventory category of the item.",
+      "technical": "EGameItemType (None=0, Money, ShortStory, Costume, Title, Nickname, Emblem, Plate, CursedTools, CursedObjects, Extras, CustomVoice, SituationOverviewPose, StoryDemoMovie, Character, Invalid=255), default None. It drives collection filtering, shop category grouping, icon sprite selection, previewability, money handling, ownership joins, and item-description behavior. Examples: Title..Plate are treated as player-card parts; CursedTools..Extras resolve equipment effects; Extras consume on one-shot use; Money bypasses per-item stock and uses user money.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameItemType.h:6",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Item.h:19",
+        "Source/Abrams/Private/GameCollectionArchiveTileWidget.cpp:76",
+        "Source/Abrams/Private/GameItemOwnership.cpp:235",
+        "Source/Abrams/Private/GameItemIconWidget.cpp:80",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:241",
+        "Source/Abrams/Private/GameManager.cpp:1075",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4475"
+      ],
+      "status": "verified"
+    },
+    "VariableId": {
+      "simple": "Type-dependent foreign key to the concrete asset/definition behind this item.",
+      "technical": "FName whose target table depends on ItemType. CursedTools/CursedObjects/Extras resolve EquipmentItemDataTable by VariableId, then its effects. Plate and Emblem resolve PlayerCardPlate/PlayerCardEmblem rows. CustomVoice resolves CharacterCustomVoice; SituationOverviewPose resolves its pose table; costume/pose/voice ownership searches match VariableId against variation/voice IDs. None is common for types without a secondary definition. Shared helpers also find the first Item row with a given VariableId.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Item.h:22",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2261",
+        "Source/Abrams/Private/GameItemOwnership.cpp:247",
+        "Source/Abrams/Private/GameItemOwnership.cpp:253",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:218",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:119",
+        "Source/Abrams/Private/GameCustomizeCharaViewVoiceTileWidget.cpp:33",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:968"
+      ],
+      "status": "verified"
+    },
+    "SortingOrder": {
+      "simple": "Display order for the item.",
+      "technical": "int32 at row offset 0x24, default 0. Used to stable-sort collection archive tiles/text rows and player-card title/nickname items, to order the first item of a shop set's lineup, and to sort vs-enemy equipment tabs (usable, used-up, unowned). Exported values are mostly unique and start around 1000; some special rows use 0.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Item.h:25",
+        "Source/Abrams/Private/GameCollectionArchiveTextListWidget.cpp:78",
+        "Source/Abrams/Private/GameCollectionArchiveTileWidget.cpp:123",
+        "Source/Abrams/Private/GamePlayerCardParameter.cpp:71",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:368",
+        "Source/Abrams/Private/GameVsEnemyEquipmentSelectTileViewWidget.cpp:150"
+      ],
+      "status": "verified"
+    },
+    "SellPrice": {
+      "simple": "Sale/resale price of the item.",
+      "technical": "int32 serialized at row offset 0x28 with constructor default 0; exported values are 0, 2000, and 7000. No identifiable C++ consumer reads this field in the available Source, and ShopLineupDataTable carries its own Price for purchases, so no sale formula or currency interaction can be asserted.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Item.h:28",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Item.h:39"
+      ],
+      "status": "observed"
+    },
+    "PossessionMax": {
+      "simple": "Maximum number of this item the player can hold.",
+      "technical": "int32 at row offset 0x2C, default 0. Purchase, initial-grant, and max-possession helpers clamp StudioItemStocks counts with FMath::Min(Count + Amount, PossessionMax). Shop confirm dialogs copy the first set item's value to set purchase quantity limits and disable buttons when stock reaches it; lottery conversion marks a draw replaced when the first item is at max. The MONEY row uses -1 and is handled through user money instead of item stock.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Item.h:31",
+        "Source/Abrams/Private/GameItemOwnership.cpp:725",
+        "Source/Abrams/Private/GameItemOwnership.cpp:744",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:120",
+        "Source/Abrams/Private/GameShopPurchaseConfirmDialogWidget.cpp:174",
+        "Source/Abrams/Private/GameShopLotteryWidget.cpp:379",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:1295"
+      ],
+      "status": "verified"
+    },
+    "InitialPossession": {
+      "simple": "Amount granted automatically on a fresh/reset save.",
+      "technical": "int32 at row offset 0x30, default 0. GameItem_GetInitialRows keeps rows with a positive value; GameItem_GrantInitialItems adds that amount to user money for Money rows or clamps it into StudioItemStocks for others. Shop UI also treats rows with UserProgressFlag < 0 and InitialPossession <= 0 as non-default/available-to-buy items in several availability checks.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Item.h:34",
+        "Source/Abrams/Private/GameItemOwnership.cpp:689",
+        "Source/Abrams/Private/GameItemOwnership.cpp:694",
+        "Source/Abrams/Private/GameItemOwnership.cpp:708",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:798"
+      ],
+      "status": "verified"
+    },
+    "UserProgressFlag": {
+      "simple": "Save-data progress bit that unlocks the item.",
+      "technical": "int32 at row offset 0x34, default 0. Values below 0 mean no gate (unlocked); otherwise the flag encodes UserProgressFlagWords[Flag >> 2] bit (Flag & 3), with word indices >=128 treated as unreached. GameItem_IsRowUnlocked, GameItem_IsUnlocked, collection lists, and shop progress checks all apply this same test. Exported rows use -1, 6, 7, and several other DLC/progress flags.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Item.h:37",
+        "Source/Abrams/Private/GameItemOwnership.cpp:51",
+        "Source/Abrams/Private/GameItemOwnership.cpp:58",
+        "Source/Abrams/Private/GameItemOwnership.cpp:62",
+        "Source/Abrams/Private/GameItemOwnership.cpp:212",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:122"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The export contains 2775 rows. ItemDataTables can contain multiple shards; most helpers scan them in order and use the first matching row. Because names are global inventory keys, duplicate IDs across shards can shadow later rows.",
+    "ItemDataTable is a hub: ItemSetDataTable::Id_Item points here; VariableId points outward to EquipmentItem/PlayerCard/Voice/Pose tables; CharacterVariation::Id_Item points back here. Shop unlock and reward code frequently resolves an ItemSet first and then reads the first contained Item row.",
+    "SellPrice is serialized but has no identified consumer. No Blueprint behavior is assumed; the reconstruction's source states Blueprints contain no game logic.",
+    "Only the supplied retail export and partial Content are available; no claim is made about all retail rows, DLC-specific tables, or editor-only consumers."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:180",
+      "detail": "Loads ItemDataTable into ItemDataTables."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemOwnership.cpp:43",
+      "detail": "GameItem_IsUnlocked/GameItem_IsRowUnlocked evaluate the UserProgressFlag save-data bit."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemOwnership.cpp:162",
+      "detail": "Filters owned stock entries by ItemType for inventory/player-card lists."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemOwnership.cpp:688",
+      "detail": "Grants InitialPossession amounts and clamps them by PossessionMax."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:208",
+      "detail": "Builds the item name request from Id_ItemText and ItemType."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemIconWidget.cpp:80",
+      "detail": "Chooses item icons by ItemType and resolves VariableId-linked plate/voice/pose art."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:2250",
+      "detail": "Uses VariableId to find EquipmentItem rows and their gameplay effects."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCollectionArchiveTileWidget.cpp:111",
+      "detail": "Filters unlocked rows by type and sorts by SortingOrder."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:120",
+      "detail": "Applies the item progress gate, purchase clamp, and first-item SortingOrder/PossessionMax for shop sets."
+    }
+  ]
+}

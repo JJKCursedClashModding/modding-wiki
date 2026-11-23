@@ -1,0 +1,431 @@
+{
+  "description": "Stage-specific combatant configuration used by Story, Arcade and PvE battle modes: character/variant selection, starting status, AI behaviour and per-instance row/rate overrides.",
+  "fields": {
+    "Id": {
+      "simple": "Mission-character instance id.",
+      "technical": "FName import key/row name for FGameDataTableRow_MissionCharacter. Rows are found by this id from wave ally/enemy id lists or from CharacterArcade->Id_MissionCharacter. Besides the row identity, the only observed direct member read is a diagnostic battle-entry log; gameplay consumers use Id_Character instead.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:13",
+        "Source/Abrams/Public/GameDataTableManager.h:197",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:237",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:210"
+      ],
+      "status": "observed"
+    },
+    "Id_Character": {
+      "simple": "Base character row to instantiate.",
+      "technical": "FName, default None. Copied into Entry.Slot.CharacterId by BattleStory_FillFromMissionCharacter and the Arcade/PvE entry builders, then used to find the FGameDataTableRow_Character in CharacterDataTables (DTM+0x3E0). UI code also uses it to find character image rows and build unique character id lists. A missing row is generally not guarded in these gameplay paths.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:17",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:118",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:205",
+        "Source/Abrams/Private/GamePvESettings.cpp:403",
+        "Source/Abrams/Private/GameArcadeRootInfoWidget.cpp:144"
+      ],
+      "status": "verified"
+    },
+    "VariationIndex": {
+      "simple": "Index selecting a character variation/costume.",
+      "technical": "int32, default 0. Copied into Slot.VariationIndex and Setup.VariationIndex; AGameCharacter::ResolveDataRows uses it as an unchecked index into Character.Id_CharacterVariation to resolve the variation row. It is also used for capture/voice selection and forwarded into battle entry requests. Exported values include -1, so validity depends on the caller and data.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:20",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:119",
+        "Source/Abrams/Private/GameCharacter.cpp:495",
+        "Source/Abrams/Private/GameCharacter.cpp:914",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:688"
+      ],
+      "status": "verified"
+    },
+    "PoseIndex": {
+      "simple": "Index selecting the situation-overview pose.",
+      "technical": "int32, default 0. BattleSituationOverview assigns it to Enemies[Index].SituationOverviewPoseIndex; capture code then indexes SituationOverview.Id_SituationOverviewPose[PoseIndex] (recorded as unchecked in the reconstructed source) to pick a FGameDataTableRow_SituationOverviewPose.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:23",
+        "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:207",
+        "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:257",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:229",
+        "Source/Abrams/Private/GameCharacterCaptureActor.cpp:237"
+      ],
+      "status": "verified"
+    },
+    "MaterialPattern": {
+      "simple": "Initial material pattern for the combatant.",
+      "technical": "int32, default 0. Copied into Slot.MaterialPattern in every mode's battle entry builder; battle base later calls Character.MaterialController->SetMaterialPattern(Entry.Slot.MaterialPattern, nullptr). It is also forwarded in character-select parameters and capture setup.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:26",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:120",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:207",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:869"
+      ],
+      "status": "verified"
+    },
+    "bDamageMaterialEnabled": {
+      "simple": "Enables the damage/decal material path for this combatant.",
+      "technical": "bool, default false. Copied into Setup.StatusSetup-adjacent Byte9C in all battle modes; AGameCharacter::ApplyCharacterSetup tests Setup.Byte9C == 1 and calls MaterialController->ResetDecalWeight(). The reconstructed name describes the data flag; the concrete observed effect is the reset call.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:29",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:141",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:230",
+        "Source/Abrams/Private/GameCharacter.cpp:1011"
+      ],
+      "status": "verified"
+    },
+    "bSpecialTagComboSoloEnabled": {
+      "simple": "Allows duplicate hit records in solo special-tag combos.",
+      "technical": "bool, default false. Copied into Setup.Byte9D, then to AGameCharacter::bSetupSpecialTagComboSoloEnabled. The interface accessor AllowsDuplicateHitRecord returns this byte, which is read by hit-record processing; it is therefore not merely serialized.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:32",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:142",
+        "Source/Abrams/Private/GameCharacter.cpp:1030",
+        "Source/Abrams/Public/GameCharacter.h:805"
+      ],
+      "status": "verified"
+    },
+    "HitPoint": {
+      "simple": "Stage-specific maximum hit points.",
+      "technical": "float, default 0.0f. Copied to Setup.StatusSetup.HitPointOverride. UGameCharacterStatusController::ApplyHitPointParameters uses it only when > 0; otherwise the base-parameter row supplies HitPoint/HitPoint_Solo. GamePvE_CalcMissionCharacterHitPoint also reads it directly, falls back to the base row when <= 0, then adds equipment/binding-vow bonuses and clamps the result to at least 1.0.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:35",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:114",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:54",
+        "Source/Abrams/Private/GamePvESettings.cpp:395",
+        "Source/Abrams/Private/GamePvESettings.cpp:411"
+      ],
+      "status": "verified"
+    },
+    "Cost": {
+      "simple": "Stock/deployment cost charged when this combatant loses stock.",
+      "technical": "int32, default 0. Copied to StatusSetup.Int44 and stored as UGameCharacterStatusController::MissionCharacterCost. Battle systems add it to TeamSpent/CostByTeam, and KO/stock functions call GetStockAfterLoss(MissionCharacterCost). In PvE enemy setup the row value is the base Cost before binding-vow Cost bonuses are added and the result is cast back to int32.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:38",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:115",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:93",
+        "Source/Abrams/Private/GameBattleManager.cpp:2103",
+        "Source/Abrams/Private/GamePhase_BattlePvESolo.cpp:611"
+      ],
+      "status": "verified"
+    },
+    "CursedEnergyLevel": {
+      "simple": "Initial cursed-energy level.",
+      "technical": "int32, default 0. Copied to Setup.Int8C and then AGameCharacter::SetupCursedEnergyLevel. AGameCharacterManager::ApplyCharactersStartStatus calls SetCursedEnergyToLevel when it is > 0; binding vows that force a full level can replace it with Setup.StatusSetup.Int40 + 1 and disable round reset.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:41",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:137",
+        "Source/Abrams/Private/GameCharacter.cpp:1017",
+        "Source/Abrams/Private/GameCharacterManager.cpp:642"
+      ],
+      "status": "verified"
+    },
+    "bResetCursedEnergyLevelEnabled": {
+      "simple": "Whether cursed energy returns to its initial level on round reset.",
+      "technical": "bool, default false. Copied to StatusSetup.Byte4C and then UGameCharacterStatusController::bResetCursedEnergyLevelOnRoundReset, which is consulted during round reset; forcing-vow paths can turn the flag off.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:44",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:117",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:152",
+        "Source/Abrams/Private/GameCharacter.cpp:1024"
+      ],
+      "status": "verified"
+    },
+    "TensionLevel": {
+      "simple": "Initial tension level.",
+      "technical": "int32, default 0. Copied to Setup.Int90 and then SetupTensionLevel. At battle start, values > 0 become SetTensionGauge((level - 1) * 100.0f), so exported 0 leaves the controller's initial gauge untouched.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:47",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:138",
+        "Source/Abrams/Private/GameCharacter.cpp:1028",
+        "Source/Abrams/Private/GameCharacterManager.cpp:647"
+      ],
+      "status": "verified"
+    },
+    "PassionGauge": {
+      "simple": "Initial passion gauge value.",
+      "technical": "float, default 0.0f. Copied to Setup.Float94 and then SetupPassionGauge; at battle start a value > 0 is passed to SetPassionGaugeValue. Exported rows are all 0.0, which leaves the controller default.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:50",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:139",
+        "Source/Abrams/Private/GameCharacter.cpp:1029",
+        "Source/Abrams/Private/GameCharacterManager.cpp:651"
+      ],
+      "status": "verified"
+    },
+    "UniqueMode": {
+      "simple": "Per-character unique-mode variant selector.",
+      "technical": "int32, default 0. Copied to Setup.Int98 and stored as AGameCharacter::SetupUniqueMode. Many character action controllers branch on this value (for example CP_051 selects different passive buffs), so it changes behaviour rather than only display.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:53",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:140",
+        "Source/Abrams/Private/GameCharacter.cpp:915",
+        "Source/Abrams/Private/CP_051_ActionController.cpp:1273"
+      ],
+      "status": "verified"
+    },
+    "CharacterSpecialTagComboLimit": {
+      "simple": "Limit governing special-tag combo behaviour.",
+      "technical": "EGameCharacterSpecialTagComboLimit, default None. Cast to uint8 into Setup.Byte89, stored as AGameCharacter::SetupSpecialTagComboLimit, exposed by GetCharacterSpecialTagComboLimit and compared by battle-state logic (for example Performers[0].SetupSpecialTagComboLimit != 2). Exported values are None, Both and Unique; the exact enum-to-effect mapping is not further decoded by these consumers.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:56",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:136",
+        "Source/Abrams/Private/GameCharacter.cpp:913",
+        "Source/Abrams/Private/GameBattleState_06.cpp:122"
+      ],
+      "status": "verified"
+    },
+    "Id_CharacterBaseParameter": {
+      "simple": "Override for the character base-parameter row.",
+      "technical": "FName, default None. GameMissionCharacter_CopyOverrideIds copies it into Setup.Overrides.BaseParameterIdOverride; GameCharacter_Override prefers a non-None override, otherwise the base Character row's Id_CharacterBaseParameter is used to resolve CharacterBaseParameterDataTables. GamePvE_CalcMissionCharacterHitPoint independently starts from this field and falls back to Character.Id_CharacterBaseParameter when None.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:59",
+        "Source/Abrams/Private/GamePvESettings.cpp:230",
+        "Source/Abrams/Private/GameCharacter.cpp:488",
+        "Source/Abrams/Private/GamePvESettings.cpp:400"
+      ],
+      "status": "verified"
+    },
+    "Id_CharacterCursedEnergy": {
+      "simple": "Override for the cursed-energy parameter row.",
+      "technical": "FName, default None. Copied into Setup.Overrides.CursedEnergyIdOverride; AGameCharacter::ResolveDataRows uses the non-None value instead of Character.Id_CharacterCursedEnergy when resolving CharacterCursedEnergyDataTables (DTM+0x410).",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:62",
+        "Source/Abrams/Private/GamePvESettings.cpp:231",
+        "Source/Abrams/Private/GameCharacter.cpp:499"
+      ],
+      "status": "verified"
+    },
+    "Id_CharacterSpecialAttack": {
+      "simple": "Override for the character special-attack row.",
+      "technical": "FName, default None. Copied into Setup.Overrides.SpecialAttackIdOverride; ResolveDataRows uses it instead of Character.Id_CharacterSpecialAttack when finding the CharacterSpecialAttack row (DTM+0x420). A resolved special attack row also leads to its domain-expansion/map data in preload. None means the base character row wins.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:65",
+        "Source/Abrams/Private/GamePvESettings.cpp:232",
+        "Source/Abrams/Private/GameCharacter.cpp:506",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:265"
+      ],
+      "status": "verified"
+    },
+    "Id_CharacterAnimationSet": {
+      "simple": "Override for the character animation-set row.",
+      "technical": "FName, default None. Copied into Setup.Overrides.AnimationSetIdOverride. BattleBase chooses the override when non-None and uses it to preload CharacterAnimationSet montage assets; exported rows with None fall back to Character.Id_CharacterAnimationSet.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:68",
+        "Source/Abrams/Private/GamePvESettings.cpp:233",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:254",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:256"
+      ],
+      "status": "verified"
+    },
+    "Id_CharacterSound": {
+      "simple": "Override for the character sound row.",
+      "technical": "FName, default None. Copied into Setup.Overrides.SoundIdOverride. ResolveDataRows first tries this override; only when it is None does it use the Variation row's Id_CharacterSound (DTM+0x510) to resolve CharacterSoundDataTables. Thus a non-None stage value replaces the variation's sound set.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:71",
+        "Source/Abrams/Private/GamePvESettings.cpp:234",
+        "Source/Abrams/Private/GameCharacter.cpp:512",
+        "Source/Abrams/Public/StudioBattleCharacterEntry.h:27"
+      ],
+      "status": "verified"
+    },
+    "Id_Action": {
+      "simple": "Override for the main action row.",
+      "technical": "FName, default None. Copied into Setup.Overrides.ActionIdOverride; ResolveDataRows uses it instead of Character.Id_Action for ActionDataTables (DTM+0x5B0). The resolved Action row then supplies Id_ActionMove, Id_ActionJump, Id_ActionBreakFall and the defaults for dash/step.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:74",
+        "Source/Abrams/Private/GamePvESettings.cpp:235",
+        "Source/Abrams/Private/GameCharacter.cpp:525",
+        "Source/Abrams/Private/GameCharacter.cpp:533"
+      ],
+      "status": "verified"
+    },
+    "Id_ActionDash": {
+      "simple": "Override for the dash action row.",
+      "technical": "FName, default None. Copied into Setup.Overrides.ActionDashIdOverride; ResolveDataRows resolves ActionDashDataTables (DTM+0x5E0) from this value when non-None, otherwise from the resolved Action row's Id_ActionDash. Exported rows use None, so the Action row normally supplies it.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:77",
+        "Source/Abrams/Private/GamePvESettings.cpp:236",
+        "Source/Abrams/Private/GameCharacter.cpp:540",
+        "Source/Abrams/Public/StudioBattleCharacterEntry.h:29"
+      ],
+      "status": "verified"
+    },
+    "Id_ActionStep": {
+      "simple": "Override for the step action row.",
+      "technical": "FName, default None. Copied into Setup.Overrides.ActionStepIdOverride; ResolveDataRows resolves ActionStepDataTables (DTM+0x5F0) from this value when non-None, otherwise from the resolved Action row's Id_ActionStep. Exported rows use None.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:80",
+        "Source/Abrams/Private/GamePvESettings.cpp:237",
+        "Source/Abrams/Private/GameCharacter.cpp:545",
+        "Source/Abrams/Public/StudioBattleCharacterEntry.h:30"
+      ],
+      "status": "verified"
+    },
+    "Damage_Rate": {
+      "simple": "Per-instance multiplier for sent attack damage.",
+      "technical": "float, default 0.0f in the row struct; the FGameCharacterRates destination defaults to 1.0f. GameMissionCharacter_CopyOverrideRates copies it to Setup.Overrides.Rates.Scale48, which is copied to AGameCharacter+0x378 and multiplied into the team x action x status damage rate in GAISlot141.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:83",
+        "Source/Abrams/Private/GamePvESettings.cpp:250",
+        "Source/Abrams/Private/GameCharacter.cpp:903",
+        "Source/Abrams/Private/GameCharacter.cpp:3445"
+      ],
+      "status": "verified"
+    },
+    "AutoCombo_Damage_Rate": {
+      "simple": "Per-instance multiplier for auto-combo damage.",
+      "technical": "float, default 0.0f. Copied to Rates.Scale4C; AGameCharacter::GetAutoComboDamageRate returns CharacterRow->DamageRate_AutoCombo * Rates.Scale4C.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:86",
+        "Source/Abrams/Private/GamePvESettings.cpp:251",
+        "Source/Abrams/Private/GameCharacter.cpp:3003"
+      ],
+      "status": "verified"
+    },
+    "Armor_Damage_Rate": {
+      "simple": "Per-instance armor damage-rate multiplier.",
+      "technical": "float, default 0.0f. Copied to Rates.Scale50; AGameCharacter::GetArmorDamageRate returns that rate directly to damage processing.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:89",
+        "Source/Abrams/Private/GamePvESettings.cpp:252",
+        "Source/Abrams/Private/GameCharacter.cpp:3662"
+      ],
+      "status": "verified"
+    },
+    "Down_Damage_Rate": {
+      "simple": "Per-instance down-damage-rate multiplier.",
+      "technical": "float, default 0.0f. Copied to Rates.Scale54; the character interface accessor GetDownDamageRateScale returns it for damage handling.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:92",
+        "Source/Abrams/Private/GamePvESettings.cpp:253",
+        "Source/Abrams/Public/GameCharacter.h:850"
+      ],
+      "status": "verified"
+    },
+    "GuardDurability_Damage_Rate": {
+      "simple": "Per-instance multiplier for guard-durability damage sent.",
+      "technical": "float, default 0.0f. Copied to Rates.Scale58. GetSendGuardDurabilityDamageRate multiplies team ally rate x status rate x Scale58.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:95",
+        "Source/Abrams/Private/GamePvESettings.cpp:254",
+        "Source/Abrams/Private/GameCharacter.cpp:3426",
+        "Source/Abrams/Private/GameCharacter.cpp:3432"
+      ],
+      "status": "verified"
+    },
+    "Destructible_Attack_Rate": {
+      "simple": "Per-instance multiplier for attacks on destructible objects.",
+      "technical": "float, default 0.0f. Copied to Rates.Scale5C; AGameCharacter::GetDestructibleAttackRate returns that value.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:98",
+        "Source/Abrams/Private/GamePvESettings.cpp:255",
+        "Source/Abrams/Private/GameCharacter.cpp:3663"
+      ],
+      "status": "verified"
+    },
+    "CursedEnergyExp_Add_Attacker_Rate": {
+      "simple": "Per-instance cursed-energy experience gain multiplier for the attacker.",
+      "technical": "float, default 0.0f. Copied to Rates.Scale60. GetCursedEnergyExpRate multiplies status rate x Scale60 x team/stock/level/buff factors, but returns 1.0f when the receiver is null.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:101",
+        "Source/Abrams/Private/GamePvESettings.cpp:256",
+        "Source/Abrams/Private/GameCharacter.cpp:2629"
+      ],
+      "status": "verified"
+    },
+    "CursedEnergyExp_Add_Receiver_Rate": {
+      "simple": "Per-instance cursed-energy experience multiplier when receiving an attack.",
+      "technical": "float, default 0.0f. Copied to Rates.Scale64; AGameCharacter::GetCursedEnergyExpAddReceiverRate exposes it to the damage/receiver calculation.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:104",
+        "Source/Abrams/Private/GamePvESettings.cpp:257",
+        "Source/Abrams/Private/GameCharacter.cpp:3664"
+      ],
+      "status": "verified"
+    },
+    "TensionGauge_Add_Attacker_Rate": {
+      "simple": "Per-instance tension-gain multiplier for the attacker.",
+      "technical": "float, default 0.0f. Copied to Rates.Scale68; GetDealtTensionGaugeGainRate returns it (both damage-row and receiver parameters are unused in the reconstructed body).",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:107",
+        "Source/Abrams/Private/GamePvESettings.cpp:258",
+        "Source/Abrams/Private/GameCharacter.cpp:2596"
+      ],
+      "status": "verified"
+    },
+    "PassionGauge_Add_Attacker_Rate": {
+      "simple": "Per-instance passion-gain multiplier for the attacker.",
+      "technical": "float, default 0.0f. Copied to Rates.Scale6C; GetPassionGaugeAddAttackerRate returns it directly.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:110",
+        "Source/Abrams/Private/GamePvESettings.cpp:259",
+        "Source/Abrams/Private/GameCharacter.cpp:2590"
+      ],
+      "status": "verified"
+    },
+    "Operation": {
+      "simple": "AI operation/personality enum.",
+      "technical": "EGameCharacterOperation, default None. Cast to uint8 into Setup.ByteA4 and passed as the AIType argument to AGameCharacter::CreateBrain. When ByteA4 is 0xFF the brain falls back to CharacterRow->AIType, so the row's operation value selects the AI operation when not None/0xFF. Exported values include Invalid, Carefully, Berserker and Onslaught.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:113",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:154",
+        "Source/Abrams/Private/GameCharacter.cpp:788",
+        "Source/Abrams/Private/GameCharacter.cpp:991"
+      ],
+      "status": "verified"
+    },
+    "AILevel": {
+      "simple": "AI difficulty/level value for the brain.",
+      "technical": "int32, default 0. Copied into Setup.IntA0 and passed as Value174 to CreateBrain/BrainSet174_94; a value of -1 is converted to 10 there. Exported rows use -1, 1, 2 and 4.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:116",
+        "Source/Abrams/Private/GamePhase_BattleStory.cpp:153",
+        "Source/Abrams/Private/GameCharacter.cpp:793",
+        "Source/Abrams/Private/GamePhase_BattleArcade.cpp:224"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The exported asset has 701 rows and uses FGameDataTableRow_MissionCharacter; the manager loads MissionCharacterDataTable into MissionCharacterDataTables (DTM+0x9C0). No numbered shards or localization variants of this table were supplied.",
+    "The same row struct is shared by Story, Arcade and PvE entry builders; the reconstructed fill functions copy the row into FStudioBattleCharacterEntry rather than keeping the data table pointer as the only state. Aliases to follow are Setup.StatusSetup.*, Setup.Overrides.*, Setup.Overrides.Rates.*, Slot.* and AGameCharacter::Rates.",
+    "The ten rate fields are copied wholesale by GameMissionCharacter_CopyOverrideRates (retail 0x126e320) and then copied to AGameCharacter+0x378. Individual accessor names are reconstructed; the status scoreboard should be consulted before treating them as byte-matched retail names.",
+    "Finders such as 0x12fae20 and 0x12fb1e0 are labelled behavioural in status/functions.json. Several consumers index arrays without bounds checks as recorded; documentation describes that behaviour rather than promising safety.",
+    "Only reconstructed C++ and the supplied export were reviewed; Content is partial, so this is not a claim about every retail or Blueprint use."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleStory.cpp:111",
+      "detail": "BattleStory_FillFromMissionCharacter copies nearly all row fields into a battle character entry."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:224",
+      "detail": "GameMissionCharacter_CopyOverrideIds copies the eight row-id overrides."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePvESettings.cpp:242",
+      "detail": "GameMissionCharacter_CopyOverrideRates copies the ten rate multipliers."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:481",
+      "detail": "ResolveDataRows consumes the id overrides and VariationIndex to resolve the base character's related rows."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:900",
+      "detail": "ApplyCharacterSetup copies rates and scalar setup values into the live AGameCharacter."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:49",
+      "detail": "Status initialization consumes HitPoint and Cost-derived fields and the cursed-energy reset flag."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterManager.cpp:637",
+      "detail": "ApplyCharactersStartStatus turns initial cursed-energy/tension/passion values into live gauge state."
+    },
+    {
+      "source": "Source/Abrams/Private/GamePhase_BattleArcade.cpp:195",
+      "detail": "Arcade enemy entries copy the same fields from mission-character rows found through wave ids."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSituationOverviewWidget.cpp:190",
+      "detail": "Uses enemy mission-character rows to assign situation-overview pose indices."
+    }
+  ]
+}

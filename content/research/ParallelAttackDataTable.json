@@ -1,0 +1,78 @@
+{
+  "description": "Upper/lower body animation pairs for parallel attacks, referenced from AttackDataTable.Id_ParallelAttack and played alongside the main attack by character-specific action controllers.",
+  "fields": {
+    "Id": {
+      "simple": "Parallel-animation pair key referenced by an Attack row.",
+      "technical": "FName row key; the export labels it ID. Action controllers read AttackRow->Id_ParallelAttack, skip None, then scan ParallelAttackDataTables with UDataTable::FindRow (inline) or the shared Action_FindParallelAttackRow helper, caching the first match in ParallelAttackRow for stop/finish logic.",
+      "evidence": [
+        "Source/Abrams/Private/CP_030_ActionController.cpp:676",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:872",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:892",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:1153",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1312",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ParallelAttack.h:10"
+      ],
+      "status": "verified"
+    },
+    "CharacterAnimation": {
+      "simple": "Animation name played on the upper body/in parallel with the attack.",
+      "technical": "FName passed to PlayAnimation(..., -1.0f, 1.0f, 0.0f, true, false) when the parallel attack starts. The pointer is cached in the action's ParallelAttackRow and the same name is passed to StopNamedAnimation(..., 0.0f) when effects finish. CP_240 also compares it literally against \"AttackH_01_Order_01\" to decide whether auto-aim offset is enabled, so changing the string changes behaviour beyond animation playback.",
+      "evidence": [
+        "Source/Abrams/Private/CP_030_ActionController.cpp:686",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:700",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:874",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:917",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:1155",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:1195",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1289",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1321",
+        "Source/AbramsDataTable/Public/GameDataTableRow_ParallelAttack.h:14"
+      ],
+      "status": "verified"
+    },
+    "CharacterAnimation_Lower": {
+      "simple": "Serialized lower-body animation name paired with CharacterAnimation.",
+      "technical": "FName serialized in every exported row (for example AttackF_01_OrderL_01 paired with AttackF_01_Order_01). No direct C++ read of this exact property exists in the reconstructed Source/ or Plugins/ tree, including all identified ParallelAttack row readers; its runtime effect is therefore unverified. Do not assume the lower-body name is played by the same consumers that read CharacterAnimation.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_ParallelAttack.h:17",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:684",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:872",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:901",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1319"
+      ],
+      "status": "observed"
+    }
+  },
+  "notes": [
+    "AGameDataTableManager::Tick resolves only ParallelAttackDataTable into ParallelAttackDataTables (Source/Abrams/Private/GameDataTableManager.cpp:230, Source/Abrams/Public/GameDataTableManager.h:141).",
+    "Identified row readers occur in CP_030, CP_140, CP_160 and CP_240 character action controllers, plus an inline CN_230 reader at Source/Abrams/Private/CN_230_ActionController.cpp:1013.",
+    "The exported table has no numbered shards or localization variants. Content is partial, so an asset/Blueprint-only reader of CharacterAnimation_Lower cannot be excluded.",
+    "Evidence is reconstructed retail-behaviour source plus serialized export schema; exported names are not treated as behavioural proof."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/CP_030_ActionController.cpp:684",
+      "detail": "Resolves AttackRow->Id_ParallelAttack into a cached row and plays CharacterAnimation at homing start."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_140_ActionController.cpp:872",
+      "detail": "CP_140 NormalAttack_1 resolves the parallel row via Action_FindParallelAttackRow and plays/stops its upper animation."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_160_ActionController.cpp:1153",
+      "detail": "CP_160 CursedEnergyAttack_1 starts the row's parallel animation and caches the row."
+    },
+    {
+      "source": "Source/Abrams/Private/CP_240_ActionController.cpp:1289",
+      "detail": "CP_240 compares CharacterAnimation to a named order animation to enable auto-aim, in addition to play/stop."
+    },
+    {
+      "source": "Source/Abrams/Private/CN_230_ActionController.cpp:1013",
+      "detail": "CN_230 resolves the row by Attack->Id_ParallelAttack for its own parallel-animation handling."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:230",
+      "detail": "Load/registry path for ParallelAttackDataTable."
+    }
+  ]
+}

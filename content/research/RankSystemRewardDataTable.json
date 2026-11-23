@@ -1,0 +1,79 @@
+{
+  "description": "PvP rank-point milestone rewards: the item set granted at each score and its UI progress display.",
+  "fields": {
+    "Id": {
+      "simple": "Rank reward row id.",
+      "technical": "FName import key/row name for FGameDataTableRow_RankSystemReward. The reward list widget sorts rows by RequiredPoint, then locates a row by Id to compute its progress index; other consumers copy the whole row into list-item data. The grant path enumerates rows and does not use this id.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankSystemReward.h:12",
+        "Source/Abrams/Public/GameDataTableManager.h:209",
+        "Source/Abrams/Private/GameRankSystemRewardListItemWidget.cpp:45",
+        "Source/Abrams/Private/GameRankSystemRewardWidget.cpp:43"
+      ],
+      "status": "verified"
+    },
+    "RequiredPoint": {
+      "simple": "PvP total score needed to unlock the reward.",
+      "technical": "int32, default 0. GameShop_GrantRankSystemRewards skips rows whose RequiredPoint exceeds the saved EGameUserRecord::PvPTotalScore. The reward UI sorts rows by this value (ascending for progress, descending for the list) and computes self/next progress bars from neighbouring rows' RequiredPoint; the shop displays the pair (current score, required point) as unlock progress.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankSystemReward.h:16",
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankSystemReward.h:24",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2156",
+        "Source/Abrams/Private/GameRankSystemRewardListItemWidget.cpp:44",
+        "Source/Abrams/Private/GameRankSystemRewardListItemWidget.cpp:47",
+        "Source/Abrams/Private/GameRankSystemRewardWidget.cpp:37",
+        "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:946"
+      ],
+      "status": "verified"
+    },
+    "RewardType": {
+      "simple": "Serialized reward category label.",
+      "technical": "EGameRankSystemRewardType, default None; exported values include Nickname, Money, Costume and Plate. No direct consumer of RewardType was found in the available reconstructed Source/ or Plugins/ C++: the grant path keys everything from Id_ItemSet and the UI derives category from the underlying Item row. The precise behavioural role of this field remains unresolved here; absence of a consumer is an evidence limit, not proof that retail never reads it.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankSystemReward.h:19",
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankSystemReward.h:24",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2156",
+        "Source/Abrams/Private/GameRankSystemRewardWidget.cpp:59"
+      ],
+      "status": "unresolved"
+    },
+    "Id_ItemSet": {
+      "simple": "Item set awarded at this milestone.",
+      "technical": "FName, default None. The grant helper checks that the set is unlocked and not already in UserInfo.PvP.ReceivedRankSystemRewardItemSetIds, then calls GameShop_AddItemSet(id, 1, 3) and records the id. UI widgets use the same id to mark a reward received, resolve its first item for the icon/category and request its name text.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_RankSystemReward.h:22",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2156",
+        "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2160",
+        "Source/Abrams/Private/GameRankSystemRewardWidget.cpp:44",
+        "Source/Abrams/Private/GameRankSystemRewardWidget.cpp:59",
+        "Source/Abrams/Private/GameRankSystemRewardListItemWidget.cpp:123",
+        "Source/Abrams/Public/GameUserPvPInfo.h:22"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "The exported asset has 140 rows with FGameDataTableRow_RankSystemReward; the manager loads RankSystemRewardDataTable into RankSystemRewardDataTables (DTM+0xA80).",
+    "Only one reward per Id_ItemSet is effectively granted because received-set ids are recorded in user info; no consumer reads RewardType to decide the grant.",
+    "The grant helper 0x1301b60 / UI widgets are reconstructed; consult status/functions.json for byte status. Content is partial and Blueprint reads of RewardType cannot be excluded.",
+    "No localization variants or numbered shards of this table were supplied; item-set name localization lives in the shop/item tables, not here."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GamePhase_IntervalPvE.cpp:2153",
+      "detail": "Grants all unlocked, unclaimed rank rewards whose RequiredPoint has been reached."
+    },
+    {
+      "source": "Source/Abrams/Private/GameRankSystemRewardWidget.cpp:36",
+      "detail": "Builds the reward list, marks received sets and opens item previews."
+    },
+    {
+      "source": "Source/Abrams/Private/GameRankSystemRewardListItemWidget.cpp:43",
+      "detail": "Displays point progress and reward name/icon from a copied row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameShopSaleItemListItemDataBase.cpp:944",
+      "detail": "Uses RequiredPoint as unlock progress for PvP reward item sets."
+    }
+  ]
+}

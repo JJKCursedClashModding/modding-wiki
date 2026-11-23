@@ -1,0 +1,231 @@
+{
+  "description": "Per-character domain-expansion configuration: timing, target selection, stage/binding behavior, buffs, forced actions and rate-profile references.",
+  "fields": {
+    "Id": {
+      "simple": "Domain-expansion row key for a character.",
+      "technical": "FName row key; export label ID. AGameCharacter resolves an optional row from DomainExpansionDataTables using CharacterSpecialAttackRow->Id_DomainExpansion and caches it at AGameCharacter::DomainExpansionRow (+0x418); it may be null. Battle preload and pre-battle code perform the same lookup by that ID. Most gameplay consumers access the cached pointer rather than resolving the row again.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:558",
+        "Source/Abrams/Public/GameCharacter.h:244",
+        "Source/Abrams/Private/BattleCharacterAssetCollectors.cpp:351",
+        "Source/Abrams/Private/GamePhase_BattleBase.cpp:269",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:12"
+      ],
+      "status": "verified"
+    },
+    "Id_Map": {
+      "simple": "Map row used as the domain's battle stage.",
+      "technical": "FName key into MapDataTable. FBattleFreeState_DomainExpansion::GetStageMapRow uses this ID while the domain is active (after finish it uses the pending battle-level request instead) and sets bHasDomainMap from !IsNone(). The domain Sub2 state requests that stage on Enter except for CP130, and GameTrapManager also resolves it via Status_FindMapRow. None means no domain map/substates.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleState_07.cpp:227",
+        "Source/Abrams/Private/GameBattleState_07.cpp:276",
+        "Source/Abrams/Private/GameBattleState_07.cpp:375",
+        "Source/Abrams/Private/GameBattleState_07.cpp:530",
+        "Source/Abrams/Private/GameTrapManager.cpp:129",
+        "Source/Abrams/Private/GameBattleManager.cpp:1662",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:16"
+      ],
+      "status": "verified"
+    },
+    "CastingTime": {
+      "simple": "Base seconds required to cast the domain expansion.",
+      "technical": "float seconds. GetDomainExpansionCastingTime and ResetDomainExpansionCastingTime use FMath::Max(sum of EGameEquipmentItemEffectType::DomainExpansionCastingTime over equipped item IDs + this base, 0.0f); the casting ratio divides DomainExpansionCastingTimeLeft by that clamped total. Non-positive totals yield a zero ratio. Action controllers use the same getter to drive casting animation/progress.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1195",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1196",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1201",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1208",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1214",
+        "Source/Abrams/Private/CP_050_ActionController.cpp:1778",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:19"
+      ],
+      "status": "verified"
+    },
+    "Duration": {
+      "simple": "Seconds the domain remains active.",
+      "technical": "float seconds. StartDomainExpansionTime(true) copies it into DomainExpansionTimeLeft; IsDomainExpansionTimeOver only reports true when Duration > 0 and the remaining time reaches 0; GetDomainExpansionDurationRatio divides by it and clamps to [0,1] only for positive durations. Duration <= 0 therefore means no timed expiry/progress.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1186",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1220",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1222",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2184",
+        "Source/Abrams/Public/GameCharacterStatusController.h:504",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:22"
+      ],
+      "status": "verified"
+    },
+    "CursedEnergyDisabledTime": {
+      "simple": "Seconds of cursed-energy lockout applied after the domain sequence.",
+      "technical": "float seconds written directly to StatusController.CursedEnergyDisabledTimeLeft at domain-sequence end, at knockout-finish end, and when a previous domain caster is replaced by a new one. The row value is copied, not added to an existing timer.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2101",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2132",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2245",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:25"
+      ],
+      "status": "verified"
+    },
+    "HitTargetType": {
+      "simple": "Which characters are inside the domain.",
+      "technical": "EGameHitTargetType. FBattleFreeState_DomainExpansion::GetDomainTargets switches on it to build candidates (for example AllyOnly selects the caster's own team); those targets drive sequence bindings, forced actions and the Characters list used by the domain state. Default None.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleState_07.cpp:153",
+        "Source/Abrams/Private/GameBattleState_07.cpp:252",
+        "Source/AbramsDataTable/Public/EGameHitTargetType.h",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:28"
+      ],
+      "status": "verified"
+    },
+    "bFinishOtherDomainExpansion": {
+      "simple": "Whether this caster's knockout finish also ends the opponent's domain.",
+      "technical": "bool. In EndKnockOutFinish, when true and a domain target is valid, the code calls EndSequenceTarget() (which removes that target's domain buffs and applies its CursedEnergyDisabledTime) and awards a finish battle-log value; no effect when false.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2125",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2127",
+        "Source/Abrams/Private/GameBattleState_05.cpp:373",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:31"
+      ],
+      "status": "verified"
+    },
+    "bTargetCharacterBind": {
+      "simple": "Whether the caster's current target is preferentially bound to the ThirdCharacter sequence tag.",
+      "technical": "bool. When true the domain sequence searches targets for the caster's GetTargetActor() first, then any rival, then the first remaining target, binding the chosen one to GSM_TagThirdCharacter and removing it from the remaining target list. When false it simply takes the first target.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleState_07.cpp:447",
+        "Source/Abrams/Private/GameBattleState_07.cpp:450",
+        "Source/Abrams/Private/GameBattleState_07.cpp:452",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:34"
+      ],
+      "status": "verified"
+    },
+    "bTeamMemberUniqueBind": {
+      "simple": "Whether same-team targets get dedicated TeamMember sequence tags.",
+      "technical": "bool. When true, remaining targets on the caster's team are bound to GSM_TagTeamMemberFirstCharacter / GSM_TagTeamMemberSecondCharacter; otherwise all remaining targets use GSM_TagSecondCharacter / GSM_TagFourthCharacter. Checked per target after ThirdCharacter binding.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleState_07.cpp:483",
+        "Source/Abrams/Private/GameBattleState_07.cpp:485",
+        "Source/Abrams/Private/GameBattleState_07.cpp:490",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:37"
+      ],
+      "status": "verified"
+    },
+    "bAdjustGroundLocation": {
+      "simple": "Whether ground placement should adjust character locations when finishing/resuming the domain.",
+      "technical": "bool passed as the third argument to GameBattle_PlaceCharacters(Caster, Parent->CharacterLocations, bFinished || HasDomainMap, bAdjustGroundLocation). It affects only that placement path; the domain-map branch handles positions from the area's character start transforms.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleState_07.cpp:634",
+        "Source/Abrams/Private/GameBattleState_07.cpp:636",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:40"
+      ],
+      "status": "verified"
+    },
+    "Id_BuffDebuff_User": {
+      "simple": "BuffDebuff row applied to the domain caster.",
+      "technical": "FName resolved with Status_FindBuffDebuffRow(Tables->BuffDebuffDataTables, Id, true). At BeginSequenceTarget the resulting row is passed to ApplyBuffDebuffRow on the caster; RemoveDomainBuffDebuffs resolves the same row and removes states of its BuffDebuff type. None is skipped by the finder.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2206",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2208",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2252",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2256",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:43"
+      ],
+      "status": "verified"
+    },
+    "Id_BuffDebuff_Enemy": {
+      "simple": "BuffDebuff row applied to every rival and removed on domain end.",
+      "technical": "FName resolved like Id_BuffDebuff_User. At domain begin the row is applied to all characters on the caster's rival team with the caster as Source; at end the same row's BuffDebuff type is removed from those rivals. GameCharacter also consults this ID in its domain handling. The begin path does not null-check the resolved enemy row before applying it.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2211",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2216",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2257",
+        "Source/Abrams/Private/GameCharacter.cpp:2654",
+        "Source/Abrams/Private/GameCharacter.cpp:2656",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:46"
+      ],
+      "status": "verified"
+    },
+    "SetActionType_Enemy": {
+      "simple": "Action forced on lockable domain targets on opposing teams.",
+      "technical": "EGameCharacterActionType selected in BattleState07_ApplyDomainTargetActions when the target team differs from the caster's. If the value is not None (enum 0), Target->ChangeAction(Type, FGameCharacterActionRequest(true)) is called. Default None.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleState_07.cpp:649",
+        "Source/Abrams/Private/GameBattleState_07.cpp:661",
+        "Source/Abrams/Private/GameBattleState_07.cpp:663",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:49"
+      ],
+      "status": "verified"
+    },
+    "SetActionType_Ally": {
+      "simple": "Action forced on lockable domain targets on the caster's team.",
+      "technical": "EGameCharacterActionType selected when the target's team equals the caster's; same ChangeAction behavior as SetActionType_Enemy when non-None. Default None.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleState_07.cpp:649",
+        "Source/Abrams/Private/GameBattleState_07.cpp:650",
+        "Source/Abrams/Private/GameBattleState_07.cpp:660",
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:52"
+      ],
+      "status": "verified"
+    },
+    "Id_DomainExpansionRate": {
+      "simple": "Reference to the caster's DomainExpansionRate row.",
+      "technical": "FName; no direct reader of this property was found in Source/ or Plugins/. DomainExpansionRateDataTable is loaded into DTM +0x7E0, but no resolver connects these IDs to it, so the effect is unverified. Exported rows set all three rate IDs to None, but that is data, not a constraint.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:55",
+        "Source/Abrams/Private/GameDataTableManager.cpp:256",
+        "Source/Abrams/Public/GameDataTableManager.h:167"
+      ],
+      "status": "observed"
+    },
+    "Id_DomainExpansionRate_Ally": {
+      "simple": "Reference to the ally-side DomainExpansionRate row.",
+      "technical": "FName; no direct reader identified. The similarly named `_Ally` exported rows exist in DomainExpansionRateDataTable, but no source code joins this ID to that table. Treat the runtime meaning as unverified.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:58",
+        "Source/Abrams/Private/GameDataTableManager.cpp:256"
+      ],
+      "status": "observed"
+    },
+    "Id_DomainExpansionRate_Enemy": {
+      "simple": "Reference to the enemy-side DomainExpansionRate row.",
+      "technical": "FName; no direct reader identified. DomainExpansionRateDataTable has an exported `CP_140_ENEMY` row, but no source code joins this ID to it. Treat the runtime meaning as unverified.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_DomainExpansion.h:61",
+        "Source/Abrams/Private/GameDataTableManager.cpp:256"
+      ],
+      "status": "observed"
+    }
+  },
+  "notes": [
+    "AGameDataTableManager::Tick resolves only DomainExpansionDataTable into DomainExpansionDataTables (Source/Abrams/Private/GameDataTableManager.cpp:255, Source/Abrams/Public/GameDataTableManager.h:166).",
+    "Most consumers use the cached AGameCharacter::DomainExpansionRow pointer (+0x418), so changing the table row while a domain is active would not affect the active state; the BuffDebuff rows are resolved separately at begin/end.",
+    "Cross-table joins: Id_Map -> MapDataTable, Id_BuffDebuff_User/_Enemy -> BuffDebuffDataTable, Id_DomainExpansionRate* -> DomainExpansionRateDataTable (last join has no identified consumer).",
+    "The three rate-reference fields are the only fields here without direct consumers; they are marked observed rather than verified. No localization variants or numbered shards were identified.",
+    "Evidence is reconstructed retail-behaviour C++ plus serialized export schema; partial Content prevents ruling out Blueprint/uncooked consumers."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameCharacter.cpp:558",
+      "detail": "Resolves CharacterSpecialAttack.Id_DomainExpansion into the cached DomainExpansionRow pointer."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:1184",
+      "detail": "Casting and duration timers/ratios derive from CastingTime and Duration, with equipment casting-time bonuses."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_07.cpp:149",
+      "detail": "Domain sequence state selects targets by HitTargetType, requests the Id_Map stage and applies sequence bindings/actions."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:2091",
+      "detail": "Domain begin/end applies and removes caster/enemy BuffDebuff rows and sets cursed-energy lockout."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleState_05.cpp:373",
+      "detail": "Checks bFinishOtherDomainExpansion when a knockout finish targets another domain caster."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:255",
+      "detail": "Load/registry path for DomainExpansionDataTable."
+    }
+  ]
+}

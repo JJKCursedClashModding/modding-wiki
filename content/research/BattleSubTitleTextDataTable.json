@@ -1,0 +1,66 @@
+{
+  "description": "Localized battle/cutscene subtitle lines, keyed by a text id usually derived from the voice id; consumed through the shared GameText subsystem when a level-sequence subtitle widget is opened.",
+  "fields": {
+    "ID": {
+      "simple": "Text id / row key used to request the subtitle.",
+      "technical": "FName declared in FGameDataTableRow_GameText and serialized alongside the UDataTable row name; the loader keys every language variant as BattleSubTitleTextDataTable_<EApplicationLanguage name>. Lookup uses this value as the FName passed to UDataTable::FindRow across the ordered 14-table GameText array. For battle subtitles the id is normally the Voice row id with its first two characters removed (voice id 'VS...'/'Btl...' style), and HasText gates whether the subtitle widget opens. Casing is preserved in FNames but FindRow resolves by FName equality.",
+      "evidence": [
+        "Source/Abrams/Public/GameDataTableRow_GameText.h:11",
+        "Source/Abrams/Private/GameTextManager.cpp:61",
+        "Source/Abrams/Private/GameTextManager.cpp:97",
+        "Source/Abrams/Private/GameTextManager.cpp:560",
+        "Source/Abrams/Private/GameTextManager.cpp:597",
+        "Source/Abrams/Private/GameSequencerManager.cpp:1201",
+        "Source/Abrams/Private/GameSequencerManager.cpp:1205",
+        "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:201",
+        "Source/Abrams/Private/GameLevelSequenceWidget.cpp:89"
+      ],
+      "status": "verified"
+    },
+    "Text": {
+      "simple": "The localized subtitle string displayed on screen.",
+      "technical": "FString (row +0x10 in the retail layout); returned by value. Missing rows return an empty FString. Before display it passes through FormatText: <TYPE=KEY>[MODS] tags are regex-matched and replaced (GLO from the glossary map, DYN from request parameters; modifiers ABS/RATE_TO_PCT/FULL_WIDTH/HALF_WIDTH/DECIMAL_PLACE_1..4). Embedded newlines are collapsed to nothing for Ja/Zh_Hant/Zh_Hans and to a space for other languages when a text block has bForceOneLine. This group's exported rows contain no tags in the En export, but the shared formatter still applies.",
+      "evidence": [
+        "Source/Abrams/Public/GameDataTableRow_GameText.h:15",
+        "Source/Abrams/Private/GameTextManager.cpp:667",
+        "Source/Abrams/Private/GameTextManager.cpp:681",
+        "Source/Abrams/Private/GameTextManager.cpp:683",
+        "Source/Abrams/Private/GameTextManager.cpp:742",
+        "Source/Abrams/Private/GameTextManager.cpp:803",
+        "Source/Abrams/Private/GameTextManager.cpp:241",
+        "Source/Abrams/Private/GameWidgetTextBlock.cpp:206",
+        "Source/Abrams/Private/GameLevelSequenceWidget.cpp:91"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "Row struct is FGameDataTableRow_GameText (ID, Text) for all 11 exported language variants; all variants share the same 1131 row ids in the companion export. The table base name is hard-coded in AGameTextManager::StartLanguageLoading and in Tick; the suffix is the EApplicationLanguage enum name, and Config/DefaultGame.ini:35-45 assigns the 11 language variants to separate cooked chunks.",
+    "Two call paths use these ids: AGameSequencerManager derives a subtitle id from a playing voice row (right-side substring after the first two characters) and opens the StoryDemoSubtitle part; UAbramsSequencerSoundModule::ShowSubtitle accepts an explicit id and either opens that part or queues a request. Both first call HasText, so only ids actually present in one of the loaded GameText tables produce a visible subtitle. The subtitle widget itself sets a text id, which the normal text block resolves through GetText.",
+    "Subtitle visibility is also gated by the user setting Settings.bSubtitlesEnabled when the level-sequence part is opened (GameLevelSequenceWidget.cpp:29-30).",
+    "Ordering matters for id collisions: FindTextRow walks the 14 tables in the fixed order listed in GameTextManager.cpp:548-564 and returns the first row found; BattleSubTitleTextDataTable_<Lang> is slot 11. No code dispatches by prefix, so a colliding non-SYS_ id in an earlier table wins.",
+    "Reconstruction caveat: GetGameText/GetSystemText/FormatText are byte-matched to retail; FindTextRow and AGameTextManager::Tick are behaviour-certified rather than byte-identical (status/functions.json rows 0x14af290, 0x14af3d0, 0x14c96f0; BEHAV record BG03). Member and helper names are reconstructed, and only a partial Content set is available, so no claim is made about retail Blueprint-only consumers or assets outside the exports."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameSequencerManager.cpp:1201",
+      "detail": "Builds SubtitleId from the playing voice row id, tests HasText, opens the level-sequence subtitle part and sets that id on the widget."
+    },
+    {
+      "source": "Source/AbramsSequencer/Private/AbramsSequencerSoundModule.cpp:199",
+      "detail": "ShowSubtitle(TextId) checks HasText, then either opens the subtitle widget or queues UGameWidgetManager::RequestSubtitle with the same id."
+    },
+    {
+      "source": "Source/Abrams/Private/GameLevelSequenceWidget.cpp:89",
+      "detail": "SetSubtitleTextId stores the id on the embedded subtitle text block; ClosePart on the voice player event removes the subtitle."
+    },
+    {
+      "source": "Source/Abrams/Private/GameTextManager.cpp:560",
+      "detail": "Installs the localized BattleSubTitleTextDataTable_<Language> into the shared TextDataTables array used by all non-SYS_ text requests."
+    },
+    {
+      "source": "Source/Abrams/Private/GameWidgetTextBlock.cpp:72",
+      "detail": "A text block's SetTextRequest resolves any text id (including subtitle ids) through AGameTextManager::GetText and caches the resulting string."
+    }
+  ]
+}

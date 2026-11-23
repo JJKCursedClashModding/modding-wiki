@@ -1,0 +1,109 @@
+{
+  "description": "Per-character relationship graph row: the visible partner list and the starting/ending relation levels plus the level-definition row id for each partner.",
+  "fields": {
+    "ID": {
+      "simple": "Character id owning the partner list.",
+      "technical": "FName row key in StoryCharaGraphPairDataTables (DTM +0x870), looked up from character ids throughout the relation UI, from GetCharaRelateLevel, and collected by Story_GetCharaGraphPairIds_1308E80. Exported rows are character codes such as CP_010.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryCharaGraphPair.h:11",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1185",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1188",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1455",
+        "Source/Abrams/Private/GameManagerGraphics.cpp:544",
+        "Source/Abrams/Private/GameStoryCharaRelateWidget.cpp:129"
+      ],
+      "status": "verified"
+    },
+    "Id_Character": {
+      "simple": "Partner character ids connected to this character.",
+      "technical": "TArray<FName>, nine slots in the export. Consumers use Find(OtherId) to obtain the parallel-array index for StartRelateLevel/EndRelateLevel/Id_StoryCharaRelateLevel, and iterate all entries to build the relation target list. Several call sites use the resulting index without checking INDEX_NONE.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryCharaGraphPair.h:15",
+        "Source/Abrams/Private/GameStoryCharaRelateWidget.cpp:135",
+        "Source/Abrams/Private/GameManagerGraphics.cpp:549",
+        "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:68",
+        "Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:73",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1126",
+        "Source/Abrams/Private/StoryLaunchHelpers.cpp:1462"
+      ],
+      "status": "verified"
+    },
+    "StartRelateLevel": {
+      "simple": "Initial relation level for each partner.",
+      "technical": "TArray<int32> parallel to Id_Character. AGameManager::GetCharaRelateLevel converts this level to a starting value via WidgetTest_StoryRelationValue (GlobalThreshold STORY_CHARA_RELATE_LV_1..5), adds the saved directed change (StudioNestedNameInts_770) and converts back with WidgetTest_StoryRelationLevel. The reward-grant flow also uses it as the lower bound for newly claimable reward levels.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryCharaGraphPair.h:18",
+        "Source/Abrams/Private/GameManagerGraphics.cpp:549",
+        "Source/Abrams/Private/GamePhase_WidgetTest.cpp:289",
+        "Source/Abrams/Private/GamePhase_WidgetTest.cpp:311",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1129",
+        "Source/Abrams/Private/GamePhase_MainMenuStory.cpp:1148",
+        "Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:76"
+      ],
+      "status": "verified"
+    },
+    "EndRelateLevel": {
+      "simple": "Maximum relation level for each partner.",
+      "technical": "TArray<int32> parallel to Id_Character. GameStoryCharaRelateRewardViewWidget shows level milestones with StartLevel < ItemLevel <= EndLevel; the pair's end level therefore bounds the displayed and claimable relationship reward tiers.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryCharaGraphPair.h:21",
+        "Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:77",
+        "Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:83"
+      ],
+      "status": "verified"
+    },
+    "Id_StoryCharaRelateLevel": {
+      "simple": "Relation-label row for each partner.",
+      "technical": "TArray<FName> parallel to Id_Character. Resolved in StoryCharaRelateLevelDataTables (DTM +0x880) so the UI can read bFriendly[level-1] for the friendly/hostile label and gauge/line visuals; missing rows or out-of-range levels are not guarded in these consumers.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_StoryCharaGraphPair.h:24",
+        "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:69",
+        "Source/Abrams/Private/GameStoryCharaGraphWidget.cpp:81",
+        "Source/Abrams/Private/GameStoryCharaRelateTargetListItemWidget.cpp:96",
+        "Source/Abrams/Private/GameCharaRelateLevelListItemWidget.cpp:100",
+        "Source/Abrams/Private/GameStoryEarnedRewardListItemWidget.cpp:120"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "All four arrays are index-parallel; the C++ uses Find(Partner) on Id_Character and immediately indexes the other arrays. A partner absent from Id_Character yields INDEX_NONE in several paths without a guard.",
+    "Row constructor is empty (Source/AbramsDataTable/Private/GameDataTableRow_StoryCharaGraphPair.cpp:3). Exported rows have nine partner slots; some EndRelateLevel values are 3 rather than 5 (later partners).",
+    "The graph-pair row is both a UI graph definition and the authority for relation level math; relation increments themselves live in GameManager.UserInfo.Story.StudioNestedNameInts_770 (Source/Abrams/Private/GameManagerGraphics.cpp:486-487).",
+    "Evidence is from the reconstructed C++ in Source/ (row shape/counts from the exported table); status/ records byte matches for some owner TUs, but this file does not claim a retail byte comparison for every function or exhaustive Blueprint/runtime coverage."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:1184",
+      "detail": "Collects all graph-pair row ids (retail 0x1308e80)."
+    },
+    {
+      "source": "Source/Abrams/Private/GameManagerGraphics.cpp:530",
+      "detail": "GetCharaRelateLevel combines StartRelateLevel, saved changes and GlobalThreshold conversion."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryCharaRelateWidget.cpp:124",
+      "detail": "Builds the relation target list from Id_Character."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryCharaRelateDetailGaugeWidget.cpp:67",
+      "detail": "Chooses level label and friendly/hostile gauge from the paired StoryCharaRelateLevel row."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryCharaGraphWidget.cpp:79",
+      "detail": "Selects friendly/hostile line parameters for the graph edge."
+    },
+    {
+      "source": "Source/Abrams/Private/GameStoryCharaRelateRewardViewWidget.cpp:71",
+      "detail": "Derives start/end level bounds for reward milestones."
+    },
+    {
+      "source": "Source/Abrams/Private/StoryLaunchHelpers.cpp:1376",
+      "detail": "Story_HasNewCharaRelate uses the partner list to find released pairs with new relation content."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:265",
+      "detail": "Loads StoryCharaGraphPairDataTable into StoryCharaGraphPairDataTables."
+    }
+  ]
+}

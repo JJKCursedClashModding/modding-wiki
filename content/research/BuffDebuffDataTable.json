@@ -1,0 +1,113 @@
+{
+  "description": "Status-effect definitions applied to characters: a buff/debuff type, an enabled flag, and a 12-slot numeric parameter vector interpreted per type.",
+  "fields": {
+    "Id": {
+      "simple": "Buff/debuff row ID used by damage, domain, item and script callers.",
+      "technical": "FName key in BuffDebuffDataTable; export label ID. Status_FindBuffDebuffRow / Status_FindBuffDebuffRowInline scan BuffDebuffDataTables in order, take the first FindRow match, and return null when bCheckNone and Id is None. AddBuffDebuffById resolves then calls ApplyBuffDebuffRow. Known cross-table key sources include DamageDataTable.Id_BuffDebuff_Add/_Remove, DomainExpansionDataTable.Id_BuffDebuff_User/_Enemy, EquipmentItemEffectDataTable.Id_BuffDebuff, and hard-coded CP_160/CN_250 script IDs. The applied state stores a copy of the whole row, so later table edits do not affect an already active state.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1378",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1411",
+        "Source/Abrams/Private/GameBattleDamage.cpp:529",
+        "Source/Abrams/Private/GameBattleDamage.cpp:355",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2206",
+        "Source/Abrams/Private/GameCharacter.cpp:2654",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:261",
+        "Source/Abrams/Private/CN_250_ActionController.cpp:3217",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:1663",
+        "Source/AbramsDataTable/Public/GameDataTableRow_BuffDebuff.h:11"
+      ],
+      "status": "verified"
+    },
+    "BuffDebuff": {
+      "simple": "The status-effect kind (which buff/debuff behaviour is applied).",
+      "technical": "EGameBuffDebuff (None default). ApplyBuffDebuffRow switches on this value to decide stacking, duration, stacking caps and additional side effects; removal/query helpers use Status_IsBuffType / Status_IsDebuffType and explicit type sets, and Status_FindStateIndex matches this exact type (optionally source-restricted). Domain expansion user/enemy rows are resolved to their types and used to remove opposing states. This type is also compared to 0x1D in item description formatting, where that particular type keeps the equipment effect's own value instead of the buff's FloatValue[0].",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameBuffDebuff.h",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1424",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1678",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1742",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1761",
+        "Source/Abrams/Private/GameBattleSystems_A.cpp:2208",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:261",
+        "Source/AbramsDataTable/Public/GameDataTableRow_BuffDebuff.h:15"
+      ],
+      "status": "verified"
+    },
+    "bEffectEnabled": {
+      "simple": "Whether an applied state counts as an active buff or debuff.",
+      "technical": "bool, default false in the struct constructor (exported rows are mostly true). Status_HasEnabledBuffIn / Status_HasEnabledDebuffIn require both the type classification (Status_IsBuffType / Status_IsDebuffType) and this flag; ApplyBuffDebuffRow and RemoveBuffDebuffAt call those helpers to compute aura/notification transitions. The value is copied into the state (and copied by the state's assignment operator); no consumer was found that mutates it after application.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1522",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1528",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1539",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1706",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1748",
+        "Source/AbramsDataTable/Public/GameDataTableRow_BuffDebuff.h:18",
+        "Source/AbramsDataTable/Public/GameDataTableRow_BuffDebuff.h:24"
+      ],
+      "status": "verified"
+    },
+    "FloatValue": {
+      "simple": "Type-specific numeric parameters (durations, rates, thresholds, counts).",
+      "technical": "TArray<float>, exported as 12 slots. No row-wide meaning: GetBuffDebuffDuration reads FloatValue[Stack*2-2] for MoveSlow/MoveSlowItem/CursedEnergyRecoverSlow, FloatValue[0] for many timed item/passive types, and returns -1 for all other types; type-specific ticks read [0], [1], [2], [3], [4], [5] or an index derived from stack/decay level, often as a rate multiplier `(Rate + FloatValue[i]) - 1`. Examples: CP_240_Passive IconCapacity = (int32)FloatValue[5]; Decay_1..3 uses an index derived from DecayGaugeValue; IceFormation_Begin uses [0] as gauge decay rate and [1] as delay; MoveSlow duration uses the stack-dependent even slot. Item descriptions can substitute FloatValue[0] for the equipment effect value except when the type is 0x1D. Consumers generally do not bounds-check indices beyond the fixed 12-slot export layout.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1477",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1518",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:657",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:699",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:883",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:992",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1011",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1831",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1885",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1909",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2012",
+        "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:256",
+        "Source/Abrams/Public/GameCharacterStatusController.h:468",
+        "Source/AbramsDataTable/Public/GameDataTableRow_BuffDebuff.h:21"
+      ],
+      "status": "verified"
+    }
+  },
+  "notes": [
+    "AGameDataTableManager::Tick resolves only BuffDebuffDataTable into BuffDebuffDataTables (Source/Abrams/Private/GameDataTableManager.cpp:232, Source/Abrams/Public/GameDataTableManager.h:143).",
+    "The row is copied wholesale into FGameCharacterBuffDebuffState::Row when applied (Source/Abrams/Public/GameCharacterStatusController.h:26, Source/Abrams/Private/GameCharacterStatusController.cpp:1748); the state's vptr is reset to FTableRowBase on removal in retail. Treat runtime values as a snapshot, not a live row pointer.",
+    "FloatValue slot meaning is per EGameBuffDebuff type; the same index can be a duration, rate, threshold or capacity depending on the type switch. Do not infer a universal slot map.",
+    "The exported table has one unlocalized file with 177 rows and 12 floats per row; no numbered shards or localized variants were identified. Direct Blueprint/uncooked consumers cannot be excluded from partial Content.",
+    "Evidence is reconstructed retail-behaviour C++ plus serialized export schema; exported values are not used as semantic proof."
+  ],
+  "usages": [
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:1378",
+      "detail": "Shared first-match finder over BuffDebuffDataTables, used by many call sites."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:1411",
+      "detail": "AddBuffDebuffById resolves an ID and applies the row to the status controller."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:1477",
+      "detail": "GetBuffDebuffDuration maps BuffDebuff type and current stack to a FloatValue index."
+    },
+    {
+      "source": "Source/Abrams/Private/GameCharacterStatusController.cpp:1742",
+      "detail": "ApplyBuffDebuffRow switches on BuffDebuff for stacking/duration/side effects and copies the row into a state."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleDamage.cpp:529",
+      "detail": "Damage resolution reads Damage row Id_BuffDebuff_Add and applies those BuffDebuff rows."
+    },
+    {
+      "source": "Source/Abrams/Private/GameBattleSystems_A.cpp:2205",
+      "detail": "Domain expansion start/end resolves user and enemy BuffDebuff rows and removes states of those types."
+    },
+    {
+      "source": "Source/Abrams/Private/GameItemDescriptionTextWidget.cpp:261",
+      "detail": "Item description formatting can substitute BuffDebuff.FloatValue[0] for an equipment effect's displayed value."
+    },
+    {
+      "source": "Source/Abrams/Private/GameDataTableManager.cpp:232",
+      "detail": "Load/registry path for BuffDebuffDataTable."
+    }
+  ]
+}
