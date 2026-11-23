@@ -2,6 +2,8 @@
 
 A static Astro reference for the Jujutsu Kaisen Cursed Clash Unreal project. The site builds one page per table family and a browser-side search index from JSON.
 
+Read the [modding wiki](https://jjkcursedclashmodding.github.io/modding-wiki/). GitHub Actions builds, verifies, and publishes the site on pushes to `main`.
+
 ```sh
 npm ci
 npm run build
