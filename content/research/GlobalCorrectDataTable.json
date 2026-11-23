@@ -1,8 +1,9 @@
 {
+  "overview": "This table holds the shared values that adjust damage taken, tag combo knockdown, Cursed Energy gains, and the speed of jump, dash, and landing animations.",
   "description": "Single multi-purpose correction row for combat damage multipliers, tag-combo down-damage rate, cursed-energy experience rates and movement/action rigidity rates; the manager caches the loaded table array, while every traced consumer re-fetches the first row on demand.",
   "fields": {
     "ID": {
-      "simple": "Row identifier.",
+      "simple": "The name attached to this group of settings. It is called Default, and no known player-facing effect comes from changing this name.",
       "technical": "FName Id (default constructed as NAME_None; the reconstructed constructor does not assign it). The export writes the row field as \"ID\": \"Default\" while the asset's ImportKeyField and native member are \"Id\". Consumers do not look the row up by this member: AGameDataTableManager::FindGlobalCorrectRow calls FirstGlobalCorrectRow(GlobalCorrectDataTables), which reads the first row name of the first table whose row-name array is non-empty and calls FindRow<FGameDataTableRow_GlobalCorrect> on it. No traced C++ reads Id itself.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalCorrect.h:11",
@@ -14,7 +15,7 @@
       "status": "observed"
     },
     "SuperArmor_Damage": {
-      "simple": "Damage multiplier while super armor absorbs a hit.",
+      "simple": "How much damage a character takes when super armor absorbs a normal hit. Bigger values make that hit hurt more.",
       "technical": "float, constructor default 0.0f; exported Default value 1.0. AGameCharacter::GetReceivedDamageRate multiplies the accumulated rate by it only when IsHitBlockedBySuperArmor(DamageRow) is true. That predicate requires a Normal/NormalAir hit that is not throwing, guard-breaking or SimpleDomainCounterStun and whose super-armor ignore is absent or resisted. The multiplier is independent of bIgnoreComboCorrect and is applied after the base ally/status/action rates and the combo, damage-action, tag-combo and casual multipliers.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2862",
@@ -26,7 +27,7 @@
       "status": "verified"
     },
     "HyperArmor_Damage": {
-      "simple": "Damage multiplier while hyper armor absorbs a hit.",
+      "simple": "How much damage a character takes when hyper armor absorbs a hit. Bigger values make that hit hurt more.",
       "technical": "float, constructor default 0.0f; exported Default value 0.5. AGameCharacter::GetReceivedDamageRate multiplies the accumulated rate by it only when IsHitBlockedByHyperArmor(DamageRow) is true, after the super-armor branch. That predicate rejects Coercion and SimpleDomainCounterStun hits and unresisted bIgnoreHyperArmor, then requires an active hyper-armor notify or action-level hyper armor.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2866",
@@ -38,7 +39,7 @@
       "status": "verified"
     },
     "TagCombo_DownDamage": {
-      "simple": "Down-damage-rate override installed at the start of tag-combo damage actions.",
+      "simple": "How quickly a tag combo builds toward knocking the target down. Bigger values make the knockdown build faster.",
       "technical": "float, constructor default 0.0f; exported Default value 1.0. Five tag-combo action starts read it via FindGlobalCorrectRow and pass it to StatusController->SetDownDamageRate (status DownDamageRate at reconstructed +0x19C; the GlobalCorrect field itself is at row +0x18), then set an unlimited collision lock 4: TagComboDamage, TagComboDamageBlow, TagComboProjectionSorceryReceive, TagComboProjectionSorceryReceiveBlow and the restraint tag-combo variant. AGameCharacter::GetDownDamageRate multiplies that status rate by the action-controller rate (and ComboDown_Casual for applicable casual non-cursed-energy hits); GameBattleManager uses the result to reduce DownValue.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:539",
@@ -53,7 +54,7 @@
       "status": "verified"
     },
     "Combo_Base": {
-      "simple": "Base of the exponential received-damage combo scaling.",
+      "simple": "How much incoming damage remains as a hit combo grows. Bigger values leave more damage at longer combos.",
       "technical": "float, constructor default 0.0f; exported Default value 0.9. AGameCharacter::GetReceivedDamageRate multiplies by max(Combo_Base ^ ComboCount, Combo_Min) when DamageRow->bIgnoreComboCorrect is false. ComboCount is GetFlaggedHitComboCount() (status ReceiveComboFlaggedCount, header comment GAISlot056) when Flag==1, otherwise GetReceivedComboCount() (status ReceiveComboCount, GAISlot055).",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2846",
@@ -66,7 +67,7 @@
       "status": "verified"
     },
     "Combo_Min": {
-      "simple": "Lower bound of the received-damage combo scaling.",
+      "simple": "The smallest share of incoming damage left after a long combo. Raising it makes long combos hurt more.",
       "technical": "float, constructor default 0.0f; exported Default value 0.6. Used as the second argument of FMath::Max in AGameCharacter::GetReceivedDamageRate, flooring Combo_Base ^ ComboCount whenever the damage row does not ignore combo correction.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2846",
@@ -76,7 +77,7 @@
       "status": "verified"
     },
     "Combo_Damage": {
-      "simple": "Damage-combo multiplier for ordinary/receive damage actions.",
+      "simple": "How much damage the target takes from ordinary hits and several binding or projection attacks. Bigger values make those hits hurt more.",
       "technical": "float, constructor default 0.0f; exported Default value 0.9. Returned by FGameCharacterAction_Damage::GetDamageComboRate, FGameCharacterAction_ProjectionSorceryReceive::GetDamageComboRate, FGameCharacterAction_CrimsonBindingRestraint::GetDamageComboRate, FGameCharacterAction_CentipedeRestraint::GetDamageComboRate and FGameCharacterAction_FreezingRestraint::GetDamageComboRate (all retail 0x14109C280). The action controller's damage-combo rate is then multiplied into AGameCharacter::GetReceivedDamageRate when the damage row does not ignore damage-action correction or a technique-damage correction applies.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2850",
@@ -90,7 +91,7 @@
       "status": "verified"
     },
     "Combo_Blow": {
-      "simple": "Damage-combo multiplier for blow-launch actions.",
+      "simple": "How much damage the target takes from a blow attack. Bigger values make blow attacks hurt more.",
       "technical": "float, constructor default 0.0f; exported Default value 0.9. FGameCharacterAction_Blow::GetDamageComboRate (retail 0x14109C1F0) returns row member +0x28; the value enters the action-controller damage-combo multiplier used by received-damage calculation.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:307",
@@ -100,7 +101,7 @@
       "status": "verified"
     },
     "Combo_BlowSmall": {
-      "simple": "Damage-combo multiplier for small blow actions.",
+      "simple": "How much damage the target takes from a small blow attack. Bigger values make those attacks hurt more.",
       "technical": "float, constructor default 0.0f; exported Default value 0.9. FGameCharacterAction_BlowSmall::GetDamageComboRate (retail 0x14109C250) returns row member +0x2C for the action-controller damage-combo multiplier.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:362",
@@ -109,7 +110,7 @@
       "status": "verified"
     },
     "Combo_BlowLarge": {
-      "simple": "Damage-combo multiplier for large blow actions.",
+      "simple": "How much damage the target takes from a large blow attack. Bigger values make those attacks hurt more.",
       "technical": "float, constructor default 0.0f; exported Default value 0.9. FGameCharacterAction_BlowLarge::GetDamageComboRate (retail 0x14109C220) returns row member +0x30 for the action-controller damage-combo multiplier.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:378",
@@ -118,7 +119,7 @@
       "status": "verified"
     },
     "Combo_Down": {
-      "simple": "Damage-combo multiplier for downed-state actions.",
+      "simple": "How much damage the target takes from an attack while the target is knocked down. Bigger values make those attacks hurt more.",
       "technical": "float, constructor default 0.0f; exported Default value 0.9. FGameCharacterAction_Down::GetDamageComboRate (retail 0x14109C2B0) returns row member +0x34 for the action-controller damage-combo multiplier.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:343",
@@ -127,7 +128,7 @@
       "status": "verified"
     },
     "Combo_TagCombo": {
-      "simple": "Damage multiplier applied during tag combos.",
+      "simple": "How much extra damage a target takes during a tag combo. Bigger values make tag combos hurt more.",
       "technical": "float, constructor default 0.0f; exported Default value 0.85. AGameCharacter::GetReceivedDamageRate multiplies by it when ActionController->bTagComboDamageAction == 1, independently of the bIgnoreComboCorrect flag.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2854",
@@ -136,7 +137,7 @@
       "status": "verified"
     },
     "Combo_Casual": {
-      "simple": "Damage multiplier for casual damage actions.",
+      "simple": "How much damage a casual attack does when this setting applies. Bigger values make casual hits hurt more.",
       "technical": "float, constructor default 0.0f; exported Default value 1.0. AGameCharacter::GetReceivedDamageRate multiplies by it when bCancelCasualDamageActionCorrect is false and ActionController->bCasualDamageAction == 1.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2858",
@@ -145,7 +146,7 @@
       "status": "verified"
     },
     "ComboDown_Casual": {
-      "simple": "Casual-attack multiplier on the down damage rate.",
+      "simple": "How much a casual attack that is not Cursed Energy builds toward knockdown. Bigger values make those hits knock down faster.",
       "technical": "float, constructor default 0.0f; exported Default value 1.0. AGameCharacter::GetDownDamageRate multiplies StatusController down rate x ActionController slot 108 by it when the attack type is neither CursedEnergyAttack_1 nor CursedEnergyAttack_2, bCancelCasualDamageActionCorrect is false and ActionController->bCasualDamageAction == 1.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2676",
@@ -155,7 +156,7 @@
       "status": "verified"
     },
     "CursedEnergyExp_Base": {
-      "simple": "Per-stock-difference slope for cursed-energy experience gain.",
+      "simple": "How the team's remaining stocks change Cursed Energy experience after a hit. With the shipped value, having fewer than the opponent increases the gain.",
       "technical": "float, constructor default 0.0f; exported Default value -0.1. AGameCharacter::GetCursedEnergyExpRate computes StockRate = (OwnStock - receiver stock) * Base + 1.0f, where stocks come from AGameBattleManager::GetCharacterStock for the attacker's and receiver's teams, then clamps StockRate to [CursedEnergyExp_Min, CursedEnergyExp_Max].",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2613",
@@ -164,7 +165,7 @@
       "status": "verified"
     },
     "CursedEnergyExp_Max": {
-      "simple": "Upper clamp for the stock-based cursed-energy experience rate.",
+      "simple": "The highest Cursed Energy experience gain allowed from remaining stocks after a hit. Raising it allows a bigger boost.",
       "technical": "float, constructor default 0.0f; exported Default value 1.2. Passed as the max argument of FMath::Clamp on StockRate in AGameCharacter::GetCursedEnergyExpRate, together with CursedEnergyExp_Min.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2614",
@@ -173,7 +174,7 @@
       "status": "verified"
     },
     "CursedEnergyExp_Min": {
-      "simple": "Lower clamp for the stock-based cursed-energy experience rate.",
+      "simple": "The lowest Cursed Energy experience gain allowed from remaining stocks after a hit. Raising it makes the smallest gain larger.",
       "technical": "float, constructor default 0.0f; exported Default value 1.0. Passed as the min argument of FMath::Clamp on StockRate in AGameCharacter::GetCursedEnergyExpRate, together with CursedEnergyExp_Max.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2614",
@@ -182,7 +183,7 @@
       "status": "verified"
     },
     "CursedEnergyExp_Level": {
-      "simple": "Per-level-difference slope for cursed-energy experience gain.",
+      "simple": "How the level gap between fighter and target changes Cursed Energy experience after a hit. Bigger changes make the gap matter more.",
       "technical": "float, constructor default 0.0f; exported Default value -0.05. AGameCharacter::GetCursedEnergyExpRate computes Rate = (LevelDifference * Level + 1.0f) * (StockRate * TeamRate), where LevelDifference is Receiver->GetCursedEnergyLevelDifference(attacker's clamped level) and TeamRate comes from the battle manager. Buff/debuff records from the receiver that name this attacker are then multiplied in; the returned value is StatusController->GetCursedEnergyExpRate() * Rates.Scale60 * Rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:2616",
@@ -192,7 +193,7 @@
       "status": "verified"
     },
     "Rigidity_JumpBegin": {
-      "simple": "Rigidity multipliers indexed by the jump-start animation type.",
+      "simple": "Picks the jump-start animation speed from Light, Normal, or Heavy. Bigger values make that animation play faster.",
       "technical": "TArray<float>, default-constructed empty (the constructor does not assign it); exported Default values [0.8, 0.7, 0.6]. UGameCharacterStatusController::GetJumpBeginRigidityRate selects element GameAnimNotify_TypeIndex(Owner->GetActionJumpRow()->Rigidity_JumpBegin); that helper returns enum value - 1, so None -> -1, Light/Normal/Heavy -> 0/1/2. Invalid/out-of-range values fall back to 1.0f. BuffDebuff float corrections are not applied in this getter. The result is passed as the jump-begin animation play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3864",
@@ -204,7 +205,7 @@
       "status": "verified"
     },
     "Rigidity_RunJumpBegin": {
-      "simple": "Rigidity multipliers for running jump starts.",
+      "simple": "Picks the running jump-start animation speed from Light, Normal, or Heavy. Bigger values make that animation play faster.",
       "technical": "TArray<float>, default-constructed empty; exported Default values [0.8, 0.7, 0.6]. UGameCharacterStatusController::GetRunJumpBeginRigidityRate looks up GetActionJumpRow()->Rigidity_RunJumpBegin through Status_RigidityRate (enum - 1, range-checked, default 1.0f). The result is used as the run-jump-begin animation play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3864",
@@ -215,7 +216,7 @@
       "status": "verified"
     },
     "Rigidity_DashJumpBegin": {
-      "simple": "Rigidity multipliers for dash jump starts.",
+      "simple": "Picks the dash jump-start animation speed from Light, Normal, or Heavy. Bigger values make that animation play faster.",
       "technical": "TArray<float>, default-constructed empty; exported Default values [0.75, 0.7, 0.65]. UGameCharacterStatusController::GetDashJumpBeginRigidityRate indexes it with GetActionJumpRow()->Rigidity_DashJumpBegin (enum - 1); out-of-range yields 1.0f. The result is used as the dash-jump-begin animation play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3892",
@@ -226,7 +227,7 @@
       "status": "verified"
     },
     "Rigidity_JumpAirBegin": {
-      "simple": "Rigidity multipliers for aerial jump starts.",
+      "simple": "Picks the air jump or running air jump animation speed from Light, Normal, or Heavy. Bigger values make that animation play faster.",
       "technical": "TArray<float>, default-constructed empty; exported Default values [1.0, 1.0, 1.0]. UGameCharacterStatusController::GetJumpAirBeginRigidityRate indexes it with GetActionJumpRow()->Rigidity_JumpAirBegin (enum - 1, range-checked; fallback 1.0f). The result is used by both JumpAirBegin and RunJumpAirBegin as their begin-animation play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3906",
@@ -236,7 +237,7 @@
       "status": "verified"
     },
     "Rigidity_DashBegin": {
-      "simple": "Rigidity multipliers for dash starts.",
+      "simple": "Dash-start animation speed for Light, Normal, or Heavy. Bigger values play faster, and some passive skills adjust the result.",
       "technical": "TArray<float>, default-constructed empty; exported Default values [1.0, 0.9, 0.8]. UGameCharacterStatusController::GetDashBeginRigidityRate starts at 1.0f, replaces it with the element selected by current dash row Rigidity_DashBegin (enum - 1, in range only), then applies each CP_010_Passive buff as Rate += FloatValue[1] - 1.0f. AGameCharacter::GetDashBeginPlayRate multiplies the result by the action-controller play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2787",
@@ -247,7 +248,7 @@
       "status": "verified"
     },
     "Rigidity_DashEnd": {
-      "simple": "Rigidity multipliers for dash ends.",
+      "simple": "Dash-end animation speed for Light, Normal, or Heavy. Bigger values play faster, and some passive skills adjust the result.",
       "technical": "TArray<float>, default-constructed empty; exported Default values [1.0, 0.92, 0.88]. UGameCharacterStatusController::GetDashEndRigidityRate starts at 1.0f, selects by current dash row Rigidity_DashEnd (enum - 1, in range only), then adds CP_010_Passive FloatValue[1] and CP_240_Passive FloatValue[2] corrections (each minus 1.0f). The getter returns the adjusted value directly; no clamp is applied in GetDashEndRigidityRate. AGameCharacter::GetDashEndPlayRate multiplies it by the action-controller play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2690",
@@ -259,7 +260,7 @@
       "status": "verified"
     },
     "Rigidity_DashAirBegin": {
-      "simple": "Rigidity multipliers for aerial dash starts.",
+      "simple": "Air dash-start animation speed for Light, Normal, or Heavy. Bigger values play faster, and some passive skills adjust the result.",
       "technical": "TArray<float>, default-constructed empty; exported Default values [1.0, 0.925, 0.9]. UGameCharacterStatusController::GetDashAirBeginRigidityRate starts at 1.0f, selects by current dash row Rigidity_DashAirBegin (enum - 1, in range only), then applies CP_010_Passive FloatValue[1] - 1.0f. AGameCharacter::GetDashAirBeginPlayRate multiplies the result by the action-controller play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2811",
@@ -270,7 +271,7 @@
       "status": "verified"
     },
     "Rigidity_DashAirEnd": {
-      "simple": "Rigidity multipliers for aerial dash ends.",
+      "simple": "Air dash-end animation speed for Light, Normal, or Heavy. Bigger values play faster, and some passive skills adjust the result.",
       "technical": "TArray<float>, default-constructed empty; exported Default values [1.0, 1.0, 1.0]. UGameCharacterStatusController::GetDashAirEndRigidityRate starts at 1.0f, selects by current dash row Rigidity_DashAirEnd (enum - 1, in range only), then applies CP_010_Passive FloatValue[1] and CP_240_Passive FloatValue[2] corrections (each minus 1.0f). AGameCharacter::GetDashAirEndPlayRate multiplies the result by the action-controller play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2835",
@@ -281,7 +282,7 @@
       "status": "verified"
     },
     "Rigidity_Landing": {
-      "simple": "Rigidity multipliers for landing.",
+      "simple": "Picks the landing animation speed from Light, Normal, or Heavy. Bigger values make the landing animation play faster.",
       "technical": "TArray<float>, default-constructed empty; exported Default values [1.1, 1.0, 0.9]. UGameCharacterStatusController::GetLandingRigidityRate indexes it with GetCurrentActionMoveRow()->Rigidity_Landing through Status_RigidityRate (enum - 1, in-range only, otherwise 1.0f). The result is passed as the landing animation play rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3899",

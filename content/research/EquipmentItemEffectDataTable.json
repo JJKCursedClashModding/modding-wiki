@@ -1,8 +1,9 @@
 {
+  "overview": "This table controls the bonuses, penalties, and one-time effects that cursed tools, cursed objects, and Extras give in battle.",
   "description": "Defines the reusable stat, resource, rate, buff/debuff, and one-shot effects attached to cursed tools, cursed objects, and extras, including numeric thresholds/chances and the localized description text IDs shown on item cards.",
   "fields": {
     "Id": {
-      "simple": "Equipment-effect row identifier.",
+      "simple": "The name that connects this effect to a cursed tool, cursed object, or Extra. The game finds it through the item's effect list.",
       "technical": "FName at row offset 0x08; the export serializes it as ID and it matches the DataTable row key. Runtime lookup uses effect IDs from FGameDataTableRow_EquipmentItem::Id_EquipmentItemEffect rather than this field value: an Item row's VariableId selects an EquipmentItem row, then each named effect row is found with FindRow. AGameDataTableManager resolves the registered table into EquipmentItemEffectDataTables; status, PvE, and description helpers scan that array in order and take the first match. None effect IDs are skipped.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItemEffect.h:12",
@@ -19,7 +20,7 @@
       "status": "verified"
     },
     "EffectType": {
-      "simple": "Selects which gameplay effect this row applies.",
+      "simple": "Chooses the effect, such as more health, attack power, or Cursed Energy. It may target the user, an ally, or a rival.",
       "technical": "EGameEquipmentItemEffectType (uint8) at row offset 0x10; None=0, StepDistance=72, Invalid=255, and the struct constructor defaults the field to None. GameEquipment_GetEffectRowsOfType filters effect rows by exact type without deduplication. Consumers then use EffectValue[0] as a signed flat amount (SumEffectValue), a multiplier whose neutral value is 1.0 (SumEffectRate subtracts one), a threshold (the AtValue helpers compare the caller's HP ratio/count/gauge against EffectValue[0] and use EffectValue[1]), or a chance (RollChance). HitPointMax sums flat HP, HitPointMaxAlly takes the maximum, and HitPointMaxEnemy sums a penalty in the PvE HP calculation; SendAttackDamage and SendAttackDamageWithHitPointRate feed the outgoing-damage rate, which is finally clamped to at least 0.01. The HP-change path enumerates 16 Once types: eight push Id_BuffDebuff to self, one to allies, three to rivals, and four consume EffectValue[1] directly. CursedEnergyOnceEnemy applies rival energy from EffectValue[1] inside the reconstructed retail loop over RivalBuffIds.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameEquipmentItemEffectType.h:6",
@@ -42,7 +43,7 @@
       "status": "verified"
     },
     "EffectValue": {
-      "simple": "Numeric parameters for the effect; behavior depends on EffectType and array index.",
+      "simple": "Sets the effect's amount or strength. Bigger numbers usually mean a larger bonus, bigger penalty, or higher chance.",
       "technical": "TArray<float> at row offset 0x18; all 268 exported rows have exactly three entries, with index 2 equal to 0.0 in every row, though the struct permits any length. Interpretation depends on EffectType and the consuming helper. SumEffectValue uses index 0 as a signed flat amount or max candidate; SumEffectRate uses index 0 as a multiplier with 1.0 neutral and accumulates value-1.0. Chance helpers use index 0 as a nominal percentage, static_cast<int32>(value*100) out of 100 with both endpoints inclusive, and use index 1 as the applied magnitude; HitPointWhenJustGuard and its ally variant use index 1 as flat HP. AtValue helpers use index 0 as an inclusive comparison threshold (caller value >= threshold when bAtLeast is true, <= threshold otherwise) and index 1 as a rate delta or flat value. Unsuccessful rolls contribute nothing; missing indices are read unguarded by these helpers, and no identified C++ consumer reads index 2.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItemEffect.h:19",
@@ -65,7 +66,7 @@
       "status": "verified"
     },
     "Id_BuffDebuff": {
-      "simple": "Buff/debuff row applied by this effect, if any.",
+      "simple": "Helpful or harmful status effect this item can give. It may target the user, ally, or rival and can change the item card number.",
       "technical": "FName at row offset 0x28. None means no resolvable buff: the shared finder rejects None and uses the first matching BuffDebuff row. GameEquipment_GetBuffDebuffIdsOfType appends this ID (including None) for DashGaugeNotRecoverWhenSendDamage on positive damage, for AttackWithDashGaugeRecover and AttackWithDashDisabled on any damage row, and for ReceiveDamageWithDashGauseUnlimited while the owner is alive; GameEquipment_RollBuffDebuffIdsOfType appends it for NormalAttackWithMoveSlow only on normal attacks after an EffectValue[0] roll. The once-effect switch routes the ID to self, ally, or rival lists for the buff-backed Once types; direct-value Once types do not use it. In item descriptions, if a BuffDebuff row exists and its enum is not 0x1D (MoveSlowItem), that row's FloatValue[0] replaces EffectValue[0] as the displayed VALUE parameter; otherwise EffectValue[0] is used. All 45 non-None IDs in the supplied export resolve in BuffDebuffDataTable.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItemEffect.h:22",
@@ -84,7 +85,7 @@
       "status": "verified"
     },
     "Id_BattleText": {
-      "simple": "Localized description text ID for this effect.",
+      "simple": "The name of this effect's description on item cards. The game fills in its number, and Extras also show a separate line during battle.",
       "technical": "FName at row offset 0x30. GameItem_GetDescriptionText requests this ID through the text manager for CursedTools, CursedObjects, and Extras at effect slots 0 and 1, passing VALUE from EffectValue[0] or the BuffDebuff override. Extras additionally render a separate extra-description line with the fixed key BTL_ITEM_BUFF_MESSAGE_1000 and EffectValue[0]; that fixed line is in addition to, not instead of, the normal Id_BattleText lines. No supplied row uses None for this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItemEffect.h:25",

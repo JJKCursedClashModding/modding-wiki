@@ -1,8 +1,9 @@
 {
+  "overview": "These entries set how high the camera aims on a fighter you have locked on to.",
   "description": "Per-target lock-on camera tuning: the target character's Character.Id_CharacterCamera selects an FName-keyed row whose TargetHeightOffset is added to the target's foot/base Z to seed the lock-on gaze in camera modes 1-3. One 46-row retail export: 44 rows use 135.0 and CN_040/CN_240 use 200.0 Unreal world units (centimetres by engine convention).",
   "fields": {
     "ID": {
-      "simple": "Row key (exported ID; native FName Id) referenced by the target character's Character.Id_CharacterCamera.",
+      "simple": "The name the game uses to link a fighter to their lock-on camera setting.",
       "technical": "FName at row +0x8, declared UPROPERTY(BlueprintReadWrite, EditAnywhere). The export declares ImportKeyField=Id and all 46 exported rows have row name == exported ID, but no traced C++ consumer reads the row's Id member as a value. UGameCharacterVirtualCamera::OnTargetChanged instead takes CameraId from the target's cached Character row Id_CharacterCamera (row +0xD8) and calls FindRow<FGameDataTableRow_CharacterCamera>(CameraId, FString(), false) over DTM->CharacterCameraDataTables (+0x460), so the DataTable row name is the effective lookup key and the first matching table wins. AGameCharacter::ResolveDataRows caches the selected Character row pointer (+0x3A0) during setup; no variation, mission override or camera-specific override rewrites Id_CharacterCamera. Alias Character rows share rows (CN_041->CN_040, CN_071->CN_070, CN_081->CN_080, CN_111->CN_110, CP_081->CP_080); CN_210 stores NAME_None and finds no row.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCamera.h:11",
@@ -18,7 +19,7 @@
       "status": "verified"
     },
     "TargetHeightOffset": {
-      "simple": "Vertical offset above the locked-on target's foot/base location used to seed the lock-on gaze (Unreal world units, normally centimetres).",
+      "simple": "How high above a locked-on fighter's feet the camera aims. A larger number raises the aim point.",
       "technical": "double at row +0x10, declared UPROPERTY(EditAnywhere) without BlueprintReadWrite. The reconstructed row constructor sets 0.0 (0.00f), but every exported row writes a value. OnTargetChanged starts a 0.25 s view blend, sets LockOnTargetIndex to the target's character index, and copies the first matching row's TargetHeightOffset into the cached LockOnGazeHeight (+0x398, member default 135.0); NAME_None or a miss writes the 135.0 .data fallback. Its invalid-target branch also writes 135.0, but the only two callers (camera modes 1 and 2) invoke it only for a valid target. CopyCameraStateFrom copies the cached height on character swap. The value is added without scaling to GAISlot014_LocationLike().Z, which is actor Z minus scaled capsule half-height: mode 1 seeds the gaze before SolveTargetCamera (gaze direction/2D distance, then the solver rewrites LockOnGazeLocation to the pivot), mode 2 sets the target-relative gaze every frame while a target is valid, and entering mode 3 adds it to a valid target's base Z and derives LockOnHeightDifference; subsequent mode-3 updates use Mode3GazeLocation instead. No other C++ read of LockOnHeightDifference was found. Export values are 135.0 in 44 rows and 200.0 in CN_040 and CN_240.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:848",

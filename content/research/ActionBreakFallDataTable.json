@@ -1,8 +1,9 @@
 {
+  "overview": "This table controls when characters can recover into a break-fall after being knocked down or blown away, and how long protection lasts afterward.",
   "description": "Shared break-fall tuning: negative-disabled timing gates that let four damage actions accept a BreakFall request, plus a timed post-BreakFall collision/invincibility lock. The retail export has one row (CP_010) and all 57 exported ActionDataTable rows reference it, so these values are a shared profile rather than per-character tuning.",
   "fields": {
     "Id": {
-      "simple": "FName row key for a break-fall tuning profile; exported as ID. It is a lookup key, not a gameplay value read from the row.",
+      "simple": "The name the game uses to connect a character's actions to this break-fall timing. All available characters share it.",
       "technical": "FName at retail offset 0x8; UPROPERTY(BlueprintReadWrite, EditAnywhere), with no explicit constructor store (FName default None). The export's Properties.ImportKeyField is Id, while the row object writes ID = CP_010 alongside the CP_010 map key. AGameDataTableManager loads the single asset named ActionBreakFallDataTable into ActionBreakFallDataTables. AGameCharacter::ResolveDataRows looks up ActionDataTable.Id_ActionBreakFall with GameCharacter_FindRowInto, which returns the first matching UDataTable and fails character setup on a miss; there is no break-fall-specific setup override (ActionIdOverride can only change which Action row supplies the key). The resolved pointer is cached in ActionBreakFallRow/GetActionBreakFallRow. No reconstructed consumer reads the embedded Id field. All 57 exported ActionDataTable rows set Id_ActionBreakFall to CP_010.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ActionBreakFall.h:11",
@@ -19,7 +20,7 @@
       "status": "verified"
     },
     "Down_CancelInput_Time": {
-      "simple": "Earliest elapsed time in a Down action at which BreakFall input can be accepted.",
+      "simple": "How long a knocked-down character must wait before using a break-fall. A longer setting delays recovery, and turning it off prevents it.",
       "technical": "float seconds at row offset 0x10; constructor default 0.0f, exported CP_010 value -1.0 (disabled). FGameCharacterAction_Down::CanBreakFall passes it to BlowCancelInputElapsed together with the action's Elapsed. The shared helper accepts only when CancelTime >= 0.0f and Elapsed >= CancelTime; any negative threshold returns false for the whole action instance. Elapsed begins at 0 after Reset and accumulates DeltaTime in FGameActionState::Tick. Unlike the Blow variants, Down::CanBreakFall has no defeated or wall-bound guard. When it returns false, UpdateBlowRequests removes EGameCharacterActionType::BreakFall from the request map.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ActionBreakFall.h:15",
@@ -35,7 +36,7 @@
       "status": "verified"
     },
     "Blow_CancelInput_Time": {
-      "simple": "Earliest elapsed time in a Blow action at which BreakFall input can be accepted.",
+      "simple": "How long before a blown-away character can break-fall. Longer waits delay recovery, and defeat or being pinned against a wall blocks it.",
       "technical": "float seconds at row offset 0x14; constructor default 0.0f, exported CP_010 value 1.1. FGameCharacterAction_Blow::CanBreakFall first rejects when the owner IsDefeated() or the action IsWallBound(); otherwise it applies the same >= 0 threshold and Elapsed >= CancelTime rule as Down_CancelInput_Time. Negative values disable this route, while 0 opens it immediately from Elapsed = 0. A false result removes the BreakFall request in UpdateBlowRequests.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ActionBreakFall.h:18",
@@ -49,7 +50,7 @@
       "status": "verified"
     },
     "BlowSmall_CancelInput_Time": {
-      "simple": "Earliest elapsed time in a BlowSmall action at which BreakFall input can be accepted.",
+      "simple": "Wait before a small blow can become a break-fall. Longer waits delay recovery, and defeat or being pinned against a wall blocks it.",
       "technical": "float seconds at row offset 0x18; constructor default 0.0f, exported CP_010 value 0.8. FGameCharacterAction_BlowSmall::CanBreakFall has the same owner-defeated and wall-bound guards as Blow, then uses the shared negative-disabled threshold test against its own action Elapsed. A false result removes the BreakFall request through the inherited UpdateBlowRequests path.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ActionBreakFall.h:21",
@@ -63,7 +64,7 @@
       "status": "verified"
     },
     "BlowLarge_CancelInput_Time": {
-      "simple": "Earliest elapsed time in a BlowLarge action at which BreakFall input can be accepted.",
+      "simple": "Wait before a large blow can become a break-fall. Longer waits delay recovery, and defeat or being pinned against a wall blocks it.",
       "technical": "float seconds at row offset 0x1C; constructor default 0.0f, exported CP_010 value 2.0. FGameCharacterAction_BlowLarge::CanBreakFall has the same owner-defeated and wall-bound guards as Blow, then uses the shared negative-disabled threshold test against its own action Elapsed. A false result removes the BreakFall request through the inherited UpdateBlowRequests path.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ActionBreakFall.h:24",
@@ -77,7 +78,7 @@
       "status": "verified"
     },
     "Invincible_Time": {
-      "simple": "Duration of the invincibility/collision lock 6 applied when a BreakFall action ends.",
+      "simple": "How long the character stays safe from hits after a break-fall. A larger value lasts longer, and zero adds no protection.",
       "technical": "float seconds at row offset 0x20; constructor default 0.0f, exported CP_010 value 0.0. FGameCharacterAction_BreakFall::End applies SetCollisionLock(6, true, Invincible_Time) only when the value is strictly > 0.0f, so zero or negative produces no lock from this path. SetCollisionLock writes or replaces the numeric timer for key 6; TickCollisionLocks subtracts DeltaTime from nonnegative timers and removes the key at <= 0. -1.0f is the general permanent-lock sentinel elsewhere, but this guard prevents it from being passed here. Key 6 is grouped with collision locks 5 and 9 as an INVINCIBLE buff-outline state, and collision locks gate damage in GameBattleDamage. The lock is created at BreakFall End, not at Start, and applies to any BreakFall exit regardless of which action originally allowed the request.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ActionBreakFall.h:27",

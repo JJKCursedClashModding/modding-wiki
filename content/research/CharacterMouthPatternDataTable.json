@@ -1,8 +1,9 @@
 {
+  "overview": "This table controls how a character's or non-player character's mouth moves during certain story voice scenes, including the pose pattern and closing speed.",
   "description": "Per-character lip-sync pattern for the unique-pair voice sequencer: an ordered mouth-pose cycle plus per-shape transition and end-of-voice close timings. The target's model/NPC ID selects the row; CharacterMouthAnim rows for the played voice only bound the talking interval.",
   "fields": {
     "Id": {
-      "simple": "Character/model (or sequencer NPC) row key for the mouth pattern.",
+      "simple": "The character or non-player character this mouth pattern belongs to. Change this name to use the pattern for another speaker.",
       "technical": "FName row key (C++/loader name Id; exported/reflected column ID, ImportKeyField Id), default NAME_None. UniquePair_FindMouthPatternRow scans DTM.CharacterMouthPatternDataTables (+0x590) in array order and returns the first UDataTable row whose name equals the derived ID; the traced finder never reads Row->Id. No matching row makes the load path return without setting mouth state. The reconstructed path derives the key from BattleState07_CharacterModelName(AGameCharacter, true), then AAbramsSequencerNPCActor::GetSequencerNPCId(true), then GameActor_ModelName(AGameNPC, true, true). All three drop the \"_00\" variant tail, and the finder is called with bCheckNone=false (no explicit NAME_None guard). Exported keys are CP_*/CN_210 model IDs and all 29 also occur in CharacterDataTable; they are not voice IDs. The finder's retail bytes are DIFF, so the exact cast chain is reconstructed rather than byte-proven.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthPattern.h:12",
@@ -22,7 +23,7 @@
       "status": "verified"
     },
     "AnimationTime": {
-      "simple": "Seconds for each mouth-pose transition while speaking.",
+      "simple": "How long each mouth pose is held while the character speaks. A larger number makes the mouth move more slowly.",
       "technical": "float, constructor default 0.0f. Exported values are 0.09 s in 28 rows and 0.18 s in CP_200. The load path copies it to MouthAnimationTime; on each talking step with no active ease, UpdateLipSync advances MouthTypeIndex and starts a 1->1 EEasingFunc::Linear ease with this duration, then calls MouthModule.SetFacialType(uint8(Type), AnimationTime * 0.5, AnimationTime * 0.25, MouthEase.GetCurrent()). The two scaled floats are the montage BlendIn/BlendOut arguments, not another duration parameter. The mouth module resolves the uint8 pose to a mouth montage on the MouthSlot. A nonpositive value would make the ease finish immediately (GetAlpha returns 1 when Duration <= 0), though no exported row uses 0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthPattern.h:16",
@@ -39,7 +40,7 @@
       "status": "verified"
     },
     "EndAnimationTime": {
-      "simple": "Seconds used to stop and settle the mouth after the voice's talking window.",
+      "simple": "How long the mouth takes to settle after the voice finishes. A larger number makes the closing motion slower.",
       "technical": "float, constructor default 0.0f. All 29 exported rows use 0.1 s. The load path copies it to MouthEndAnimationTime. When bTalking is false and a mouth montage is still playing, StopPlayingMontage(MouthEndAnimationTime) uses it as BlendOutTime and a 1->0 Linear ease with the same duration fades the mouth-slot weight through UpdateFacialType. bTalking is false when SoundModule has no AtomComponent, or when playback time is >= the last matched CharacterMouthAnim row's ApplyTiming (strict comparison: PlaybackTime < ApplyTiming means still talking). With an AtomComponent but no matched anim rows, bTalking stays true, so this field is not reached; the close branch also requires GetPlayingMontage() != nullptr. A nonpositive value would complete the fade immediately; no exported row uses 0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthPattern.h:19",
@@ -58,7 +59,7 @@
       "status": "verified"
     },
     "MouthTypeArray": {
-      "simple": "Ordered pool of mouth poses cycled while the character speaks.",
+      "simple": "The mouth poses the game repeats in order while the character speaks, skipping empty spots. Rearranging them changes the pattern of open and closed mouths.",
       "technical": "TArray<EGameCharacterFacialPartsMouth>; the uint8 enum is None=0, Close_01=1, Open_01=2, Open_02=3, Invalid=255, and the array defaults empty. All 29 exported rows have exactly 12 entries with three trailing None sentinels, leaving nine cycled poses: 26 rows share Open_02/Open_01/Close_01/Open_02/Open_01/Open_01/Open_02/Open_01/Close_01, CP_150 is all Close_01, CP_220 is all Open_01, and CP_200 alternates Open_01/Close_01. The load path appends the entire array to the evaluator's persistent MouthTypes cache and removes None entries; Invalid is not exported and the mouth module ignores 255. On each completed talking ease, MouthTypeIndex is advanced modulo the filtered count and uint8(MouthType) is passed to SetFacialType. An empty filtered array leaves the index at -1 and applies no facial type.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthPattern.h:22",

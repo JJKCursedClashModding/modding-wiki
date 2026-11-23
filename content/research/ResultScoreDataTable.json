@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets what players must do to earn result bonuses and how many points each bonus gives in each game mode.",
   "description": "Defines result-score bonus conditions, their per-mode thresholds, caps and awarded points.",
   "fields": {
     "Id": {
-      "simple": "Result-score row id.",
+      "simple": "The name that lets the game tell this result bonus apart from the others.",
       "technical": "FName import key/row name for FGameDataTableRow_ResultScore; the export declares ImportKeyField = Id and emits row names under the key ID. AGameBattleManager enumerates ResultScore rows from ResultScoreDataTables (DTM+0x360) through FGameDataTableArray::GetRows, which calls GetRowNames and FindRow. No reconstructed consumer reads Row->Id as data, so it identifies and orders rows rather than supplying a bonus value.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:12",
@@ -16,7 +17,7 @@
       "status": "observed"
     },
     "ResultScore": {
-      "simple": "Which result bonus this row defines.",
+      "simple": "Which result bonus this describes, such as winning, helping a teammate, or attacking from far away.",
       "technical": "EGameResultScore, default None (Invalid=255 is the enum sentinel and is absent from the export). EvaluateResultBonuses copies the enum into FStudioBattleBonusEntry.Type and switches on it: Win needs the winner team with stock below its maximum; OverwhelmingWin adds an infinite-or-positive remaining-time guard and requires full stock; GoodFight is for a character whose team is not the winner and whose rival has finite stock with rival stock <= rival maximum * Threshold. Most remaining cases test total battle-log values, while MaximumOutput uses a fixed >3 check, and first attack/kill, Finisher's FocusActor match, Runner, KillStreak, round-log Involvement and NoOperation have their own branches. Unhandled enum values add no entry. In a final pass, Runner entries are removed for every character except the farthest positive-distance mover.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameResultScore.h:7",
@@ -33,7 +34,7 @@
       "status": "verified"
     },
     "Threshold": {
-      "simple": "Default threshold for the bonus condition.",
+      "simple": "What the player must achieve before this bonus counts in other game modes.",
       "technical": "float, default 0.0f. Used when BattleMode is not 2, 5, 6 or 9. GoodFight compares the rival's total stock against rival maximum * Threshold (and skips unlimited stock); FastFinish requires a found total TimeLimit value <= Threshold; KillStreak requires adjacent total log-entry values differing by <= Threshold; LongShot, ReturnToHell and NoOperation require a found total log value >= Threshold; Involvement uses the round-log AttackTarget.ValueA4 smallest-banked-target-time value, whose missing-block sentinel is FLT_MAX, and requires <= Threshold. Exported rows use case-specific values (0.5, 60 seconds, 3000, 10, 0.2, 3 and 30). All five Threshold columns are identical on every shipped row, so the mode switch currently changes which column is read rather than the numeric threshold.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:19",
@@ -51,7 +52,7 @@
       "status": "verified"
     },
     "Threshold_Story": {
-      "simple": "Threshold override for Story battle mode.",
+      "simple": "What the player must achieve before this bonus counts in Story mode.",
       "technical": "float, default 0.0f. Selected when BattleMode == 2 (Story) while building each bonus entry; the shared condition switch then consumes it as Threshold. It equals the default Threshold on all 34 exported rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:22",
@@ -61,7 +62,7 @@
       "status": "verified"
     },
     "Threshold_PvE_Normal": {
-      "simple": "Threshold override for PvE missions whose MissionKind is not 2.",
+      "simple": "What the player must achieve in PvE missions that are not survival missions before this bonus counts.",
       "technical": "float, default 0.0f. Selected for BattleMode 5 or 6 when Game->PvESettings.MissionKind != 2; the code tests only inequality with 2, so the field name is conventional. It equals the default Threshold on all 34 exported rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:25",
@@ -72,7 +73,7 @@
       "status": "verified"
     },
     "Threshold_PvE_Survival": {
-      "simple": "Threshold override for PvE survival missions.",
+      "simple": "What the player must achieve before this bonus counts in PvE survival missions.",
       "technical": "float, default 0.0f. Selected for BattleMode 5 or 6 when Game->PvESettings.MissionKind == 2; otherwise Threshold_PvE_Normal is used. It equals the default Threshold on all 34 exported rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:28",
@@ -83,7 +84,7 @@
       "status": "verified"
     },
     "Threshold_Arcade": {
-      "simple": "Threshold override for Arcade battle mode.",
+      "simple": "What the player must achieve before this bonus counts in Arcade mode.",
       "technical": "float, default 0.0f. Selected when BattleMode == 9 (Arcade) while building each bonus entry; the shared condition switch then consumes it as Threshold. It equals the default Threshold on all 34 exported rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:31",
@@ -93,7 +94,7 @@
       "status": "verified"
     },
     "UpperLimit": {
-      "simple": "Maximum counted quantity for scaled bonuses.",
+      "simple": "For bonuses that build up with repeated actions, the most actions that can count. A bigger number lets more count.",
       "technical": "int32, default 0. In the Scaled branches (Defeat, Assist, LevelUp, LinkCombo, SpecialTagCombo, Debuff and JustGuard) a found total log value must be >0; it is truncated to int32, clamped with FMath::Min(Count, UpperLimit) when UpperLimit > 0, then multiplied by Score. A zero or negative limit leaves the count uncapped. Damage instead replaces Entry.Value with the truncated total Attack_Damage value and ignores both UpperLimit and Score; flat/boolean branches ignore UpperLimit. Exported caps are 4 (LevelUp), 10 (LinkCombo), 2 (SpecialTagCombo) and 5 each (Debuff, JustGuard); all other rows use 0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:34",
@@ -108,7 +109,7 @@
       "status": "verified"
     },
     "Score": {
-      "simple": "Points (positive or negative) contributed by this result bonus.",
+      "simple": "The points this bonus adds to the player's result. A bigger number raises the score, and a negative number lowers it.",
       "technical": "int32, default 0. Initialises Entry.Value: Scaled branches replace it with the capped count * Score, Damage replaces it with the truncated total log value, and every other branch that adds an entry keeps the initial value. The player's entry values are summed into ResultSnapshot.Value43C and, after the mission score-rate multiplier, select a rank from mode-specific RESULT_SCORE_* rows in GlobalThresholdDataTable; GetBonusScoreRank separately sums the same values times Rate. Ranking-record bonus checks test entry Type rather than Value. Exported Scores range from -100 (NoOperation) to 350 (OverwhelmingWin).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ResultScore.h:37",

@@ -1,8 +1,9 @@
 {
+  "overview": "This table lists the marks the game can place on floors or objects and which ones it readies at startup.",
   "description": "Decal row catalog: the exported DCL_* row ID is the lookup key, FileName selects a Decal primary-asset Blueprint class to spawn, and bResident opts that asset into the global boot Decal preload.",
   "fields": {
     "ID": {
-      "simple": "Decal row ID / DataTable row key (for example, DCL_00100).",
+      "simple": "The name that lets attacks, effects, and cutscenes ask for this particular mark in the world.",
       "technical": "FName Id. The export writes ID and uses Id as ImportKeyField; all 51 rows have ID equal to their row key and Filename equal to ID + '_BP'. Runtime does not read Row->Id for these lookups: Status_FindDecalRow (0x141048AF0), the manager wrappers/FindDecalRowInline, and local inlined finders scan DecalDataTables (+0x800) and return the first row whose row key matches the requested FName. NAME_None is rejected by the shared helper when bCheckNone is true and always by the inline/local finders. DecalDataTables currently resolves the single DecalDataTable asset, but first match wins if more tables are added. Requesters include UGameAnimNotify_Decal.Id_Decal, FGameDataTableRow_Effect.Id_Decal (31 references; None entries are skipped and array index 2 gets mirrored relative scale), FGameDataTableRow_Damage.Id_GroundBoundDecal (7 references), UGameDestructibleReactioner.SpawnDecalId, UAbramsSequencerSpawnDecalSection.DecalId/sequence DecalReferenceParameters, and many action/trap controllers with hardcoded DCL_* IDs.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Decal.h:10",
@@ -19,7 +20,7 @@
       "status": "verified"
     },
     "Filename": {
-      "simple": "Decal Blueprint asset name (DCL_*_BP) used as the Decal primary-asset ID.",
+      "simple": "The mark the game shows on a floor or object when this entry is used.",
       "technical": "FName FileName; the export spells the column Filename. All 51 rows are non-None, unique, and exactly <ID>_BP. AGameRenderManager::SpawnDecal(row) null-checks the row and forwards FileName with DecalType 0 (its trailing bool is ignored); the direct overload builds FPrimaryAssetId(GamePrimaryAssetType_Decal, FileName) and only uses an already-loaded UClass that is an AActor child and casts to AGameDecalActor, otherwise it returns null. Spawning is deferred at identity, then the actor is attached to the render manager, tracked under the 'Decal' or 'DestructibleDecal' managed-actor key, given a per-type sort order (existing value post-incremented; absent type starts at 200), set up, given a dynamic material instance, and FinishSpawning at the requested transform. Boot resident rows become Decal loaders, sequence decal references collect FileName for preload, and UGameDestructibleReactioner::SpawnBreakDecal passes FileName directly with type 1.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Decal.h:14",
@@ -38,7 +39,7 @@
       "status": "verified"
     },
     "bResident": {
-      "simple": "Whether the row's decal asset joins the global boot preload.",
+      "simple": "Whether this mark is ready from the start. If not, it can still appear in a fight or cutscene after the game readies it.",
       "technical": "bool bResident; constructor default false, and 3 of the 51 exported rows set it true (DCL_01100, DCL_01200, DCL_80311). After the table load, boot collects every decal row (0x13c8420; FGameDataTableArray::GetRows walks table order then row-name order) and AGameRenderManager::BootInitialize copies only true rows' FileName values into Decal-type FGamePrimaryAssetLoaders. Loader creation skips None names and deduplicates by name; the render manager's Tick waits for those loaders before BootState_44C becomes 2, which boot case 3 requires. bResident=false only excludes a row from this global boot loader set: SpawnDecal does not load on demand (it reads GetPrimaryAssetObject and fails if the asset is not loaded), while separate battle/sequence Decal loader caches are fed by CharacterDecalDataTable, MapDecalDataTable, and sequencer decal references.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Decal.h:18",

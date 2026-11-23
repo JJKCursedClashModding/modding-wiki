@@ -1,8 +1,9 @@
 {
+  "overview": "These settings shape how effects and some shikigami attacks launch, steer, fall, slide along the ground, and leave a second effect behind.",
   "description": "Effect/shikigami movement profiles used by AGameEffect::Initialize and fetched directly by CN_* action controllers: launch aiming, speed easing, homing, optional tilt, ground following and an optional child ground effect.",
   "fields": {
     "ID": {
-      "simple": "Effect-move profile ID, e.g. CP_010_ATTACKG_01_01.",
+      "simple": "The name the game uses to connect an effect or shikigami attack to this movement setup.",
       "technical": "FName row key (export column 'ID', native UPROPERTY Id, import key Id; FName lookups are case-insensitive). AGameEffect::Initialize checks EffectRow.Id_EffectMove, resolves it against manager slot +0x690 with an inlined first-match UDataTable::FindRow (bWarnIfMissing=false; retail Initialize 0x131f290) and passes the result to UGameEffectMovementController::Start (retail 0x135cba0). None or a name with no row leaves movement unstarted. One exported shard with 147 distinct rows. 149 Effect rows name an EffectMove row (114 distinct IDs) and all resolve; other rows are fetched by name from CN_* controllers (28 have a literal C++ call site in the current reconstruction; five have no identified C++ use).",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:55",
@@ -15,7 +16,7 @@
       "status": "verified"
     },
     "EffectMoveType": {
-      "simple": "How the initial direction is chosen (Straight/Target/Location).",
+      "simple": "Chooses whether the effect starts ahead of itself, toward the target, or toward a chosen spot.",
       "technical": "EGameEffectMoveType : uint8 (0 None, 1 Straight, 2 Target, 3 Location, 255 Invalid). Straight aims along the effect actor's own GetFacingForwardVector(); Target aims at Source->GetTargetLocation(Source->GetSecondaryTargetActor()), using a yaw/pitch basis from the source's auto-aim and root axes when either Limit_AngleXY or Limit_AngleZ is positive; Location uses Source->GetEffectMoveTargetLocation(). None/unhandled leaves the controller's current MoveDirection unchanged before the final normalization. Exports: 141 Straight, 6 Target, no None or Location rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameEffectMoveType.h:6",
@@ -28,7 +29,7 @@
       "status": "verified"
     },
     "MoveDirection": {
-      "simple": "Direction offset/axis applied to the chosen launch orientation.",
+      "simple": "Changes the travel direction compared with the chosen aim, including whether the effect rises or drops.",
       "technical": "FVector (UE5 double components). AimAlong faces the effect with FRotationMatrix::MakeFromX(launch direction), then sets MoveDirection = that rotation rotated into the row vector (Rotation.RotateVector(Row->MoveDirection)); Start normalizes once after the type switch. Exports: 143 rows (1,0,0), two rows with Z=0.05/0.1, and two rows (0,0,-1). A zero row vector would leave movement at zero.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:113",
@@ -38,7 +39,7 @@
       "status": "verified"
     },
     "bHomingEnabled": {
-      "simple": "Whether the effect steers toward the source's secondary target.",
+      "simple": "Turns on steering toward the target after launch, letting the effect follow the target as it moves.",
       "technical": "bool. Start stores Source->GetSecondaryTargetActor() as HomingTarget. Each Update refreshes HomingTargetLocation from the source's GetTargetLocation(HomingTarget) only while not bHomingLocked (the lock is set when the target reports a status/action slot 66 within its range), then runs UpdateHomingXY/Z while Homing_Time permits. true selects the homing Update branch (tilt applies, Fall_AngularVelocityZ and along-ground sliding do not); the child ground effect check is outside both branches. Exports: 112 true, 35 false.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:209",
@@ -49,7 +50,7 @@
       "status": "verified"
     },
     "Speed_Start": {
-      "simple": "Initial movement speed.",
+      "simple": "The speed the effect or shikigami attack starts with. A bigger number makes the opening movement faster.",
       "technical": "float, UE units/s. StartValue of FGameFloatEaseInterpolator::Start(From, To, Duration, EaseType, Exponent, InSteps=2): FloatInterp38.Start(Speed_Start, Speed_End, Speed_InterpolateTime, ShikigamiMovement_ToEasingFunc(Speed_EasingType), Speed_Blend_Exp, 2). Direct shikigami action consumers copy the same five row values into their own ease (CN_050, CN_180, CN_220, CN_231, CN_270, CN_280). Export sample: 6000.0.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:216",
@@ -60,7 +61,7 @@
       "status": "verified"
     },
     "Speed_End": {
-      "simple": "Final movement speed after interpolation.",
+      "simple": "The speed the effect or shikigami attack reaches as the move continues. Bigger numbers make the later movement faster.",
       "technical": "float, UE units/s. TargetValue of the same interpolator; direct shikigami action consumers read it with the other Speed_* fields. Export sample: 4500.0.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:216",
@@ -71,7 +72,7 @@
       "status": "verified"
     },
     "Speed_InterpolateTime": {
-      "simple": "Time over which speed changes from start to end.",
+      "simple": "How long the move takes to change from its starting speed to its ending speed. Longer times make the change more gradual.",
       "technical": "float seconds, the interpolator Duration. Update clamps Elapsed at Duration, so once elapsed the current speed remains Speed_End; two exported rows use 0.0 and are immediately at the target. Export sample: 0.5.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:216",
@@ -81,7 +82,7 @@
       "status": "verified"
     },
     "Speed_EasingType": {
-      "simple": "Easing curve for the speed change.",
+      "simple": "Shapes how the speed changes over time, whether it eases in or out. Even the plain setting eases out.",
       "technical": "EGameEasingType : uint8 (0 None, 1 EaseIn, 2 EaseOut, 3 EaseInOut, 255 Invalid). ShikigamiMovement_ToEasingFunc (retail 0x1412fa480) maps EaseIn/EaseOut/EaseInOut directly and maps None and all other values to EEasingFunc::EaseOut, not Linear. Exports: 114 None (therefore EaseOut at runtime), 32 EaseOut, 1 EaseIn, no EaseInOut.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameEasingType.h:6",
@@ -91,7 +92,7 @@
       "status": "verified"
     },
     "Speed_Blend_Exp": {
-      "simple": "Exponent/shape parameter of the speed easing.",
+      "simple": "Changes how strongly the speed curve bends. Bigger values make the speed change feel more pronounced.",
       "technical": "float passed as the interpolator's InExponent, used by the EaseIn/EaseOut/EaseInOut branches (including the EaseOut produced from None). The final literal 2 is InSteps and is only used by EEasingFunc::Step. Export values are 1.0, 2.0 and 4.0.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:217",
@@ -102,7 +103,7 @@
       "status": "verified"
     },
     "Delay_Time": {
-      "simple": "Wait before movement begins.",
+      "simple": "How long the effect waits before it starts moving. Longer waits hold it in place for more time.",
       "technical": "float seconds. Start stores UE_KINDA_SMALL_NUMBER when Delay_Time<=0, otherwise the row value; Update decrements DelayTime and returns while it is >0, so non-positive values consume only one negligible delay step. Exports: 141 rows 0.0, five 0.05, one 0.07.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:218",
@@ -112,7 +113,7 @@
       "status": "verified"
     },
     "Fall_AngularVelocityZ": {
-      "simple": "Downward arc turn rate used by the non-homing update and one CN_231 attack.",
+      "simple": "Sets how fast the path bends downward during a falling phase in one shikigami's attacks. Bigger values make the arc turn faster.",
       "technical": "float degrees/second. In UGameEffectMovementController it is read only in the non-homing branch: when >0 MoveDirection is rotated about the effect's current local-right axis by DeltaSeconds * value and the actor quaternion is rebuilt via MakeFromXY. All 10 exported rows with 60.0 also have bHomingEnabled=true, so the effect controller never applies the field to those shipped rows; CN_231_ActionController independently applies the same rotation during its attack phase using this row. The other 137 rows are 0.0.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:290",
@@ -121,7 +122,7 @@
       "status": "verified"
     },
     "Limit_AngleXY": {
-      "simple": "Maximum horizontal aim/homing angle.",
+      "simple": "Limits how far the move can aim or steer sideways from its intended direction. Bigger numbers allow wider side angles.",
       "technical": "float degrees. For EffectMoveType::Target with either limit positive, the initial direction is clamped around the source's auto-aim yaw by this angle. During homing, UpdateHomingXY returns when the XY angle to the target is >= Limit_AngleXY (when >0). Values <=0 disable that clamp; exports include 13 zeros and six -1 sentinels. Export sample: 40.0.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:141",
@@ -131,7 +132,7 @@
       "status": "verified"
     },
     "Limit_AngleZ": {
-      "simple": "Maximum vertical aim/homing angle.",
+      "simple": "Limits how far the move can aim or steer above or below its intended direction. Bigger numbers allow wider up-and-down angles.",
       "technical": "float degrees. With either initial limit positive, Start caps the computed vertical misalignment from the source's auto-aim at this value when Limit_AngleZ>0; UpdateHomingZ likewise returns when the elevation angle is >= Limit_AngleZ. <=0 disables the vertical cap; exports include eight zeros and six -1 sentinels. Export sample: 40.0.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:183",
@@ -140,7 +141,7 @@
       "status": "verified"
     },
     "Homing_AngularVelocityXY": {
-      "simple": "Horizontal homing rotation rate.",
+      "simple": "How fast the effect or shikigami attack turns left or right to follow the target. Bigger values turn more quickly.",
       "technical": "float degrees/second. UpdateHomingXY returns when <=0; otherwise it steps MoveDirection by DeltaSeconds * rate toward the target's XY bearing (sign from the 2D cross product), clamped to the remaining angle and suppressed past Limit_AngleXY. Export sample: 1.0; 13 rows use 0.0 to disable XY steering.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:330",
@@ -150,7 +151,7 @@
       "status": "verified"
     },
     "Homing_AngularVelocityZ": {
-      "simple": "Vertical homing rotation rate.",
+      "simple": "How fast the effect or shikigami attack turns up or down to follow the target. Bigger values turn more quickly.",
       "technical": "float degrees/second. UpdateHomingZ transforms the target into effect-local space, measures elevation and rotates MoveDirection about the horizontal axis 90 degrees from it (the effect-local right in the XY plane) by DeltaSeconds * rate toward the target, clamped to the angle and Limit_AngleZ. Export sample: 1.0; nine rows use 0.0 to disable Z steering.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:376",
@@ -160,7 +161,7 @@
       "status": "verified"
     },
     "Homing_Time": {
-      "simple": "How long homing is applied.",
+      "simple": "How long the move keeps steering toward the target. Longer times keep the chase going, and zero means no limit.",
       "technical": "float seconds. HomingElapsed starts at 0 and increments while !(HomingElapsed > Homing_Time && Homing_Time > 0); once that fails, XY/Z steering stops but movement continues. 62 exported rows use 0.0 (unlimited homing); the maximum is 3.0.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:256",
@@ -169,7 +170,7 @@
       "status": "verified"
     },
     "bTilt": {
-      "simple": "Bank the homing effect into turns.",
+      "simple": "Turns on the lean into turns while an effect follows its target. This setting is off in every listed move.",
       "technical": "bool; only consumed in the homing Update branch. The 2D angle between previous and new direction *10 (capped at 30 degrees, signed by the cross product) becomes a roll offset that approaches/leaves at 60 degrees per second (TiltRoll). All 147 exported rows are false.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:264",
@@ -179,7 +180,7 @@
       "status": "verified"
     },
     "bAlongGroundEnabled": {
-      "simple": "Sliding movement along the ground instead of free flight.",
+      "simple": "Turns on ground sliding for effects that are not steering toward a target.",
       "technical": "bool; only used in the non-homing Update branch. Six exported rows enable it (CP_050_ATTACKH_01_01, four CP_260_ATTACKC/D_02_01_* rows and CN_250_ATTACKG_01_01). MoveAlongGround performs up to 10 capsule sweeps of radius AlongGroundHeight*mean actor scale, projects direction along hit normals (slopes above 65 degrees are ignored), then line-probes downward. Rotation alignment is additionally gated by the controller's non-row bGroundAlignedRotation flag, which CP_260 sets on the spawned effects that use four of these rows.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:298",
@@ -190,7 +191,7 @@
       "status": "verified"
     },
     "bAlongGroundDownEnabled": {
-      "simple": "Use a deeper ground probe and accept any ground normal when following ground.",
+      "simple": "Makes ground-following effects check farther down and accept any ground surface they find.",
       "technical": "bool used only by MoveAlongGround: doubles the downward probe depth when bOnGround is set, and determines the ground-acceptance test (true accepts any filtered ground hit; false requires Dot(ImpactNormal, MoveDirection) < -0.0). Five exported rows enable it.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:460",
@@ -199,7 +200,7 @@
       "status": "verified"
     },
     "bIsStoppedOnAir": {
-      "simple": "Finish the effect if no ground is found while ground-following.",
+      "simple": "Ends a ground-following effect when it cannot find ground beneath it. This only matters when ground sliding is on.",
       "technical": "bool; at the end of MoveAlongGround, when the filtered downward probe reports no ground hits the effect actor is finished. Only reachable with bAlongGroundEnabled=true; four exported rows enable it.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:485"
@@ -207,7 +208,7 @@
       "status": "verified"
     },
     "AlongGroundHeight": {
-      "simple": "Radius/depth of the ground-following sweeps.",
+      "simple": "Sets how far around the effect the game checks for ground while it slides. Bigger values let it follow ground from farther away.",
       "technical": "float multiplied by the mean of the effect actor's XYZ scale ((X+Y+Z)/3) to form both the capsule sweep radius and the downward probe depth (doubled when bAlongGroundDownEnabled && bOnGround). 141 exported rows are 0.0; CP_050_ATTACKH_01_01 uses 25.0, the four CP_260 ground rows use 100.0 and CN_250_ATTACKG_01_01 uses 150.0.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:422",
@@ -216,7 +217,7 @@
       "status": "verified"
     },
     "Id_Effect_AlongGround": {
-      "simple": "Child effect spawned at the ground under the moving effect.",
+      "simple": "Names the extra effect that appears on the ground beneath a moving effect. Only one listed move uses it.",
       "technical": "FName; skipped when None. Only CP_050_ATTACKH_01_01 sets it, to FX_CP_050_09116 (present in EffectDataTable with PoolCount=0). UpdateAlongGroundEffect is called after either movement branch, independently of bAlongGroundEnabled/bHomingEnabled: it line-traces downward by AlongGroundEffect_Height * mean actor scale; on a hit it resolves this ID to an Effect row, spawns/initializes its FileName_BP (pooled only when that row's PoolCount>0), places it at ImpactPoint and orients it to the hit normal plus travel direction. On a miss an existing child is finished and cleared.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:321",
@@ -227,7 +228,7 @@
       "status": "verified"
     },
     "AlongGroundEffect_Height": {
-      "simple": "Downward trace length for the ground child effect.",
+      "simple": "Sets how far below the moving effect the game looks for ground before placing the extra effect. Bigger values search farther down.",
       "technical": "float multiplied by the effect's mean actor scale to determine the End point of the line trace in UpdateAlongGroundEffect. Only read when Id_Effect_AlongGround is not None: 50.0 on CP_050_ATTACKH_01_01, 0.0 on the other 146 rows.",
       "evidence": [
         "Source/Abrams/Private/GameEffectMovementController.cpp:323",

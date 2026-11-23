@@ -1,8 +1,9 @@
 {
+  "overview": "This table controls how characters and shikigami run, turn, slow near targets, guard, land, and lean.",
   "description": "Per-character and per-shikigami ground/air movement tuning: run speed and turning, inertial/lean animation, target and camera-relative slowdowns, guard/landing inertia and landing rigidity.",
   "fields": {
     "Id": {
-      "simple": "Row key naming a movement profile (usually a character code; CP_210_2 is a CP_210 variant).",
+      "simple": "The name the game uses to connect this movement setup to a fighter, shikigami, or special form.",
       "technical": "FName `Id` (exported as ID; DataTable ImportKeyField is Id). AGameCharacter::ResolveDataRows first resolves the Action row (honouring a non-None ActionIdOverride), then finds ActionMoveDataTables by Action.Id_ActionMove and caches the pointer in AGameCharacter.ActionMoveRow; a miss fails character setup. Shikigami resolves Shikigami.Id_ActionMove through the same manager array; CP_210 also hard-codes CP_210_2. The struct has no explicit constructor store for Id (FName default None); all 50 exported rows have ID equal to their row key.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ActionMove.h:12",
@@ -15,7 +16,7 @@
       "status": "verified"
     },
     "Foreground_Angle": {
-      "simple": "Angular cone for movement against the camera view that triggers slowdown.",
+      "simple": "How wide the area is around moving toward the camera where movement slows. A bigger value covers a wider area.",
       "technical": "Degrees; the half-angle is taken around straight-back. Character GetMoveSpeed enters the cone only when bForegroundSlow is true and this value > 0, then tests 180 - Angle/2 <= GameAnimNotify_AngleDegrees2D(view-forward, move-direction). Shikigami GetMoveSpeed applies the same cone test to its own row. C++ default 0.0f (off); all 50 exported rows are 180.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:4",
@@ -26,7 +27,7 @@
       "status": "verified"
     },
     "Foreground_Speed_Rate": {
-      "simple": "Speed multiplier at the centre of the foreground slowdown cone.",
+      "simple": "How slow movement can get in the area where moving toward the camera slows it. Higher values mean less slowdown.",
       "technical": "Speed factor at the exact centre of the slowdown cone: Factor = (180-angle)/(Angle/2) * (1 - Rate) + Rate, clamped to [0,1] and multiplied into speed; at the cone edge the factor is 1. C++ default 0.0f; 49 exports use 1.0 (no slowdown), CP_180 uses 0.7. The character and shikigami GetMoveSpeed helpers both read this field.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:5",
@@ -36,7 +37,7 @@
       "status": "verified"
     },
     "Target_Speed_Distance": {
-      "simple": "Distance within which movement near the target is slowed.",
+      "simple": "For characters, how close they must be to their target before movement slows. A bigger value starts slowdown farther away.",
       "technical": "World units: character GetMoveSpeed measures 2D distance from controller Location3F0 to the target's GAISlot014 location and, when bTargetSlow is true, a valid target is within this distance, computes Distance / this value. There is no zero guard before the division; all 50 exports are 1500. C++ default 0.0f. The shikigami controller does not use this field; its target slowdown is a separate squared-distance curve.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:6",
@@ -46,7 +47,7 @@
       "status": "verified"
     },
     "Target_Speed_Rate": {
-      "simple": "Speed multiplier at zero distance from the target.",
+      "simple": "For characters, the slowest movement speed right next to the target. Higher values mean less slowdown.",
       "technical": "Speed multiplier at zero distance in the character target slowdown: Factor = distance/Target_Speed_Distance * (1 - Rate) + Rate, clamped to [0,1] and multiplied into speed; at the boundary the factor is 1. C++ default 0.0f; all 50 exports use 0.8. Not read by the shikigami controller.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:7",
@@ -55,7 +56,7 @@
       "status": "verified"
     },
     "ParallelAttack_Speed_Rate": {
-      "simple": "Speed multiplier while a parallel attack action is active.",
+      "simple": "For characters, how much movement slows while a simultaneous attack is active. Higher values keep movement closer to normal speed.",
       "technical": "When Owner.IsAttackActionFlag15A() is true, character GetMoveSpeed multiplies speed by this field (no clamp) before the owner's GetMoveSpeedRate multiplier. C++ default 0.0f; 47 exports use 1.0, CP_070 and CP_210_2 use 0.8, CP_140 uses 0.6. Not read by the shikigami controller.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:8",
@@ -64,7 +65,7 @@
       "status": "verified"
     },
     "Run_Rotation_Time": {
-      "simple": "Time window over which the run turn is completed.",
+      "simple": "How long the turning step lasts after the fighter starts running, before normal running takes over. A bigger value extends the turn.",
       "technical": "Seconds. FGameCharacterAction_RunBegin::Start copies it to RotationTimer; Tick decrements that timer and finishes the phase when the stick is released or the timer expires, and UpdateRequests requests GetDefaultMoveActionType() while the timer is positive, otherwise Run. Movement controller TickModeRunBegin separately sets RunTurnDuration61C = this value - MovePhaseElapsed and eases yaw over the remaining time. C++ default 0.0f; CP_010 exports 0.175 (43 of 50 use that value).",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:9",
@@ -76,7 +77,7 @@
       "status": "verified"
     },
     "Run_Speed_Start": {
-      "simple": "Initial run speed when starting a run move phase.",
+      "simple": "The speed a fighter has when a run starts. A bigger value gives a faster launch.",
       "technical": "Units/second. Character SETMOVE_START_RUN uses this value unscaled as the FloatInterp28 start (only the end is scaled by GetRunSpeedRate()); shikigami mode 1 uses both start and end unscaled. C++ default 0.0f; CP_010 exports 750 and exported rows range from 150 to 850.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:10",
@@ -86,7 +87,7 @@
       "status": "verified"
     },
     "Run_Speed_End": {
-      "simple": "Target run speed at the end of the interpolation.",
+      "simple": "The speed a run builds toward after it starts. For characters, another speed setting can change this target.",
       "technical": "Units/second. Character SETMOVE_START_RUN passes GetRunSpeedRate() * this value as the interpolation end; shikigami mode 1 passes the raw field. C++ default 0.0f; CP_010 exports 800 and exported rows range from 450 to 900.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:11",
@@ -96,7 +97,7 @@
       "status": "verified"
     },
     "Run_InterpolateTime": {
-      "simple": "Duration of run speed interpolation.",
+      "simple": "How long the fighter takes to reach the run's ending speed. A bigger value makes the increase more gradual.",
       "technical": "Seconds passed as the duration to FloatInterp28.Start when a run mode begins. C++ default 0.0f; CP_010 exports 0.5 and exported rows range from 0.25 to 1.0.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:12",
@@ -105,7 +106,7 @@
       "status": "verified"
     },
     "Run_EasingType": {
-      "simple": "Easing function for run speed interpolation.",
+      "simple": "Chooses how the run speeds up over that time. The game's data uses a quick rise that eases near the end.",
       "technical": "EGameEasingType (uint8). ShikigamiMovement_ToEasingFunc maps EaseIn/EaseOut/EaseInOut directly and sends every other value, including None and Invalid=255, to EEasingFunc::EaseOut. C++ default EGameEasingType::None; all 50 exports are None, so the shipped rows actually use EaseOut rather than a no-easing mode.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:13",
@@ -116,7 +117,7 @@
       "status": "verified"
     },
     "Run_Blend_Exp": {
-      "simple": "Exponent/shape parameter for run speed interpolation.",
+      "simple": "Fine-tunes the shape of the speed-up curve. Its visible effect depends on the chosen curve.",
       "technical": "Float passed as the BlendExp argument to FloatInterp28.Start alongside Run_EasingType. C++ default 0.0f; CP_010 exports 2.0 (49 rows), CP_180 exports 1.0.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:14",
@@ -125,7 +126,7 @@
       "status": "verified"
     },
     "Run_Rotation_Rate": {
-      "simple": "Per-step rotation blend rate when turning toward input.",
+      "simple": "How quickly the fighter turns toward the direction you push while running. A value of zero snaps there instantly. Bigger values turn faster.",
       "technical": "Used in the run and target-run ticks when bSteerTowardMoveInput is set: 0 assigns the desired rotation directly, otherwise the controller calls GameVirtualCamera_LerpRotator with Rate * 60.000004 * Step. C++ default 0.0f (snap); CP_010 exports 0.2 (45 of 50 use that value) and exported rows range from 0.05 to 0.2.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:15",
@@ -136,7 +137,7 @@
       "status": "verified"
     },
     "Run_Inertia_Rate": {
-      "simple": "Inertia rate inherited when the previous action was Run.",
+      "simple": "How much running momentum carries over when the fighter starts another action. A bigger value keeps more momentum.",
       "technical": "Applied when a new action inherits inertia from a previous Run action: character ApplyPrevInertia calls SetInertia and BlendInertiaFromAction calls BlendInertia; shikigami ApplyPrevInertia calls SetInertia. The (Rate, Time) SetInertia overload uses this rate for both XY and Z and resets inertia when rate <= 0 or time <= 0. C++ default 0.0f; CP_010 exports 0.5 and exported rows range from 0.2 to 1.0.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:16",
@@ -148,7 +149,7 @@
       "status": "verified"
     },
     "Run_Inertia_Time": {
-      "simple": "Duration over which run inertia is applied.",
+      "simple": "How long that carried-over running momentum keeps fading. A bigger value lets it last longer.",
       "technical": "Seconds passed as the duration to SetInertia/BlendInertia in the Run previous-action arms. C++ default 0.0f; CP_010 exports 0.5 (49 rows) and CP_180 exports 1.0.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:17",
@@ -158,7 +159,7 @@
       "status": "verified"
     },
     "Run_Lean_Rate": {
-      "simple": "Rate used to blend character lean while running.",
+      "simple": "How quickly the running lean appears or changes. Bigger values blend faster. In one shikigami's climbing turn, zero applies the lean instantly.",
       "technical": "Passed to the shared UpdateLeanRate: 0 snaps to the target lean, otherwise it interpolates with Rate * 60.000004 * Step. CP_240 instead reads the shikigami's MoveRow, assigns the target directly when this rate is 0, and uses Rate * 60.000004 as a per-frame lerp factor otherwise. C++ default 0.0f; CP_010 exports 0.3 and exported rows range from 0.2 to 0.4.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:18",
@@ -170,7 +171,7 @@
       "status": "verified"
     },
     "Run_Lean_Max": {
-      "simple": "Clamp for character lean while running.",
+      "simple": "The most the fighter can lean while running. A bigger value allows a stronger lean.",
       "technical": "Maximum magnitude passed to UpdateLeanRate, which clamps the signed angle/45 target to [0, Max]; CP_240 also clamps shikigami LeanLR/LeanUD against the shikigami row's value. C++ default 0.0f; CP_010 exports 0.5 and exported rows range from 0.1 to 1.0.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:19",
@@ -181,7 +182,7 @@
       "status": "verified"
     },
     "Guard_Inertia_Rate": {
-      "simple": "Ground-guard inertia multiplier.",
+      "simple": "How much existing sideways momentum carries over when a grounded guard begins. Bigger values keep more of it.",
       "technical": "XY rate passed to ScaleInertia when ground guard starts; ScaleInertia only restarts an already-active XY inertia interpolator. C++ default 0.0f; CP_010 exports 0.5 (48 rows), CP_050 and CP_180 export 0.1.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:20",
@@ -191,7 +192,7 @@
       "status": "verified"
     },
     "Guard_Inertia_RateZ": {
-      "simple": "Vertical (Z) ground-guard inertia multiplier.",
+      "simple": "How much existing upward or downward momentum carries over when a grounded guard begins. Bigger values keep more of it.",
       "technical": "Z rate passed as the second ScaleInertia argument when ground guard starts; inactive Z inertia is unaffected. C++ default 0.0f; CP_010 exports 0.5 (48 rows), CP_050 and CP_180 export 0.1.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:21",
@@ -201,7 +202,7 @@
       "status": "verified"
     },
     "GuardAir_Inertia_Rate": {
-      "simple": "Air-guard inertia multiplier.",
+      "simple": "How much existing sideways momentum carries over when an air guard begins. Bigger values keep more of it.",
       "technical": "XY rate passed to ScaleInertia by both the base GuardAir action and CP_180's override. C++ default 0.0f; CP_010 exports 0.3 (48 rows), CP_050 and CP_180 export 0.1.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:22",
@@ -211,7 +212,7 @@
       "status": "verified"
     },
     "GuardAir_Inertia_RateZ": {
-      "simple": "Vertical (Z) air-guard inertia multiplier.",
+      "simple": "How much existing upward or downward momentum carries over when an air guard begins. Bigger values keep more of it.",
       "technical": "Z rate passed as the second ScaleInertia argument in air guard (also used by CP_180). C++ default 0.0f; CP_010 exports 0.5 (48 rows), CP_050 and CP_180 export 0.1.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:23",
@@ -221,7 +222,7 @@
       "status": "verified"
     },
     "GuardAir_Speed_Start": {
-      "simple": "Initial speed of the air-guard speed interpolation.",
+      "simple": "The speed at which air-guard movement begins. A bigger value starts that movement faster.",
       "technical": "Units/second used as the FloatInterp28 start in SetMoveMode case 13 (air-guard movement); no owner rate multiplier is applied at this site. C++ default 0.0f; CP_010 exports 10.0 (48 rows), CP_050 exports 300.0 and CP_060 exports 50.0.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:24",
@@ -230,7 +231,7 @@
       "status": "verified"
     },
     "GuardAir_Speed_End": {
-      "simple": "Final speed of the air-guard speed interpolation.",
+      "simple": "The speed air-guard movement builds toward or drops toward. A bigger value leaves the fighter moving faster at the end.",
       "technical": "Units/second passed as the FloatInterp28 end in air-guard movement setup. C++ default 0.0f; CP_010 exports 2000.0 (49 rows), CP_050 exports 0.0, which makes the interpolation descend from its 300.0 start.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:25",
@@ -239,7 +240,7 @@
       "status": "verified"
     },
     "GuardAir_InterpolateTime": {
-      "simple": "Duration of the air-guard speed interpolation.",
+      "simple": "How long air-guard movement takes to reach its ending speed. A bigger value makes the change more gradual.",
       "technical": "Seconds passed as the FloatInterp28 duration in air-guard movement setup. C++ default 0.0f; all 50 exported rows use 0.5.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:26",
@@ -248,7 +249,7 @@
       "status": "verified"
     },
     "GuardAir_EasingType": {
-      "simple": "Easing for air-guard speed interpolation.",
+      "simple": "Chooses how air-guard speed changes over that time. The game's data uses a curve that changes quickly at first and eases near the end.",
       "technical": "EGameEasingType (uint8) converted by ShikigamiMovement_ToEasingFunc; None and Invalid=255 both fall through to EEasingFunc::EaseOut. C++ default EGameEasingType::None; all 50 exported rows are None, so the effective easing is EaseOut.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:27",
@@ -259,7 +260,7 @@
       "status": "verified"
     },
     "GuardAir_Blend_Exp": {
-      "simple": "Exponent/shape for air-guard speed interpolation.",
+      "simple": "Fine-tunes the shape of the air-guard speed-change curve. Its visible effect depends on the chosen curve.",
       "technical": "Float passed as the BlendExp argument to FloatInterp28.Start in air-guard movement setup. C++ default 0.0f; CP_010 exports 0.5 (49 rows), CP_050 exports 2.0.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:28",
@@ -268,7 +269,7 @@
       "status": "verified"
     },
     "Landing_Inertia_Rate": {
-      "simple": "Inertia multiplier applied on landing.",
+      "simple": "How much sideways momentum remains after landing, even in the sword fighter's special form. Bigger values keep more.",
       "technical": "XY rate passed to ScaleInertia in FGameCharacterAction_LandingBase::Start. That site reads AGameCharacter::GetActionMoveRow() (the stored ActionMoveRow) directly, not GetCurrentActionMoveRow(), so the CP_210 row override does not affect landing inertia. C++ default 0.0f; CP_010 exports 0.3, CP_040 and CP_210 export 0.1, CP_180 exports 1.0.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:29",
@@ -279,7 +280,7 @@
       "status": "verified"
     },
     "Landing_Inertia_RateZ": {
-      "simple": "Vertical inertia multiplier applied on landing.",
+      "simple": "How much upward or downward momentum remains after landing, even in the sword fighter's special form. Bigger values keep more.",
       "technical": "Z rate passed as the second ScaleInertia argument on landing, from the stored character ActionMoveRow (not the current/override row). C++ default 0.0f; CP_010 exports 0.5 (49 rows), CP_180 exports 1.0.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:30",
@@ -289,7 +290,7 @@
       "status": "verified"
     },
     "Rigidity_Landing": {
-      "simple": "Rigidity class used to scale landing hit/stun duration.",
+      "simple": "Chooses the landing animation's speed by heaviness, with heavier levels slowing it further. All fighters use the normal level.",
       "technical": "EGameActionRigidityType (uint8: None=0, Light=1, Normal=2, Heavy=3, Invalid=255). GetLandingRigidityRate converts the enum to index uint8(Type) - 1 and reads GlobalCorrect.Rigidity_Landing; the exported Default array is [1.1, 1.0, 0.9], so all 50 rows (Normal) resolve to 1.0. None/Invalid or an out-of-range index/short array falls back to 1.0. The returned rate is passed as PlayAnimation's rate in the landing action. C++ default EGameActionRigidityType::None; all 50 exports are Normal.",
       "evidence": [
         "Source/AbramsDataTable/Private/GameDataTableRow_ActionMove.cpp:31",

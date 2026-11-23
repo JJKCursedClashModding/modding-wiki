@@ -65,6 +65,8 @@ def main():
             errors.append(f"{path.name}: {exc}")
             continue
         counts["groups reviewed"] += bool(article.get("description"))
+        overview = article.get("overview")
+        counts["plain-language overviews"] += isinstance(overview, str) and bool(overview.strip())
         fields = {field["name"].casefold(): field for field in groups[path.stem]["fields"]}
         for name, note in article.get("fields", {}).items():
             if name.casefold() not in fields:
@@ -119,6 +121,8 @@ def main():
           f"({rendered['verified']} traced, {rendered['observed']} observed, {rendered['unresolved']} unresolved)")
     if args.strict and (counts["groups reviewed"] < len(catalog) or reviewed < total_fields):
         errors.append("Research coverage is incomplete")
+    if args.strict and counts["plain-language overviews"] < len(catalog):
+        errors.append("Each table needs a plain-language overview")
     for warning in warnings:
         print(f"Note: {warning}")
     for error in errors:

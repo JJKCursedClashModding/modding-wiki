@@ -1,8 +1,9 @@
 {
+  "overview": "This table tells the game which recording to play when a character speaks during battle, story scenes, menus, or cutscenes.",
   "description": "Registry mapping voice IDs to CRI cue sheets and cue names; the central lookup for battle, story, menu, sequencer and customization voice playback.",
   "fields": {
     "Id": {
-      "simple": "Row key / voice ID.",
+      "simple": "The name that connects this voice line to a battle conversation, story scene, character action, or voice preview. Change it only when those other places use the same name.",
       "technical": "FName native field and DataTable import key (the export writes the property as ID). Producers pass the ID from BattleTalk.Id_Voice, CharacterChat.Id_Voice and Stamp.Id_Voice, CharacterVoiceGroup/VoiceGroup arrays, story-demo/short-story/DLC voice rows, StoryVoiceOverride rows, custom-voice samples, unique-pair rows and PlayVoice candidate arrays. Runtime lookup is by UDataTable row key through FindRow, not by reading the Id property: the shared GameScript_FindVoiceRow helper and its inline equivalents walk DTM.VoiceDataTables (+0x740) in table order, return the first typed match, and reject NAME_None only when bCheckNone is true (several callers pass false and filter None first). The supplied export has one 34,165-row table; every row key equals ID and CueName, with no empty keys or duplicates.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Voice.h:12",
@@ -22,7 +23,7 @@
       "status": "verified"
     },
     "CueSheetName": {
-      "simple": "Name of the loaded CRI Atom cue sheet containing the voice.",
+      "simple": "The sound collection that contains this voice line. If that collection is unavailable, the line does not play.",
       "technical": "FString, cast to FName for the sound manager's CueSheetLoaders map. PlayVoiceById copies this field from the Voice row; PlayVoice and PlayVoice3DCue return -1 when no sheet is loaded (PlayVoice also gates on bSystemVoiceEnabled, while 3D adds bVoicePlaybackEnabled), and preview paths check or load the sheet before playback. The story script loader takes CueSheetName from the first matching StoryDemoVoice/DLC voice row; battle-story and level-sequencer collectors add it for StoryVoiceOverride rows, whereas battle-talk cue sheets are preloaded separately from BattleTalkSet.CueSheetName rather than from the Voice row. Customization and shop preview code also collect sample rows' cue sheets into load sets. Voice playback has no empty-sheet fallback (the SE_System fallback in SE paths does not apply). The export has 304 non-empty sheet names; Part has 2,152 rows and OutGame has 1,844.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Voice.h:16",
@@ -46,7 +47,7 @@
       "status": "verified"
     },
     "CueName": {
-      "simple": "CRI cue name for the spoken line.",
+      "simple": "The recorded sound to use from that collection. When the language calls for English voices, the game requests the English version automatically.",
       "technical": "FString holding the CRI cue name. PlaySystemVoice, PlayVoice and PlayVoice3DCue call GetLocalizedVoiceCueName, which appends literal _En only when bAppendEnVoiceSuffix is set; language setup sets that flag true except for Japanese, Korean, Zh_Hant and Zh_Hans. The volume lookup still uses the original unsuffixed FName(CueName) against VoiceVolumeDataTable, with 1.0 when no row exists. The sequencer sound module instead reads the active component's cue name and strips a trailing _En before the same volume lookup, while the SetVoiceVolume track resolves a row by section ID and matches the raw row CueName against active 2D/3D voice players case-insensitively. The export has 17,080 explicit <base>_En rows, each paired with a base row on the same cue sheet, with ID and CueName identical throughout and no empty cue names. Among the traced producer exports, only CharacterMouthAnim rows reference those _En IDs: the unique-pair lip-sync path appends _En to its voice ID for that lookup. Normal playback IDs select base rows and localization derives the English cue at playback, so the two mechanisms must not be treated as the same lookup.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Voice.h:18",

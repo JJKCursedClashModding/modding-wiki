@@ -1,8 +1,9 @@
 {
+  "overview": "This table tells the game which traps to prepare for each character before a battle.",
   "description": "Per-character lists of trap Blueprint asset names collected by the shared retail trap asset collector during battle preparation and battle preload; this table holds asset selection, not per-trap tuning data.",
   "fields": {
     "ID": {
-      "simple": "Row key, matching the character-side Id_CharacterTrap entries.",
+      "simple": "The name of this trap list. The game uses it to match the list to the right character.",
       "technical": "FName FGameDataTableRow_CharacterTrap::Id at row+0x08 behind the 8-byte FTableRowBase; the export writes it as ID while ImportKeyField is Id. All five exported rows have ID equal to their row key (CP_130, CP_140, CP_150, CN_122, CN_250), and each is referenced once by CharacterDataTable::Id_CharacterTrap; the second trap-ID slot is None in each referencing character. BattleAssets_Traps_12BCE80 skips None trap IDs and resolves each remaining ID with FindRow<FGameDataTableRow_CharacterTrap>(Id, TEXT(\"\"), false) over CharacterTrapDataTables (DTM +0x4C0), taking the first non-null matching row without a missing-row warning. The stored Id value is not otherwise read by the observed consumers; no Blueprint-only reader can be confirmed from the available evidence.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterTrap.h:11",
@@ -16,7 +17,7 @@
       "status": "verified"
     },
     "FileName_BP": {
-      "simple": "Array of Trap primary-asset Blueprint names to preload for the traps listed by the character.",
+      "simple": "Which traps the game gets ready for this character before a battle. Change the names to change which traps are ready.",
       "technical": "TArray<FName> at row+0x10; the constructor leaves it empty, so every exported value comes from data. Each of the five exported rows serializes exactly ten positional slots with no per-index behavior: 13 non-None names and 37 None entries in total. BattleAssets_Traps_12BCE80 appends the entire array for every resolved trap row, including None entries, unlike the None trap-ID filter; GamePrimaryAssetLoader_CreateLoaders then skips None names and duplicate asset names and keeps the first occurrence when building the GamePrimaryAssetType_Trap loader map. These are FName asset names, not trap row IDs, and no statistics, sockets, spawn rules or units are stored. All 13 exported names match FileName_BP values in TrapDataTable (TR_010_00_BP is shared by TR_010_00/_01/_02 and TR_032_00_BP comes from TR_030_00), but no code joins the two tables. The collector has two direct call sites: battle prepare collects TrapNames into StudioTrapLoaders_860, and battle preload collects Names into StudioTrapLoaders_2C0; both maps are later merged into StudioRetainedLoaders_90. The level-sequencer path creates an empty TrapNames list and does not read this table. Missing CharacterTrap rows contribute nothing. Runtime spawning independently reads TrapDataTable's own FileName_BP through AGameTrapManager::SpawnPooled and the same Trap primary asset type; that shared asset identity is an indirect relationship, not a read of this row.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterTrap.h:15",

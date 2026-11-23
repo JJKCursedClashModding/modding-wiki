@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets the colored outline shown on characters, their weapons, or shikigami during special combat states.",
   "description": "Buff-state outline presets: emissive color, scale and fade times applied to character/weapon or shikigami materials when status bits turn on/off.",
   "fields": {
     "ID": {
-      "simple": "Outline preset key (BREAK_FALL, INVINCIBLE, SUPER_ARMOR, HYPER_ARMOR, LIMITLESS, COUNTER).",
+      "simple": "Chooses which combat state uses this outline, such as invincibility, armor, or a counter. Shikigami only use the invincibility outline.",
       "technical": "FName (declared Id, export key ID) used as the DataTable row name; consumers pass a name to FindRow rather than reading Row->Id, although every exported ID value matches its row name. Shikigami_FindMaterialOutlineRow walks MaterialOutlineDataTables (+0x810, retail VA 0x14126A9E0) in array order and returns the first FindRow hit. The outline callers pass bCheckNone=false and bWarn=false but guard NAME_None themselves, so a missing row silently produces no animation. AGameCharacter::Tick gates on bOutlineEnabled and derives six bits from status/action queries (battle-sequence playback forces all zero), assigning AddOutline/RemoveOutline in the order LIMITLESS (0x1), COUNTER (0x2), BREAK_FALL (0x4), SUPER_ARMOR (0x8), HYPER_ARMOR (0x10), INVINCIBLE (0x20). AGameShikigami::Tick also gates on bOutlineEnabled and requests only INVINCIBLE when collision-lock membership changes for lock 4 or 5.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MaterialOutline.h:12",
@@ -16,7 +17,7 @@
       "status": "verified"
     },
     "OutlineEmissiveColor": {
-      "simple": "Outline emissive color.",
+      "simple": "Players see this as the glowing color around a character, their weapons, or a shikigami. Modders can change it to recolor that outline.",
       "technical": "Declared FVector (UE5 three doubles); the explicit FLinearColor conversion copies X,Y,Z to R,G,B and sets A=1. The float values are handed unchanged to StartOutlineEmissiveColor, so values above 1 are not clamped by this code (LIMITLESS Z=2.6; SUPER_ARMOR/HYPER_ARMOR/COUNTER X=1.1/1.1/1.5). Characters pass the same color to the body MaterialController and through WeaponController to each weapon; shikigami pass it to their MaterialController. Exact exported RGB: BREAK_FALL (0,1,0), INVINCIBLE (0.6,0.6,0.9), SUPER_ARMOR (1.1,0.8,0), HYPER_ARMOR (1.1,0,0), LIMITLESS (1.2,0,2.6), COUNTER (1.5,0.6,0.3); the constructor default is ZeroVector.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MaterialOutline.h:16",
@@ -29,7 +30,7 @@
       "status": "verified"
     },
     "OutlineScale": {
-      "simple": "Outline thickness/scale.",
+      "simple": "Players see this as the thickness of the outline on a character, their weapons, or a shikigami. A larger value makes the outline thicker.",
       "technical": "Declared float at layout offset +0x28 (constructor default 0.0). It is passed as the Goal to StartOutlineScale for every cached OutlineScale animator on the character body, each weapon, and (for shikigami) the shikigami material controller; the Duration is the same row FadeInTime. Exported values: 3.0 for BREAK_FALL and INVINCIBLE; 4.0 for SUPER_ARMOR, HYPER_ARMOR, LIMITLESS and COUNTER. The animator writes the interpolated value to the cached OutlineScale scalar parameter of each material instance while its tween is active.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MaterialOutline.h:19",
@@ -42,7 +43,7 @@
       "status": "verified"
     },
     "FadeInTime": {
-      "simple": "Duration of the outline ramp-in.",
+      "simple": "Players see this as how gradually the outline appears after the combat state begins, and some presets appear instantly. A longer time makes the change slower.",
       "technical": "Declared float seconds at layout offset +0x2C (constructor default 0.0). Used as Duration for both StartOutlineEmissiveColor and StartOutlineScale on the add path. StartTo begins a linear tween from each parameter's captured material default to the row Goal, advanced by controller DeltaSeconds; Duration <= 0 also applies the Goal immediately. Exported values are 0 for BREAK_FALL, INVINCIBLE and COUNTER and 0.05 s for SUPER_ARMOR, HYPER_ARMOR and LIMITLESS.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MaterialOutline.h:22",
@@ -55,7 +56,7 @@
       "status": "verified"
     },
     "FadeOutTime": {
-      "simple": "Duration of the outline reset when the buff turns off.",
+      "simple": "Players see this as how long the outline takes to fade back to normal when the combat state ends. A longer time slows that change, and every listed preset is instant.",
       "technical": "Declared float seconds at layout offset +0x30 (constructor default 0.0). Read only when a previously displayed buff bit turns off and no add name was selected; it is passed to AGameCharacter::ResetOutline or AGameShikigami::ResetOutline, which reset both cached Outline* parameter animators to the defaults captured from their material instances over this duration. Row color and scale are not read on removal. Duration <= 0 applies those defaults immediately; all six exported rows set 0.0. SetOutlineEnabled(false) bypasses this row path and resets with 0.0 directly.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MaterialOutline.h:25",

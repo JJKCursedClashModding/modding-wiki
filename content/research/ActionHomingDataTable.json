@@ -1,8 +1,9 @@
 {
+  "overview": "This table controls how each attack follows, turns toward, or teleports to its target.",
   "description": "Per-attack homing behavior: movement/rotation curves, range and timing gates, warp placement, ground following, armor and external push effects.",
   "fields": {
     "Id": {
-      "simple": "Homing row key, normally the attack id.",
+      "simple": "The name that connects this tracking setup to a specific attack or follow-up attack.",
       "technical": "FName Unreal DataTable row key (exported as ID). Attack actions resolve ActionHomingDataTables by AttackRow.Id_ActionHoming or Id_CancelAttackActionHoming through Action_FindActionHomingRow (bCheckNone=true, so None resolves to no row); FName comparison is case-insensitive. Character-specific actions and shikigami also look up hardcoded ids, and ResolveActionHomingId overrides can remap or suppress the id before lookup (CP_110, CP_130, CP_210, CN_240). The manager loads all five numbered shards into one ordered array and the first table containing the id supplies the row. Exported rows use ids such as CP_010_ATTACKA_01.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:244",
@@ -14,7 +15,7 @@
       "status": "verified"
     },
     "ActionHomingType": {
-      "simple": "Homing mode: none, eight-way, curve, warp or warp-move.",
+      "simple": "Chooses how the attack follows its target, including stick direction, curving, teleporting, or moving in before a teleport.",
       "technical": "uint8-backed EGameActionHomingType switch in StartHoming/TickHoming. None/Curve use target steering or the default branch; EightWay derives direction from stick angle bands; Warp teleports to the computed warp location; WarpMove moves toward it before teleporting. StartHoming returns immediately when Homing_Time_Max <= 0. Only Warp (not WarpMove) uses AttackRow animations in StartAttackHoming. The shikigami StartHoming stores the type but its tick uses the basic steering path. Invalid=255 exists in the enum; no exported row uses EightWay or Invalid.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameActionHomingType.h:6",
@@ -26,7 +27,7 @@
       "status": "verified"
     },
     "CharacterAnimation": {
-      "simple": "Attack animation played for the homing start.",
+      "simple": "Which character animation plays when tracking starts, for moving teleports and ordinary attacks. Plain teleports use the attack's own animation.",
       "technical": "FName. Character attacks play it in StartAttackHoming when the armed row's type is neither Warp nor WarpMove; Warp and WarpMove instead take CharacterAnimation from AttackRow. Shikigami attacks unconditionally play this homing-row FName when their homing is active. If homing timed out (HomingResult == 0) and CharacterAnimation_Failure is None, ActivateAttack continues to PlayAnimationDefault(AttackRow.CharacterAnimation); on non-timeout activation it returns without playing an animation if that AttackRow name is None or the homing type is Warp. Exported names are animation keys, not montage asset paths.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:317",
@@ -38,7 +39,7 @@
       "status": "verified"
     },
     "CharacterAnimation_Failure": {
-      "simple": "Animation played when homing ends by timeout.",
+      "simple": "Which animation plays when the attack loses its target before connecting. Leaving this empty keeps the normal attack animation.",
       "technical": "FName. If HomingResult == 0 and this name is non-None, ActivateAttack plays it and clears super/hyper armor and bByte1E9 before returning. None means normal attack activation proceeds.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:916",
@@ -47,7 +48,7 @@
       "status": "verified"
     },
     "WeaponAnimation": {
-      "simple": "Weapon animation played for the homing start.",
+      "simple": "Which weapon animation plays when tracking starts for ordinary attacks and moving teleports. Plain teleports use the attack's own weapon animation.",
       "technical": "FName passed to PlayWeaponAnimation when character homing arms for any type other than Warp/WarpMove; those two take WeaponAnimation from AttackRow. None skips playback in StartAttackHoming. ActivateAttack's later weapon playback also uses AttackRow.WeaponAnimation only on its normal fall-through path.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:318",
@@ -57,7 +58,7 @@
       "status": "verified"
     },
     "Inertia_Rate": {
-      "simple": "Inertia magnitude applied when homing ends.",
+      "simple": "How strongly the character keeps sliding after this attack stops tracking. Higher values give a stronger slide.",
       "technical": "Float magnitude passed to SetInertia with EaseOut when arrival, timeout, warp exit or WarpMove completion ends homing; bFollowGroundEnabled is the follow-ground flag in most character paths (Warp uses false; shikigami and CN_081's hit-quota early exit use false). CN_081 also applies it directly from the cached row on a hit quota.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:2207",
@@ -69,7 +70,7 @@
       "status": "verified"
     },
     "Inertia_Time": {
-      "simple": "Inertia duration when homing ends.",
+      "simple": "How long the character keeps sliding after the attack stops tracking. Longer settings make the slide last longer.",
       "technical": "Seconds passed with Inertia_Rate to SetInertia on homing termination paths.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:2207",
@@ -78,7 +79,7 @@
       "status": "verified"
     },
     "Rotation_Yaw": {
-      "simple": "Yaw offset applied to the heading-to-target rotation.",
+      "simple": "Turns the character's starting aim a little to the side when tracking begins. Most attacks keep the aim straight at the target.",
       "technical": "Degrees. 0 means rotate directly toward the target (subject to Rotation_Angle_Limit); non-zero rotates the flattened target heading by this angle about Z, then uses StartRotationEase over Rotation_Time.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1593",
@@ -88,7 +89,7 @@
       "status": "verified"
     },
     "Rotation_Time": {
-      "simple": "Duration of the homing rotation ease.",
+      "simple": "How long the character takes to turn toward the target, with shorter times feeling quicker. A negative setting turns this turn off.",
       "technical": "Seconds. RotateTowardTarget / RotateTowardLocation / StartRotationEase start an EEasingFunc::Linear ease with blend exponent 2.0 only when Time >= 0; the exported -1.0 value (9 rows) is therefore a sentinel that suppresses the rotation ease. EightWay also uses it to rotate to the stick-derived destination.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1528",
@@ -100,7 +101,7 @@
       "status": "verified"
     },
     "Rotation_Angle_Limit": {
-      "simple": "Maximum target angle for automatic direct rotation.",
+      "simple": "How far off-center the target may be before the character turns to face it. Keeping this low allows turns at any angle.",
       "technical": "Degrees. In the default branch with Rotation_Yaw == 0, RotateTowardTarget is called only when this limit is <= 0 or >= the angle between owner forward and target. 0 effectively disables the angle gate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1595"
@@ -108,7 +109,7 @@
       "status": "verified"
     },
     "Rotation_Speed_Start": {
-      "simple": "Starting angular speed for homing rotation interpolation.",
+      "simple": "How fast the character first turns while following the target. Higher values start the turn faster.",
       "technical": "Degrees/second-style value passed to State4B8.RotationSpeedInterp.Start with Rotation_Speed_End and Rotation_Speed_InterpolateTime. The interpolator is armed only when a secondary target exists.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1495"
@@ -116,7 +117,7 @@
       "status": "verified"
     },
     "Rotation_Speed_End": {
-      "simple": "Final angular speed for homing rotation interpolation.",
+      "simple": "How fast the character is turning by the end of the turn. Higher values finish the turn faster.",
       "technical": "Second value of RotationSpeedInterp.Start; see Rotation_Speed_Start.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1495"
@@ -124,7 +125,7 @@
       "status": "verified"
     },
     "Rotation_Speed_InterpolateTime": {
-      "simple": "Duration of the rotation-speed interpolation.",
+      "simple": "How long the turn speed takes to change from its starting value to its ending value.",
       "technical": "Seconds passed to RotationSpeedInterp.Start.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1495"
@@ -132,7 +133,7 @@
       "status": "verified"
     },
     "Rotation_Speed_EasingType": {
-      "simple": "Easing for homing rotation-speed interpolation.",
+      "simple": "Chooses how the turn speed changes, with the usual setting easing out gently near the end.",
       "technical": "EGameEasingType converted by ShikigamiMovement_ToEasingFunc before RotationSpeedInterp.Start.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1496"
@@ -140,7 +141,7 @@
       "status": "verified"
     },
     "Rotation_Speed_Blend_Exp": {
-      "simple": "Exponent/shape for homing rotation-speed interpolation.",
+      "simple": "Shapes how the turn speed changes during the move. The exact feel of this setting is unclear.",
       "technical": "Float passed as the blend exponent in RotationSpeedInterp.Start.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1496"
@@ -148,7 +149,7 @@
       "status": "verified"
     },
     "Speed_Start": {
-      "simple": "Starting homing movement speed.",
+      "simple": "How fast the character begins moving while following the target, scaled by Cursed Energy attack rate for fighters and used directly by shikigami.",
       "technical": "Units/second. Character homing starts State4B8.SpeedInterp at GetCP240PassiveRate() * Speed_Start (the passive rate is read for both endpoints); TickHoming updates it each step after Homing_Delay_Time. The shikigami path uses Speed_Start and Speed_End directly without that multiplier.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1498",
@@ -158,7 +159,7 @@
       "status": "verified"
     },
     "Speed_End": {
-      "simple": "Final homing movement speed.",
+      "simple": "How fast the character moves by the end of the approach, scaled by Cursed Energy attack rate for fighters and used directly by shikigami.",
       "technical": "Units/second, also multiplied by GetCP240PassiveRate() before interpolation for characters (raw for shikigami). CP_010 exports 1500.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1495"
@@ -166,7 +167,7 @@
       "status": "verified"
     },
     "Speed_InterpolateTime": {
-      "simple": "Duration of homing speed interpolation.",
+      "simple": "How long the character takes to go from the starting speed to the ending speed while tracking.",
       "technical": "Seconds passed to SpeedInterp.Start.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1495"
@@ -174,7 +175,7 @@
       "status": "verified"
     },
     "Speed_EasingType": {
-      "simple": "Easing for homing speed interpolation.",
+      "simple": "Chooses how the movement speed changes during the approach, with the usual setting slowing gently near the end.",
       "technical": "EGameEasingType converted by ShikigamiMovement_ToEasingFunc in SpeedInterp.Start.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1496"
@@ -182,7 +183,7 @@
       "status": "verified"
     },
     "Speed_Blend_Exp": {
-      "simple": "Exponent/shape for homing speed interpolation.",
+      "simple": "Shapes how the movement speed changes during the approach. The exact feel of this setting is unclear.",
       "technical": "Float passed as the blend exponent in SpeedInterp.Start.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1496"
@@ -190,7 +191,7 @@
       "status": "verified"
     },
     "HomingDistance": {
-      "simple": "Distance beyond which the reduced homing time applies.",
+      "simple": "How far away the target can be before the attack uses its shorter tracking time. Some characters also use this distance to repeat attacks.",
       "technical": "World units. At StartHoming, if a secondary target is farther than this positive distance, HomingTime is set to Homing_Time_Min instead of Homing_Time_Max. CP_051 also gates attack repeats by Distance <= HomingDistance; CP_051's warp-start gates use WarpDistance instead.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1490",
@@ -199,7 +200,7 @@
       "status": "verified"
     },
     "Homing_Delay_Time": {
-      "simple": "Delay before homing movement begins.",
+      "simple": "How long the character waits before moving toward the target after tracking begins. This also delays a teleport.",
       "technical": "Seconds. TickHoming accumulates HomingElapsed and returns without moving while elapsed < Homing_Delay_Time. This check runs for every armed type after the non-warp arrival and timeout checks; it is not skipped by Warp/WarpMove, so it also delays a warp teleport or WarpMove completion. The shikigami tick applies the same delay.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:2215",
@@ -208,7 +209,7 @@
       "status": "verified"
     },
     "Homing_Time_Min": {
-      "simple": "Short homing budget used for distant targets.",
+      "simple": "The shorter tracking time used when the target is far away. Moving teleports also finish within this time if they have not arrived.",
       "technical": "Seconds. Selected at StartHoming when the target is beyond HomingDistance; WarpMove also completes when Homing_Time_Min <= elapsed even if the warp destination has not been reached. It is 0.0 in 149 exported rows, which makes the post-delay timeout immediate when that branch is selected.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1492",
@@ -217,7 +218,7 @@
       "status": "verified"
     },
     "Homing_Time_Max": {
-      "simple": "Main homing time budget; 0 disables homing.",
+      "simple": "How long the attack can keep following its target. A value of zero turns tracking off.",
       "technical": "Seconds. StartHoming returns immediately when this is <= 0; otherwise it initializes HomingTime, and non-warp homing exits by timeout when HomingTime <= HomingElapsed.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1476",
@@ -227,7 +228,7 @@
       "status": "verified"
     },
     "bIgnoreHomingRange": {
-      "simple": "Disables the capsule/range arrival test.",
+      "simple": "Chooses whether the attack stops when it gets close enough to the target. Turning this on skips that closeness check.",
       "technical": "Bool. When false, TickHoming calls IsOutsideHomingRange with Distance_Correct and Z ranges to decide arrival; when true this check is skipped and only follow-ground blocking, delay/time or warp logic can end homing.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:2184",
@@ -236,7 +237,7 @@
       "status": "verified"
     },
     "Distance_Correct": {
-      "simple": "Extra distance correction for the arrival range test.",
+      "simple": "Adds extra room to the closeness check, changing how near the character must be to count as arriving.",
       "technical": "World units passed with owner/target capsule radii to IsOutsideHomingRange in normal and WarpMove arrival checks.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:2187",
@@ -245,7 +246,7 @@
       "status": "verified"
     },
     "RangeZ_Upper": {
-      "simple": "Upper relative-Z bound for homing arrival.",
+      "simple": "How high above the target the character may be and still count as close enough. This applies when ground following is off.",
       "technical": "World units. Copied into RangeUpper only when homing ignores ground following; if both characters hit ground and the ceiling trace finds no hit, upper/lower are cleared. Used in IsOutsideHomingRange and WarpMove passage tests.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:2159",
@@ -254,7 +255,7 @@
       "status": "verified"
     },
     "RangeZ_Lower": {
-      "simple": "Lower relative-Z bound for homing arrival.",
+      "simple": "How far below the target the character may be and still count as close enough. This applies when ground following is off.",
       "technical": "World units, paired with RangeZ_Upper in the same arrival/range tests.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:2160",
@@ -263,7 +264,7 @@
       "status": "verified"
     },
     "AngleZ": {
-      "simple": "Vertical angle clamp that bends homing direction toward level.",
+      "simple": "How steeply the character may travel upward or downward while following the target. Larger angles allow steeper paths when ground following is off.",
       "technical": "Degrees. TickHomingMove reads the row value when ground-following is disabled; if the angle between direction and the flattened horizontal vector exceeds it, direction is rotated about the right axis by -AngleZ (sign flips when the owner is above the target) and target steering is disabled.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:2087",
@@ -273,7 +274,7 @@
       "status": "verified"
     },
     "WarpDistance": {
-      "simple": "Maximum sweep distance used to compute a warp destination.",
+      "simple": "How far ahead the game searches for a teleport landing spot. For closer targets it searches around the target.",
       "technical": "World units. GameWarp_ComputeWarpLocation takes the far-target branch when WarpDistance > 0 and is less than the 3D distance to the target (or the target is invalid), sweeping a capsule from the owner toward the target to WarpDistance minus owner radius; the pitch/yaw-adjusted WarpDirection is used for the near-target heading/candidate ring, not that initial sweep. CP_051 gates warp-start effects by Distance <= WarpDistance.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1428",
@@ -283,7 +284,7 @@
       "status": "verified"
     },
     "WarpTargetDistance": {
-      "simple": "Extra distance from target capsule used for near-target warp placement.",
+      "simple": "How much space the game leaves around the target when choosing a teleport landing spot. One character uses this to cancel tracking up close.",
       "technical": "World units added to the target capsule radius to form ReachDistance for the near-target candidate ring (2 steps x 4 turns). BlowSimulate can replace ReachDistance with a prediction-based value on walls. CN_240 also reads it to suppress CN_240_ATTACKB_01 homing when the target is already within that range.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1428",
@@ -293,7 +294,7 @@
       "status": "verified"
     },
     "WarpDirectionAdjustPitch": {
-      "simple": "Pitch tilt applied to the warp direction.",
+      "simple": "Tilts the teleport approach upward or downward when choosing a landing spot near the target. Faraway teleports keep the straight approach.",
       "technical": "Degrees. The flat direction toward the target is rotated about the direction quaternion's Y axis by this pitch to form WarpDirection for the near-target heading/candidate ring; the far-target sweep uses the raw owner-to-target vector. Exported values are 0 except a few 15/30/60/80/90 rows.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1429",
@@ -302,7 +303,7 @@
       "status": "verified"
     },
     "WarpDirectionAdjustYaw": {
-      "simple": "Yaw turn applied to the warp direction.",
+      "simple": "Turns the teleport approach sideways near the target. A half-turn also changes the camera after a moving teleport.",
       "technical": "Degrees. Rotates WarpDirection about Z for near-target placement; the far-target sweep is unadjusted. WarpMove completion also calls NotifyHomingWarpEnd with bSkipViewInterp = (180 == this value).",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1429",
@@ -312,7 +313,7 @@
       "status": "verified"
     },
     "WarpAdjustTargetSimulateType": {
-      "simple": "How the target blow/motion is simulated while choosing a warp spot.",
+      "simple": "Chooses how the game predicts a recently hit target's movement when picking a teleport landing spot, including knockback and sideways drift.",
       "technical": "uint8-backed EGameWarpAdjustTargetSimulateType (None, DeviationOnlySimulate, BlowSimulate, Invalid=255). Simulation requires type != None, a valid target, a clear damage-action slot, no collision locks and the owner as last attacker. DeviationOnlySimulate sweeps the target's predicted vertical motion then keeps WarpDirection; BlowSimulate approaches against the target's last blow/move direction with wall sliding or push-out. BlowSimulate dominates the exports.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameWarpAdjustTargetSimulateType.h:6",
@@ -323,7 +324,7 @@
       "status": "verified"
     },
     "bFollowGroundEnabled": {
-      "simple": "Enables ground-following behavior during homing.",
+      "simple": "Chooses whether the character stays close to the ground while following the target. This also changes how arrival and falling are handled.",
       "technical": "Bool. It is inverted into bHomingIgnoresGroundFollowing at start, gates RangeZ usage and AngleZ bending, enables the follow-ground blocked arrival test, is passed to SetInertia, and drives fall-curve handling.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1483",
@@ -333,7 +334,7 @@
       "status": "verified"
     },
     "FollowGroundCheckDistance": {
-      "simple": "Extra forward trace distance for ground-follow blocking.",
+      "simple": "How far ahead the game checks for ground while the character follows the target. A blocked path counts as arriving.",
       "technical": "World units added to owner capsule radius for the forward ground test; when blocked, homing counts as arrived.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:2189",
@@ -342,7 +343,7 @@
       "status": "verified"
     },
     "FollowGroundFallGravity": {
-      "simple": "Gravity/fall speed parameters for the follow-ground fall curve.",
+      "simple": "How quickly the character falls while following the ground during this move. Higher values pull the character down faster.",
       "technical": "Float. BuildFallCurve uses it with Global.JumpFall_Speed_Max, then MoveState.FallGravity is set to this value and vertical position is advanced by the sampled fall speed.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:2334",
@@ -351,7 +352,7 @@
       "status": "verified"
     },
     "FollowGroundIgnoreStepDistance": {
-      "simple": "Distance argument to the follow-ground blocked test.",
+      "simple": "Helps decide whether a small step or low obstacle blocks ground following. The exact threshold behavior is unclear.",
       "technical": "World units passed as the step-distance parameter of Movement_IsFollowGroundBlocked (with 1000.0 as the other threshold).",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:2196"
@@ -359,7 +360,7 @@
       "status": "verified"
     },
     "bSuperArmorEnabled": {
-      "simple": "Super armor flag installed when homing arms.",
+      "simple": "Chooses whether the character can power through hits while this attack is tracking. The attack's own armor setting takes over when the attack activates.",
       "technical": "Bool copied into FGameCharacterAction_AttackBase.bSuperArmorEnabled and exposed through IsSuperArmorEnabled while the homing phase is active; cleared on the homing-failure animation. ActivateAttack replaces it with AttackRow.bSuperArmorEnabled on all normal activation paths, including non-warp homing.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:333",
@@ -370,7 +371,7 @@
       "status": "verified"
     },
     "bHyperArmorEnabled": {
-      "simple": "Hyper armor flag installed when homing arms.",
+      "simple": "Chooses whether the character keeps attacking through hits while tracking. The attack's own armor setting takes over when the attack activates.",
       "technical": "Bool copied into the attack action alongside super armor, exposed via IsHyperArmorEnabled; cleared on homing failure. ActivateAttack replaces it with AttackRow.bHyperArmorEnabled on all normal activation paths.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:334",
@@ -381,7 +382,7 @@
       "status": "verified"
     },
     "bExternalForceEnabled": {
-      "simple": "Enables the timed outward push during homing.",
+      "simple": "Chooses whether this move pushes the target outward for a short time. The push fires when the path between them is clear.",
       "technical": "Bool. When true, StartHoming arms ExternalForceInterp and TickHoming traces to the secondary target; on a clear trace it issues a push-out request.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1503",
@@ -390,7 +391,7 @@
       "status": "verified"
     },
     "ExternalForceRange": {
-      "simple": "Radius/range passed to the push-out request.",
+      "simple": "How wide the outward push is when this move sends the target away. Larger values reach farther.",
       "technical": "World units passed as the final argument of BattleManager.AddPushOutRequest when external force fires.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:2366"
@@ -398,7 +399,7 @@
       "status": "verified"
     },
     "ExternalForceStrength_Start": {
-      "simple": "Starting push strength.",
+      "simple": "How strong the outward push is when it begins. Higher values push harder at the start.",
       "technical": "Value used to start ExternalForceInterp; TickHoming reads GetCurrent() as push strength.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1505",
@@ -407,7 +408,7 @@
       "status": "verified"
     },
     "ExternalForceStrength_End": {
-      "simple": "Final push strength.",
+      "simple": "How strong the outward push is by the time it ends. Higher values keep the push stronger near the end.",
       "technical": "Second endpoint of ExternalForceInterp.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1505"
@@ -415,7 +416,7 @@
       "status": "verified"
     },
     "ExternalForceStrength_InterpolateTime": {
-      "simple": "Duration of the push-strength interpolation.",
+      "simple": "How long the outward push takes to change from its starting strength to its ending strength.",
       "technical": "Seconds passed to ExternalForceInterp.Start.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1505"
@@ -423,7 +424,7 @@
       "status": "verified"
     },
     "ExternalForceStrength_EasingType": {
-      "simple": "Easing for push-strength interpolation.",
+      "simple": "Chooses how the push strength changes over its short duration, with the usual setting easing out gently near the end.",
       "technical": "EGameEasingType converted by ShikigamiMovement_ToEasingFunc in ExternalForceInterp.Start.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1506"
@@ -431,7 +432,7 @@
       "status": "verified"
     },
     "ExternalForceStrength_Blend_Exp": {
-      "simple": "Exponent/shape for push-strength interpolation.",
+      "simple": "Shapes how the push strength changes during the move. The exact feel of this setting is unclear.",
       "technical": "Float passed as the blend exponent in ExternalForceInterp.Start.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:1506"
@@ -439,7 +440,7 @@
       "status": "verified"
     },
     "ExternalForceGravityCorrect": {
-      "simple": "Gravity correction passed to the push-out request.",
+      "simple": "Adjusts how gravity is accounted for when the outward push happens. Most moves use the standard setting, with a few lower ones.",
       "technical": "Float passed to BattleManager.AddPushOutRequest alongside the push point, strength and range. Exported as 1.0 in 266 rows and 0.2 in 2 (the C++ constructor default is 0.0).",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:2366"

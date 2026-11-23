@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets the battle text, Cursed Energy gauge style, and lock-on cursor position for each character.",
   "description": "Per-character battle-UI presentation row linked from CharacterDataTable.Id_CharacterUI: resource terminology, cursed-energy gauge preset, and lock-on cursor placement on the target.",
   "fields": {
     "ID": {
-      "simple": "FName row key selected by a Character row's Id_CharacterUI.",
+      "simple": "The name that connects these settings to one character, so the game gives them to the right fighter.",
       "technical": "The native UPROPERTY is Id (FName, row +0x8); the export names it ID and declares ImportKeyField=Id. AGameDataTableManager loads the single CharacterUIDataTable asset into CharacterUIDataTables (+0x470). Status_FindCharacterUIRow (retail 0x14ddf60, behavior-certified against retail) walks that array in order, rejects incompatible row structs, and returns the first matching non-null row; with bCheckNone=true it rejects NAME_None before lookup (used by the target cursor and VS-enemy interval callers). bUnknown is passed false at every call and is unread in the reconstructed finder. In the exports, 46 of 48 Character rows have non-None Id_CharacterUI values and map one-to-one onto these 46 keys; CP_081 and CN_210 use NAME_None and have no UI row. Missing rows are not handled uniformly: some consumers default, while others dereference the lookup result unchecked.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUI.h:12",
@@ -15,7 +16,7 @@
       "status": "verified"
     },
     "CharacterEnergyType": {
-      "simple": "Whether the character's resource is called cursed energy or given a physical-substitute label.",
+      "simple": "Chooses whether battle labels call the resource Cursed Energy or Physical Strength for this character. Physical changes technique, boost, cost, and level report wording.",
       "technical": "EGameCharacterEnergyType is uint8 (None=0, Cursed=1, Physical=2, Invalid=255; the reflected enum dump agrees). Consumers test specifically for Physical: the button guide switches BTL_HUD_LABEL_0631/0632 (Cursed Energy Technique / Cursed Tool Technique), the damage combo switches 0710/0711 (Cursed Energy Increase / Physical Strength Boost), the command list and VS-enemy interval switch SYS_COMMON_LABEL_0049/0050 (Cursed Energy / Physical Strength), PvE growth switches labels 0202/0203 and 0204/0205, and customize chat switches level-report labels 0001/0002. The command list checks character CP_020 by ID before its Physical category branch and copies the raw enum into FGameCommandListActionCursedEnergyParameter::EnergyType and FGameCommandListActionCostParameter::EnergyType; downstream action widgets branch on Physical for cost labels. Export: 44 Cursed and 2 Physical (CP_060, CP_200); None and Invalid are unused. There is no universal missing-row fallback: the button guide, damage combo, VS-enemy interval and growth list default to Cursed behavior, but CommandList, CustomizeChat, GrowthDialog and GrowthLevelUp dereference the UI row without a null check.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameCharacterEnergyType.h:5",
@@ -35,7 +36,7 @@
       "status": "verified"
     },
     "CursedEnergyGaugeType": {
-      "simple": "Selects the character's gauge color/style preset.",
+      "simple": "Sets the look and colors of the Cursed Energy gauge in battle and battle menus. A few characters use their own special style.",
       "technical": "EGameCursedEnergyGaugeType is uint8 (None=0, JujutsuSorcerers=1, CursedSpirits=2, Physical=3, CP_020=4, CP_110=5, Invalid=255; the reflected enum dump agrees). The value is a key into UGameWidgetCharacterParameter::CursedEnergyGaugeParameterMap through AGameWidgetManager::GetCursedEnergyGaugeParameter; its returned colors tint battle gauges, button-guide widgets, command-list gauges and VS-enemy interval icons. The button guide stores it with SetGaugeType and calls ApplyColors; battle character data passes it through SetupCursedEnergy to the gauge's SetGaugeColor. The C++ constructor only value-initializes the map and the getter falls back to a value-initialized default parameter for an absent key, so exact per-skin colors are not recoverable from reconstructed C++. Missing UI rows default to JujutsuSorcerers in the button guide, battle character data and VS-enemy interval; CommandList dereferences the row unchecked. Export: 22 JujutsuSorcerers, 20 CursedSpirits, 2 Physical, and one each CP_020 (row CP_020) and CP_110 (row CP_110); None and Invalid are unused.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameCursedEnergyGaugeType.h:5",
@@ -52,7 +53,7 @@
       "status": "verified"
     },
     "TargetCursorHeightRate": {
-      "simple": "Vertical fraction of the target's screen bounds at which the lock-on cursor is drawn.",
+      "simple": "Where the lock-on cursor sits vertically on the character being targeted. Higher values move it closer to that character's top.",
       "technical": "float at row +0x14 (pinned by the retail layout check). UGameBattleTargetCursorWidget reads the target character's UI row, not the viewer's, then sets Translation.Y = (ScreenBounds.Bottom - ScreenBounds.Top) * (1 - HeightRate) + ScreenBounds.Top and Translation.X to the bounds center X; no clamp is applied. Thus 0.5 is the vertical midpoint and 0.6 lies 40% down from the top / 60% up from the bottom. The row constructor default is 0.0, but the sole consumer substitutes 0.5 when no row is found; it calls the finder with bCheckNone=true, so NAME_None also takes that default. Export: 44 rows at 0.5 and 2 rows at 0.6 (CN_040 and CN_240).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUI.h:22",

@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets up each PvE mission with its map, waves, binding vows, and the risk, money, and experience it can earn.",
   "description": "Defines one PvE mission row: map selection, wave and binding-vow lottery pools, and the named PvECalculation rows used for risk, money and experience payouts.",
   "fields": {
     "Id": {
-      "simple": "PvE mission identifier.",
+      "simple": "The mission's name in the game, used to track played missions and include it in online results.",
       "technical": "Native FName Id; export metadata sets ImportKeyField=Id and the dump writes the key as ID (all 1073 row keys match). Runtime lookup does not read this member: GamePvE_FindMissionRow resolves PvESettings.MissionId with UDataTable::FindRow against PvEMissionDataTables (DTM+0x900). That id comes from GamePvE_PickMission: risk-thresholded PvEMissionLottery lottery with prior-lottery exclusion and a 0.01x weight per previous use for normal missions, numbered PVE_SURVIVAL_MISSION_xx ids with PVE_SURVIVAL_MISSION_01 fallback in survival, and PVE_EXTRA_MISSION_01/PVE_X_00 fallbacks. The cached active row's Id is appended to PlayedMissionIds on result and written as mission_id in online KPI.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:11",
@@ -19,7 +20,7 @@
       "status": "verified"
     },
     "Id_Map": {
-      "simple": "Preferred map for the mission.",
+      "simple": "The map this mission plays on. When no map is set, as in Survival missions, the game picks an available map at random.",
       "technical": "Native FName with no explicit constructor initializer (NAME_None). GamePvE_GetMissionMapId looks up the row and returns Id_Map; on a missing row or NAME_None it calls Story_PickRandomMapId_12FD510, which selects uniformly from Map rows with MapSelectPlacementIndex >= 0. Offline and online interval setup store the result in BattleLevel. In the export 320/1073 rows are None, including all four PVE_SURVIVAL_MISSION_0x rows; PvE_SURVIVAL_01 uses MAP_01. Every non-None value resolves in MapDataTable.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:15",
@@ -37,7 +38,7 @@
       "status": "verified"
     },
     "Id_PvEMissionWaveLottery": {
-      "simple": "Wave lottery row used by the mission.",
+      "simple": "Which group of waves regular PvE missions can draw from, with repeated waves becoming less likely and boss waves appearing last. Survival missions create their waves in order each time.",
       "technical": "Native TArray<FName>, empty by default. Every exported row has exactly one id (614 distinct values, covering all PvEMissionWaveLottery rows); the struct can hold more, but no supplied row does. GamePvE_PickMissionWaves, only for GameMode != 2, resolves each id against PvEMissionWaveLotteryDataTables (DTM+0x920), builds candidates from parallel Id_MissionWave/Weights/EvaluationMin/EvaluationMax/bBoss arrays, applies rank bounds, halves the weight for each previous wave, skips None/nonpositive weights, and fills up to three slots with a selected boss forced into the last slot. Survival (GameMode==2) bypasses the field and generates PVE_SURVIVAL_WAVE_xx ids.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:18",
@@ -55,7 +56,7 @@
       "status": "verified"
     },
     "Id_PvECalculation_RiskValue": {
-      "simple": "Named risk multiplier for this mission.",
+      "simple": "Which risk reward setting this mission uses, with higher settings earning more risk on a win and none on a loss or extra mission.",
       "technical": "Native FName, NAME_None by default. GamePvE_CalcResultRiskValue starts from RISK_VALUE_MISSION_CLEAR_VALUE, multiplies in task/evaluation/mission-count factors, and, when the named PvECalculation row is found, multiplies by its Value (dimensionless; A-E = 1.0/1.2/1.3/1.4/1.5). Extra missions return 0 before the lookup; bBelowMaxRisk or a loss also forces 0, and the result is FloorToInt. 1072 rows use A-E; only PVE_EXTRA_MISSION_01 has None and is bypassed.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:21",
@@ -69,7 +70,7 @@
       "status": "verified"
     },
     "Id_PvECalculation_Money": {
-      "simple": "Named money multiplier for this mission.",
+      "simple": "Which money reward setting this mission uses, with higher settings paying more after battle bonuses, tasks, binding vows, and help. Extra missions always use their own fixed money payouts.",
       "technical": "Native FName, NAME_None by default. For non-extra missions GamePvE_CalcResultMoney multiplies max(previous battle bonus sum, 0) by this named PvECalculation row's Value (A-E = 1.1/1.3/1.8/3.0/4.5), then task/vow/help and win/loss vow factors, and floors the final float to int32 (extra missions use fixed MONEY_EXTRA_MISSION_* values). The mission lookup is dereferenced without a null guard here. For whole-run mode-clear money, GMoneyMissionDifficultyMap maps A-E to 1-5 and sums over played mission rows to choose bonus rows; None/unmatched ids add no difficulty.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:24",
@@ -84,7 +85,7 @@
       "status": "verified"
     },
     "Id_PvECalculation_Experience": {
-      "simple": "Named experience multiplier for this mission.",
+      "simple": "Which experience reward setting this mission uses, with higher settings giving more after battle results, tasks, binding vows, and help. Extra missions always use their own fixed experience payouts.",
       "technical": "Native FName, NAME_None by default. For non-extra missions GamePvE_CalcResultExperience starts from the evaluation-rank PvECalculation value, multiplies by this named row's Value when found (A-E = 1.0/1.3/1.8/2.5/3.5), then task/vow/help and win/loss vow factors, and floors the final float to int32 (extra missions use fixed EXPERIENCE_EXTRA_MISSION_* values). For whole-run mode-clear experience, GExperienceMissionDifficultyMap maps A-E to 1-5 and sums over played mission rows; None/unmatched ids add no difficulty.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:27",
@@ -100,7 +101,7 @@
       "status": "verified"
     },
     "Id_BindingVowsLottery": {
-      "simple": "Binding-vow lottery pools offered for this mission.",
+      "simple": "Which groups of binding vows this mission can offer. Waves and tasks can remove vows before the game makes its picks.",
       "technical": "Native TArray<FName>, empty by default; all exported rows have four slots. IntervalPvE_PickBindingVows iterates the array by index, skips NAME_None ids, and pairs each kept id with Weights[Index] (no bounds check). It resolves the selected pool through BindingVowsLotteryDataTables, then excludes vows by mission-wave MissionOrder and mission-task ExcludeBindingVowsEffectType before repeated weighted picks without replacement. 1595/4292 exported slots are None; the 119 distinct non-None ids cover all BindingVowsLottery rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:30",
@@ -116,7 +117,7 @@
       "status": "verified"
     },
     "Weights": {
-      "simple": "Relative weights for choosing among the binding-vow lotteries.",
+      "simple": "How likely each binding-vow group is to be chosen, with higher weights making a group more likely. Empty choices are ignored when the game chooses.",
       "technical": "Native TArray<float>, empty by default; all exported rows have four entries, matching their Id_BindingVowsLottery length. GameSound_PickWeightedIndex normalizes these weights by their total and a StoryFRand roll, so they are relative lottery weights, not probabilities or currency. Non-None slots use 100/50/20 (18 rows also include 1.0); None slots carry 1.0 or 20.0 but are discarded before the pool pick, so padding weight is not a zero sentinel. Empty candidate pools yield INDEX_NONE; with no positive weight the picker falls through to its last candidate. No previous-vow penalty is applied at this pool-selection stage, unlike mission and wave picking.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMission.h:33",

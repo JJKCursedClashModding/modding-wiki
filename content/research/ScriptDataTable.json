@@ -1,8 +1,9 @@
 {
+  "overview": "This table lists the story scenes the game can play and connects each one to its music and stages.",
   "description": "Defines playable story scripts: the row ID and Script asset name used to locate and load the script, the BGM request, and an optional Map row whose level list story phases use for transitions.",
   "fields": {
     "ID": {
-      "simple": "Row key / script ID used to look up the script row (export label ID; native property Id).",
+      "simple": "The name the game uses to find this story scene. A few names also bring up the credits or a movie.",
       "technical": "FName primary key (native Id at row +0x08; DataTable ImportKeyField=Id). All 245 exported rows have a unique key equal to the exported ID value. UGamePhase_StoryDemoBase::PreparePhase walks ScriptDataTables for GetScriptId() and caches the first matching row in ScriptRow; Story_GetScriptLevels_1307AE0 and Story_FindScriptRow use the same key (the latter rejects NAME_None and checks the row struct before the first match). GetScriptId is virtual: pre-/post-battle phases take StoryDemo.Id_Script_PreBattle/Id_Script_PostBattle, the collection phase synthesizes GALLERY_01..04 and the short-story phase uses the short-story row id. The ID, not ScriptFileName, is tested against the hard-coded credit list (STDM_05065B, STDM_08094A, STDM_09114A) and movie list (STDM_08090A, STDM_08094A, STDM_09095A, STDM_09114A), selecting extra widgets; story-demo prepare dereferences the found row unguarded.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Script.h:11",
@@ -22,7 +23,7 @@
       "status": "verified"
     },
     "ScriptFileName": {
-      "simple": "Primary asset name of the script data asset to load (equals ID in the export).",
+      "simple": "The saved script that decides which dialogue and voices play in this scene. For some scenes, it also chooses downloadable voices.",
       "technical": "FName (row +0x10). Story-demo prepare passes it to UGameScriptPlayer::SetScript, which stores FPrimaryAssetId(\"Script\", ScriptFileName); UpdateLoad uses that ID to load and cache UGameScriptData from /Game/Scripts, initialize the context, derive message ids and voice cue sheets, and add related thumbnails. The shipped config declares PrimaryAssetType \"Script\" for /Game/Scripts. GameScript_IsDlcScript scans every Script row for a matching ScriptFileName, then requires a StoryDemo row whose Id_Script_PreBattle or Id_Script_PostBattle equals that name and whose chapter has a first UserProgressFlag != -1; it selects the DLC voice tables in ParseVoice and the DLC voice-cue path in UpdateLoad. All 245 exported rows have ScriptFileName == row key, but 52 rows are not named by any exported StoryDemo pre/post field, so they fail this second DLC condition. Voice branching also tests the name's GALLERY_/STDM_SS_ substrings before the DLC test.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Script.h:15",
@@ -44,7 +45,7 @@
       "status": "verified"
     },
     "Id_Bgm": {
-      "simple": "BGM ID requested when the story-demo phase prepares.",
+      "simple": "The background music that plays during this story scene, fading in over half a second. Leaving it unset stops the music immediately.",
       "technical": "FName (row +0x18). With a valid Script row, NAME_None calls StopBgm(0.0f) (immediate fade-out); otherwise PlayBgm(Id_Bgm, 0.0f, 0.5f, true) passes the value to the BGM loader as the cue name, with 0 s start time, a 0.5 s fade in/out and looping enabled. Retail reads the field unguarded. In the export, STDM_09104B and STDM_09111B use the None sentinel; the other 243 rows use 15 distinct BGMDataTable IDs (BGM_DEMO_01 alone appears on 123 rows), all of which exist in BgmDataTable.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Script.h:18",
@@ -61,7 +62,7 @@
       "status": "verified"
     },
     "Id_Map": {
-      "simple": "Optional Map row ID supplying a story phase's level list.",
+      "simple": "The stage whose areas the game uses when moving on from this story scene. Most scenes leave this blank.",
       "technical": "FName (row +0x20). Story_GetScriptLevels_1307AE0 resolves the Script row by ID, then Status_FindMapRow(MapDataTables, Id_Map, true, false); NAME_None is rejected up front, and an empty TArray is returned if either lookup fails. On success it returns Map.FileName (export label Filename), including any None placeholders. Unlike StoryMission.Id_Map / Story_GetMissionMapId, Script.Id_Map has no random-map fallback. The levels feed battle-story, credits, collection, main-menu story, script and story-character-select phase transitions; StoryDemoBase::StudioPhaseQuery2D0 filters None entries and only defers to the base query when no non-None level remains. Only 8/245 exported rows set this field: GALLERY_01..04 -> SDM_10..40 and STDM_01000A/STDM_04054B/STDM_05065B/STDM_06085B -> SDM_10/SDM_20/SDM_30/SDM_40; all four map rows exist and each Filename begins with the matching SDM level plus an _Environment level and two None slots.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Script.h:21",

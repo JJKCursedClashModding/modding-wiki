@@ -1,8 +1,9 @@
 {
+  "overview": "These values decide how many rank points you gain or lose after a battle.",
   "description": "Scalar constants for the reconstructed post-battle rank-point delta; the result is cached in the battle result snapshot and applied to saved rank points by the online/ranked result path.",
   "fields": {
     "Id": {
-      "simple": "Calculation row name (export row DEFAULT).",
+      "simple": "The name of this set of scoring values. The supplied set is called DEFAULT, and the game uses the first available set.",
       "technical": "FName import key/row name for FGameDataTableRow_RankPointCalculation; the export serializes it as \"ID\": \"DEFAULT\" under DataTable ImportKeyField Id. CalcRankPointDelta never reads the Id value or looks up a literal name: the row finder takes RowNames[0] from the first RankPointCalculationDataTables entry with rows, then FindRow for that name. Null tables are not skipped and a missing/empty set leaves the row pointer null, which the consumer dereferences.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:11",
@@ -17,7 +18,7 @@
       "status": "observed"
     },
     "Result_Win": {
-      "simple": "Base rank-point delta for a win.",
+      "simple": "The rank points added to your score when your team wins. A larger number gives you more points for the win.",
       "technical": "int32, constructor default 0, exported DEFAULT 23. GetWinnerTeam() maps Win_TeamA to 0, Win_TeamB to its enum value (1) and Timeover/Invalid to the 0xFF draw sentinel. After the invalid-player early return (delta 0), the consumer selects Result_Win only when the winner is not 0xFF and equals the player's team (GAISlot001). It is the base before evaluation, stock-gap, rank-gap and loss-floor steps.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:15",
@@ -31,7 +32,7 @@
       "status": "verified"
     },
     "Result_Lose": {
-      "simple": "Base rank-point delta for a loss.",
+      "simple": "Points lost when your team loses. A higher value costs fewer points, and your rank's minimum or a computer-controlled ally can raise it.",
       "technical": "int32, constructor default 0, exported DEFAULT -43. Selected for any non-draw winner that is not the player's team. After the other modifiers and rank-gap scaling, a non-draw loss is raised with FMath::Max to the LoseLowerLimit of the RankPointDataTable row found for the pre-battle RankPoint (GameRankPoint_FindRow checks GlobalThreshold ranges and keeps the first row encountered when no range matches); if no row is found, that floor is skipped. If any ally with a valid user-settings index has GetControlType() == 3 (AI control), the loss is then also raised to at least 0. Draws skip this branch and use the <= 0 clamp instead.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:18",
@@ -49,7 +50,7 @@
       "status": "verified"
     },
     "Result_Draw": {
-      "simple": "Base rank-point delta for a draw.",
+      "simple": "The rank points added when a battle ends without a winner. Draws cannot leave you with more points than you started with.",
       "technical": "int32, constructor default 0, exported DEFAULT -10. Selected when GetWinnerTeam() returns the 0xFF sentinel for Timeover/Invalid. After the evaluation, stock-gap and rank-gap modifiers, the final value is clamped with FMath::Min(Points, 0); the non-draw loss-floor branch is skipped.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:21",
@@ -63,7 +64,7 @@
       "status": "verified"
     },
     "Evaluation_S": {
-      "simple": "Point adjustment for a S result evaluation.",
+      "simple": "Extra rank points when your battle result earns an S. A larger number makes that result more rewarding.",
       "technical": "int32, constructor default 0, exported DEFAULT 10. Added to the running total when the result-rank argument (Snapshot.Key00, produced by GetResultScoreRank) is 4 (S); the switch maps 1=C, 2=B, 3=A, 4=S and unrecognised ranks add nothing.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:24",
@@ -77,7 +78,7 @@
       "status": "verified"
     },
     "Evaluation_A": {
-      "simple": "Point adjustment for a A result evaluation.",
+      "simple": "Extra rank points when your battle result earns an A. A larger number makes that result more rewarding.",
       "technical": "int32, constructor default 0, exported DEFAULT 5. Added to the running total when the result-rank argument (Snapshot.Key00, produced by GetResultScoreRank) is 3 (A); the switch maps 1=C, 2=B, 3=A, 4=S and unrecognised ranks add nothing.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:27",
@@ -91,7 +92,7 @@
       "status": "verified"
     },
     "Evaluation_B": {
-      "simple": "Point adjustment for a B result evaluation.",
+      "simple": "Extra rank points when your battle result earns a B. A larger number makes that result more rewarding.",
       "technical": "int32, constructor default 0, exported DEFAULT 0. Added to the running total when the result-rank argument (Snapshot.Key00, produced by GetResultScoreRank) is 2 (B); the switch maps 1=C, 2=B, 3=A, 4=S and unrecognised ranks add nothing.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:30",
@@ -105,7 +106,7 @@
       "status": "verified"
     },
     "Evaluation_C": {
-      "simple": "Point adjustment for a C result evaluation.",
+      "simple": "Extra rank points when your battle result earns a C. A larger number makes that result less of a penalty.",
       "technical": "int32, constructor default 0, exported DEFAULT -5. Added to the running total when the result-rank argument (Snapshot.Key00, produced by GetResultScoreRank) is 1 (C); the switch maps 1=C, 2=B, 3=A, 4=S and unrecognised ranks add nothing.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:33",
@@ -119,7 +120,7 @@
       "status": "verified"
     },
     "ForceGaugeRate": {
-      "simple": "Points per team-stock difference.",
+      "simple": "How strongly the difference in remaining fighters changes your rank points. A larger number makes leftover team strength matter more.",
       "technical": "int32 multiplier, constructor default 0, exported DEFAULT 2. After the result and evaluation terms, the consumer adds (GetCharacterStock(player team) - GetCharacterStock(rival team)) * ForceGaugeRate. GetCharacterStock returns the configured max for an unlimited team and 0 when no stock entry exists, so this is a stock-count difference, not a percentage or a normalized gauge value.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:36",
@@ -132,7 +133,7 @@
       "status": "verified"
     },
     "RankGapThreshold": {
-      "simple": "Rank-point gap that triggers loss mitigation.",
+      "simple": "How far ahead the other team's average rank points must be to soften your loss. This applies only when your team is losing.",
       "technical": "int32, constructor default 0, exported DEFAULT 3000, in rank-point units. The consumer sums UserInfo.RankPoint from OnlineUserBattleSettings entries indexed by each character's GetCharacterIndex() (out-of-range indices are skipped; entries can include CPU users), integer-divides each team sum by its counted characters, and compares (enemy average - ally average) >= RankGapThreshold together with GetLoserTeam() == player team.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:39",
@@ -148,7 +149,7 @@
       "status": "verified"
     },
     "RankGapRate": {
-      "simple": "Multiplier applied to a mitigated loss.",
+      "simple": "When the other team is much higher ranked, this sets how much of your loss remains. A larger number costs you more rank points.",
       "technical": "float multiplier, constructor default 0.0f, exported DEFAULT 0.2. When the RankGapThreshold and loser-team conditions hold, the running int32 total is converted to float, multiplied by RankGapRate and cast back to int32 (truncation toward zero) before the draw clamp and the non-draw loss floor.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPointCalculation.h:42",

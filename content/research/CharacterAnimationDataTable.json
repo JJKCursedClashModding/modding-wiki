@@ -1,8 +1,9 @@
 {
+  "overview": "This table tells the game which character animation clip to use for actions, poses, and expressions.",
   "description": "Per-row mapping from animation state names to AnimMontage primary-asset names. Rows are selected indirectly by CharacterAnimationSet, CharacterCapture, and SituationOverviewPose IDs; consumers file loaded montages under Key in character anim instances or turn Key -> FileName pairs into capture-loader maps.",
   "fields": {
     "Id": {
-      "simple": "Animation group row key (character or specialized group such as facial parts).",
+      "simple": "The name of one animation group, such as a character's main set, facial expressions, or a special attack set. Other game data uses this name to choose the group.",
       "technical": "FName row identity exported as ID. In all 1125 aggregate rows the ID string equals the DataTable row name, and no traced consumer reads the struct property itself. Callers instead pass a row name from CharacterAnimationSet.Id_CharacterAnimation, CharacterCapture.Id_CharacterAnimation, or SituationOverviewPose.Id_CharacterAnimation_Ally/_Enemy to a first-match FindRow over AGameDataTableManager.CharacterAnimationDataTables; None is skipped or returns no row. The 55 per-character export shards partition the same 1125 keys exactly. Names include base character rows such as CP_010 and suffixed groups such as CP_010_FACIAL and CP_010_ATTACKA.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterAnimation.h:11",
@@ -17,7 +18,7 @@
       "status": "verified"
     },
     "Key": {
-      "simple": "Parallel list of animation state names that a montage gets bound to.",
+      "simple": "The action or pose for an animation, such as standing, running, falling, or an expression. Each entry matches the animation in the same position.",
       "technical": "TArray<FName>. Every exported row has 35 entries, with trailing None slots. Install loops iterate Key.Num() and pair Key[Index] with FileName[Index]; a None in either array is skipped. Battle spawning calls UGameAnimInstance::SetAnimationAsset(Key, Montage, bDuplicate), requesting a transient duplicate only for Idle and Fall_01; sequencer spawning passes false. Capture builds a TMap<Key, FileName>: every non-None pair for situation overview, only the CharacterCapture idle/enter keys otherwise. TMap::Add means a later duplicate Key overwrites an earlier mapping; the exported duplicate keys carry identical FileNames. There is no FileName.Num() comparison before GetData()[Index]/operator[] indexing, so ragged arrays would be unsafe.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterAnimation.h:15",
@@ -39,7 +40,7 @@
       "status": "verified"
     },
     "FileName": {
-      "simple": "Parallel list of AnimMontage primary-asset names paired with Key.",
+      "simple": "Change this name to use a different clip for the action in the same position. Character pictures use these names for idle, entry, and special pose animations.",
       "technical": "TArray<FName> serialized as Filename. Each value is an AnimMontage primary-asset name, not an object path: collectors append the whole FileName array (including None entries, with no Key check), and loader creation then drops None names and deduplicates by name. Install paths look up each non-None name in the relevant StudioAnimMontageLoaders cache (StudioAnimMontageLoaders_810 for battle, _7C0 for sequencer), resolve FPrimaryAssetId(AnimMontage, FileName) through AbramsAssetManager, and bind the loaded UAnimMontage at the paired Key; missing cache entries are fail-fast FindChecked lookups there. Capture maps store Key -> FileName and the per-slot AnimMontageLoaders map; idle/enter playback reads the map value, while situation-overview pose playback indexes FileName[0] directly without rechecking Key[0]. All exported rows have a non-None first FileName, but the data contains one non-None FileName with a None Key and one non-None Key with a None FileName; the checking consumers skip both kinds of pair, while preload still sees the non-None file.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterAnimation.h:18",

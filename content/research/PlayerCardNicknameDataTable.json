@@ -1,8 +1,9 @@
 {
+  "overview": "This table lists the nicknames players can show on the upper and lower lines of their player card.",
   "description": "Defines the selectable top and bottom lines of a player card: each row pairs a nickname ID and slot type with the inventory nickname item required to select it and the text key used for its displayed label.",
   "fields": {
     "Id": {
-      "simple": "Nickname row identifier (export key `ID`; native property `Id`).",
+      "simple": "The name the game saves when a player picks this nickname, also used for leaderboard cards.",
       "technical": "FName row key; all 2940 export row names equal this property, and the asset's ImportKeyField is `Id`. FGamePlayerCardParameter stores the chosen row in TopNicknameId/BottomNicknameId. Validate() requires a row whose NicknameType matches the slot, otherwise substitutes '3830'/'23830'; the ownership sanitiser uses the same defaults. For leaderboards, the numeric FName is converted with FCString::Atoi into uint16 TopNicknameNumber/BottomNicknameNumber and rebuilt with FString::FromInt, with a row-existence fallback. Selection tiles carry this ID into UGameCustomizeCardTileItem::Id, which the editor writes back to the card; substitution can make the tile carry the currently selected row's ID instead of the displayed variant's.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardNickname.h:11",
@@ -21,7 +22,7 @@
       "status": "verified"
     },
     "NicknameType": {
-      "simple": "Whether this row is a top or bottom nickname line.",
+      "simple": "Whether this nickname goes on the upper or lower line of the player card. Players only see choices meant for that line.",
       "technical": "EGameNicknameType (None=0, Top=1, Bottom=2, Invalid=255) is a uint8 property whose row constructor defaults to None. Validate() compares the saved ID's row type to the expected slot and replaces a mismatch with that slot's default ID. Tile building removes rows whose NicknameType differs from the widget's Blueprint-editable TargetNicknameType (the C++ constructor defaults to Top), so wrong-slot rows are not offered in that reconstructed C++ path; retail widget Blueprints are unavailable to confirm the instance values. The export itself has only Top and Bottom rows (1470 each), no None or Invalid.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameNicknameType.h:6",
@@ -36,7 +37,7 @@
       "status": "verified"
     },
     "Id_Item": {
-      "simple": "Inventory nickname item whose ownership permits this variant.",
+      "simple": "The nickname item a player must own and have unlocked to use this choice. Choices without an item are always available.",
       "technical": "FName matched against Item row IDs. PlayerCard_GetOwnedNicknameRows collects owned (stock count > 0) Item rows of EGameItemType::Nickname, keeps unlocked ones (UserProgressFlag < 0 or its progress bit set), then removes any nickname row with a non-None Id_Item whose ID is absent from that set; NAME_None is treated as always available. With bSort it stable-sorts by the linked Item row's SortingOrder. PlayerCard_FindNicknameItem resolves the selected row through this field to its Item row. Tile new badges read GameItem_IsNew(Row->Id_Item), while clearing the stock-new flag resolves TileItem->Id back to an Item row, so the two can differ under tile substitution. MakeNicknameRowTextRequest also uses this field to find the first other row sharing the item when a label has no text.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardNickname.h:19",
@@ -56,7 +57,7 @@
       "status": "verified"
     },
     "Id_ItemText": {
-      "simple": "Text-table key used to resolve this nickname's displayed label.",
+      "simple": "The words shown for this nickname on the player card. Some languages switch the upper and lower wording, and choices without words use a general label.",
       "technical": "FName passed as GameItem_GetNameTextCore(Id_ItemText, EGameItemType::Nickname, nullptr, 0, true). That helper calls PlayerCard_MakeNicknameTextId, which case-insensitively swaps a trailing _TOP/_BOTTOM for languages 2/3/5/9/10 (Fr/Es/It/Pt/Es_LA) and otherwise returns the key unchanged; AGameTextManager then resolves it through the loaded ItemTextDataTable_<language>. Tile building keeps NAME_None text keys and gives them SYS_CUSTOMIZE_PLAYERCARD_LABEL_0011, but removes rows with a real key that has no text after the swap, then deduplicates by resolved label string per Id_Item. Separately, PlayerCard_MakeNicknameTextRequest(Id) uses the first other row with the same Id_Item as a fallback label when the row's own text is missing, Id_Item is not None, and bUseTwin is true.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardNickname.h:22",

@@ -1,8 +1,9 @@
 {
+  "overview": "This table groups a character's moves into a combo and sets how that combo handles range, Cursed Energy, movement, and recovery.",
   "description": "Attack-set row that groups an ordered list of AttackDataTable IDs for a character's attack chain and stores range, cursed-energy, inertia and recovery metadata for that chain.",
   "fields": {
     "Id": {
-      "simple": "Attack-set row key.",
+      "simple": "The name given to this group of combo moves. The game uses it when a character starts the matching attack.",
       "technical": "FName row key/export label (exported as ID). Action objects select a set ID from the owning character's action row--scalar Id_AttackSet_* fields, level-selected arrays such as Id_AttackSet_CursedEnergy_*, or hard-coded fallbacks--and call Action_FindAttackSetRow, which rejects None when bCheckNone is true and returns the first matching DataTable row. All 731 exported row keys match their Id value. Character controllers may cache the chosen row (HeldAttackSetRow/StartedAttackSet), and some branch on AttackSetRow->Id itself. The command-list widget resolves an explicitly supplied ID with its own first-match helper. This is a single unsharded table.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:856",
@@ -22,7 +23,7 @@
       "status": "verified"
     },
     "AttackRangeType": {
-      "simple": "Whether this attack chain is short-range or long-range.",
+      "simple": "Whether this combo counts as close-range or long-range for combat tracking. It does not change how the moves themselves perform.",
       "technical": "EGameAttackRangeType (uint8: None=0, Short=1, Long=2, Invalid=255). After the indexed Attack row resolves, Start with StartCount <= 0 switches on the set value: Short adds battle-log 0x3F and calls OnCharacterShortRangeAttack; Long adds 0x40 and calls OnCharacterLongRangeAttack. None and Invalid do nothing. This is set-level tracking, not an Attack-row field, and the calls occur only after a successful AttackRow lookup.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameAttackRangeType.h:6",
@@ -35,7 +36,7 @@
       "status": "verified"
     },
     "bCursedEnergyAttack": {
-      "simple": "Marks this chain as a cursed-energy attack for mission/stat tracking.",
+      "simple": "Turn this on to count the whole combo as a Cursed Energy attack for mission records.",
       "technical": "bool checked once on chain start (StartCount <= 0, after AttackRow resolution). When true it adds battle-log 9, additionally 0xE for action classes whose IsCursedEnergyAttack1() is true or 0x13 for those whose IsCursedEnergyAttack2() is true, calls OnCharacterCursedEnergyAttack, and calls OnCharacterCursedEnergyAttackLevelMax when GetCursedEnergyLevelClamped() >= 3. Those two action-class predicates are virtual overrides, not fields of this table. The flag does not choose the Attack row's CursedEnergyCalcType or CursedEnergy_Add.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:258",
@@ -51,7 +52,7 @@
       "status": "verified"
     },
     "bRecoverCursedEnergyDisabled": {
-      "simple": "Suppresses cursed-energy recovery during this attack chain.",
+      "simple": "Turn this on to stop Cursed Energy from recovering while this combo is active. It affects both recovery speed and how soon recovery begins.",
       "technical": "bool. FGameCharacterAction_AttackBase::GetCursedEnergyRecoverRate and GetCursedEnergyRecoveryWaitRate each return 0.0f while the cached AttackSetRow has this flag true, otherwise 1.0f; a null row also yields 1.0f. UGameCharacterActionController multiplies the rate returned by each active layer action, so one such attack set zeroes the controller-level rate.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:722",
@@ -65,7 +66,7 @@
       "status": "verified"
     },
     "Inherit_Inertia_Rate": {
-      "simple": "XY inertia multiplier carried into the attack start.",
+      "simple": "How much sideways movement carries into the attack's first move. When the character is already drifting, a larger value keeps more of that motion.",
       "technical": "float unitless multiplier passed as RateXY to UGameActorMovementController::ScaleInertia on chain start. If the active XY inertia interpolation FloatInterp228 is active, its current value is multiplied by this rate and a new interpolation is restarted over the remaining duration with the same ease. No effect when that interpolation is inactive; Z uses Inherit_Inertia_RateZ instead.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:257",
@@ -76,7 +77,7 @@
       "status": "verified"
     },
     "Inherit_Inertia_RateZ": {
-      "simple": "Vertical inertia multiplier carried into the attack start.",
+      "simple": "How much upward or downward movement carries into the attack's first move. It also changes jump movement already being carried, with larger values keeping more motion.",
       "technical": "float unitless multiplier. On chain start it first scales the active jump-inertia carry interpolation (UGameCharacterMovementController::ScaleJumpInertiaCarry multiplies its current value) and is then passed as RateZ to ScaleInertia, which rescales the active FloatInterp258. Both rescalings preserve remaining time and ease type; inactive interpolations are untouched.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:255",
@@ -90,7 +91,7 @@
       "status": "verified"
     },
     "Id_Attack": {
-      "simple": "Ordered list of AttackDataTable row IDs comprising the chain steps.",
+      "simple": "The moves that make up the combo, usually in the order the game plays them.",
       "technical": "TArray<FName>. The base virtual GetAttackRow(SetRow, Index) rejects a null set or negative/out-of-range Index, skips NAME_None, and scans the five AttackDataTables in registration order for the first matching row; Start supplies GetActionStartCount() as Index, and GetNextCursedEnergyAdd uses the current count (or count+1 after a same-type action). Character-specific GetAttackRow overrides can remap that index or bypass the array with a hard-coded Attack ID under state conditions (for example CP_090, CP_110, CP_190 and CP_200); CP_160's condition helper reads Id_Attack[0] directly. The command-list widget iterates the array but does not sum: it returns the first non-None, resolvable Attack row whose |CursedEnergy_Add| > 1e-8, scaled by -0.01 and formatted as integer/tenths; a missing set returns '-1' and no qualifying row returns '0'. All 731 exported sets have 12 slots with no non-None entry after the first None; duplicate IDs are valid because the index, not uniqueness, selects the step. Cross-table join: AttackSetDataTable -> AttackDataTable1..5.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Attack.cpp:862",

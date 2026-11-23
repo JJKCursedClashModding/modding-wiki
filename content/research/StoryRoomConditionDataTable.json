@@ -1,8 +1,9 @@
 {
+  "overview": "Helps the game choose which story room layout appears as the player moves through the story.",
   "description": "Per-condition weighted candidate lists for the story-room placement chosen from demo progress.",
   "fields": {
     "ID": {
-      "simple": "Room-condition id (e.g. ROOM_COND_0000).",
+      "simple": "Which point in the player's story progress makes this room choice apply. The game bases it on how far the player has advanced.",
       "technical": "The export column ID is the native FName Id at row +0x08 and the DataTable import key; FindRow matches the external row key in StoryRoomConditionDataTables (DTM +0x860), taking the first loaded table that contains it. Story_PickRoomPlacement_13097C0 derives that key from demo progress: default ROOM_COND_0000, the last cleared demo's non-None StoryDemo.Id_StoryRoomCondition while the ChapterIndex-6 chapter has a pending demo, or a uniform pick of all chapters' non-None demo conditions when bPickWhenAllCleared is true. The 67 exported keys are noncontiguous ROOM_COND_0000..0086 (20 gaps); each is referenced by exactly one StoryDemo row, and every non-None StoryDemo.Id_StoryRoomCondition resolves. A missing condition row returns NAME_None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomCondition.h:11",
@@ -21,7 +22,7 @@
       "status": "verified"
     },
     "Id_StoryRoomPlacement": {
-      "simple": "Candidate StoryRoomPlacement rows for this condition.",
+      "simple": "Which story room layout can appear for this condition. Right now each condition offers just one choice.",
       "technical": "TArray<FName> (row +0x10) with eight slots in every export; index 0 is a non-None ROOM_* id in all 67 rows and indices 1-7 are None. The picker collects only the prefix before the first None (None is the terminator), returns NAME_None when that prefix is empty, and returns the selected prefix entry; a missing condition row also returns NAME_None. Callers cache the result in GameManager.StudioStoryRoomPlacementId_D18 (+0xD18, initially NAME_None), copy it to FStudioPhaseRequest.Name5C (+0x5C), resolve it through StoryRoomPlacementDataTables (+0x850), and then to map levels and room actors. All 67 ids resolve and each exported placement row is named exactly once.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomCondition.h:15",
@@ -39,7 +40,7 @@
       "status": "verified"
     },
     "Weights": {
-      "simple": "Selection weights parallel to Id_StoryRoomPlacement.",
+      "simple": "How likely each listed room layout is to be chosen. A bigger number gives that layout more chances, though only one layout is offered.",
       "technical": "TArray<float> (row +0x20) parallel by index to Id_StoryRoomPlacement. The picker copies Weights[i] only for the non-None candidate prefix, returns NAME_None for an empty prefix, sums those floats, sets roll = StoryFRand() * total (StoryFRand is RandRange(0, MAX_int32) * 2^-32), then uses the first index where roll < Weights[i] after earlier weights are subtracted; otherwise it falls back to the last prefix index. Weights[i] has no independent bounds check, so the arrays must stay aligned and a shorter Weights array is out-of-bounds. Every exported row has eight 1.0 weights, but only index 0 is a candidate, so the supplied data deterministically selects that one placement rather than making an eight-way uniform draw.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomCondition.h:18",

@@ -1,8 +1,9 @@
 {
+  "overview": "This table controls how a move's hitting area grows, shifts, and stops while the attack is active.",
   "description": "Collision-shape, relative-offset and attack-lifetime parameters used when an attack component is armed; selected through the damage row's Id_CollisionModify and applied by FGameCollisionParameter.",
   "fields": {
     "Id": {
-      "simple": "Row identifier used by damage rows to select this modification.",
+      "simple": "The name that links these hit-area settings to a particular damage move.",
       "technical": "FName row key. FGameCollisionParameter::Setup skips the lookup when DamageRow->Id_CollisionModify is None; otherwise it scans CollisionModifyDataTables in load order and uses the first UDataTable::FindRow match. The table Properties use ImportKeyField Id and the native UPROPERTY is Id; the exporter spells the per-row key ID, and it matches the row-map key in all 63 exported rows.",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:37",
@@ -15,7 +16,7 @@
       "status": "verified"
     },
     "Size": {
-      "simple": "Target collision extents (or radius/height inputs for spheres and capsules).",
+      "simple": "How large the hit area becomes during the move. Bigger values make it larger, and zero leaves it unchanged.",
       "technical": "FVector target size. A zero vector is a no-animation sentinel: TickSize returns before any wait/timer work and leaves the shape unchanged. For boxes it lerps cached OriginalSize to Size component-wise and sets box extent; for spheres it averages X/Y/Z of both vectors and sets sphere radius; for capsules it averages X/Y for radius and uses Z as half-height. Units are Unreal world units (centimetres); exported examples include (90,90,200) and (70,70,200).",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:230",
@@ -27,7 +28,7 @@
       "status": "verified"
     },
     "Size_Time": {
-      "simple": "Duration over which the collision size reaches Size.",
+      "simple": "How long the hit area takes to reach its new size. Shorter times make the change faster, and zero applies it at once.",
       "technical": "Seconds, consulted only when a modification row exists and Size is nonzero. CollisionParameter_Alpha yields 1 when Time<=0, otherwise clamps Elapsed/Time to [0,1]; SizeElapsed advances by DeltaTime multiplied by the owner's CustomTimeDilation after alpha is computed. Zero/negative therefore applies the target size on the first animating tick (after any wait); default 0.",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:178",
@@ -39,7 +40,7 @@
       "status": "verified"
     },
     "Size_WaitTime": {
-      "simple": "Delay before the size animation starts.",
+      "simple": "How long the game waits before the hit area starts changing size. Longer waits delay the change.",
       "technical": "Seconds, cached into FGameCollisionParameter::SizeWaitTime at Setup. While positive, TickSize subtracts scaled DeltaTime and returns without changing shape; default 0 (no delay).",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:71",
@@ -50,7 +51,7 @@
       "status": "verified"
     },
     "Location": {
-      "simple": "Target relative offset applied to the collision component.",
+      "simple": "How far the hit area shifts during the move. Bigger values move it farther, and zero leaves it unchanged.",
       "technical": "FVector offset in Unreal world units (centimetres) before rotation. A zero vector is a no-offset sentinel: TickLocation returns without touching relative location. Otherwise it rotates Location * Alpha by FQuat(Base) * Rotation130, where Base is the component relative rotation or FRotator::ZeroRotator when bLocation_AbsoluteRotation is true, and then calls SetRelativeLocation(Offset + OriginalLocation).",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:285",
@@ -63,7 +64,7 @@
       "status": "verified"
     },
     "Location_Time": {
-      "simple": "Duration over which the collision offset reaches Location.",
+      "simple": "How long the hit area takes to reach its new position. Shorter times make the shift faster, and zero applies it at once.",
       "technical": "Seconds, consulted only when a modification row exists and Location is nonzero. Same CollisionParameter_Alpha rule as Size_Time: non-positive duration gives alpha 1 immediately; positive duration ramps Elapsed/Time. LocationElapsed advances by scaled DeltaTime after alpha computation; default 0.",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:218",
@@ -74,7 +75,7 @@
       "status": "verified"
     },
     "Location_WaitTime": {
-      "simple": "Delay before the offset animation starts.",
+      "simple": "How long the game waits before the hit area starts shifting. Longer waits delay the movement.",
       "technical": "Seconds, cached into FGameCollisionParameter::LocationWaitTime at Setup. While positive, TickLocation subtracts scaled DeltaTime and returns without changing relative location; default 0.",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:73",
@@ -85,7 +86,7 @@
       "status": "verified"
     },
     "bLocation_AbsoluteRotation": {
-      "simple": "Whether the Location offset is interpreted without the component's relative rotation.",
+      "simple": "On keeps the hit area's shift steadier as the character turns. Off lets it follow the attack's facing. Most moves use On.",
       "technical": "When true, TickLocation uses FRotator::ZeroRotator as the base instead of Component->GetRelativeRotation() before composing cached Rotation130. Affects only the Location offset; default false.",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:296",
@@ -95,7 +96,7 @@
       "status": "verified"
     },
     "Life_Time": {
-      "simple": "Lifetime after which the component's collision is queued off and a bound OnHit delegate is fired.",
+      "simple": "How long the attack's hit area stays active. Bigger numbers last longer, and zero means it has no time limit.",
       "technical": "Seconds. Setup stores Life_Time != 0 ? Life_Time : -1, so the header/export default 0 means unlimited (-1, no countdown), as do negative values. Only a positive internal LifeTime counts down by owner-scaled DeltaTime; when that countdown crosses zero, FGameCollisionParameter queues NoCollision through AGameCollisionManager::RequestCollisionEnabled (applied later in ACollisionManager::Tick), zeroes LifeTime, and broadcasts/clears OnHit only if bound. The verified binding is AGameEffect::OnAttackHit, which clears the source's attack-active flag for non-type-1 effects; no character-attack OnHit binding was found in Source.",
       "evidence": [
         "Source/Abrams/Private/GameCollisionParameterInterface.cpp:74",

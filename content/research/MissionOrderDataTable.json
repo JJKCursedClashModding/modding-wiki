@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets what each battle wave asks you to do, the words shown for that goal, and which binding vows can appear.",
   "description": "Defines a wave's win condition/order type, its display text, numeric thresholds and binding-vow exclusions.",
   "fields": {
     "Id": {
-      "simple": "Mission order identifier.",
+      "simple": "The name the game uses to connect this mission order to its wave. Players never see it.",
       "technical": "FName import key/row name for FGameDataTableRow_MissionOrder; the export's ImportKeyField is Id. The manager registers one MissionOrderDataTable loader and resolves it into MissionOrderDataTables (DTM+0x9D0). The first matching row in that array is returned by the shared finder; with bCheckNone true it rejects a None id, and some UI callers pass false. MissionWave.Id_MissionOrder supplies the key for gameplay, UI and pre-battle filtering. No observed C++ consumer reads the row's Id member as a value.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionOrder.h:13",
@@ -17,7 +18,7 @@
       "status": "observed"
     },
     "OrderType": {
-      "simple": "Kind of objective or wave special rule.",
+      "simple": "Choose the mission's goal, such as a boss fight, timed survival, lower enemy health, Cursed Energy finish, Domain Expansion, or Special Tag Combo.",
       "technical": "EGameMissionOrderType (uint8), default None; enum order gives None=0, Normal=1, Boss=2, Protracted=3, Event=4, SuperCursedEnergyAttack=5, SuperCursedEnergyAttackFinish=6, DomainExpansion=7, SpecialTagCombo=8, Extra=9 and Invalid=255. BattleStory_IsMissionOrderAchieved switches on it: Protracted succeeds when the player's logged elapsed battle time (the TimeLimit log value) is >= Value[0]; Event succeeds when the mean enemy-team HitPointRate is <= Value[0]; SuperCursedEnergyAttack, SuperCursedEnergyAttackFinish and SpecialTagCombo require an ally-send log hit >= 1. SuperCursedEnergyAttackFinish also has an explicit failure path when enemy stock is <= 0 and no finish hit is logged. Boss selects the boss wave transition and boss-cost indicator paths in the battle overlay, radar, player-info and versus-interval widgets. Raw 3 (Protracted) suppresses the remaining-time display in both Arcade and PvE results when the winning team is the player's; raw 4 (Event) with Value[1] > 0 sets HitPointMin on each resolved enemy character to Value[0] times its MissionCharacter row's HitPoint. DomainExpansion and SpecialTagCombo are also read through the cached GetMissionOrderType in end-state checks; with no cached order it returns Invalid.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionOrder.h:17",
@@ -39,7 +40,7 @@
       "status": "verified"
     },
     "Value": {
-      "simple": "Numeric parameters for the order condition and display.",
+      "simple": "The first number sets survival time or enemy health percentage. A second number sets enemy minimum health on some event waves.",
       "technical": "TArray<float>, default empty; all 18 exported rows contain exactly two floats. Value[0] is the Protracted elapsed-time threshold in seconds (the exported PVE_PROTRACTED_30/60 values match their MissionWave TimeLimit), the mean-enemy-HP-rate threshold for Event, and the HitPointMin rate for OrderType 4. It is also inserted as the VALUE float parameter by the in-battle mission-order widget for every row, but of the exported text ids only Event message BTL_MISSION_ORDER_MESSAGE_0010 contains <DYN=VALUE> and formats it as a percentage. Value[1] gates the Event/raw-4 HitPointMin behaviour (> 0); exported Event rows No.112_1/2/3 use 1.0 while the other Event rows use 0.0. Consumers index Value[0], and Event battle setup indexes Value[1], without a general length guard. The 999.0 in exported Normal/Extra rows has no sentinel behaviour in the reconstructed consumer code.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionOrder.h:20",
@@ -55,7 +56,7 @@
       "status": "verified"
     },
     "Id_BattleText_OrderName": {
-      "simple": "Localized text id for the order name.",
+      "simple": "The name that picks the order's title in battle and wave announcements. It also appears in the situation overview and versus wave info.",
       "technical": "FName, default None. Displayed by the in-battle mission-order widget, the wave overlay's subtext, the situation overview win-condition title and the versus-enemy interval wave-info widget. The overlay falls back to an empty id when its lookup misses, and the interval widget hides the order text. The table supplies a text id; localization strings are not stored here.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionOrder.h:23",
@@ -67,7 +68,7 @@
       "status": "verified"
     },
     "Id_BattleText_OrderDetail": {
-      "simple": "Localized text id for the order description.",
+      "simple": "This name picks the explanation shown in battle and the situation overview. Story character selection uses fixed wording for events and missing orders.",
       "technical": "FName, default None. The in-battle mission-order detail widget passes it to SetTextIdWithParameters with VALUE taken from Value[0]; of the exported detail texts only Event message BTL_MISSION_ORDER_MESSAGE_0010 contains <DYN=VALUE> and renders that parameter as a percentage. The situation overview uses it as plain text. The story character-select mission-info widget uses this field except for Event rows (hard-coded BTL_MISSION_ORDER_MESSAGE_0001) and null orders (hard-coded BTL_MISSION_ORDER_MESSAGE_0003), so those two cases do not read it. Localization strings are resolved from BattleTextDataTable shards, not stored here.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionOrder.h:26",
@@ -81,7 +82,7 @@
       "status": "verified"
     },
     "ExcludeBindingVowsEffectType": {
-      "simple": "Binding-vow effect types disallowed for waves using this order.",
+      "simple": "In PvE preparation, this removes binding vows with effects not allowed for the wave's goal. It works alongside the mission task's own restrictions.",
       "technical": "TArray<EGameBindingVowsEffectType>, default empty. In IntervalPvE_PickBindingVows, a PvE mission's weighted BindingVowsLottery first produces a deduplicated candidate list. For every wave with a non-None Id_MissionOrder, the order row is resolved and each candidate vow's BindingVows.Id_BindingVowsEffect rows are expanded; the candidate is removed if any EffectType is contained in this array. MissionTask.ExcludeBindingVowsEffectType is then applied in a separate pass to the surviving candidates, so the two filters are conjunctive on the same list. Exported rows use eight-element arrays padded with None; no exported BindingVowsEffect row has EffectType None, so that padding is inert in the retail export.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionOrder.h:29",

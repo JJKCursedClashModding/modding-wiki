@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets up each story room by choosing its location, camera, characters, and how they appear.",
   "description": "Concrete story-room layout: map, camera and five index-parallel character slots (id, variation, material pattern, idle montage, spawn tag) used by MainMenuStory.",
   "fields": {
     "ID": {
-      "simple": "Room placement id (export rows ROOM_0000 through ROOM_0086, with gaps).",
+      "simple": "The name that identifies this room setup and connects it to the story scene that uses it.",
       "technical": "The export column ID is the native FName Id at row +0x08 and the DataTable import key; no traced runtime consumer reads the member itself. Both finders use the external row key supplied in FStudioPhaseRequest.Name5C / GameManager.StudioStoryRoomPlacementId_D18. Story_PickRoomPlacement normally derives that key from a StoryRoomCondition weighted draw, but with bPickWhenAllCleared=false and no pending condition it returns the already cached id (NAME_None at a fresh start) instead of drawing. Story_ResolveDemoLaunch sets the cache with bPickWhenAllCleared=true and copies it into the request; MainMenuStory prepare scans StoryRoomPlacementDataTables for this key and uses the first match.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:11",
@@ -17,7 +18,7 @@
       "status": "verified"
     },
     "Id_Map": {
-      "simple": "Map row supplying the room's base/environment levels and character-lighting settings.",
+      "simple": "The base location the game loads for this room, including the lighting used on its characters.",
       "technical": "FName (row +0x10). Story_GetRoomPlacementLevels resolves it with Status_FindMapRow(MapDataTables, Id_Map, false, false): there is no explicit None pre-check, though UDataTable::FindRow rejects None, and a missing placement or Map row makes the helper return an empty array. MainMenuStory separately resolves it into RoomMapRow and passes that row to ApplyMapCharacterLighting for each spawned character; a null Map row is a no-op there. Exported values are SRM_10, SRM_20 and SRM_30; all three resolve in MapDataTable.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:15",
@@ -31,7 +32,7 @@
       "status": "verified"
     },
     "LevelDesignName": {
-      "simple": "Extra level-design package appended to the room's map levels.",
+      "simple": "Which additional room design loads after the base location, completing the space the characters stand in.",
       "technical": "FName (row +0x18). Story_GetRoomPlacementLevels appends every Map.FileName entry first and then this single name; the whole array is copied into the phase transition without filtering or de-duplication, so exported None placeholders in Map.Filename remain in the returned list. This is a separate package, not a field read from the Map row. The export contains nine SRM_10/20/30_LevelDesign_NN values, all carrying the same map prefix as their row's Id_Map.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:18",
@@ -43,7 +44,7 @@
       "status": "verified"
     },
     "CameraName": {
-      "simple": "Tag used to find the story-room camera actor.",
+      "simple": "Which camera frames this story room. Changing it changes the viewing angle while characters are on screen.",
       "technical": "FName (row +0x20). MainMenuStory's spawn state calls GetAllActorsOfClassWithTag(AGameStoryRoomCamera::StaticClass(), CameraName); only the first tagged actor is used, with the camera manager's target aspect ratio forced on its component and SetViewTarget called. The current FOV and view target are saved before unlocking; if no actor has the tag, no new view target is set. Exported names are CAM_01 through CAM_08 and are never None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:21",
@@ -57,7 +58,7 @@
       "status": "verified"
     },
     "Id_Character": {
-      "simple": "Character ids placed in the room, one per character slot.",
+      "simple": "Which characters stand in the room, with one name for each possible place. An empty place adds no character.",
       "technical": "TArray<FName> (row +0x28; five entries in every exported row). MainMenuStory loops over this array's length and indexes the other four arrays at the same position. A None id, VariationIndex -1 or None PlacementName skips the slot; a character row that cannot be found, or a CharacterVariation row that cannot be found, is also skipped. Surviving rows and variations are cached in FStoryRoomSpawnEntry; the variation's FileName_BP becomes the Character primary-asset loader name. The export uses 14 character ids across 171 active slots.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:24",
@@ -71,7 +72,7 @@
       "status": "verified"
     },
     "VariationIndex": {
-      "simple": "Zero-based index of the character variation to spawn in each slot.",
+      "simple": "Which outfit version each character wears. A different number chooses a different version, and minus one leaves that place empty.",
       "technical": "TArray<int32> (row +0x38) parallel to Id_Character. -1 disables the slot; otherwise the value indexes Character.Id_CharacterVariation with no bounds check, and the resulting variation id is resolved in CharacterVariationDataTables to get FileName_BP for preloading. It is an array position, not the numeric suffix of the variation: for CP_010, indices 0/5/10/12 select CP_010_00/CP_010_10/CP_010_20/CP_010_22. Only 0, 5, 10 and 12 are exported, and every exported slot is in range. ApplyCharacterSetup writes the same index to the spawned character, which is what the material controller later uses to re-resolve its variation.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:27",
@@ -86,7 +87,7 @@
       "status": "verified"
     },
     "MaterialPattern": {
-      "simple": "Material pattern index applied to each spawned character.",
+      "simple": "Which material look each character shows. The usual look appears most often, with an alternate look for one character in certain rooms.",
       "technical": "TArray<int32> (row +0x48) parallel to Id_Character, with 0 and 1 as the only exported values. MainMenuStory copies it into FStoryRoomSpawnEntry and calls CharacterMaterialController::SetMaterialPattern(Pattern, nullptr) after ApplyCharacterSetup. That controller re-resolves the character material row through the spawned character's current variation, ignores values <0 or >7, and makes index 0 the visible MaterialName_P1 list and index 1 the P2 list. This is a selector, not a count or duration; the ten nonzero exported slots are pattern 1 on CP_080, and -1 is not used in this table (it would be ignored by the controller, not skip the slot).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:30",
@@ -101,7 +102,7 @@
       "status": "verified"
     },
     "CharacterAnimation": {
-      "simple": "AnimMontage asset name played as the idle pose for each placed character.",
+      "simple": "Which idle animation each character plays while standing in the room. Changing it changes what the character does while waiting.",
       "technical": "TArray<FName> (row +0x58) parallel to Id_Character. Surviving slots add the name to MontageNames, which becomes AnimMontage primary-asset loader names (FPrimaryAssetId with this name); duplicate names collapse and None names are skipped by the loader helper. After spawning, the loaded montage is installed under this same FName key by SetAnimationAsset and played by PlayAnimationAsset(Name, 0.0f, 0.0f, 1.0f, 0.0f, true, false); a null montage makes SetAnimationAsset a no-op. Exported names are AM_*_StoryMode_Idle_* asset names; none appears as an ID or Filename value in the supplied CharacterAnimationDataTable export, and no matching montage file was present in the supplied Content subset.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:33",
@@ -118,7 +119,7 @@
       "status": "verified"
     },
     "PlacementName": {
-      "simple": "Actor tag of the spawn point for each character.",
+      "simple": "Where each character stands in the room. If the named place is missing, the character appears at the room's default starting position.",
       "technical": "TArray<FName> (row +0x68) parallel to Id_Character. A None tag disables the slot; otherwise MainMenuStory collects AGameStoryRoomCharacterSpawnPoint actors and uses the first one whose ActorHasTag matches this name. Its transform becomes Setup.StartTransform, with FTransform::Identity when no actor matches; the name is also copied into the cached spawn entry. Exported active tags are CHR_01 through CHR_07 (unused slots are None).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryRoomPlacement.h:36",

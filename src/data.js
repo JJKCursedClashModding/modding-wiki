@@ -24,6 +24,16 @@ const exportTypes = {
   bool: 'JSON boolean', array: 'JSON array', object: 'JSON object', NoneType: 'JSON null',
 };
 
+const componentExplanations = {
+  R: 'The amount of red in this color.',
+  G: 'The amount of green in this color.',
+  B: 'The amount of blue in this color.',
+  A: 'The part of the color that can control how see-through it looks.',
+  Pitch: 'Controls up-or-down tilt.',
+  Yaw: 'Controls left-or-right turning.',
+  Roll: 'Controls sideways tilt.',
+};
+
 export const groups = catalog.map((entry) => {
   const raw = research[`../content/research/${entry.id}.json`];
   let article = {};
@@ -44,14 +54,13 @@ export const groups = catalog.map((entry) => {
       const parent = annotations.get(container.replace(/\[\]$/, '').toLowerCase());
       if (field.exportOnly) {
         annotation = {
-          simple: `Hex representation of ${container} in the JSON export.`,
+          simple: ['A short text code for this color in the exported file.', parent?.simple].filter(Boolean).join(' '),
           technical: 'The export exposes Hex alongside the four native FLinearColor channels. The Unreal row declares the color struct and has no separate Hex property.',
           status: 'observed',
         };
       } else if (parent) {
-        const channel = { R: 'red', G: 'green', B: 'blue', A: 'alpha' }[component];
         annotation = {
-          simple: `${channel ?? component} component of ${container}.`,
+          simple: `${componentExplanations[component] ?? `The ${component} value for this setting.`} ${parent.simple}`,
           technical: `Stored as part of ${field.componentOf}. ${parent.technical ?? parent.simple ?? ''}`.trim(),
           evidence: parent.evidence,
           status: parent.status === 'unresolved' ? 'unresolved' : 'observed',
@@ -72,9 +81,9 @@ export const groups = catalog.map((entry) => {
     ...entry,
     fields,
     description: article.description,
+    overview: article.overview,
     notes: article.notes ?? [],
     usages: article.usages ?? [],
-    reviewed: fields.filter((field) => field.status !== 'pending').length,
     assetRowCount: entry.variants.reduce((sum, asset) => sum + asset.rows, 0),
   };
 }).sort((a, b) => a.id.localeCompare(b.id));

@@ -18,54 +18,60 @@ const statuses = {
 const formatCount = (value) => value.toLocaleString('en-US');
 const refs = Object.entries(group.references);
 ---
-<Reference title={group.id} description={group.description ?? `Unreal schema for ${group.id}.`} current={group.id}>
+<Reference title={group.id} description={group.overview ?? group.description ?? `Unreal schema for ${group.id}.`} current={group.id}>
   <div class="doc-grid">
     <article class="doc">
       <div class="breadcrumb"><a href={base}>Overview</a><span aria-hidden="true">/</span><a href={`${base}#${group.category}`}>{categoryNames[group.category]}</a></div>
       <h1 class="table-title">{group.id}</h1>
-      <p class="lead"><InlineText value={group.description ?? 'Purpose is pending a review of the table’s runtime consumers.'} /></p>
-      <dl class="specs">
-        <div><dt>Unreal row struct</dt><dd><code>F{group.rowStruct}</code></dd></div>
-        <div><dt>Asset variants</dt><dd>{formatCount(group.variants.length)}</dd></div>
-        <div><dt>Distinct row keys</dt><dd>{formatCount(group.rowKeyCount)}</dd></div>
-      </dl>
+      <p class="lead"><InlineText value={group.overview ?? group.description ?? 'Purpose is pending review.'} /></p>
+      <details class="table-details">
+        <summary>Table details</summary>
+        {group.overview && group.description && group.overview !== group.description && (
+          <p class="technical"><InlineText value={group.description} /></p>
+        )}
+        <dl class="specs">
+          <div><dt>Unreal row struct</dt><dd><code>F{group.rowStruct}</code></dd></div>
+          <div><dt>Asset variants</dt><dd>{formatCount(group.variants.length)}</dd></div>
+          <div><dt>Distinct row keys</dt><dd>{formatCount(group.rowKeyCount)}</dd></div>
+        </dl>
+      </details>
 
       <section id="fields" class="doc-section">
-        <div class="section-heading"><h2>Row fields</h2><span>{group.reviewed} of {group.fields.length} reviewed</span></div>
-        <p class="section-intro">Each field is shared by records that use this schema. Deep links open directly to a field.</p>
+        <h2>What each setting does</h2>
         <label class="filter-label" for="field-filter">Filter fields</label>
         <input class="filter" type="search" id="field-filter" placeholder="Field name, type, or definition" autocomplete="off" />
         <p id="field-empty" class="muted" hidden>No fields match this filter.</p>
         <div class="field-list">
           {group.fields.map((field) => (
             <article class="field" id={fieldAnchor(field.name)}>
-              <div class="field-heading">
-                <h3><a href={`#${fieldAnchor(field.name)}`}><code>{field.name}</code></a></h3>
-                <span class:list={['badge', field.status]}>{statuses[field.status] ?? field.status}</span>
-              </div>
-              <div class="field-type"><code>{field.type || 'Type unknown'}</code>
-                {field.nativeName && field.nativeName !== field.name && !field.name.includes('.') && <span>Unreal property <code>{field.nativeName}</code></span>}
-                {!field.exportKinds.length && <span>Declaration only</span>}
-                {field.exportOnly && <span>Export representation</span>}
-                {field.seenInVariants > 0 && field.seenInVariants < group.variants.length && (
-                  <span>Present in {field.seenInVariants} of {group.variants.length} exports</span>
-                )}
-              </div>
+              <h3 class="field-heading"><a href={`#${fieldAnchor(field.name)}`}><code>{field.name}</code></a></h3>
               <p class="simple"><InlineText value={field.simple ?? 'Definition pending review.'} /></p>
-              {field.technical && <p class="technical"><InlineText value={field.technical} /></p>}
-              {field.enum && (
-                <details class="field-evidence">
-                  <summary>Enum values{field.enum.underlying ? ` · ${field.enum.underlying}` : ''}</summary>
-                  <ul class="enum-values">{field.enum.values.map(([name, value]) => <li><code>{name}</code> <span>{value}</span></li>)}</ul>
-                  <p><code>{field.enum.source}</code></p>
-                </details>
-              )}
-              {(field.source || field.evidence?.length) && (
-                <details class="field-evidence">
-                  <summary>Evidence</summary>
-                  <ul>{[...new Set([field.source, ...(field.evidence ?? [])].filter(Boolean))].map((ref) => <li><code>{ref}</code></li>)}</ul>
-                </details>
-              )}
+              <details class="field-details">
+                <summary>Technical details</summary>
+                <div class="field-type"><code>{field.type || 'Type unknown'}</code>
+                  <span class:list={['badge', field.status]}>{statuses[field.status] ?? field.status}</span>
+                  {field.nativeName && field.nativeName !== field.name && !field.name.includes('.') && <span>Unreal property <code>{field.nativeName}</code></span>}
+                  {!field.exportKinds.length && <span>Declaration only</span>}
+                  {field.exportOnly && <span>Export representation</span>}
+                  {field.seenInVariants > 0 && field.seenInVariants < group.variants.length && (
+                    <span>Present in {field.seenInVariants} of {group.variants.length} exports</span>
+                  )}
+                </div>
+                {field.technical && <p class="technical"><InlineText value={field.technical} /></p>}
+                {field.enum && (
+                  <details class="field-evidence">
+                    <summary>Enum values{field.enum.underlying ? ` · ${field.enum.underlying}` : ''}</summary>
+                    <ul class="enum-values">{field.enum.values.map(([name, value]) => <li><code>{name}</code> <span>{value}</span></li>)}</ul>
+                    <p><code>{field.enum.source}</code></p>
+                  </details>
+                )}
+                {(field.source || field.evidence?.length) && (
+                  <details class="field-evidence">
+                    <summary>Evidence</summary>
+                    <ul>{[...new Set([field.source, ...(field.evidence ?? [])].filter(Boolean))].map((ref) => <li><code>{ref}</code></li>)}</ul>
+                  </details>
+                )}
+              </details>
             </article>
           ))}
         </div>
@@ -113,7 +119,7 @@ const refs = Object.entries(group.references);
     </article>
     <nav class="toc" aria-label="On this page">
       <strong>On this page</strong>
-      <a href="#fields">Row fields</a>
+      <a href="#fields">Settings</a>
       <a href="#variants">Assets & row keys</a>
       <a href="#usage">Code usage</a>
       <a href="#notes">Notes</a>

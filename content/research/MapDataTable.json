@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets each battle or menu stage's scenery, appearance, and sound, including the picture players choose and the lighting used on fighters.",
   "description": "Per-stage master table: selects the level packages and map-local presentation for a battle/menu stage, including its display-text key, nested map effect and decal asset lists, character lighting/material grading, global effect/decal/blood colors, stage-select and mini-map textures, mission-layout IDs, reverb and ambient sound, and sequencer lighting/bloom overrides.",
   "fields": {
     "ID": {
-      "simple": "Stage/map id (e.g. MAP_01, VLM_01, CharacterCapture).",
+      "simple": "The name that identifies this stage and connects it to battles, story scenes, and stage selection.",
       "technical": "FName primary key/import key (native Id, export label ID); the lookup name, not normally a value read from the row. Status_FindMapRow returns the first row named Id in MapDataTables (DTM +0x3A0); sources include GameManager.StudioBattleLevelRequest_CA0.BattleLevel, DomainExpansion/StoryMission/Script/RoomPlacement Id_Map, hard-coded SDM_10/20/30/40, VLM_01 and CharacterCapture. Reads of the value forward MapRow->Id to BattleWidget -> HUD -> Radar SetMiniMap, key SequencerLightDataTables via FindSequencerLightRow(MapId, File->Filename), key SequencerCapture MapOverrideCaptureSource, and identify stage-select/random-map choices. MAP_00 is a synthetic UGameStageSelectWidget row, not a table row. Export has 30 unique rows: MAP_01..MAP_16 (including MAP_14_01/MAP_15_01), DEM_01..03, VLM_01, SDM_10..40, SRM_10..30 and CharacterCapture.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:11",
@@ -16,7 +17,7 @@
       "status": "verified"
     },
     "Id_MapText": {
-      "simple": "Glossary text id for the stage name.",
+      "simple": "Which translated stage name appears in menus and character selection.",
       "technical": "FName text key such as GLS_NAME_MAP_01 (export values are GLS_NAME_* keys, not localized strings). UI consumers pass it straight to SetTextIdOnly (stage-select item and focused stage) or store it as the option label in FreeBattleRuleSelect's Id -> text StageOptions map. GameCharacterSelectWidget looks up a Map row to label the selected stage; GameShopSaleItemListItemDataBase returns it as the map-name label and falls back to ERROR when no row is found. UGameStageSelectWidget's synthetic MAP_00 row hard-codes GLS_NAME_MAP_00. DEM/VLM/SDM/SRM/CharacterCapture rows have their own GLS_NAME_* ids.",
       "evidence": [
         "Source/Abrams/Private/GameStageSelectListItemWidget.cpp:17",
@@ -29,7 +30,7 @@
       "status": "verified"
     },
     "Filename": {
-      "simple": "Ordered list of level packages that make up the map.",
+      "simple": "Change the ordered pieces of the stage the game loads, from its main area to surroundings, layout, and extra scenery.",
       "technical": "TArray<FName> (native FileName, row +0x18; constructor default empty). StartBattleLevelPreload and FStudioBattleSystem2D0::RequestStageLevels call RequestStreamLevel on each name without an IsNone guard. Most phase transitions either call PhaseTrans_RequestLevels(..., MapRow->FileName, ...) or copy the array into StudioRequestedLevelNames_F8 for the phase mailbox. Story helpers append StoryRoomPlacement.LevelDesignName after the map levels, return the list for a Script row, and Story_PrepareBattleRequest unguardedly copies the active map's array. Exported arrays always have 4 entries: base map, *_Environment, *_LevelDesign and an optional foliage/battle-area level or None; the CharacterCapture row has CharacterCapture plus three None entries.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:18",
@@ -44,7 +45,7 @@
       "status": "verified"
     },
     "Id_MapEffect": {
-      "simple": "Foreign key to the map's effect asset list.",
+      "simple": "The name of the separate effect list this stage uses. Leave it empty for no extra effects.",
       "technical": "FName; when non-None, BattleAssets_MapEffects_12BD820 resolves it in MapEffectDataTables (DTM +0x3B0) and appends the nested MapEffect row's FileName list to an Effect primary-asset loader batch. StartBattleAssetPreload uses StudioMapEffectLoaders_180; GamePhase_BattleBase uses StudioMapEffectLoaders_720. NAME_None and a missing row yield no effects. Export values are MAP_05, MAP_06, MAP_09, MAP_11, MAP_12, MAP_13, MAP_14, MAP_15 and MAP_16; every other row is None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:22",
@@ -57,7 +58,7 @@
       "status": "verified"
     },
     "Id_MapDecal": {
-      "simple": "Foreign key to the map's decal asset list.",
+      "simple": "The name of the separate decal list this stage uses. Leave it empty for no extra decals.",
       "technical": "FName; when non-None, BattleAssets_MapDecals_12BD690 resolves it in MapDecalDataTables (DTM +0x3C0) and appends the nested MapDecal row's FileName list to a Decal primary-asset loader batch (StudioMapDecalLoaders_1D0 in preload, _770 in BattleBase). NAME_None and a missing row yield no decals. Export values are MAP_01, MAP_03, MAP_06, MAP_07 and MAP_13; all other rows are None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:25",
@@ -70,7 +71,7 @@
       "status": "verified"
     },
     "CharacterLightColor": {
-      "simple": "Per-map lighting tint for characters.",
+      "simple": "The main tint on characters, weapons, and Shikigami in this stage. Story-scene lights can use it too.",
       "technical": "FVector (row +0x38; constructor default ZeroVector). UGameActorMaterialController::ApplyMapCharacterLighting pushes it as material vector parameter 'Character Light Color'; AGameEffectManager::ApplyMapColors pushes the same vector to the world's MaterialParameterCollection instance as 'FXLightColor'. The lighting call fans out to every managed character's character/weapon/shikigami controllers, and sequencer evaluate paths apply it to the bound character, NPC, level object, shikigami or weapon; sequencer point lights use it as FLinearColor when a map row is selected. Character-capture actors use the CharacterCapture map row here and retain this parameter even though widget Common parameters later override shadow/grade parameters.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:28",
@@ -84,7 +85,7 @@
       "status": "verified"
     },
     "CharacterOverlayColor": {
-      "simple": "Secondary character lighting overlay tint.",
+      "simple": "A second tint layered onto characters, weapons, and Shikigami in this stage. Character previews still use it.",
       "technical": "FVector (constructor default ZeroVector). Its sole traced consumer is UGameActorMaterialController::ApplyMapCharacterLighting, which sets the material vector parameter 'Character Light OverlayColor' on character, weapon and shikigami material controllers (including sequencer-bound targets and the CharacterCapture map row for capture actors). It is not one of the parameters overwritten later by FGameWidgetCharacterCaptureCommonParameter.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:31",
@@ -95,7 +96,7 @@
       "status": "verified"
     },
     "CharacterShadowColor": {
-      "simple": "Per-map character shadow tint.",
+      "simple": "The tint on character shadows in this stage. Character previews use their own setting for this.",
       "technical": "FVector (row +0x68; constructor default ZeroVector). ApplyMapCharacterLighting sets material vector parameter 'Character Light ShadowColor'; ApplyMapColors writes it to the MaterialParameterCollection parameter 'FXCharacterColor'. Capture actors first receive the CharacterCapture map row's value, then GameCharacterCaptureActor and AbramsSequencerSceneCaptureActor overwrite 'Character Light ShadowColor' with FGameWidgetCharacterCaptureCommonParameter.CharacterLightShadowColor (widget-capture data, not this table). Export values vary per map.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:34",
@@ -107,7 +108,7 @@
       "status": "verified"
     },
     "CharacterContrast": {
-      "simple": "Map-specific character material contrast.",
+      "simple": "Higher values increase contrast on characters, weapons, and Shikigami in this stage. Character previews use their own setting.",
       "technical": "float (constructor default 0.0f). ApplyMapCharacterLighting sets scalar parameter 'Character Contrast' through the shared material controller; the fan-out reaches all managed characters' character/weapon/shikigami controllers and sequencer targets. For character capture the CharacterCapture map row supplies the initial value, after which the widget's FGameWidgetCharacterCaptureCommonParameter.CharacterContrast overrides it (default 1.0 in that struct). Export values include 0.9 (MAP_06) and 1.0 (15 of 30 rows).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:37",
@@ -118,7 +119,7 @@
       "status": "verified"
     },
     "CharacterSaturation": {
-      "simple": "Map-specific character material saturation.",
+      "simple": "Higher values make character, weapon, and Shikigami colors richer, and lower values make them grayer. Character previews use their own setting.",
       "technical": "float (constructor default 0.0f). Written as scalar parameter 'Character Saturation' by UGameActorMaterialController::ApplyMapCharacterLighting for every managed character/weapon/shikigami and sequencer-bound target. The CharacterCapture row value is initially applied to capture actors and then overwritten by FGameWidgetCharacterCaptureCommonParameter.CharacterSaturation (widget default 0.0). Export values range from -0.316 to 0.12.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:40",
@@ -129,7 +130,7 @@
       "status": "verified"
     },
     "CharacterLevelsWhite": {
-      "simple": "Character-material white-level grading value.",
+      "simple": "Controls the brightest tones on characters, weapons, and Shikigami in this stage. Character previews use their own setting.",
       "technical": "float (constructor default 0.0f). ApplyMapCharacterLighting sets scalar parameter 'Character LevelsWhite' on the character/weapon/shikigami controllers of managed and sequencer-bound actors. Capture actors get the CharacterCapture row's value first, then FGameWidgetCharacterCaptureCommonParameter.CharacterLevelsWhite (widget default 1.0) overwrites it. Export values include 0.8 (MAP_04) and 1.0 for most stages.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:43",
@@ -140,7 +141,7 @@
       "status": "verified"
     },
     "CharacterLevelsMiddle": {
-      "simple": "Character-material midtone grading value.",
+      "simple": "Controls the middle tones on characters, weapons, and Shikigami in this stage. Character previews use their own setting.",
       "technical": "float (constructor default 0.0f). ApplyMapCharacterLighting sets scalar parameter 'Character LevelsMiddle' across managed characters, their weapons/shikigami and sequencer-bound targets. Capture actors' initial map-row value is overwritten by FGameWidgetCharacterCaptureCommonParameter.CharacterLevelsMiddle (widget default 1.0). Export values include 0.85 (MAP_01), 0.88 (MAP_05) and 0.9 (MAP_06).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:46",
@@ -151,7 +152,7 @@
       "status": "verified"
     },
     "CharacterLevelsBlack": {
-      "simple": "Character-material black-level grading value.",
+      "simple": "Controls the darkest tones on characters, weapons, and Shikigami in this stage. Character previews use their own setting.",
       "technical": "float (constructor default 0.0f). ApplyMapCharacterLighting sets scalar parameter 'Character LevelsBlack' through the same material-controller fan-out as the other grading fields. Character capture first applies the CharacterCapture map row, then FGameWidgetCharacterCaptureCommonParameter.CharacterLevelsBlack (widget default 1.0) overwrites it. Export values include 0.45 (MAP_06) and 1.9 on one row, with many stages at 1.0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:49",
@@ -162,7 +163,7 @@
       "status": "verified"
     },
     "EffectColor": {
-      "simple": "Map-wide tint for spawned effects.",
+      "simple": "The overall color tint for effects in this stage. It applies during battles and story scenes.",
       "technical": "FVector (row +0x98; constructor default ZeroVector). AGameEffectManager::ApplyMapColors writes it to the world's MaterialParameterCollection instance as vector parameter 'Color'. ApplyMapColors is called from battle phase setup/results, battle states 05/07/08/10 and the studio level-sequencer cast spawn. This is distinct from FGameDataTableRow_MapGround.EffectColor, which AbramsSequencerSetEffectGroundColorEvaluate reads after a physical-surface trace. Export values include (1,1,1) and per-map tints such as MAP_01 (0.88,1,1) and DEM_02 (0.67,0.8,1).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:52",
@@ -176,7 +177,7 @@
       "status": "verified"
     },
     "DecalColor": {
-      "simple": "Map-wide tint for decals.",
+      "simple": "The overall color tint for decals in this stage, such as markings left on the ground.",
       "technical": "FVector (row +0xB0; constructor default ZeroVector). AGameEffectManager::ApplyMapColors writes it verbatim to the MaterialParameterCollection vector parameter 'DecalColor' alongside Color/FXCharacterColor/FXLightColor/BloodColor, using the same row selected by the battle or sequencer phase. Export values are dark per-map tints, e.g. MAP_01 (0.18,0.23,0.30).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:55",
@@ -187,7 +188,7 @@
       "status": "verified"
     },
     "BloodColor": {
-      "simple": "Map-wide blood tint.",
+      "simple": "The color used for blood effects in this stage. Most stages use the normal white color.",
       "technical": "FVector (row +0xC8; constructor default ZeroVector). AGameEffectManager::ApplyMapColors writes it to the world's MaterialParameterCollection as 'BloodColor'. No separate sequencer or ground-surface field with this name is consumed; the row comes from the active BattleLevel or the studio sequencer's cached map row. Export is (1,1,1) for 29 rows and a single non-white row.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:58",
@@ -198,7 +199,7 @@
       "status": "verified"
     },
     "SequencerBloomIntensityOffset": {
-      "simple": "Bloom multiplier applied by sequencer post-process tracks.",
+      "simple": "How strong the glow looks during story scenes. Most stages leave it unchanged, and a few reduce it.",
       "technical": "float (constructor default 0.0f). FAbramsSequencerCopyPostProcessVolumeEvaluate reads it from MapModule->GetMapRow() (sequencer-manager row first, then BattleLevel row). Values nearly equal to 1.0 skip the write. Otherwise the target volume's copied BloomIntensity (CachedValueA) is compared: if the current value equals CachedValueB it is reset to CachedValueA * Scale (then B is updated); if it still equals A nothing happens; otherwise the current value is multiplied in place. OnSetup zeroes A/B; OnPreExecute copies the source volume's settings and initializes both to the copied bloom. Export values are 1.0 except 0.4 on MAP_14, MAP_14_01, MAP_16 and DEM_03.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:61",
@@ -211,7 +212,7 @@
       "status": "verified"
     },
     "MapSelectPlacementIndex": {
-      "simple": "Non-negative marks a stage as selectable in stage UI.",
+      "simple": "Decides whether the game offers this stage in stage selection and Free Battle. Negative values hide it.",
       "technical": "int32 (row +0xE4; constructor default 0). Every traced consumer only tests the sign: stage-select list, free-battle stage options, main-menu free-battle/PvE/PvP icon preloads and Story_PickRandomMapId keep rows with index >= 0 and skip negative ones. No consumer in the reconstructed source uses the numeric value as an array index or sort key; StageItemParameterMap is keyed by Id instead. Export indices are 0..11 for selectable MAP_ rows and -1 for MAP_14_01, MAP_15_01, DEM_*, VLM_01, SDM_*, SRM_* and CharacterCapture. UGameStageSelectWidget's synthetic MAP_00 row is hard-coded to 0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:64",
@@ -224,7 +225,7 @@
       "status": "verified"
     },
     "MapSelectIconFileName": {
-      "simple": "Stage-select icon texture name.",
+      "simple": "The picture shown for this stage in menus and stage selection. Some menus load pictures only for stages players can choose.",
       "technical": "FName (row +0xE8; default empty). Consumers add it to WidgetTexture primary-asset loader batches or call FindDynamicLoadTexture and set it as a brush/texture parameter. Main-menu FreeBattle/PvE/PvP preload icons only for rows with MapSelectPlacementIndex >= 0; FreeBattleRuleSelect applies the same sign test to stage options but does not preload this icon. IntervalArcade, IntervalPvE and WidgetTest preload every row's icon; MainMenuLobby preloads its VLM_01 icon and StoryCharacterSelect preloads the active story mission map's icon. BattleSettingsBackgroundWidget, BattleSituationOverviewWidget, FreeBattleWidget, StageSelectWidget and StoryCharacterSelectWidget display it. Some callers fall back to hard-coded T_UI_Common_StageImage_MAP_00 for the synthetic MAP_00/random-stage case. Export is a T_UI_Common_StageImage_* name for selectable maps, T_UI_Lobby_* for VLM_01 and None for DEM_02/03, SDM_*, SRM_* and CharacterCapture.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:67",
@@ -239,7 +240,7 @@
       "status": "verified"
     },
     "MiniMapFileName": {
-      "simple": "Mini-map texture name shown in battle HUD.",
+      "simple": "The battle mini-map picture for this stage. A character's Domain Expansion can use its own.",
       "technical": "FName (row +0xF0; default empty). GamePhase_BattleBase preloads the active map's value (retail unguarded) and also the map referenced by each character's DomainExpansion row; BattleAssets_DomainExpansionMiniMap performs the same nested CharacterSpecialAttack -> DomainExpansion -> Map join. UGameBattleRadarWidget::SetMiniMap resolves MapRow->Id, checks the name is not None, looks up the preloaded widget texture and sets the dynamic material's 'MiniMapTexture' parameter; missing row/texture leaves the old material. Export values are T_UI_MiniMap_* for MAP/DEM rows and None for VLM_01, SDM_*, SRM_* and CharacterCapture.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:70",
@@ -253,7 +254,7 @@
       "status": "verified"
     },
     "Id_MissionLayout": {
-      "simple": "Mission-layout ids indexed by the current wave.",
+      "simple": "Which mission layout supplies starting positions and facing directions for this wave. The stage still sets the final ground height.",
       "technical": "TArray<FName> (default empty; 16 slots in every exported row). AGameBattleManager::GetCharacterStartTransform uses the active MissionWave->MissionLayoutIndex: if MapRow->Id_MissionLayout is valid at that index and the entry is not None, it resolves the id in MissionLayoutDataTables (DTM +0x9B0) and overrides the start transform's translation/rotation from Layout.Location[CharacterIndex] / Layout.Rotation[CharacterIndex] (each guarded by IsValidIndex; CharacterIndex is the spawn index, not MissionLayoutIndex). The final Z is then ground-traced, so the layout's Z is not authoritative. Export ids use per-map ST/DLC01 and PVE00..PVE05 naming, with None filling unused slots; story-only maps are all None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:73",
@@ -266,7 +267,7 @@
       "status": "verified"
     },
     "ReverbRate": {
-      "simple": "Reverb bus send amount for the stage.",
+      "simple": "More echo for battle voices and sound effects in this stage. Ambient stage sound stays unaffected.",
       "technical": "float (row +0x108; constructor default 0.0f). GameBattle_ApplyStageMapRow and its inlined copies, battle phases/states and the studio level-sequencer cast spawn assign it to AGameSoundManager::ReverbBusSendLevel (+0x398). Voice and ordinary/3D SE playback paths call Player->SetBusSendLevelByName(ReverbBusName, ReverbBusSendLevel), with ReverbBusName defaulting to 'Reverb'; the traced ambient-SE player path does not set this bus send. Transition paths explicitly reset the manager value to 0 when leaving battle/sequencer stages. Export values are 0.0, 0.05, 0.1 and 0.15.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:76",
@@ -281,7 +282,7 @@
       "status": "verified"
     },
     "Id_SoundEffect": {
-      "simple": "Ambient background sound id for the stage.",
+      "simple": "Which background battle sound plays for this stage, sometimes chosen from a character's Domain Expansion during finishing moves.",
       "technical": "FName (row +0x10C; default empty). AGameBattleManager::PlayMapAmbientSe resolves it with Status_FindSoundEffectRow(SoundEffectDataTables DTM +0x730, bCheckNone=true) and calls GameSoundManager.PlayAmbientSe(Row->CueSheetName, Row->CueName, GameSoundDefaultPlayParameter); a missing row/None plays nothing. StartMapAmbientSe first prefers the map referenced by the finish target's DomainExpansion row and otherwise uses the active BattleLevel row. GameBattle_ApplyStageMapRow and battle states 07/08 call PlayMapAmbientSe after applying colors/reverb. Export values are SE_BG_* for MAP/DEM/VLM rows and None for SDM_*, SRM_* and CharacterCapture.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Map.h:79",

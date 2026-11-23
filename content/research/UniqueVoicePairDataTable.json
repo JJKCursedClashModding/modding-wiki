@@ -1,8 +1,9 @@
 {
+  "overview": "This table gives two-fighter teams their special spoken lines during entrance scenes and post-match result scenes.",
   "description": "Defines unique appearance/result sequencer voice lines for a two-character team: each row maps three character/model ID slots to parallel voice row IDs, and the runtime returns the speaking character's voice from the selected pair row.",
   "fields": {
     "Id": {
-      "simple": "Row key / unique voice-pair ID.",
+      "simple": "The unique name for this pairing, used by the game to find its set of spoken lines.",
       "technical": "FName import key stored as the DataTable row name; the export property is spelled ID. FindUniquePairVoice adds each matching row's Id to the candidate list, selects ComputeSideSeed(Side) % Candidates.Num(), stores it as UniquePairChoice.PairRowId, and later resolves that ID with FindRow in UniqueVoicePairDataTables table order (first matching table wins). Candidate enumeration itself is table order then row-name order (FGameDataTableArray::GetRows). All 344 exported row names equal their ID and are unique.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_UniqueVoicePair.h:12",
@@ -16,7 +17,7 @@
       "status": "verified"
     },
     "SeuqnecerType": {
-      "simple": "Sequencer context the pair applies to (appearance or result).",
+      "simple": "Tells the game whether this line belongs to an entrance scene or the post-match result scene.",
       "technical": "EGameSequencerUniquePairType (uint8) has None=0, Appearance=1, Result=2 and Invalid=255; the property name SeuqnecerType is misspelled exactly as in the retail struct and export. The row constructor defaults it to None, and the sequencer section constructor also defaults its requested SequencerType to None. FindUniquePairVoice requires exact equality with the section's requested type, so None/Invalid rows cannot be selected by an Appearance or Result section. The export has 172 Appearance rows and 172 Result rows; no None or Invalid rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_UniqueVoicePair.h:16",
@@ -30,7 +31,7 @@
       "status": "verified"
     },
     "Id_Character": {
-      "simple": "The three character/model ID slots that identify the pair (unused slots are None).",
+      "simple": "The character names used to recognize the fighters in the scene. Most pairings name two fighters, and a few also include a shikigami.",
       "technical": "TArray<FName>, parallel to Id_Voice. Candidate matching unconditionally reads indices [0], [1] and [2], so the runtime expects exactly three entries; all 344 exported rows have three. A row qualifies only for the ordered checks ids[0]==target && ids[1]==mate, ids[0]==target && ids[2]==mate, or ids[1]==target && ids[2]==mate; reversed pair order is a separate row, not an in-row swap. 336 rows use two real IDs plus trailing None; 8 rows (UNIQUE_PAIR_0509_01..04 and UNIQUE_PAIR_1509_01..04) use three real IDs, with CN_080 in an extra slot. The export has 43 unordered character pairs x 2 sequencer types, with 4 candidate rows per pair/type. The CN_080 ID is a shikigami model rather than a CharacterDataTable row. On the chosen row, the manager scans indices 0..Id_Character.Num()-1 for equality with the speaking target's ID; the first match selects the voice at the same index.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_UniqueVoicePair.h:19",
@@ -45,7 +46,7 @@
       "status": "verified"
     },
     "Id_Voice": {
-      "simple": "Voice row ID spoken by the character at the matching Id_Character index.",
+      "simple": "The spoken line paired with each character name, so the game knows what that fighter says. Change this to change the line.",
       "technical": "TArray<FName>, parallel to Id_Character, with three entries in every exported row. After a pair row is chosen, the manager returns Id_Voice[Index] for the first Id_Character[Index] equal to the target ID, or NAME_None if there is no match; the character index is bounded by Id_Character.Num() but the voice array itself is not bounds-checked. 336 rows end in None and 8 rows use all three real voices. All 696 distinct non-None IDs resolve to VoiceDataTable rows carrying CueSheetName/CueName; 688 have CharacterMouthAnim rows by Id_Voice, the exceptions being the eight CN_080 lines. The evaluator wraps the result in a one-element list (keeping None), then may fall through to common voice selection; playback resolves the ID through VoiceDataTable to CueSheetName/CueName and derives the subtitle ID by removing the first two characters of the voice string.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_UniqueVoicePair.h:22",

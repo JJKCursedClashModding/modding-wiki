@@ -1,8 +1,9 @@
 {
+  "overview": "These settings decide whether a fully cleared solo run offers an extra mission after its last fight.",
   "description": "Chance rows evaluated once after the final cleared solo PvE mission to decide whether an extra mission is offered; each row combines an Id mode tag, a GlobalThreshold point-sum band, and an integer probability roll.",
   "fields": {
     "Id": {
-      "simple": "Row id; its name also carries the solo/tag mode tag.",
+      "simple": "The name the modder changes to mark this chance for a solo run or a paired run. The paired version requires one character to have a perfect score.",
       "technical": "FName UPROPERTY (BlueprintReadWrite, EditAnywhere; exported as ID, ImportKeyField Id). GamePvE_RollExtraMission calls ToString() and FString::Contains(Tag): one point selects PVE_EXTRA_MISSION_LOTTERY_SOLO, while exactly two points with one value equal to 100 select PVE_EXTRA_MISSION_LOTTERY_TAG; any other count, or a two-point array without a 100, returns false before the table is read. The call passes no ESearchCase argument, so UE 5.1's default IgnoreCase applies (matching the reconstructed comment), and a substring match anywhere in the name is enough. All 14 exported IDs equal their row names: seven SOLO and seven TAG; rows without the active tag are skipped.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEExtraMissionLottery.h:11",
@@ -16,7 +17,7 @@
       "status": "verified"
     },
     "Id_GlobalThreshold": {
-      "simple": "Foreign key to the inclusive point-sum band in GlobalThresholdDataTable.",
+      "simple": "The linked range tells the game which total extra mission points this chance covers for a solo or paired run. This name connects the chance to that range.",
       "technical": "FName UPROPERTY (BlueprintReadWrite, EditAnywhere); implicit default NAME_None because the row constructor initializes only Probability. The consumer resolves it with StoryFindRowInline over GlobalThresholdDataTables (DTM+0x300), taking the first row hit with FindRow's missing-row warning suppressed; a null result skips the lottery row. The integer point sum is cast to float and tested with InRange_FloatFloat(Sum, Min, Max, true, true), so both float bounds are inclusive. Every exported key resolves to a same-named threshold row: SOLO bands 0-49, 50-59, ..., 90-99, 100-100; TAG bands 0-149, 150-159, ..., 190-199, 200-200. These SOLO/TAG bands are distinct from the PVE_EXTRA_MISSION_POINT_01..11 bands used by the extra-mission suggestion widget.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEExtraMissionLottery.h:15",
@@ -33,7 +34,7 @@
       "status": "verified"
     },
     "Probability": {
-      "simple": "Integer roll threshold for offering the extra mission.",
+      "simple": "How strongly this chance favors giving an extra mission after a strong run. A higher value makes it more likely, the lowest still gives a small chance, and the highest always grants one.",
       "technical": "int32 UPROPERTY (BlueprintReadWrite, EditAnywhere) with constructor default 0. After a tag and threshold-band match, the consumer calls RollChance(0, Probability, 100). The byte-matched implementation returns Chance >= RandRange(0, 100), i.e. an inclusive 101-outcome roll: Probability 0 succeeds on roll 0 (1/101, not 0%), 100 always succeeds, and exported 5/10/25/30/40/50/60/70/85 correspond to Probability+1 favorable outcomes. A successful roll sets bDrawn=true and breaks the row loop; a failed roll lets later rows be tested. Exported values are 0, 5, 10, 25, 30, 40, 50, 60, 70, 85 and 100.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEExtraMissionLottery.h:18",

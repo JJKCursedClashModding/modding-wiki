@@ -1,8 +1,9 @@
 {
+  "overview": "These entries define the unlockable normal and Cursed Energy voice choices players can preview for each customizable character.",
   "description": "Unlockable alternate battle-voice packs for customizable characters: one row per character/category/variant, with the VoiceDataTable cues used to audition the pack in customization and the shop.",
   "fields": {
     "Id": {
-      "simple": "Row key / custom-voice pack ID.",
+      "simple": "This name identifies one voice pack and connects it to the item that tracks whether it is unlocked.",
       "technical": "FName primary key (exported as ID; ImportKeyField is Id). ItemDataTable rows of EGameItemType::CustomVoice point here through VariableId. The tile's row ID drives ownership/selection checks and is stored in its CurrentSettings/SavedSettings maps; the shop and common row finders resolve that same ID against DTM +0x560. CommitSettings does not save the ID itself: it saves the selected row's mapped IndexType.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCustomVoice.h:13",
@@ -16,7 +17,7 @@
       "status": "verified"
     },
     "Id_Character": {
-      "simple": "Character that owns this voice pack.",
+      "simple": "Choose the character who gets this voice pack. The game uses this name to show the pack with that character and portrait.",
       "technical": "FName into CharacterDataTable and CharacterImageDataTable. CollectVoiceSamples and tile filtering require it to equal the displayed character; save sanitization pairs it with Category/IndexType; item descriptions resolve it to the Character row and return that row's Id; icons build \"<Id_Character>_00\" for CharacterImageDataTable. Shop preview reuses it to collect the matching character/category sample set.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCustomVoice.h:17",
@@ -30,7 +31,7 @@
       "status": "verified"
     },
     "Category": {
-      "simple": "Which attack voice set is customized: normal or cursed-energy attack.",
+      "simple": "Choose whether this pack changes normal attacks or Cursed Energy attacks. That choice also decides which voice clips the game previews and which attack voices change in battle.",
       "technical": "uint8 EGameCustomVoiceCategory: None=0 (struct default), NormalAttack=1, CursedEnergyAttack=2, Invalid=255. Tiles use VoiceCategory 1/2, PreviewVoice uses it to select NormalAttackVoiceSamples vs CursedEnergyAttackVoiceSamples, icons use it with IndexType for tint (None/Invalid gives Transparent), and save validation checks literal 1/2. In battle the same 1/2 values select the normal/cursed saved-index path into the character's voice-group-set IDs. All 81+81 exported rows use the two real values.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCustomVoice.h:20",
@@ -46,7 +47,7 @@
       "status": "verified"
     },
     "IndexType": {
-      "simple": "Variant slot inside the category: Default, TypeA or TypeB.",
+      "simple": "Choose the starting voice or one of the two unlockable voices for this attack type. The chosen voice is remembered for battles and changes the pack's icon color.",
       "technical": "uint8 EGameCustomVoiceIndexType: None=0 (struct default), Default=1, TypeA=2, TypeB=3, Invalid=255. CollectVoiceSamples precreates keys 1/2/3 and appends matching rows' Id_Voice_Sample in row order, so None/Invalid rows are skipped; None sample IDs are then removed. GUnknownByteIntMap0 maps None/Default->0, TypeA->1, TypeB->2: CommitSettings stores that int in CharacterIntPair.First (NormalAttack) or Second (CursedEnergyAttack), SetupTileSettings picks the first matching row for it, and sanitization requires an owned item for nonzero values. The same int indexes CharacterSoundDataTable.Id_CharacterVoiceGroupSet through ActionController slot 90 in battle; index 3 is the low-HP PINCH set, not a saved variant. Invalid/255 has no map entry: commit dereferences Find unguarded, while the validator and restorer use operator[] and treat it as 0. Default items have InitialPossession=1 in the export and the tile treats Default as unlocked without an owned voice item (still subject to the Item row progress gate); TypeA/TypeB require one. IndexType also selects one of the six icon tint colors.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCustomVoice.h:23",
@@ -66,7 +67,7 @@
       "status": "verified"
     },
     "Id_Voice_Sample": {
-      "simple": "Voice row IDs used to audition this pack.",
+      "simple": "The game plays these voice clips when you preview the pack in customization or the shop. Changing them changes only the clips used for preview.",
       "technical": "TArray<FName> keys into VoiceDataTable (DTM +0x740), not cue-sheet or PlayVoice IDs. Collection appends arrays from every row whose Id_Character and Category match and whose IndexType is one of the three bucket keys, then strips NAME_None; 14 of 1,134 exported sample slots are None. Customization PreviewVoice does not read this array in place: it looks up the accumulated list for the selected row's Category/IndexType, uses Samples[SampleIndex] if valid else index 0, resolves that Voice row, and only when its cue sheet is already loaded calls PlaySystemVoice and advances SampleIndex (so an invalid next index wraps to 0). Shop preview uses the same collector, loads the distinct cue sheets of the aggregated samples after a 0.1 s delay, and aborts loading if any sample Voice row is missing. None of the non-None sample IDs appears in CharacterVoiceGroupDataTable or PlayVoiceDataTable, so this is audition data rather than the battle line-selection table.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCustomVoice.h:26",

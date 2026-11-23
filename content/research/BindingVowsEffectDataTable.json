@@ -1,8 +1,9 @@
 {
+  "overview": "This table defines what each binding vow does in battle and which message describes that effect.",
   "description": "Concrete binding-vow effects: an effect-type discriminator, type-dependent numeric parameters, and the battle-text ID used to describe the effect in UI.",
   "fields": {
     "Id": {
-      "simple": "Binding-vow effect row key.",
+      "simple": "The name the game uses to attach this effect to a binding vow.",
       "technical": "FName row key in BindingVowsEffectDataTable; the export writes it as ID and declares Id as ImportKeyField. GameBindingVows_GetEffectRows scans BindingVowsDataTables, uses the first table containing the vow ID, skips None effect IDs, and for each ID resolves the first matching row in BindingVowsEffectDataTables; later table matches are ignored. DTM_FindBindingVowsEffectRow applies the same first-table precedence when the selection UI resolves the ordered effect IDs directly. Resolved row pointers are also held transiently in FGameCharacterBindingVowsEffectState::Effect for status checks.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:241",
@@ -17,7 +18,7 @@
       "status": "verified"
     },
     "EffectType": {
-      "simple": "Which gameplay/stat effect this row applies.",
+      "simple": "Choose what this vow changes or switches on, such as health, movement, attack power, Cursed Energy, or mission rewards.",
       "technical": "EGameBindingVowsEffectType (uint8): None=0, behavior enumerators 1-80, Invalid=255; the row constructor defaults to None. GameBindingVows_GetEffectRowsOfType filters joined rows by this value, status code switches on it, and GameBattleSystems_B uses it for failed/dead-vow checks. It also drives the widget's hit-point/movement/attack/cursed-energy/other category (together with the paired buff/debuff slot), while MissionOrder and MissionTask exclusion arrays use it to reject PvE vow candidates. Interpretation of EffectValue is type-specific; several flag-only types use EffectType presence with 0/0 values.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameBindingVowsEffectType.h:6",
@@ -33,7 +34,7 @@
       "status": "verified"
     },
     "EffectValue": {
-      "simple": "Type-dependent numeric parameters; index 0 is often a raw multiplier, threshold or chance and index 1 is a conditional multiplier or applied amount, or is unused.",
+      "simple": "These numbers set the effect's strength, chance, or required condition. A bigger number can make the change stronger, more likely, or harder to reach.",
       "technical": "TArray<float>. The sole export shard has 239 rows and every row has exactly two finite values. [0] is polymorphic: GameBindingVows_SumEffectRate treats each value as a raw multiplier and accumulates Value-1; GameBindingVows_SumEffectValue sums raw [0] (or takes a max floored at 0); ForceGaugeMax adds [0] to an int base and clamps nonnegative results to at least 1; battle-log vows store [0] as State.Required; HitPointOnce treats [0] as a maximum-HP ratio; elapsed-time types use [0] with GetBattleElapsedTime; and chance types pass int32([0]*100) out of 100 to RollChance kind 2. [1] is the applied magnitude/multiplier for the relevant types: HitPointWhenJustGuard adds HitPointMax*[1], HitPointOnce adds int32([1]*HitPointMax), RateAtValue helpers add [1]-1 after the [0] threshold test, SendAttackDamageEveryWithTime multiplies the rate by [1] for each elapsed/[0] interval, and DeadKillWithTime/DeadCursedEnergyLevelWithTime compare [1] after their [0] time limit is reached. Many simple or flag-only types use only [0] or store 0/0, so zero in an unused slot is a placeholder rather than a universal value. Runtime helpers index the array without bounds checks; the selection UI requires EffectValue.Num()>=2 before passing both entries to text parameters.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameBindingVowsEffectType.h:6",
@@ -57,7 +58,7 @@
       "status": "verified"
     },
     "Id_BattleText": {
-      "simple": "Battle-text row ID used to render the vow effect description.",
+      "simple": "Change this to choose the description shown in battle for this effect on a binding vow.",
       "technical": "FName key supplied to SetTextIdWithParameters. UGameVsEnemyBindingVowsSelectWidget::OnVowFocused requires the vow to have at least two effect IDs, resolves effect [0] as the debuff and [1] as the buff, requires each effect's EffectValue.Num()>=2, passes [0] as VALUE and [1] as VALUE2, and then calls SetTextIdWithParameters with that effect's Id_BattleText; a failed lookup or short array collapses the corresponding text. No other direct reader of this property was identified in the reconstructed source. All 239 exported rows have non-empty BTL_BINDING_VOWS_* keys, and all of them resolve in each of the 11 exported BattleText locale tables.",
       "evidence": [
         "Source/Abrams/Private/GameVsEnemyBindingVowsSelectWidget.cpp:141",

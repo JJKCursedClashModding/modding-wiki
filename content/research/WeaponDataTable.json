@@ -1,8 +1,9 @@
 {
+  "overview": "This table tells the game which weapon to create when a character needs one.",
   "description": "Thin catalog: 20 exported rows keyed by weapon ID, each supplying the FName of the Weapon primary-asset Blueprint class used when that weapon is spawned. Socket, loadout and initial-visibility data live in CharacterWeaponDataTable, not here.",
   "fields": {
     "ID": {
-      "simple": "Weapon catalog ID and DataTable row name, e.g. WP_010_00.",
+      "simple": "The name that picks one weapon from the list of weapons in the game. Other parts of the game use it to give a character this weapon.",
       "technical": "FName native member Id (UPROPERTY, GameDataTableRow_Weapon.h:11) and the UDataTable row key. The export declares ImportKeyField \"Id\" but serializes the same value as \"ID\"; all 20 central rows have unique keys equal to ID (WP_..._00/10/20 suffixes), with no None or empty values. Code looks up by row name rather than reading Id: the shared collector skips NAME_None IDs and resolves CharacterVariation.Id_CharacterWeapon -> CharacterWeapon.Id_Weapon[i] -> the first table in WeaponDataTables (DTM +0x6B0) that contains the key; BattleBase, LevelSequencer and capture use equivalent first-hit walks. Capture also reaches these rows from SituationOverviewPose.Id_AnimationWeapon_Ally/Enemy. FindRow is called with bWarnIfMissing=false, so a missing row is skipped silently; first matching table wins. Across the central and per-character exports, every referenced non-None weapon ID resolves here; WP_040_00 has no checked loadout/pose reference.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Weapon.h:11",
@@ -27,7 +28,7 @@
       "status": "verified"
     },
     "FileName_BP": {
-      "simple": "Name of the weapon Blueprint asset, e.g. WP_010_00_BP.",
+      "simple": "Change this name to give a character a different weapon. The game uses it when creating that weapon.",
       "technical": "FName (GameDataTableRow_Weapon.h:15). The constructor is empty, so an unset value would be NAME_None; all 20 exported values are unique and exactly <ID>_BP, with no None values. C++ forms FPrimaryAssetId(GamePrimaryAssetType_Weapon, FileName_BP): the shipped config defines the \"Weapon\" type with base class /Game/Weapons/GameWeapon_BP and scans /Game/Weapons. Loader maps are keyed by this FName; CreateLoadersForIds skips NAME_None and duplicate names, so repeated rows would share one loader (none repeat in the export). Dedicated battle preload, battle character setup, level-sequence setup and capture LoadCharacter collect the name and wait for Weapon loaders. At spawn, BattleBase_LoadedAsset / FindChecked resolves the loader, the primary asset is Cast<UClass>, and AGameCharacter::SpawnWeapon attaches an AGameWeapon to a socket. BattleBase uses CharacterWeapon.SocketName[WeaponIndex] and bDefaultHidden[WeaponIndex]; LevelSequencer uses SocketName[WeaponIndex] but not bDefaultHidden; capture prefers the SituationOverviewPose socket, falls back to root for missing parallel slots or configured weapon idle animations, and uses its own merged hidden flags. FindChecked asserts when the loader key is absent; an unresolved primary asset yields a null class and no spawned weapon rather than a fatal error from this row. Capture preload adds a pose weapon's FileName_BP only when no already-collected name starts with its first nine characters (\"WP_000_00\" shape, case-insensitive), a loader-name dedup rather than a row-key check.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Weapon.h:15",

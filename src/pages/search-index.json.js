@@ -5,7 +5,7 @@ export function GET() {
     const href = hrefFor(group.id);
     return [
       [group.id, categoryNames[group.category], href,
-        [group.description, group.rowStruct, ...group.variants.map((variant) => variant.name)].join(' ')],
+        [group.overview, group.description, group.rowStruct, ...group.variants.map((variant) => variant.name)].join(' ')],
       ...group.fields.map((field) => [
         field.name, `${group.id} · ${field.type || 'Type unknown'}`, `${href}#${fieldAnchor(field.name)}`,
         [field.nativeName, field.simple, field.technical].join(' '),

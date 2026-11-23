@@ -1,8 +1,9 @@
 {
+  "overview": "This table controls which mission objective appears for each wave and how often, with story demos always using the first listed objective.",
   "description": "Per-wave mission-task lottery pools: ten candidate task ids paired with relative weights. The main battle paths (Arcade, Story battle and PvE) pick one weighted candidate per wave, while story-demo objective UI reads only the first candidate. The single exported asset has 134 rows.",
   "fields": {
     "Id": {
-      "simple": "Mission task lottery row identifier.",
+      "simple": "The name a wave uses to find this group of possible objectives. Change it only if the wave is changed to match.",
       "technical": "FName import key / DataTable row name for FGameDataTableRow_MissionTaskLottery (export field ID; all 134 keys match the ID value). MissionWave rows point to it with Id_MissionTaskLottery; 1768 non-None references across MissionWaveDataTable cover all 134 lottery rows. AGameDataTableManager loads the single MissionTaskLotteryDataTable asset through the DataTable primary-asset loader named by that row key into MissionTaskLotteryDataTables (DTM+0x9F0); once all loaders complete, null tables are filtered and StoryFindRowOutOfLine checks tables in order with bCheckNone=true, so a None id returns no row. No C++ consumer reads the row's Id member as data; an unreconstructed retail GetRows<MissionTaskLottery> collector (0x15B7FD0, HOLD) leaves another possible use unknown.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTaskLottery.h:11",
@@ -20,7 +21,7 @@
       "status": "observed"
     },
     "Id_MissionTask": {
-      "simple": "Candidate mission-task ids in the pool.",
+      "simple": "Possible objectives for this wave. One is picked by chance in Arcade, Story battles and computer-opponent missions, and story demos use the first.",
       "technical": "TArray<FName>, default empty. All 134 exported rows have 10 slots; unused slots are the FName string \"None\" and every exported row's first slot is non-None. BattleArcade_PickLotteryTask copies the array with Weights, removes None tasks together with the same-index weight, and returns Tasks[Picked] from the weighted pick; if the row is absent, all candidates are None, or either filtered array is empty, it returns NAME_None. The 150 distinct non-None ids all resolve in MissionTaskDataTable, and the picked id is looked up there (a missing/no pick leaves a None slot). Story_GetDemoMissionTask_13096F0 instead takes Id_MissionTask[0] when the array is non-empty, ignoring Weights and without filtering None; in the export that first slot is always a real task id.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTaskLottery.h:15",
@@ -40,7 +41,7 @@
       "status": "verified"
     },
     "Weights": {
-      "simple": "Relative weight for each candidate task.",
+      "simple": "How likely each listed objective is to be picked in Arcade, Story battles and computer-opponent missions. Bigger numbers mean that objective appears more often.",
       "technical": "TArray<float>, default empty; all 134 exported rows have 10 values aligned with Id_MissionTask (106 rows are all 1.0; 28 use tiered values such as 80/40/40/20/20/...). BattleArcade_PickLotteryTask removes weights at filtered None slots, sums the survivors, draws StoryFRand() * Sum (StoryFRand is a uniform [0,1) float from GameDataTableManager_RandRange(0, MAX_int32)), and BattleArcade_PickWeightIndex returns the first index whose interval contains the roll, falling back to the last index if the walk exhausts the array. An empty pool returns NAME_None. Weights are relative totals, not probabilities (row sums often exceed 1), and must stay index-aligned with Id_MissionTask; the export has no zero/negative weights, but the runtime picker does not reject them.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTaskLottery.h:18",

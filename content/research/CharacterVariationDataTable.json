@@ -1,8 +1,9 @@
 {
+  "overview": "This table connects each character costume to its model, appearance, weapons, sounds, unlock item, and menu pictures.",
   "description": "Costume/variation records indexed by Character::Id_CharacterVariation. Each row joins a specific character model Blueprint to its material pattern, weapon set, sound, UI images and the in-game Item that unlocks it.",
   "fields": {
     "ID": {
-      "simple": "Variation/costume row ID (character ID plus costume/color suffix).",
+      "simple": "Names one costume option by combining the character’s name with its costume and colour choice. The game uses it to find that option.",
       "technical": "FName primary key: native field Id, exported as ID (ImportKeyField=Id), and the export row key equals it in all 437 rows. A GameCharacter/setup VariationIndex indexes Character.Id_CharacterVariation; the shared first-hit finder then resolves that FName in CharacterVariationDataTables (DTM +0x400). Every exported variation ID is referenced by at least one Character row (ten IDs are shared by the CP_081/CN_081 and CP_160/CN_260 pairs). Item-description and thumbnail helpers also scan variation rows by Id to map a costume item back to its character.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:11",
@@ -16,7 +17,7 @@
       "status": "verified"
     },
     "FileName_BP": {
-      "simple": "Character-primary asset name of the variation's model/actor Blueprint.",
+      "simple": "Names the character model shown for this costume. The last two digits tell the menus which costume and colour option to show.",
       "technical": "FName (row +0x10), always <row ID>_BP in the export. Battle prepare, battle preload, level/story-room setup and capture use it as the GamePrimaryAssetType_Character primary-asset name; spawn paths look it up with FindChecked in loader maps. GameCharacter_GetFileNameCostumeIndex/ColorIndex apply the greedy regex ^.*_([0-9]{1})([0-9]{1})_BP$ to the last two digits before _BP and return -1 on no match; selection/visual-lobby UIs use those digits, so the name, not the array position, is authoritative. Select lists reject None, but several battle/capture paths dereference the resolved row without a null check.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:15",
@@ -31,7 +32,7 @@
       "status": "verified"
     },
     "Id_CharacterMaterial": {
-      "simple": "CharacterMaterialDataTable row holding this costume's material pattern set.",
+      "simple": "Chooses the material pattern used on this costume, such as its colours and surface look. Leave it empty to keep the costume’s usual pattern.",
       "technical": "FName joined to CharacterMaterialDataTables (DTM +0x490). UGameCharacterMaterialController::SetMaterialPattern, when called without an explicit CharacterMaterial row, resolves the owner's current variation and then this row; None (335/437 exported rows) or a missing material row returns before any pattern is applied. The pattern index itself is checked as 0..7 after the row is chosen.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:18",
@@ -42,7 +43,7 @@
       "status": "verified"
     },
     "Id_CharacterWeapon": {
-      "simple": "CharacterWeaponDataTable row defining which weapons this variation carries.",
+      "simple": "Chooses which weapons this costume carries in battle and character viewing. Empty means none, and one alternate weapon style changes two hit sounds.",
       "technical": "FName (row +0x20) joined to CharacterWeaponDataTables (DTM +0x4E0). Battle collectors, battle setup, level-sequencer setup, preload and capture expand CharacterWeapon.Id_Weapon into Weapon.FileName_BP names, skipping None IDs; spawn/attach uses those loaded weapon classes. None (256/437 rows) or a missing set row skips weapon handling. All 181 non-None exported IDs resolve. CP_040_50 (five rows) also gates two hit-SE remaps in CP_040_ActionController: SE_CP_040_02001 -> SE_CP_040_02101 and SE_CP_040_02011 -> SE_CP_040_02111.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:21",
@@ -56,7 +57,7 @@
       "status": "verified"
     },
     "Id_CharacterSound": {
-      "simple": "CharacterSoundDataTable row holding this variation's voice/SE IDs.",
+      "simple": "Chooses the voice and sound set heard when this costume fights or speaks. Missions can supply a different sound set that takes priority.",
       "technical": "FName joined to CharacterSoundDataTables (DTM +0x510); non-None in all exported rows. AGameCharacter::ResolveDataRows caches the resolved sound row in SoundRow, but a non-None FStudioBattleCharacterOverrides::SoundIdOverride has precedence. GamePvESettings copies MissionCharacter.Id_CharacterSound into that override; it is not a read of this variation field. Direct uses of this field resolve CharacterSound rows for battle/preload/PvE/situation-overview cue sheets and PlayCharacterVoice's voice-group lookup. Shikigami.Id_CharacterSound and MissionCharacter.Id_CharacterSound are separate fields resolved through other paths.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:24",
@@ -71,7 +72,7 @@
       "status": "verified"
     },
     "Id_CharacterImage": {
-      "simple": "CharacterImageDataTable row with this variation's portraits and sprites.",
+      "simple": "Connects this costume to its portraits, battle talk picture, cut-in art, and menu icons. Some screens hide the picture when art is missing.",
       "technical": "FName (row +0x30) joined to CharacterImageDataTables (DTM +0x480). It supplies CutInImageFileName, the 5x5 face-icon sprites and corner cut-ins, BattleTalkImageFileName, command-list icons and the generic GameCharacter_FindImageRow path. All 437 exported values are non-None and resolve. Some consumers skip a None ID or missing row; the arcade first-variation path uses [0] and passes the ID without a None check, and other UI paths collapse or hide the image, so there is no universal fallback.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:27",
@@ -85,7 +86,7 @@
       "status": "verified"
     },
     "Id_CharacterUniqueImage": {
-      "simple": "Serialized link to a CharacterUniqueImageDataTable row; no reconstructed consumer or table loader was found.",
+      "simple": "This name connects two costume groups for one character to a special image entry. What that entry would display is unclear.",
       "technical": "FName (row +0x38) declared and exported. Only CP_270_00..04 and CP_270_10..14 are non-None, pointing to the two rows of CharacterUniqueImageDataTable, whose exported ImageFileName arrays are all None. No reconstructed consumer reads this field, and AGameDataTableManager loads CharacterUniqueDataTable1..5 but no CharacterUniqueImageDataTable. The evidence is therefore an identifier-level association only; no UI or asset behavior is asserted.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:30",
@@ -96,7 +97,7 @@
       "status": "observed"
     },
     "Id_Item": {
-      "simple": "Item ID that unlocks/represents this costume in the shop/inventory.",
+      "simple": "Names the shop item that unlocks this costume. An empty name makes it free, and filled names require the item unlocked and in stock.",
       "technical": "FName (row +0x40), e.g. ITM_COSTUME_CP_010_00. GameItem_IsVariationAvailable and GameItem_IsVariationIdAvailable treat None as free; a non-None ID requires an unlocked Item row (negative UserProgressFlag is always unlocked, otherwise the progress word/bit is set) and a positive stock count. Costume item/icon/thumbnail/description helpers match Item.Id to this field; the first matching variation row in DTM table order and then row-name order wins. Select/free-battle/visual-lobby lists parse FileName_BP and check availability; the latter two can fall back to the default 00 variation and read its Id_Item unguarded. 22 rows have None; 10 exported CP_250/CP_260 rows name item IDs absent from the ItemDataTable export. Distinct from Character.Id_Item, which gates the base character.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:33",
@@ -111,7 +112,7 @@
       "status": "verified"
     },
     "ImageFileName": {
-      "simple": "Costume image texture name shown for the corresponding Item.",
+      "simple": "Sets the large costume picture shown on shop and collection item cards. It also helps choose the card’s watermark position.",
       "technical": "FName (row +0x48), e.g. T_UI_Item_Costume_CP_010_00. GameItem_GetFullImageFileName returns this for ItemType::Costume by matching Item.Id to Id_Item; GameItemIconWidget requests it when bShowThumbnail is false. GameItemThumbnailWidget matches this field (not ThumbnailImageFileName) to find the variation's owning character and watermark offset. Match precedence is first variation row in DTM table order then row-name order; 22 exported rows are None. No per-locale suffix is added here.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:36",
@@ -122,7 +123,7 @@
       "status": "verified"
     },
     "ThumbnailImageFileName": {
-      "simple": "Small/thumbnail version of the costume image texture name.",
+      "simple": "Sets the smaller costume picture shown on item cards in shops and lists. It is the compact version of the large costume picture.",
       "technical": "FName (row +0x50), e.g. T_UI_ItemThumbnail_Costume_CP_010_00. GameItem_GetImageFileName (the item thumbnail helper) returns this for Costume items whose Id_Item matches; GameItemIconWidget requests it when bShowThumbnail is true. The same first-match table/row-name precedence applies; 22 exported rows are None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:39",
@@ -133,7 +134,7 @@
       "status": "verified"
     },
     "FreeBattleImageFileName": {
-      "simple": "Character-selection image used for this variation in Free Battle.",
+      "simple": "Sets the character picture shown on the team panel in Free Battle. Changing it changes that costume’s Free Battle portrait.",
       "technical": "FName (row +0x58), e.g. T_UI_FreeBattleImage_CP_010_00. UGameFreeBattleCharacterIndexContentWidget::ShowCharacter checks the Character row and VariationIndex bounds, resolves the variation row, then requests this texture for the team character panel. It does not null-check the resolved variation or the FName, so there is no fallback in that path.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterVariation.h:42",

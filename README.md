@@ -19,10 +19,11 @@ Add or edit `content/research/<ExactGroupName>.json`. The name comes from `conte
 
 ```json
 {
+  "overview": "One plain-English sentence about what this table changes in the game.",
   "description": "Describe what one row configures and where the table is used.",
   "fields": {
     "ExampleField": {
-      "simple": "A short definition.",
+      "simple": "Explain what this setting does in words a player would use.",
       "technical": "Explain when the engine reads it, any boundaries, units, defaults, and important interactions.",
       "status": "verified",
       "evidence": ["Source/Module/Private/Example.cpp:42"]

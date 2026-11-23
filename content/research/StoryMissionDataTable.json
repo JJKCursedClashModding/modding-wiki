@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets up a Story mode battle by choosing its map, waves, intro, results screen, and how easily it earns a high rank.",
   "description": "Defines a story battle mission: map, wave chain and flags controlling appearance, result screen and score scaling.",
   "fields": {
     "ID": {
-      "simple": "Story mission id (STMSN_xxxxxM or STMSN_xxxxxS; 68 M and 22 S in the export).",
+      "simple": "The unique name of this Story mode mission. The game uses it to connect the mission to its story scene, saved progress, and tutorial steps.",
       "technical": "FName native Id and the export ImportKeyField/row key; all 90 exported rows have key == Id. Launch normally reaches the row through StoryDemo.Id_StoryMission: Story_ResolveDemoLaunch writes that id to FStudioPhaseRequest.Name34, which GamePhase copies to GameManager.StudioStoryMissionId_CE0. Story_FindMissionRow and the out-of-line finders then search StoryMissionDataTables (DTM +0x8D0). The same id keys StudioMissionRecords_680 on a story win, and Story_GetFreeMissions compares it with Demo.Id_StoryMission. Suffix M is classified as a main mission by telemetry/UI code; the tutorial row STMSN_01000M is also hard-coded in battle/tutorial logic.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMission.h:11",
@@ -21,7 +22,7 @@
       "status": "verified"
     },
     "Id_Map": {
-      "simple": "Battle map id.",
+      "simple": "Chooses the battlefield and the map picture shown in character selection. If left empty, the game chooses an available battlefield at random.",
       "technical": "FName (row +0x10). Story_GetMissionMapId and the inline ternary in Story_ResolveDemoLaunch use this id when it is not NAME_None; otherwise (including a null mission row in the helper) Story_PickRandomMapId_12FD510 picks a uniformly random Map row whose MapSelectPlacementIndex >= 0. The chosen id is written to the battle request, and when the demo has no pre-battle script the matching Map row FileName list supplies the loaded levels. Character-select code also reads the raw id for the map thumbnail and can dereference an unguarded Map lookup. All 90 exports set a map id (18 distinct keys that all resolve in MapDataTable; none is None), although three of those map rows have MapSelectPlacementIndex -1 and therefore would not be candidates for the random fallback.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMission.h:15",
@@ -38,7 +39,7 @@
       "status": "verified"
     },
     "Id_StoryMissionWave": {
-      "simple": "Ordered StoryMissionWave rows for the mission's waves.",
+      "simple": "Lists the waves of allies and enemies in the order they appear, usually just one. The first wave helps decide who the player controls and which companions join them.",
       "technical": "TArray<FName> (row +0x18). Every export has four slots: 89 use slot 0 and leave slots 1-3 None; STMSN_09112M uses four valid ids. All 93 referenced ids resolve in StoryMissionWaveDataTable. Slot 0 supplies the first wave used for PlayableCharacterIndex, allies, MissionWave/task and battle-talk lookups. Several launch and select paths dereference GetData()[0] or [0] without a Num check; Story_FindFirstWave and the battle notify helpers do check. The mission retry count indexes this array for later waves; Story_GetBattleLayout returns 255 for a null row, out-of-range index or missing wave/MissionWave row and maps tabulated ally/enemy counts to EGameBattlePair values 0-11 (unsupported counts leave 0). Story_GetMissionAllyCharacters resolves None slots by failed lookup rather than an explicit filter, skips them, stops after the first successful wave when bAllWaves is false, and walks every slot only when bAllWaves is true.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMission.h:18",
@@ -60,7 +61,7 @@
       "status": "verified"
     },
     "bAppearanceDisabled": {
-      "simple": "Skips the first-attempt battle appearance intro.",
+      "simple": "Skips the opening character introduction the first time this mission is played. On retries, that introduction is already skipped.",
       "technical": "bool (row +0x28), constructor default false. AGameBattleManager::IsAppearanceEnabled returns (flag != 1) only when RetryCount <= 0 and a StoryMission row is cached; any retry returns false regardless of the flag, while a missing story row returns true on the first attempt. The intro state jumps to step 10 when the result is false. This reconstruction traces the cache write from GamePhase_BattleStory::SetupBattleCharacterEntries through AGameBattleManager::SetupStoryMission into FStudioBattleMissionTaskSystem::SetupStory (System360) and FStudioBattleSystem390::SetStoryMission. 49/90 exported rows set true.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMission.h:21",
@@ -78,7 +79,7 @@
       "status": "verified"
     },
     "bResultDisabled": {
-      "simple": "Skips the normal result phase when the player wins the final wave.",
+      "simple": "Skips the normal results screen when the player wins the final wave. Losses and earlier waves still follow the normal battle flow.",
       "technical": "bool (row +0x29), constructor default false. In FBattleStoryState_Finish::RequestState this is checked only after HasNextMissionWave() is false and GetWinnerTeam() == 0 (Team A win). When true, the game calls OnBattleFinished/OnBattleWon and sets BattleEndRequest = 0 instead of requesting the normal result state. Losses, non-final waves and false rows follow the normal path. 40/90 exported rows set true.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMission.h:24",
@@ -93,7 +94,7 @@
       "status": "verified"
     },
     "ResultEvaluationScoreRate": {
-      "simple": "Dimensionless multiplier on the score used for result rank thresholds.",
+      "simple": "Changes how much the battle score counts toward the rank shown after a Story mission. Higher values make the same score more likely to earn a better rank.",
       "technical": "float (row +0x2C), constructor default 0.0f. GetResultEvaluationScoreRate starts at 1.0f, replaces it with StoryMission->ResultEvaluationScoreRate when System360 has a story row, then lets ArcadeMission->ResultEvaluationScoreRate override it whenever that cache is also set. The result snapshot builder uses the same precedence: it converts float(Value43C) * rate to int32 (truncation toward zero) and passes the score to GetResultScoreRank; that block runs only when PlayerCharacter is valid and BonusEntries has an entry for the character index. The PvE result state also passes GetResultEvaluationScoreRate() to GetBonusScoreRank to raise MissionWaveRank. Exported rates are 1.0 (83 rows), 1.2 (5), 1.5 (1) and 2.0 (1); no row omits the field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMission.h:27",

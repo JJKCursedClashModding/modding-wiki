@@ -1,8 +1,9 @@
 {
+  "overview": "This table tells the game which trap to create and what that trap should do after it appears.",
   "description": "World trap setup catalog: each row pairs a trap row ID and trap actor Blueprint asset name with the EGameTrapActionType behavior installed when AGameTrapManager::InitializeTrap initializes the spawned trap. It stores identity, asset selection and behavior selection, not trap statistics.",
   "fields": {
     "ID": {
-      "simple": "Trap row ID; it matches the DataTable row key.",
+      "simple": "The name the game uses to find this trap, and for some traps to match their effects and damage.",
       "technical": "FName value of FGameDataTableRow_Trap::Id (+0x08), serialized as ID while the export's ImportKeyField is Id; all 15 exported rows have ID equal to their row key. Callers normally look up by row key with Trap_FindTrapRow or a first-match FindRow over TrapDataTables (DTM +0x670). The shared finder rejects NAME_None only when bCheckNone=true, and every observed call to it passes false; the inlined CN_122 walk has no None test. The value is also read after spawn: FGameTrapAction_IceWall uses the cached trap row's Id to index C++ maps of rise effect, damage row and finish effect for TR_060_00/_10/_20 and TR_061_00/_10. Export IDs referenced by C++ include TR_010_00/_01/_02, TR_020_00, TR_030_00, TR_031_00/_10, TR_040_00/_10, TR_050_00, TR_060_00/_10/_20 and TR_061_00/_10. All exported IDs are populated; there is no None ID row.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Trap.h:11",
@@ -16,7 +17,7 @@
       "status": "verified"
     },
     "FileName_BP": {
-      "simple": "Name of the trap actor Blueprint asset to spawn.",
+      "simple": "The name of the trap model the game creates. Changing it changes which trap appears, and several trap types share one model.",
       "technical": "FName primary-asset name, not a filesystem path. SpawnTrap passes it to SpawnPooled, which forms FPrimaryAssetId(GamePrimaryAssetType_Trap, FileName_BP), resolves an already-loaded UClass through UAbramsAssetManager, and acquires or spawns an AGameTrap from the object pool keyed by that class; a missing class produces no trap. Config/DefaultGame.ini maps the Trap type to /Game/Traps with base class /Game/Traps/GameTrap_BP.GameTrap_BP_C. InitializeTrap caches the source row pointer on the spawned trap at +0x300, but only when both owner and row are non-null. The three exported TR_010_* rows intentionally share TR_010_00_BP while using three different ActionType values; TR_030_00 uses TR_032_00_BP, which is also the second trap asset in the CP_150 CharacterTrap preload array. Layout pin: row+0x10 is the spawn asset argument at retail 0x1414C2DE0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Trap.h:15",
@@ -30,7 +31,7 @@
       "status": "verified"
     },
     "ActionType": {
-      "simple": "Trap behavior/action class discriminant.",
+      "simple": "What the trap does after it appears, such as firing or forming walls. For one character, it also affects when traps are replaced and cleared.",
       "technical": "uint8 EGameTrapActionType: 0 None, 1 VolcanoHoming, 2 VolcanoOneShot, 3 VolcanoTrigger, 4 FlowerMachineGun, 5 PlantRootMove, 6 PlantWall, 7 BodyRepel, 8 Uzumaki, 9 IceWall, 255 Invalid. The row constructor defaults this field to None; the export uses only the nine behavior values (IceWall x5, PlantWall x2, BodyRepel x2, and one each of the other six), with no None or Invalid row. InitializeTrap passes row+0x18 to SetTrapActionType. That function reuses the existing FGameTrapAction when GetActionType() matches; otherwise the switch installs the corresponding per-type action and initializes it with the controller's owner only when that owner is valid, then calls Start() if an action exists. None/Invalid or a case-less change leaves any existing action unchanged. CP_140 checks the cached row's ActionType to keep at most one VolcanoTrigger trap live; CP_150 checks it to replace the active FlowerMachineGun trap and reset shot state, and to special-case FlowerMachineGun/PlantWall trap-handle cleanup. SpawnFlag is a separate caller-supplied byte stored on AGameTrap, not part of this row field.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameTrapActionType.h:6",

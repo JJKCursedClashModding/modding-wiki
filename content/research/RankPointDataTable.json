@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets the rank tiers players see, the point ranges that unlock them, and how much a loss can cost.",
   "description": "One row defines a rank tier: it joins a GlobalThresholdDataTable point band to the rank class/grade shown in UI, used by lobby/session rules, ranked rewards and KPI, and it supplies that tier's floor for a non-draw loss.",
   "fields": {
     "Id": {
-      "simple": "Rank tier row id (e.g. GRADE4_01, SPECIAL_GRADE_01).",
+      "simple": "The name of this rank tier, such as Grade 4 or Special Grade. The game uses this name to tell ranks apart and find this tier.",
       "technical": "FName import key/row name for FGameDataTableRow_RankPoint; the export writes the key as \"ID\" while ImportKeyField is Id. GameRankPoint_FindRow does not read Id: it enumerates cached rows via FGameDataTableArray::GetRows (table order, then each table's GetRowNames order) and selects by threshold. The previous/next UI helpers instead sort rows by the Min of their Id_GlobalThreshold thresholds and locate the current row with Row->Id == Current->Id. Result UI compares CurrentRank->Id with PreviousRank->Id only to detect no change; if the Ids differ, CurrentPoint <= PreviousPoint selects down and otherwise up. Leaderboard card packing maps the found row's Id to a 0..63 index stored in 10 bits; unpacking indexes the same row list to recover the tier's threshold Min. Shop unlock text and PvPRankPointMax gating find rows directly by a configured row name (ValueStrs[0]) with the shared StoryFindRowOutOfLine finder (bCheckNone=false).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPoint.h:13",
@@ -19,7 +20,7 @@
       "status": "verified"
     },
     "RankPointClass": {
-      "simple": "Rank class/tier group shown in UI and used for matchmaking, rewards and reports.",
+      "simple": "The main rank group players see on their rank display, from Grade 4 up to Special Grade. Moving it up raises the shown rank and changes matchmaking and ranked match rewards.",
       "technical": "EGameRankPointClass is a uint8 enum (None=0, Grade4=1, Grade3=2, SemiGrade2=3, Grade2=4, SemiGrade1=5, Grade1=6, SpecialGrade=7, Max=8, Invalid=255); constructor default None, and all 27 exported rows use 1..7. SetRank is called from UGamePlayerRankWidget::SetRankPoint and GameRankSystemGradeInfoWidget::SetupGradeInfo: it selects the class icon through AGameWidgetManager::GetRankPointClassIconTexture and shows only the matching grade spacer (spacers registered for Grade4, Grade3, SemiGrade2, Grade2, SemiGrade1 and Grade1; SpecialGrade collapses them all). Result, ranking, replay and shop UI use the numeric value as GSysRankingLabelMap key for localized grade names; the PvE result path uses the same values in GPvPRankMatchRewardLobbyLabelMap / GPvPRankMatchRewardLabelMap to grant an item set. Session helpers map Grade4/Grade3 to a None border, SemiGrade2 to Grade4, Grade2 to Grade3, SemiGrade1 to SemiGrade2 and Grade1/SpecialGrade to Grade2, then advertise/query point borders from GGameRankPointClassBorders (None 1200, Grade4 1300, Grade3 1500, SemiGrade2 1600, Grade2 1700, SemiGrade1 5000); GetRankBorderClass adds an optional class delta, clamping it to 0..4 only when the delta is nonzero. Lobby join/create checks the player's class against session minimum/maximum. Battle KPI rows store the numeric class as a string (0 when no row is found).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPoint.h:17",
@@ -42,7 +43,7 @@
       "status": "verified"
     },
     "RankPointGrade": {
-      "simple": "Rank grade/subdivision shown as pips inside the rank class.",
+      "simple": "The small rank marks shown inside a rank group, with Vermilion and Special Grade showing none. Moving this up adds marks from Bronze to Platinum.",
       "technical": "EGameRankPointGrade is a uint8 enum (None=0, Vermilion=1, Bronze=2, Silver=3, Gold=4, Platinum=5, Invalid=255); constructor default None. The export uses Vermilion/Bronze/Silver/Gold/Platinum on the 26 classed rows and None on SPECIAL_GRADE_01. SetRank passes it to UGamePlayerRankGradeWidget::SetGrade, which shows each mark when Grade >= its key for Bronze=2, Silver=3, Gold=4 and Platinum=5, so Vermilion and None display no marks. The rank-system manual filters rows to the selected RankPointClass, stable-sorts them descending by RankPointGrade (Platinum first, Vermilion last) and feeds up to five GradeInfoWidgets; each displays the row's threshold Min/Max plus previous/next progress. Battle KPI rows also record the numeric grade (0 when no row is found).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPoint.h:20",
@@ -62,7 +63,7 @@
       "status": "verified"
     },
     "Id_GlobalThreshold": {
-      "simple": "Foreign key to the GlobalThresholdDataTable row holding this tier's point band.",
+      "simple": "The name of the point range that decides when this rank appears. Changing it connects this tier to a different range of rank points.",
       "technical": "FName, default None, pointing into GlobalThresholdDataTable (DTM+0x300); the referenced row supplies float Min/Max (both default 0). GameRankPoint_FindRow (0x13077a0) enumerates RankPointDataTables (DTM+0x380) through FGameDataTableArray::GetRows and calls the per-table FindRow helper with bCheckNone=false for each Id_GlobalThreshold. It keeps the first row seen as a fallback, and returns a row immediately when UKismetMathLibrary::InRange_FloatFloat(static_cast<float>(RankPoint), Threshold->Min, Threshold->Max, true, true) succeeds: both float bounds are inclusive, a row whose threshold is missing is skipped, and if no rows exist the result is null rather than a synthetic default. All 27 exported keys resolve to distinct threshold rows with contiguous, non-overlapping bands covering 0..99999. UI helpers sort rows by WidgetTest_FindGlobalThreshold(...)->Min; grade-info displays Min/Max and uses previous/next row Mins for progress, with 'next' limited to rows of the same RankPointClass. Result UI uses the next row's Min for progress/remaining points (or a full bar when there is no next row); the shop PvPRankPointMax unlock compares the saved record with ceil(Threshold->Min). Leaderboard card unpacking converts the stored row index back to round(Threshold->Min), returning 0 past the end of the row list.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPoint.h:23",
@@ -86,7 +87,7 @@
       "status": "verified"
     },
     "LoseLowerLimit": {
-      "simple": "Lower bound (in rank points) for a non-draw loss at this tier.",
+      "simple": "The smallest rank-point drop after a non-draw ranked loss, with values closer to zero meaning a gentler drop. An AI-controlled ally can stop the drop completely.",
       "technical": "int32 floor in rank-point units, constructor default 0. At the end of CalcRankPointDelta, after result base, evaluation, stock difference and optional rank-gap scaling, it is read only when the winner is not the 0xFF draw sentinel and the player's team lost: Points = FMath::Max(Points, Row->LoseLowerLimit), where Row is found for the pre-battle GameManager UserInfo.Header.RankPoint. A null finder result skips the floor. If any ally with a valid online-user index has GetControlType()==3 (AI control), a second FMath::Max(Points, 0) applies. Draws instead clamp to <= 0 and never read this field; wins do not read it. Exported floors are 0 for the six Grade4/Grade3 rows, -5 SemiGrade2, -10 Grade2, -20 SemiGrade1, -22/-24/-26/-28/-30 for Grade1 rows 1..5, and -40 SpecialGrade. The resulting delta is applied by AddRankPoint, which clamps saved rank points to [0, 99999].",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankPoint.h:26",

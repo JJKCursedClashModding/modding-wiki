@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets where characters and the random pick appear in character select and lobby lists, and which tiles get extra space.",
   "description": "Per-ID presentation and ordering metadata for the character-select and visual-lobby/ranking UIs: row identity, main-list order (and -1 hide sentinel), visual-lobby/ranking order, and a flag that requests an extra list-item X offset. CP_000 is a synthetic random-select entry, not a playable character row.",
   "fields": {
     "ID": {
-      "simple": "Row key, normally the CharacterSelect id pointed to by Character::Id_CharacterSelect; CP_000 is the separate random-select entry.",
+      "simple": "The name that connects this tile to a character in the roster. A special name marks the random pick.",
       "technical": "FName row key at offset +0x8 (export column 'ID', ImportKeyField='Id'). In the export all 27 non-CP_000 keys are referenced exactly once by Character::Id_CharacterSelect. CharacterSelect_FindRow (retail 0x1508460) walks DTM CharacterSelectDataTables (+0x450) and returns the first FindRow hit; it rejects NAME_None only when bCheckNone=true, and bUnused is ignored. BuildListData looks up the literal FName CP_000 to create the 'random' entry and dereferences that result without a null check.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSelect.h:11",
@@ -15,7 +16,7 @@
       "status": "verified"
     },
     "PlacementIndex": {
-      "simple": "Zero-based order in the main character-select list; exactly -1 removes a Character row from that list.",
+      "simple": "Where the character sits in character select. Higher numbers place them later. Minus one keeps them off the list.",
       "technical": "int32 at row +0x10 (unitless ordinal; constructor default 0). BuildListData (retail 0x1506740) drops Character rows whose Select lookup misses or whose PlacementIndex == -1, then TArray::Sort ascending by this value (the comparator's 0 fallback for a missing row is unreachable after that filter). GameCharacter_PickRandomId (0x12fd200) uses a different test: it skips a missing Select row, PlacementIndex < 0, and ids in Exclude via Exclude.Contains(Select->Id) (the Select row key, equal to the Character id in this export). The export has unique values 0..27; CP_000's 27 is never compared by the main sort because CP_000 has no Character row and is appended after the sorted entries. No exported row uses the -1 hide sentinel.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSelect.h:15",
@@ -30,7 +31,7 @@
       "status": "verified"
     },
     "VisualLobbyPlacementIndex": {
-      "simple": "Zero-based ordering ordinal for visual-lobby, free-battle team and ranking character lists; it is not itself a C++ exclusion flag.",
+      "simple": "Where the character appears in lobby, team, and ranking lists. Higher numbers place them farther down.",
       "technical": "int32 at row +0x14 (constructor default 0). The visual-lobby top widget, free-battle team select and GameCharacter_GetOrderedSelectableIds (0x13081e0) build TMap<CharacterId, index> and ValueSort ascending; Next/PreviousSelectableId consume that order. Ranking's BuildCharacterFilters (0x16377f0) uses StableSort and substitutes MAX_int32 when a Select row is missing. None of these C++ paths tests the index sign: a negative value would sort first if it entered those maps, while CP_000's -1 never does because no Character row references CP_000 and the random item is appended separately. Export values are unique: -1 only on CP_000, otherwise 0..26.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSelect.h:18",
@@ -47,7 +48,7 @@
       "status": "verified"
     },
     "bUseListItemLeftPadding": {
-      "simple": "Flag requesting an extra X offset on a character-select list item; the offset size itself is a widget property, not a table field.",
+      "simple": "Whether this character's tile gets extra space on the left in character select. Turning it on gives the random pick the same gap.",
       "technical": "bool at row +0x18 in the retail game build (constructor default false; export 14 true and 14 false). BuildListData copies it into UGameCharacterSelectCharacterListData::LeftPadding as ListItemLeftPaddingSize when true, else 0.0f; the CP_000 row is read the same way for the random item. SetupFromData (0x1519080) adds LeftPadding to the saved BaseRenderTranslation.X only when a base translation is set. ListItemLeftPaddingSize (widget +0x568) gets no store in the C++ constructor (0x14a4440), so its effective layout-unit magnitude depends on widget defaults not verified here.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSelect.h:21",

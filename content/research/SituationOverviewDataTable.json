@@ -1,8 +1,9 @@
 {
+  "overview": "This table tells the game which poses each character can use on the Situation Overview screen and in character previews.",
   "description": "Ordered per-character pose list for the situation-overview/card customization and battle capture views. Character.Id_SituationOverview selects a row by its Id; each Id_SituationOverviewPose element names a SituationOverviewPoseDataTable row that supplies the pose's animations, icons and weapon setup. The export has one 45-row table with six fixed slots per row and uses NAME_None for unused slots.",
   "fields": {
     "ID": {
-      "simple": "Character id that owns this pose list (export row key and Id value).",
+      "simple": "The character this pose set belongs to, written as the game's character code. It connects the character to this set of poses.",
       "technical": "FName declared as the row's first UPROPERTY (header line 11); the export writes it as both the row key and ID, with ImportKeyField=Id. Resolved from Character.Id_SituationOverview (Character row +0x100) against SituationOverviewDataTables (DTM +0xAD0). The typed finders (GameCharacter_FindSituationOverviewRow, capture FindRow, GameUserCustomize_FindRowInline and the model-viewer helper) walk the cached table array in order and return the first matching row; with the single exported shard there is no competing source. All 45 keys equal their ID and match Character row keys. Export exceptions to a strict one-to-one character link: CP_081/CN_170/CN_210 have Id_SituationOverview=None, CN_260's Character row points at CP_160, and the overview row CN_260 is therefore unreferenced by Character. GameItem_GetCharacterId for a SituationOverviewPose item uses Overview->Id to find a Character row, returns Character->Id, and GameItem_GetCharacterNameText formats that Character's Id_GlossaryText_Name into the CHARACTER_NAME parameter; it does not display the raw row key itself.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverview.h:11",
@@ -21,7 +22,7 @@
       "status": "verified"
     },
     "Id_SituationOverviewPose": {
-      "simple": "Zero-based ordered list of pose ids available to this character.",
+      "simple": "The poses this character can use, listed in the order the game uses them. The first is free, and later listed poses need an item to unlock them.",
       "technical": "TArray<FName> (row +0x10). Consumers read this as a zero-based int32 index: FGameCharacterCaptureParameter::SituationOverviewPoseIndex and FGameSituationOverviewCharacter default to 0, saved FStudioCharacterSelection::SelectedPoseIndex defaults to 0, and battle slots use PoseIndex (MissionCharacter rows override enemy indices in Arcade/PvE). GameCharacter_IsSituationOverviewPoseAvailable and GameUserCustomize_IsPoseAvailable are id-based: the id found at index 0, or any id absent from the array, is free; an id found at a nonzero index requires an owned Item row of ItemType SituationOverviewPose whose VariableId equals that id. GameUserCustomize_SanitizeSelections resets a nonzero saved SelectedPoseIndex to 0 when IsValidIndex fails or the indexed pose is locked; GetPoseIndex maps an unlisted pose id to 0; the model-viewer distance-offset lookup falls back to Poses[0]. Capture resolution paths do not validate the index (GetData()[Index] / operator[]) and have no alternate-row fallback. All 45 exported arrays have six slots: 29 CP rows list six distinct pose ids; 16 CN rows have one real pose at index 0 and NAME_None in slots 1-5. All 190 non-None ids resolve in SituationOverviewPoseDataTable (each pose row is referenced once); NAME_None is the absent-slot sentinel, skipped by the pose tile but passed to capture's pose-row finder when indexed. There are no numeric values or units in this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverview.h:15",

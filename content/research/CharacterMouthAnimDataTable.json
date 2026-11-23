@@ -1,8 +1,9 @@
 {
+  "overview": "This table tells the game how long a character should keep moving their mouth while a spoken line plays.",
   "description": "Sparse mouth-animation rows keyed by voice ID for the unique-pair voice sequencer. The traced C++ consumer uses only the last matched row's ApplyTiming as an end-of-talking cutoff while a sound module has an AtomComponent; MouthType and AnimationTime on these rows are serialized but have no observed C++ read.",
   "fields": {
     "Id": {
-      "simple": "Unique row key for one mouth-animation keyframe row.",
+      "simple": "The name that picks out this mouth movement from the others. Changing it does not change what you see.",
       "technical": "FName row key (export property ID; import key Id). All 4,447 exported keys are unique and follow <Id_Voice>_<two-digit cue index> (for example VoBtl_CN_210_Intro_1_011010_00). The traced evaluator never looks a row up by this property: FGameDataTableArray::GetRows enumerates UDataTable row names in table-then-row-name order, and the evaluator then filters by Id_Voice. This is a serialized row identity with no observed behavioral use in the available source.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthAnim.h:11",
@@ -14,7 +15,7 @@
       "status": "observed"
     },
     "Id_Voice": {
-      "simple": "VoiceDataTable row ID whose playback this keyframe group belongs to.",
+      "simple": "Which spoken line this mouth movement belongs to. With English voices chosen, it uses that line's English name.",
       "technical": "FName into VoiceDataTable. All table rows are collected, then retained only when Row->Id_Voice equals the resolved voice ID; that same base ID is what UAbramsSequencerSoundModule::FindSoundRow uses to fetch the VoiceDataTable cue row. GameManager.Settings.StudioByte_371 is the voice-language flag (0 selects Japanese voice cues; nonzero selects the English-cue '_En' suffix, also mirrored to GameSoundManager::bAppendEnVoiceSuffix). Under the nonzero flag the evaluator appends '_En' to the ID used for mouth-row filtering, matching the suffix the sound manager applies to the cue actually played. Every exported Id_Voice, including its _En variants, resolves to a VoiceDataTable row key.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthAnim.h:15",
@@ -29,7 +30,7 @@
       "status": "verified"
     },
     "MouthType": {
-      "simple": "Mouth-pose enum stored on the keyframe; no use by the traced consumer was found.",
+      "simple": "The mouth shape saved for this mouth movement. Its effect on what you see is unclear.",
       "technical": "EGameCharacterFacialPartsMouth (uint8 enum: None, Close_01, Open_01, Open_02, Invalid=255); the row constructor defaults this member to None. All 4,447 exported rows use only Close_01, Open_01 or Open_02; no None or Invalid rows are present. The traced unique-pair evaluator never reads this property: its cycling shapes come from CharacterMouthPatternDataTable.MouthTypeArray, where None entries are sentinel values removed before use. Any effect of this row property outside that evaluator is unresolved.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthAnim.h:19",
@@ -42,7 +43,7 @@
       "status": "observed"
     },
     "ApplyTiming": {
-      "simple": "Voice playback time, in seconds, used as the last-row end-of-talking cutoff.",
+      "simple": "How long the character keeps moving their mouth while the voice plays. A larger value keeps it moving longer.",
       "technical": "float, constructor default 0.0f. Matching rows are kept in table order and are not sorted. In UpdateLipSync, when SoundModule->GetAtomComponent() is non-null, bTalking = !MouthAnimRows.IsValidIndex(LastKey) || PlaybackTime < MouthAnimRows[LastKey]->ApplyTiming; the comparison is strict, so the last row's value is the cutoff at which talking ends. With no AtomComponent, bTalking stays false regardless of rows; with an AtomComponent but no matching rows, the negation makes talking indefinite. The export has two rows for 2,222 Id_Voice groups (first row 0.0, final cutoff 0.16666667-5.8333335 s) and three single-row groups whose only ApplyTiming is 0.0, so row order matters because no sort is applied.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthAnim.h:22",
@@ -56,7 +57,7 @@
       "status": "verified"
     },
     "AnimationTime": {
-      "simple": "Serialized per-keyframe float whose exported values look like seconds; no C++ read was found.",
+      "simple": "The saved length of this mouth movement, measured in seconds. What it changes during play is unclear.",
       "technical": "float, constructor default 0.0f. Exported values range from 0.0 to 2.8333333 s (many are 0.083333336 or 0.16666667, but not all are sub-second). No read of this row member was found in the available consumers; the unique-pair evaluator takes its shape duration from CharacterMouthPatternDataTable.AnimationTime and its stop fade from EndAnimationTime instead. The purpose of this per-row value is therefore serialized but behaviorally unresolved here.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterMouthAnim.h:25",

@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets up each Arcade mission by choosing its battle stage, enemy waves, and how much bonuses affect the player's rank.",
   "description": "Defines an individual Arcade mission: its stage, ordered wave references, and result-score scaling.",
   "fields": {
     "Id": {
-      "simple": "Arcade mission identifier.",
+      "simple": "The name that links this mission to its group of Arcade missions. Changing it changes which mission the game selects.",
       "technical": "FName import key/row name for FGameDataTableRow_ArcadeMission. BattleArcade_GetMissionIds selects it from an ArcadeMissionSet difficulty list; IntervalArcade writes the stage's entry to Game->ArcadeRun.MissionId, which is the key passed to the finders over ArcadeMissionDataTables (DTM+0x980). No reconstructed consumer reads the row member Id as a value.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeMission.h:11",
@@ -14,7 +15,7 @@
       "status": "observed"
     },
     "Id_Map": {
-      "simple": "Battle stage/map for the mission.",
+      "simple": "The name of the battle stage where this mission takes place. Changing it moves the fight to another stage.",
       "technical": "Default-constructed FName (None). UGamePhase_IntervalArcade copies the current mission's Id_Map into Game->StudioBattleLevelRequest_CA0.BattleLevel before the wave-derived battle pair is chosen. The map id is subsequently used as a key into MapDataTables (DTM+0x3A0) for map data and selection icons; unlike the story-mission path, this Arcade consumer does not substitute Story_PickRandomMapId when the name is None. All 90 exported map ids resolve to MapDataTable rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeMission.h:15",
@@ -27,7 +28,7 @@
       "status": "verified"
     },
     "Id_MissionWave": {
-      "simple": "Ordered list of wave ids that make up the mission.",
+      "simple": "The enemy waves the player faces, in order, with unused places empty. The first wave supplies the enemies shown on mission screens.",
       "technical": "TArray<FName>, default empty. UGamePhase_BattleArcade iterates every entry, resolves each through MissionWaveDataTables (DTM+0x9A0) with bCheckNone=true, and keeps only non-null rows; the resulting wave/task arrays are indexed by RetryCount and passed to AGameBattleManager::SetupArcadeMission. All first-wave consumers index element 0 without a Num() guard. Null handling varies by consumer: RootInfo and the Arcade overview widget null-check the looked-up mission and wave, the interval helper dereferences the mission row without a null check, and FGameSituationOverviewParameter::BuildArcade dereferences the first-wave row without a null check. The first wave determines enemy portraits, situation-overview poses and IntervalArcade_BattlePairFromWave (which maps a null wave to 0xFF). Every exported row has three slots: one valid wave id followed by two None sentinels; None has no MissionWave row and is dropped by the battle loop.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeMission.h:18",
@@ -50,7 +51,7 @@
       "status": "verified"
     },
     "ResultEvaluationScoreRate": {
-      "simple": "Multiplier applied to the battle's bonus score for rank evaluation.",
+      "simple": "For this Arcade mission, how much battle bonuses count toward the player's rank. A bigger number makes those bonuses count more.",
       "technical": "float, constructor default 0.0f, distinct from the accessor's 1.0f fallback when no mission row is cached. AGameBattleManager::GetResultEvaluationScoreRate starts at 1.0, applies StoryMission->ResultEvaluationScoreRate, then unconditionally overrides it with the Arcade mission value when System360->ArcadeMission is non-null. Result-snapshot construction repeats the same precedence inline: summed player bonus points are multiplied by the rate and cast to int32 before GetResultScoreRank. The PvE result Enter path calls the accessor for a bonus rank and takes it when the returned value is numerically greater than the existing MissionWaveRank. Of the 90 exported rows, the 30 Easy-list rows (_01.._05 for roots A-F) use 1.3 and the 60 Normal/Hard-list rows use 1.0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ArcadeMission.h:21",

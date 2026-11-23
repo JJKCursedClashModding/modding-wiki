@@ -1,8 +1,9 @@
 {
+  "overview": "These presets control how the gamepad shakes when the player lands or takes an unguarded hit, including Cursed Energy attacks.",
   "description": "Named gamepad vibration pulse presets referenced by damage rows; each row supplies a motor mask, amplitude and duration consumed by the unguarded player-side hit path.",
   "fields": {
     "ID": {
-      "simple": "Row key/name of the force-feedback preset, e.g. NormalAttack or Attacker_Small.",
+      "simple": "The name that connects a damage move to this vibration when the player lands or takes an unguarded hit.",
       "technical": "Exported as ID; declared as FName Id (the export's ImportKeyField is Id). FStudioBattleSystem2E0::PlayForceFeedback(Id) takes the data-table manager, returns on NAME_None (exported as \"None\"), then scans DataTables->ForceFeedbackDataTables (+0x7C0) in order and accepts the first UDataTable::FindRow<FGameDataTableRow_ForceFeedback>(Id, FString(), false) hit; null tables or missing rows produce no pulse. The struct's Id member is not read by this lookup. The single master export has 11 rows, every key equal to its ID: NormalAttack, NormalAttack_Blow, NormalAttack_Down, CursedEnergyAttack_1..3, CursedEnergyAttack_Blow_1..3, TagCombo and Attacker_Small. All 11 are referenced from exported Damage rows: Attacker_Small is the only non-None attacker-side value and the other ten are receiver-side values.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:11",
@@ -18,7 +19,7 @@
       "status": "verified"
     },
     "ForceFeedbackChannel": {
-      "simple": "Which rumble motors the pulse targets.",
+      "simple": "Which parts of the controller shake for this hit. The included presets shake both sides.",
       "technical": "EGameForceFeedbackChannel is a BlueprintType uint8 UENUM with None=0, Left=1, Right=2, All=3 and Invalid=255. The reconstructed row constructor defaults the member to None; all 11 exported rows use All. AGameInputManager::PlayForceFeedbackPulse fills an FForceFeedbackChannelDetails, whose engine constructor enables all four motors; Left clears bAffectsRightSmall/bAffectsRightLarge, Right clears bAffectsLeftSmall/bAffectsLeftLarge, and every other value (including None and Invalid) leaves all four enabled. There is no enum validation in the reconstructed consumer and no exported row exercises the Left, Right or Invalid arms.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameForceFeedbackChannel.h:5",
@@ -36,7 +37,7 @@
       "status": "verified"
     },
     "Power": {
-      "simple": "Vibration amplitude of the pulse.",
+      "simple": "How strongly the controller shakes during the hit. Higher values make the vibration stronger.",
       "technical": "float copied verbatim into both keys of a flat FRichCurve at times 0 and Duration in FForceFeedbackChannelDetails::Curve.EditorCurveData. The game code applies no scaling, player-character rate or clamping; UE 5.1 evaluates that curve and clamps each motor output against the current value and 1.0. Exported values are 0.2 (TagCombo), 0.3 (Attacker_Small), 0.5 (the three NormalAttack rows), 0.6 (CursedEnergyAttack_1 and its Blow row), 0.8 (CursedEnergyAttack_2 and its Blow row) and 1.0 (CursedEnergyAttack_3 and its Blow row). The reconstructed row constructor defaults Power to 0.0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:19",
@@ -51,7 +52,7 @@
       "status": "verified"
     },
     "Duration": {
-      "simple": "How long the vibration pulse lasts.",
+      "simple": "How long the controller keeps shaking for the hit. Higher values make the vibration last longer.",
       "technical": "float seconds used as the second Power-curve key's time (the first key is at 0); with the positive exported values, UE 5.1 takes the curve's maximum time as UForceFeedbackEffect::Duration. FStudioBattleSystem2E0::PlayForceFeedback forwards Duration and Power with player index 0, and PlayForceFeedbackPulse bakes them into the curve before calling AInputManager::PlayForceFeedback(Details, FForceFeedbackParameters(), 0). The engine base never reads that parameter object: it stops prior feedback for the player, replaces the transient effect's ChannelDetails with this one channel and calls ClientPlayForceFeedback with a fresh default FForceFeedbackParameters (non-looping, time dilation honored, no play-while-paused). Exported values are 0.25-0.8 seconds; the row constructor defaults Duration to 0.0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ForceFeedback.h:22",

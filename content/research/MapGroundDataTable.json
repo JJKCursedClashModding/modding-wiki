@@ -1,8 +1,9 @@
 {
+  "overview": "This table chooses the effects and sounds that play when characters touch different ground types, such as soil, water, or wood.",
   "description": "Surface-type catalog used after a ground trace: selects footstep/ground-contact/dash/jump/landing/down/bound effects and sounds, plus Niagara ground attributes and effect color per physical surface.",
   "fields": {
     "ID": {
-      "simple": "Physical-surface row key (exported as ID for native FName Id / ImportKeyField).",
+      "simple": "The ground material for this entry, such as soil, concrete, grass, or water. Cursed Energy attacks and other moves use this name for special effects.",
       "technical": "FName row key (native Id, export key ID, ImportKeyField=\"Id\") matched against the UPhysicsSettings PhysicalSurfaces name from a line trace through CN_050_GroundObjectTypes. AGameCharacter/AGameTrap trace Location +/- Distance on Z (GetMapGroundRowAtLocation and AGameShikigami use Distance=50; other call sites pass 100/200/500); a miss or SurfaceType_Default yields NAME_None and no row. First matching table in MapGroundDataTables (+0x3D0) wins. Sequencer ground-effect/SE evaluates instead call AGameSequencerManager::FindMapGroundRow with Section.GroundTraceLength (section defaults 10 for effect+SE and 120 for SE-only) and an offset (ankle height or zero); the EffectColor evaluate uses a separate fixed 100-unit downward trace. Id itself is also consumed by surface-specific effect maps in CP_020/CP_190/CP_220 and by the Water branch of PlayManualGroundEffect. Native offset +0x08. Export rows: Soil, Concrete, Grass, Gravel, Iron, Water, Tile, Wood.",
       "evidence": [
         "Source/Abrams/Private/GameGroundSurfaceInline.h:19",
@@ -21,7 +22,7 @@
       "status": "verified"
     },
     "Id_Effect_Footstep": {
-      "simple": "Footstep effect IDs by action (run/dash).",
+      "simple": "The visual effect when a character runs or dashes across this ground. Some characters have their own footstep effect.",
       "technical": "TArray<FName> (row +0x10) indexed by GameAnimNotify_TypeIndex(EGameFootstepActionType) = enum value - 1: Run->0, Dash->1, None->-1, Invalid(255)->254. The base controller and shikigami controller reject Index < 0 and out-of-range indices; the sequencer uses IsValidIndex. The resulting ID is resolved against EffectDataTables and spawned at the notify transform with the owner’s GetMapGroundEffectScale(). Sequencer footstep tracks use Section.FootstepActionType with the same index; per-character overrides can remap the resolved FName. All 8 exported rows have 2 entries.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterActionController.cpp:2716",
@@ -33,7 +34,7 @@
       "status": "verified"
     },
     "Id_SoundEffect_Footstep": {
-      "simple": "Footstep sound IDs by character footstep type.",
+      "simple": "The footstep sound for each way a character walks on this ground, such as shoes or bare feet.",
       "technical": "TArray<FName> (row +0x20) indexed by GameAnimNotify_TypeIndex(Actor->GetFootstepType()) (EGameFootstepType ShoesMan=1 .. Totality=6 -> indices 0..5); None->-1, Invalid(255)->254 and other out-of-range values are ignored by the runtime bounds checks. Each ID is resolved to a SoundEffect row and played as 3D SE at the foot socket/location. Sequencer ground-SE and ground-effect-and-SE evaluates use the same indexing with IsValidIndex. All 8 exported rows have 6 entries.",
       "evidence": [
         "Source/Abrams/Private/GameAnimNotify_Footstep.cpp:53",
@@ -45,7 +46,7 @@
       "status": "verified"
     },
     "Id_Effect_DashBegin": {
-      "simple": "Effect played when a dash starts on this surface.",
+      "simple": "The visual effect that appears when a dash starts on this ground.",
       "technical": "FName effect ID (row +0x30). CN_060/CN_081/CN_140 controllers and shared GameCharacterAction_Dash resolve it through EffectDataTables, spawn it with the owner’s location and root rotation (transform scale 1), then set actor scale to GetMapGroundEffectScale(). NAME_None resolves to no effect. Exported examples: FX_CP_000_01112 (Soil/non-Water) and FX_CP_000_01122 (Water).",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:417",
@@ -56,7 +57,7 @@
       "status": "verified"
     },
     "Id_SoundEffect_DashBegin": {
-      "simple": "Sound played when a dash starts on this surface.",
+      "simple": "The sound that plays when a dash starts on this ground. Water has its own sound.",
       "technical": "FName sound ID (row +0x38) resolved through the action helper to a SoundEffect row and played as 3D SE at the owner’s location. Used by the shared dash action, CN_060/CN_081/CN_140, CP_180 and shikigami dash. Exported values: SE_CP_000_02001 for Soil/non-Water and SE_CP_000_02101 for Water.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:357",
@@ -67,7 +68,7 @@
       "status": "verified"
     },
     "Id_SoundEffect_DashEnd": {
-      "simple": "Sound played when a dash ends on this surface.",
+      "simple": "The sound that plays when a dash ends on this ground. Some characters have their own dash-end sound.",
       "technical": "FName sound ID (row +0x40). The shared dash action uses it directly and PlaySoundEffect resolves it to a SoundEffect row for 3D playback at the owner’s location. CP_180’s override does not use the row ID directly: it starts from fixed fallback SE_CP_180_01021 and remaps SE_CP_000_02002 -> SE_CP_180_01021 and SE_CP_000_02102 -> SE_CP_180_01022; the selected FName is then resolved by PlaySoundEffect. Exported values: SE_CP_000_02002 (Soil/non-Water), SE_CP_000_02102 (Water).",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:489",
@@ -77,7 +78,7 @@
       "status": "verified"
     },
     "Id_Effect_JumpBegin": {
-      "simple": "Effect played when jumping off this surface.",
+      "simple": "The visual effect that appears when a character jumps off this ground. Some characters have their own jump effect.",
       "technical": "FName effect ID returned by UGameCharacterActionController::GetJumpEffectName (vslot 128, retail 0x141182440, row +0x48) and read by PlayJumpEffect; the effect is spawned with identity rotation at the owner's location scaled by GetMapGroundEffectScale() and then Initialize'd. Shikigami read the same field in Shikigami_PlayGroundEffectAndSound.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterActionController.cpp:2704",
@@ -88,7 +89,7 @@
       "status": "verified"
     },
     "Id_SoundEffect_JumpBegin": {
-      "simple": "Sound played when jumping off this surface.",
+      "simple": "The sound that plays when a character jumps off this ground.",
       "technical": "FName; PlayJumpEffect resolves it to a SoundEffect row (bCheckNone=true) and plays its CueSheetName/CueName as 3D SE at the owner's location with game default parameters. Shikigami read it alongside Id_Effect_JumpBegin. Row offset +0x50. Exported Soil value: SE_CP_000_03001.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterActionController.cpp:2758",
@@ -97,7 +98,7 @@
       "status": "verified"
     },
     "Id_Effect_Landing": {
-      "simple": "Effect played on landing on this surface.",
+      "simple": "The visual effect that appears when a character lands on this ground. Some characters have their own landing effect.",
       "technical": "FName effect ID returned by GetLandingEffectName (vslot 129, retail 0x141182570, row +0x58). PlayLandingEffect spawns it at the owner's location with ground-effect scale; CP_070 and the shared dash/landing code and shikigami also read it directly. Exported Soil value: FX_CP_000_02012.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterActionController.cpp:2710",
@@ -108,7 +109,7 @@
       "status": "verified"
     },
     "Id_SoundEffect_Landing": {
-      "simple": "Sound played on landing on this surface.",
+      "simple": "The sound that plays when a character lands on this ground.",
       "technical": "FName; PlayLandingEffect and CP_070 resolve it to a SoundEffect row and play 3D SE at the owner/landing location. Row offset +0x60. Exported Soil value: SE_CP_000_03002.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterActionController.cpp:2783",
@@ -118,7 +119,7 @@
       "status": "verified"
     },
     "Id_Effect_Ground": {
-      "simple": "Ground-contact effect IDs by ground-effect type.",
+      "simple": "The visual effect for ordinary contact, braking, upward movement, stepping, or a hard impact on this ground. Heavy steps use the hard impact effect.",
       "technical": "TArray<FName> (row +0x68) indexed by GameAnimNotify_TypeIndex(EGameGroundEffectType) (Normal=0, Brake=1, Upper=2, Step=3, Impact=4; None=-1; Invalid(255)->254). UGameAnimNotify_PlayGroundEffect resolves the ID to an Effect row, spawns it with the notify rotation/offset and notify scale multiplied by owner GetMapGroundEffectScale(), and can attach it to mesh socket \"root\". GameCharacterAction_Step computes Heavy(3)+1, i.e. TypeIndex 4 (Impact), and uses that array element without a separate bounds check. All exported rows have 5 entries.",
       "evidence": [
         "Source/Abrams/Private/GameAnimNotify_PlayGroundEffect.cpp:56",
@@ -129,7 +130,7 @@
       "status": "verified"
     },
     "Id_SoundEffect_Ground": {
-      "simple": "Ground-contact sound IDs by ground-effect type.",
+      "simple": "The sound for ordinary contact, braking, upward movement, stepping, or a hard impact on this ground.",
       "technical": "TArray<FName> (row +0x78) indexed by the same EGameGroundEffectType-1 convention in UGameAnimNotify_PlayGroundEffect; each ID is resolved to a SoundEffect row and played at the notify location (optionally attaching the SE player to mesh \"root\"). Effect rows have their own separate Id_SoundEffect_Ground field used by AGameEffect’s ground-contact sound branch. All exported MapGround rows have 5 entries.",
       "evidence": [
         "Source/Abrams/Private/GameAnimNotify_PlayGroundEffect.cpp:77",
@@ -139,7 +140,7 @@
       "status": "verified"
     },
     "Id_Effect_Down": {
-      "simple": "Effect played when a character is knocked down on this surface.",
+      "simple": "The visual effect when a knocked-down character or Shikigami hits this ground. Damage can make it larger for characters.",
       "technical": "FName effect ID (row +0x88). FGameCharacterAction_DownBase::LandDown spawns it at the owner’s location with identity rotation. Character effect scale is GetMapGroundEffectScale() multiplied by DamageTableRow->GroundBoundEffectScale only when bFlag16B is false, a damage row exists and bBoundEnabled is false; otherwise that damage factor is 1. Shikigami LandDown uses identity rotation, owner location and GetMapGroundEffectScale() without the damage-row factor. Exported Soil value: FX_CP_000_04211.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:462",
@@ -148,7 +149,7 @@
       "status": "verified"
     },
     "Id_SoundEffect_Down": {
-      "simple": "Sound played when a character is knocked down on this surface.",
+      "simple": "The sound when a knocked-down character or Shikigami hits this ground. Some Shikigami use their own version of the sound.",
       "technical": "FName; played as 3D SE at the owner's location in LandDown. Shikigami route it through the overridable GetDownSoundEffectId virtual before playing. Row offset +0x90. Exported Soil value: SE_CP_000_07001.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:467",
@@ -158,7 +159,7 @@
       "status": "verified"
     },
     "Id_Effect_Bound": {
-      "simple": "Effect played when a knocked-down character bounces on this surface.",
+      "simple": "The visual effect when a knocked-down character bounces off this ground. Damage can make the effect larger.",
       "technical": "FName effect ID (row +0x98). On the ground-bound branch it is spawned at the hit ImpactPoint with rotation from BlowBoundEffectRotation(Hit) and scale GetMapGroundEffectScale() * (damage row ? GroundBoundEffectScale : 1.0f). Exported Soil value: FX_CP_000_04611.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1062"
@@ -166,7 +167,7 @@
       "status": "verified"
     },
     "Id_SoundEffect_Bound": {
-      "simple": "Sound played when a knocked-down character bounces on this surface.",
+      "simple": "The sound when a knocked-down character bounces off this ground.",
       "technical": "FName; played as 3D SE at the hit ImpactPoint on the same branch as Id_Effect_Bound. Row offset +0xA0. Exported Soil value: SE_CP_000_07011.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:1067"
@@ -174,7 +175,7 @@
       "status": "verified"
     },
     "EffectAttribute": {
-      "simple": "Numeric ground attribute for Niagara effects.",
+      "simple": "A number some visual effects get from the ground. Water uses one and other ground types use zero, with the visual result unclear.",
       "technical": "int32 (row +0xA8) cast to float and written to each spawned effect’s Niagara user parameter \"GroundAttribute\" when bGroundAttributeEnabled is true; \"IsGround\" is set to 1 when a MapGround row was found and 0 on a miss. AGameEffect::Initialize enables the check only when EffectRow.GroundCheckTargetType is Possessor or Own; UpdateGroundAttribute early-returns without writing parameters if source interface or EffectRow is null. For Own, the trace is GetMapGroundRow(EffectLocation, EffectRow.GroundCheckDistance); otherwise the source’s current row is used. With the check disabled, GroundAttribute remains 0 while IsGround stays 1; with the check enabled but no row, both are 0. Constructor default 0. Export: Water=1, all other seven surfaces=0.",
       "evidence": [
         "Source/Abrams/Private/GameEffect.cpp:1250",
@@ -188,7 +189,7 @@
       "status": "verified"
     },
     "EffectColor": {
-      "simple": "RGB tint for effects on this surface.",
+      "simple": "Effect tint for this ground during scripted sequences, using red, green, and blue. With no matching ground, effects appear black.",
       "technical": "FVector (X,Y,Z). FAbramsSequencerSetEffectGroundColorEvaluate traces 100 units under the bound actor, resolves the physical surface to a MapGround row and returns FLinearColor(X,Y,Z,1); black is returned when no surface/row is found. This is a sequencer evaluate path, distinct from AGameEffectManager::ApplyMapColors which uses MapDataTable.EffectColor. Constructor default FVector::ZeroVector; all exported rows use (1,1,1).",
       "evidence": [
         "Source/AbramsSequencer/Private/AbramsSequencerSetEffectGroundColorEvaluate.cpp:58",

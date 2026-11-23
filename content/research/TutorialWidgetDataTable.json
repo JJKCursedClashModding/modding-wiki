@@ -1,8 +1,9 @@
 {
+  "overview": "This table holds the text and pictures for each page of the game's tutorial and help popups.",
   "description": "Stores the pages of the in-game tutorial/help popup: which tutorial flow each page belongs to, its heading and message keys, and the explanation images (including keyboard/controller-specific variants) shown beside the text.",
   "fields": {
     "Id": {
-      "simple": "Tutorial-page row identifier.",
+      "simple": "The game's name for this page, which helps keep tutorial pages in order.",
       "technical": "FName export key (export field ID, import key Id). The row’s own Id is not read by the reconstructed runtime. FGameDataTableArray::GetRows collects pointers in table order and then UDataTable row-name order; ShowTutorialTypes filters only on TutorialWidgetType and appends each matching row, so row names establish page order within a requested type. The single export shard has 54 unique row keys.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:11",
@@ -14,7 +15,7 @@
       "status": "verified"
     },
     "TutorialWidgetType": {
-      "simple": "Tutorial flow/category this page belongs to.",
+      "simple": "Which tutorial topic this page belongs to, such as movement, Cursed Energy, or story. Pages on the same topic appear together.",
       "technical": "EGameTutorialWidgetType (uint8): None=0, Move=1 through Adapt=38 as contiguous values, and Invalid=255 as a sentinel. The row constructor defaults this field to None. ShowTutorial(Type) forwards a one-element list to ShowTutorialTypes; for each requested type in list order, that function scans the cached rows and appends the matches. All 38 named non-None/non-Invalid values occur in the export, and some types contribute several pages; no None or Invalid row is exported.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameTutorialWidgetType.h:6",
@@ -28,7 +29,7 @@
       "status": "verified"
     },
     "Id_TutorialLabel": {
-      "simple": "Localized heading shown at the top of the page.",
+      "simple": "The heading players see at the top of this tutorial page. This name chooses which heading text the game displays.",
       "technical": "FName heading key passed unchanged to HeaderText->SetTextIdOnly on every SetPage call. The text block builds an FGameTextRequest and resolves it through AGameTextManager; the exported TUT_* keys are not SYS_* IDs and are present in TutorialTextDataTable_<Language>, one of the GameText tables loaded into the text manager’s language cache. No COUNT/MAX parameters are attached to the heading.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:19",
@@ -41,7 +42,7 @@
       "status": "verified"
     },
     "Id_TutorialMessage": {
-      "simple": "Localized body text for the tutorial page.",
+      "simple": "The main explanation players read on this tutorial page. This name normally chooses that message, with one downloadable story page showing revised wording.",
       "technical": "FName body key passed to ExplanationText_1 when either texture slot is non-None, or to ExplanationText_2 when slots 0 and 1 are both None. The sole exported row using TUT_OUTGAME_MESSAGE_1301 (TUT_WIDGET_OUTGAME_1301) is rewritten to TUT_OUTGAME_MESSAGE_1304 at display time; all other 53 rows pass through unchanged. Both keys are present in all 11 TutorialTextDataTable_<Language> export shards.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:22",
@@ -54,7 +55,7 @@
       "status": "verified"
     },
     "TutorialTextureName": {
-      "simple": "Ordered list of explanation image names for the page.",
+      "simple": "The explanation pictures shown beside this page's text, in the order they appear. A blank picture spot leaves that area empty.",
       "technical": "TArray<FName> with exactly two slots in every exported row; 24 of those 108 slots are None. The loader skips None, then uses the same-index switch flag to create bare-FName WidgetTexture primary-asset loaders (false) or direct Win64 streamable paths (true). SetPage reads indices 0 and 1 unguarded: both None selects Layout_2/ExplanationText_2, otherwise Layout_1/ExplanationText_1. ApplyPageTextures walks the row’s non-None names in order and the two ExplanationImages, applying only names that have a loaded texture; a missing earlier texture is skipped rather than reserving its image slot.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:25",
@@ -68,7 +69,7 @@
       "status": "verified"
     },
     "bSwitchPlatformTutorialTexture": {
-      "simple": "Parallel flags selecting input-device-specific image variants.",
+      "simple": "Chooses whether each picture has keyboard and controller versions. For those pictures, players see artwork matching their current control device.",
       "technical": "TArray<bool> parallel to TutorialTextureName; every exported row has two flags. After a None name is skipped, the loader reads bSwitchPlatformTutorialTexture[Index] without a bounds check. true loads /Game/Widgets/StreamingAssets/Tutorial/Win64/<Name>_Win64_Keyboard.<Name>_Win64_Keyboard and the matching _Controller object through LoadAssetList; false creates a WidgetTexture primary-asset loader keyed by the bare FName and resolved through the asset-manager cache. ApplyPageTextures removes _Win64 from loaded object names; EGameWidgetInputGuideType::Keyboard selects the _Keyboard asset, while every other guide type selects _Controller. Seven exported rows contain at least one true flag (10 true slots).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_TutorialWidget.h:28",

@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets which prizes players earn as their total PvP score rises in ranked matches, and what progress they see toward each reward on the rank screen.",
   "description": "PvP cumulative-score milestone rewards: the item set granted at each score threshold and its rank-screen/unlock UI display.",
   "fields": {
     "Id": {
-      "simple": "Rank reward row id.",
+      "simple": "The name for this milestone on the rank rewards screen. It links the reward to its progress display.",
       "technical": "FName import key/row name (export field spelled ID, native name Id; ImportKeyField is Id). All 140 exported row keys are unique and equal to Id, with no None values. The grant helper enumerates GetRows and never reads Id. The list-item path instead passes FName(Reward.Id) to SetupRequiredPointProgress, which first stable-sorts rows by RequiredPoint and then uses IndexOfByPredicate; a missing id would be INDEX_NONE and Rows[Index] is unguarded. SetupRewards copies the entire row into UGameRankSystemRewardListItemData.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankSystemReward.h:12",
@@ -18,7 +19,7 @@
       "status": "verified"
     },
     "RequiredPoint": {
-      "simple": "Cumulative PvP total score needed to unlock the reward (not current rank points).",
+      "simple": "The total PvP score needed in ranked matches to earn this reward. A bigger number means the reward unlocks later.",
       "technical": "int32, default 0; the export contains 140 strictly increasing positive thresholds (500..129000), with no duplicates or sentinel rows. This is the cumulative EGameUserRecord::PvPTotalScore, not the current rank-point value: the PvP result handler adds the result delta to that record (clamped to 0..9,999,999; an absent record reads 0) immediately before calling the grant helper, which grants when TotalScore >= RequiredPoint. The reward list sorts descending; the rank screen scrolls to the highest row with threshold <= score; the list item formats the threshold without grouping (max 7 digits) and builds self/next progress from adjacent ascending rows using denominator max(neighbor gap, 1), clamped to 0..1. Shop unlock progress returns (current score, threshold) for a qualifying PvP reward set; a missing match yields the (-1,0) sentinel.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankSystemReward.h:16",
@@ -39,7 +40,7 @@
       "status": "verified"
     },
     "RewardType": {
-      "simple": "Serialized reward category label.",
+      "simple": "This reward's prize category, such as money, a costume, a nickname, or a player card plate. Its effect on gameplay is unclear.",
       "technical": "uint8-backed EGameRankSystemRewardType; the row constructor defaults it to None (0), and the enum also defines Invalid = 255. The export uses Nickname (41 rows), Costume (41), Money (21), Plate (21) and SituationOverviewPose (16); there are no None or Invalid rows. For every row the value equals the ItemType of the first item in its Id_ItemSet, but no traced C++ consumer reads this field: grant/set selection keys off Id_ItemSet, while UI category, name and preview use the first Item row's ItemType. This is a verified export data relationship, not proof of gameplay branching. Retail Blueprint reads cannot be excluded.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankSystemReward.h:19",
@@ -56,7 +57,7 @@
       "status": "unresolved"
     },
     "Id_ItemSet": {
-      "simple": "Item set awarded at this milestone.",
+      "simple": "This name picks the prize group a player receives at this milestone. Change it to grant a different set of rewards.",
       "technical": "FName, default None. The grant helper requires the score threshold reached, this id absent from UserInfo.PvP.ReceivedRankSystemRewardItemSetIds, and GameShop_IsItemSetUnlocked(id): that resolves an ItemSetDataTable row and requires every non-None Id_Item to be unlocked (Item.UserProgressFlag < 0 or its saved progress bit set). It then calls GameShop_AddItemSet(id, 1, 3), which resolves the set, adds Quantity[Index] for each resolvable Item row (money via AddUserMoney, others to stock clamped by PossessionMax), and appends the set id to the received list. UI uses the id for received state, first-item/icon/name/preview lookups (Id_Item[0]; nickname sets also use Id_Item[1]), and unlock progress/message matching. Export has 140 unique ids, all present in ItemSetDataTable with five aligned Id_Item/Quantity slots; None padding slots are ignored by unlock checks and skipped by the grant.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankSystemReward.h:22",

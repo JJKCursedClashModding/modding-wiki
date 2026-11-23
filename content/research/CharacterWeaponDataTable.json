@@ -1,8 +1,9 @@
 {
+  "overview": "This table decides which weapons each version of a character carries in battles, scenes, and character pictures, where they sit, and whether they start visible.",
   "description": "Per-variation weapon loadout rows: parallel arrays of weapon IDs, attachment socket names and initial visibility flags used by battles, level sequences and UI captures.",
   "fields": {
     "ID": {
-      "simple": "Row key referenced by CharacterVariation::Id_CharacterWeapon (typically a base variation ID shared by several costume/colour variations).",
+      "simple": "The name that connects this weapon setup to a character version. It is often shared by that character's other looks.",
       "technical": "FName primary key (native UPROPERTY Id, export key/ImportKeyField=Id, serialized as ID in the JSON export), e.g. CP_040_00. Battle preload, BattleBase, LevelSequencer and capture resolve the current variation's Id_CharacterWeapon against CharacterWeaponDataTables (DTM +0x4E0) with UDataTable::FindRow on the row name; None skips the lookup. All 15 exported keys are referenced by CharacterVariation rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterWeapon.h:11",
@@ -15,7 +16,7 @@
       "status": "verified"
     },
     "Id_Weapon": {
-      "simple": "Array of WeaponDataTable IDs to spawn for this loadout.",
+      "simple": "The weapons this character version carries, in the order the game gives them to the character. Blank spots add no weapon.",
       "technical": "TArray<FName> (variable-length natively; four slots in the available export). Each non-None ID is resolved to a Weapon row (DTM +0x6B0); its FileName_BP becomes a Weapon-primary loader/preload key and the loaded class is spawned via AGameCharacter::SpawnWeapon. The shared collector is called by battle preload, BattleBase, LevelSequencer preload and capture LoadCharacter; BattleBase/LevelSequencer/capture then spawn the actors. None entries are skipped, and every non-None exported ID resolves to a Weapon row.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterWeapon.h:15",
@@ -29,7 +30,7 @@
       "status": "verified"
     },
     "SocketName": {
-      "simple": "Socket/bone name on the character mesh where each weapon attaches.",
+      "simple": "Where each weapon sits, such as the right or left hand. Character pictures may move some weapons to the main body.",
       "technical": "TArray<FName> parallel to Id_Weapon, e.g. R_Weapon or L_Weapon. BattleBase and LevelSequencer pass SocketName[WeaponIndex] directly to SpawnWeapon without an IsValidIndex check; SpawnWeapon attaches the actor to the character mesh at that socket and calls InitializeWeapon(Socket). The capture actor uses the same value but falls back to FName('root') when the parallel slot is missing and, for non-SituationOverview captures with weapon idle montages configured, overrides the socket to 'root'.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterWeapon.h:18",
@@ -42,7 +43,7 @@
       "status": "verified"
     },
     "bDefaultHidden": {
-      "simple": "Whether each weapon starts inactive/hidden after spawning where the consumer applies it.",
+      "simple": "In battles and character pictures, whether a weapon starts hidden. Turning this on keeps it out of sight at first.",
       "technical": "TArray<bool> parallel to Id_Weapon. BattleBase calls Weapon->SetActive(bDefaultHidden[Index] == false) after spawning; AGameActor::SetActive(false) hides the actor and disables ticking, so true means hidden/inactive and false means active. The capture actor copies the flag with a false fallback when the parallel slot is missing, then may hide weapons not present in a SituationOverview pose or show pose-only weapons. LevelSequencer spawns weapons but does not read this array. In the export CP_070_00 and CP_070_20 have true in their first slot; the other exported slots are false.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterWeapon.h:21",

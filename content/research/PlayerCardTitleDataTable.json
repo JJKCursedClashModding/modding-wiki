@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets which titles players can show on their player cards and how each title appears.",
   "description": "Defines the player-card title choices: each row joins a title row ID to an Item row that gates ownership and to an ItemText key used for the localized display label.",
   "fields": {
     "Id": {
-      "simple": "Title row key (exported as ID).",
+      "simple": "The name that connects a saved player card to this title. A card shows the starting title if it cannot use the saved one.",
       "technical": "FName. The save/online customization struct stores it as TitleId, and FGamePlayerCardParameter::InitializeFromSave copies it into FGamePlayerCardParameter::TitleId; the customization constructor defaults it to '10'. Every exported key is a decimal string (10-7030). Validate() replaces an unknown or None ID with '10', and PlayerCard_ResetUnownedIds() uses the owned-title test to do the same. The leaderboard packer converts the ID with FCString::Atoi into uint16 TitleNumber; the unpacker rebuilds it with FString::FromInt and falls back to '10' if no row exists. Lookups scan PlayerCardTitleDataTables and take the first matching row; the player-card and customize widgets use this ID for lookup and selection.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardTitle.h:11",
@@ -24,7 +25,7 @@
       "status": "verified"
     },
     "Id_Item": {
-      "simple": "Item row ID whose ownership and unlock state gates this title.",
+      "simple": "Chooses the item a player must own and unlock before the title appears in customization.",
       "technical": "FName. PlayerCard_FindTitleItem resolves it against ItemDataTables by Item row ID; the exported title items carry this ID and have VariableId 'None', unlike emblem/plate item links. The customize tile widget checks the linked item's stock bNew flag and clears it through the resolved Item row. PlayerCard_GetOwnedTitleRows keeps rows with Id_Item == None and removes other rows unless a Title item with that ID has positive stock and GameItem_IsRowUnlocked passes (a negative UserProgressFlag is always unlocked; otherwise the progress word bit must be set). With bSort it stably sorts the surviving rows by that Item row's SortingOrder. The title-text twin fallback searches all title rows for another row with the same non-None Id_Item and a different Id; the supplied export has no such pair.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardTitle.h:15",
@@ -47,7 +48,7 @@
       "status": "verified"
     },
     "Id_ItemText": {
-      "simple": "GameText key for the localized title label.",
+      "simple": "Chooses the words shown for this title. The customization list needs the title in the player's language, and a blank name shows a generic label.",
       "technical": "FName. GameItem_GetNameTextCore is called with EGameItemType::Title, which does no Title-specific ID rewrite, and HasGameTextContent checks whether the current-language GameText row for that key has non-empty text. All 227 export keys are present and non-empty in each of the 11 ItemTextDataTable language shards. The customize tile filter keeps rows whose key is None or resolves to text and drops only non-None keys with no text; None-key tiles use SYS_CUSTOMIZE_PLAYERCARD_LABEL_0011. PlayerCard_MakeTitleTextRequest checks the plain key first and, only when it has no text while Id_Item is non-None and bUseTwin is true, substitutes the Id_ItemText of the first other row across all title rows with the same Id_Item and a different Id; otherwise it uses this row's key.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayerCardTitle.h:18",

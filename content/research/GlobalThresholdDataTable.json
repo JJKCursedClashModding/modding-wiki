@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets the score and point ranges that decide your rank, match grade, story relationship level, and mission tier.",
   "description": "Shared, unsharded lookup vocabulary of named numeric intervals. Each row's inclusive float [Min, Max] band is resolved by Id; reconstructed C++ consumers use it to classify battle result scores, rank points, PvE risk/point values and character relationship values, and to supply rank-tier bounds to UI and shop-unlock checks. The table has no behavior of its own.",
   "fields": {
     "Id": {
-      "simple": "Threshold band key referenced by other data tables and hard-coded C++ lookups.",
+      "simple": "This name tells the game which rank, mission, match result, or story relationship the range belongs to.",
       "technical": "FName UPROPERTY (BlueprintReadWrite, EditAnywhere; AllowPrivateAccess=true), exported as ID; ImportKeyField is Id and the constructor leaves it NAME_None because only Min/Max are set. All 104 exported rows carry an ID equal to their row name, with no duplicates. WidgetTest_FindGlobalThreshold (retail 0x12face0) and local inline equivalents scan GlobalThresholdDataTables (DTM+0x300) in table order and return the first FindRow hit with missing-row warnings suppressed; every observed shared-helper call passes bCheckNone=false/bUnused=false and the inline finders have no game-level None check. Actual foreign keys exist only in RankPointDataTable.Id_GlobalThreshold (27 rows), PvEAllyParameterDataTable.Id_GlobalThreshold (5), PvEMissionLotteryDataTable.Id_GlobalThreshold (223 rows / 15 distinct keys) and PvEExtraMissionLotteryDataTable.Id_GlobalThreshold (14); all exported foreign keys resolve. Other keys are hard-coded names in C++. MissionCharacter, PvEGrowth, StoryCharaRelateLevel and StoryCharaRelateChange rows do not store a threshold key.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalThreshold.h:7",
@@ -21,7 +22,7 @@
       "status": "verified"
     },
     "Min": {
-      "simple": "Inclusive lower bound of the numeric band.",
+      "simple": "The lowest score or point total that still counts. Raising it makes that rank or level harder to reach.",
       "technical": "float UPROPERTY (BlueprintReadWrite, EditAnywhere; AllowPrivateAccess=true) with constructor default 0.0f; all 104 exported rows set it. Classification callers cast the int32 input to float and use UKismetMathLibrary::InRange_FloatFloat(Value, Min, Max, true, true): battle result rank, rank-tier lookup, PvE AI level, ally parameter, risk mission class, mission lottery, extra-mission point level and extra-mission lottery. Min is also the tier floor for story relation level/value conversion, rank sorting by ascending Min, grade/result progress bars and remaining points, leaderboard-card RankPoint (FMath::RoundToInt) and the shop PvPRankPointMax unlock (FMath::CeilToInt(Min)). Exported story relation floors are 0/25/50/75/100; extra-mission point levels 1..11 use 0/10/.../100; rank points span 0..99999, matching the save clamp in AddRankPoint.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalThreshold.h:14",
@@ -45,7 +46,7 @@
       "status": "verified"
     },
     "Max": {
-      "simple": "Inclusive upper bound of the numeric band.",
+      "simple": "The largest score or point total that still counts. Raising it lets more results count.",
       "technical": "float UPROPERTY (BlueprintReadWrite, EditAnywhere; AllowPrivateAccess=true) with constructor default 0.0f; all 104 exported rows set it. Every range-classification caller uses bIncludeMaximum=true; no exclusive-max consumer was found. SetupGradeInfo formats Max as the displayed rank upper point value. Story relation conversion and the shop unlock never read Max. Exported maxima include 24/49/74/99/100 for relation levels, 99999 for rank-point/ally/AI bands, 50000 for the top PvE mission bands, 9999999 for result-score catch-alls, exact singletons at 100/200, and -1..-1 sentinel bands for PVE_AI_LEVEL_01/02/10; those sentinels cannot contain ordinary nonnegative risk values and have no special-case branch in the consumer.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_GlobalThreshold.h:17",

@@ -1,8 +1,9 @@
 {
+  "overview": "This table chooses each character's Arcade paths, when those paths open, and the battle setup for the player and partner in Arcade fights.",
   "description": "Per-character Arcade configuration: maps a playable character to the MissionCharacter row used for the player slots in Arcade battles, and supplies the ordered Arcade mission-set roots, unlock masks, and root-clear flags consumed by the Arcade root-select screen.",
   "fields": {
     "ID": {
-      "simple": "Row key; in every exported row it equals the playable character ID (CP_* in this export).",
+      "simple": "The playable character this Arcade setup belongs to. Change this name to give the options to another character.",
       "technical": "FName declared as Id; the supplied export writes the key as ID and records ImportKeyField=Id. UDataTable::FindRow uses the row key. Root-select Setup receives the selected character ID from the menu sequence and looks this table up directly by that ID, while the clear-condition helper and Arcade battle setup first resolve Character.Id_CharacterArcade and look up by that alias. All 27 exported keys equal the corresponding Character row's Id_CharacterArcade; the other 21 exported Character rows have None there and no row in this table. The native Id member itself has no direct value reader in the traced C++ consumers.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterArcade.h:11",
@@ -16,7 +17,7 @@
       "status": "verified"
     },
     "Id_MissionCharacter": {
-      "simple": "Mission-character row used to configure this character's Arcade battle entry.",
+      "simple": "The name of the battle profile used for the player and partner in Arcade fights. It sets their skill, Cursed Energy and Tension.",
       "technical": "FName (default None) joined to MissionCharacterDataTable (DTM +0x9C0). In GamePhase_BattleArcade::SetupBattleCharacterEntries, player slots 0 and 1 follow Character.Id_CharacterArcade -> this row -> Id_MissionCharacter with no null tests; the MissionCharacter row supplies override IDs/rates and setup scalars such as AILevel, Operation, cursed energy/tension, unique mode and status overrides. Those player slots take VariationIndex/MaterialPattern from the GameManager battle slot (Game->GetBattleCharacterSlot), not from this row; enemy slots 2+ instead take variation/material from the current wave's Id_MissionCharacter_Enemy rows. All 27 exported values are unique ARCADE_CP_* IDs and resolve in the supplied MissionCharacterDataTable.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterArcade.h:15",
@@ -34,7 +35,7 @@
       "status": "verified"
     },
     "Id_ArcadeMissionSet": {
-      "simple": "Ordered Arcade mission-set slots offered as selectable roots for this character.",
+      "simple": "The Arcade paths shown for this character on the select screen, in the order they appear.",
       "technical": "TArray<FName> (default empty) of ArcadeMissionSetDataTable row IDs (DTM +0x970). InitializeWidget sizes the candidate list-item objects from the first arcade row's array length. Setup looks up the selected character's row, iterates these slots, skips NAME_None entries and closed roots, resolves each surviving set with FindArcadeRow<FGameDataTableRow_ArcadeMissionSet>, and stores it on UGameArcadeRootSelectListItemData together with the original array Index as RootIndex. Displayed items are compacted, so RootIndex is the source slot index, not necessarily the visible list position. Deciding an item copies MissionSet.Id to RootSelection.RootId and RootIndex to RootSelection.RootIndex; the index also drives the recorded clear bit. Every exported row has six populated A..F slots and all 162 references resolve in the supplied ArcadeMissionSetDataTable.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterArcade.h:18",
@@ -55,7 +56,7 @@
       "status": "verified"
     },
     "ClearFlagConditions": {
-      "simple": "Per-root bit masks that decide whether an Arcade root is released; mask zero means always open.",
+      "simple": "How many earlier Arcade paths a player must clear before each path opens. A value of zero means it is available right away.",
       "technical": "TArray<uint32> (default empty), index-aligned with Id_ArcadeMissionSet. IsArcadeRootOpen resolves the Character row from the setup character ID, then the CharacterArcade row by Character.Id_CharacterArcade, rejects an index outside this array, and requires Mask == (uint8(OR of every UserInfo.StudioArcadeClearFlags_C48 entry's Clear byte) & Mask). Only the Clear byte is used; NoContinueClear/HardClear and the map key's identity do not enter the union, and the use is truncated to uint8 so only clear bits 0..7 can satisfy a mask. A zero mask always passes. All exported rows use [0,0,0,0,15,31], requiring clear bits 0..3 for root E and 0..4 for root F. Separately, Setup derives the displayed bCleared flag from clear bit Index, sets bSpecial when this mask is nonzero, and for special roots with a valid mask sets the distinct persistent progress flag 160+Index in UserProgressFlagWords on first display (word = Flag>>2, bit = Flag&3, 128 words, four flags per word), raising bNewlyReleased/bHasNewlyReleasedRoot and writing the word in place. On a winning final mission, RecordArcadeClear sets clear bit RootIndex in the winning character's Clear byte; that bit is what these masks later test. No traced code closes or special-cases a zero-mask root.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterArcade.h:21",

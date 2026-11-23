@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets the reward items players receive after reaching milestones in story, PvE, PvP, arcade, or collection progress.",
   "description": "Defines progression rewards: the ItemSet granted when a story, PvE, PvP, arcade, or collection milestone is reached, plus the condition type and numeric/name parameters used to test and describe that milestone. The grant path adds the set once while its first item is out of stock; it has no separate per-row granted flag.",
   "fields": {
     "Id": {
-      "simple": "Progress-reward row identifier.",
+      "simple": "The name a modder changes to identify this reward when the game checks reached milestones.",
       "technical": "FName import key; the retail export writes it as ID and all 493 row keys equal their ID value. UGameResultWidget::OpenPvPResult collects the Id of every row whose condition is PvPRankMatchWinningStreakCount, while GameShop_GrantProgressRewards collects every row Id for a full sweep. GameShop_GrantProgressRewardRows looks each name up in ProgressRewardDataTables in shard order and uses the first matching row; a missing name leaves a null row that is dereferenced rather than safely skipped. Every identified grant path in the reconstructed C++ converges on this helper.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ProgressReward.h:11",
@@ -16,7 +17,7 @@
       "status": "verified"
     },
     "Id_ItemSet": {
-      "simple": "ItemSet awarded by this reward row.",
+      "simple": "Which set of reward items the player receives after reaching the milestone.",
       "technical": "FName. All 493 exported rows have a unique ITM_SET_PROGRESS_REWARD* ItemSet, and every target ItemSet and its first item resolve in the supplied exports. GameShop_GrantProgressRewardRows first finds the set in ItemSetDataTables, requires Id_Item[0] to be non-None and absent from the save's stock, then requires the reward condition to be reached and the set to be unlocked; it finally calls GameShop_AddItemSet with Count=1 and a condition-derived GetType. UI lookup instead scans rows whose Id_ItemSet equals an ITM_SET_PROGRESS_REWARD* set after that prefix is selected from an item or the arcade plate filter.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ProgressReward.h:16",
@@ -32,7 +33,7 @@
       "status": "verified"
     },
     "UnlockConditionsType": {
-      "simple": "Kind of player milestone that unlocks the reward.",
+      "simple": "What the player must do to earn the reward, such as clearing story content, winning PvP matches, or clearing arcade stages.",
       "technical": "EGameItemUnlockConditionsType stored as one uint8; the header default is None. The reconstructed enum runs None=0, Default=1 through UseKyotoStudentsCount=59, with Invalid=255. GameItem_GetUnlockProgress switches on it to convert save data into zero or more (current, required) FIntPoint pairs; GameItem_IsProgressRewardReached requires every pair to pass. A separate progress-reward text switch maps a subset of types to ITM_UNLOCK_MESSAGE_* requests and returns no text for unhandled types. For grants, story types 2-8 and 57 get GetType=2, StoryReleaseAllCorrelationDiagramCharacter gets 6, PvERiskValueThreshold and the other PvE types get 4, and everything else gets 7. PvP result display additionally selects only PvPRankMatchWinningStreakCount rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameItemUnlockConditionsType.h:6",
@@ -50,7 +51,7 @@
       "status": "verified"
     },
     "UnlockConditionsValue": {
-      "simple": "Numeric thresholds/counts for the unlock condition.",
+      "simple": "The count, level, rank point, or money amount a player must reach. A larger count means the player must do more.",
       "technical": "TArray<float>; every exported row has exactly three floats, but only index 0 is nonzero in this export and indices 1-2 are always zero. Most runtime branches use ceil(Values[0]) as the required count, level, or threshold. PvPRankPointMax ignores all values and instead uses ceil(GlobalThreshold.Min) reached through the RankPoint row. PvEModeClearRankCount and PvPBattleWinResultRankThreshold use ceil(Values[0]) as a rank tier (1=S, 2=S+A) and ceil(Values[1]) as the count, but no exported row uses those two types. Arcade clear, StoryMissionClearRank, StoryReleaseAllCorrelationDiagramCharacter, and StoryAllMissionTaskClear use no numeric value; StoryMissionTaskClear instead treats Values[0] as an objective index. UseKyotoStudentsCount uses ceil(Values[0]) per listed character. The text formatter casts floats with static_cast<int32> rather than ceil. An empty interpreter result is replaced by the never-passing pair (-1, 0).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ProgressReward.h:22",
@@ -67,7 +68,7 @@
       "status": "verified"
     },
     "UnlockConditionsValueStr": {
-      "simple": "Name parameters such as character, stage, mission, and rank IDs for the unlock condition.",
+      "simple": "The character, stage, mission, or rank a modder picks for the milestone. For arcade rewards, this chooses whose clears count.",
       "technical": "TArray<FName>; every exported row has six entries, with unused slots set to None. Meanings are type-specific: StoryCharaRelateThreshold uses two character IDs; StoryMissionClearRank uses a StoryDemo ID; StoryChapterAllMissionClearRank uses a chapter ID; PvEGrowthCharaLevelThreshold uses one character ID; UseCharacterCount and StageSelectCount use a character or map ID; UseMultiCharacterCount, UsePvPCharacterGroupCount, and UseKyotoStudentsCount use multiple character IDs; PvPRankPointMax uses a RankPoint ID whose Id_GlobalThreshold selects GlobalThreshold::Min. Arcade clear types emit one (0/1, 1) pair for each non-None character ID using the flag selected by the condition type. All RankPoint, GlobalThreshold, StoryDemo, and Character references in the export resolve. Several fixed-index reads and the arcade reward widget's index-0 read are unguarded. Character, mission, chapter, stage, and rank IDs are resolved before insertion into ITM_UNLOCK_MESSAGE_* parameters; raw FNames are not printed directly.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ProgressReward.h:25",

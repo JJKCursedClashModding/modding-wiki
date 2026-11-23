@@ -1,8 +1,9 @@
 {
+  "overview": "This table groups items into packages that the game gives, takes away, or displays in shops and rewards.",
   "description": "Groups ItemDataTable entries with one amount per member so shop lineups, progress/story/rank rewards, DLC grants, collections, unlock progress and unlock text can treat a package of items as one row. Quantity describes package contents or a currency amount, not the shop price; ShopLineupDataTable.Price is separate.",
   "fields": {
     "Id": {
-      "simple": "Item-set row identifier (exported as ID; native field name Id).",
+      "simple": "The name the game uses to find this bundle for shop offers, rewards, story content, or downloadable content.",
       "technical": "FName row key. ShopLineupDataTable.Id_ItemSet, ProgressRewardDataTable.Id_ItemSet, StoryDemoDataTable.Id_ItemSet arrays, RankSystemReward/StoryCharaRelateReward/ShopLotteryLineup.Id_ItemSet, rank-reward label maps and hard-coded DLC entitlement lists reference it. DataTableLoaders resolve one ItemSetDataTable primary asset into AGameDataTableManager.ItemSetDataTables; GameShop_FindRow, GameItem_FindRow, StoryFindRowOutOfLine/InlineChecked and PvEResult_FindRow scan that array in order, so the first matching row wins. The generic holder supports multiple tables, but the current loader registers only one ItemSet asset. Item and set finders cross-probe the other table on a miss but discard the probed row, so those probes are not an alias; no exported ItemSet ID currently equals an ItemDataTable ID.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ItemSet.h:11",
@@ -19,7 +20,7 @@
       "status": "verified"
     },
     "Id_ItemText": {
-      "simple": "Optional whole-set text-ID override.",
+      "simple": "Changes the name shown for the whole bundle when it is not currency or a nickname pair.",
       "technical": "FName. GameShop_GetItemSetNameText reads it only after resolving the first item and after the Money and Nickname special cases. A non-None value becomes the direct text request; NAME_None falls back to the first item's Id_ItemText and then to no text. All 2,402 exported rows have Id_ItemText = None, so the supplied snapshot relies on the fallback or special cases. This field is not consulted by the per-item name-text list or by unlock-text prefix handling.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ItemSet.h:15",
@@ -32,7 +33,7 @@
       "status": "verified"
     },
     "Id_Item": {
-      "simple": "Ordered ItemDataTable row IDs included in the package.",
+      "simple": "The items included in the bundle, with the first item often standing in for the bundle in shops and collections.",
       "technical": "TArray<FName>, paired element-for-element with Quantity. Every exported row has exactly five entries: 2,374 have trailing NAME_None fillers (positions 1-4) and 28 fill all five slots; all 3,122 non-None references resolve in ItemDataTable. Grant, spend and content collectors skip None slots, but representative-item helpers read index 0 (and nickname text index 1) without a Num check, and Story_GetDemoRewardItem reads GetData()[0]. The first item controls the Money/Nickname text branches and is used as the representative for image, ItemType and sorting order; nickname sets place TOP and BOTTOM items at indices 0 and 1. Unlock tests ignore None slots.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ItemSet.h:18",
@@ -50,7 +51,7 @@
       "status": "verified"
     },
     "Quantity": {
-      "simple": "Per-item amounts paired element-for-element with Id_Item.",
+      "simple": "How many of each listed item players receive or spend. A bigger number means more of that item.",
       "technical": "TArray<int32>. GameItem_SpendItemSet passes Quantity[Index] to GameItem_SpendItem: Money uses AddUserMoney(-Count), other stocks are lowered and clamped at 0. GameShop_AddItemSet grants Count * Quantity[Index]: Money uses AddUserMoney, other stocks use FindOrAdd and clamp to PossessionMax, and the amount list feeds KPI/collection reporting unless GetType is -1. GameShop_GetItemSetItemNameTexts passes Quantity[Index] to GameItem_GetNameTextCore, which uses it only as ITEM_VALUE or grouped digits for Money and ignores it for other item types. A Money set title uses Quantity[0] directly; Story_GetDemoRewardItem returns Quantity[0] or -1 on failure; PvP GetItemSetMoney sums Money members with an IsValidIndex guard. Exported values range 1..100000: every non-money member is 1 and every unused None slot is 1 padding, so trailing values are not grants. Several consumers index [Index] or [0] unchecked, so keep the arrays aligned.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ItemSet.h:21",

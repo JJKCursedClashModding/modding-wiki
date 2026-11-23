@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets up each shop item, what players receive, what it costs, where it appears, and what they must do before buying it.",
   "description": "Defines shop listings: which ItemSet a listing sells, its price and shop category, and the progression condition that governs its on-sale/new state and unlock-description text.",
   "fields": {
     "Id": {
-      "simple": "Shop lineup/listing identifier.",
+      "simple": "The name the game uses to find this shop listing and remember whether it is new.",
       "technical": "FName at row offset 0x08; the export's ID value equals the DataTable row key in all 1009 rows and is the table's ImportKeyField. GameShopSaleItemList::CreateItems seeds each shop item data object from Row->Id, and the saved FName is then used for price/unlock row lookups, the purchase dialog's re-resolution before granting and charging, and the GameManager's on-sale/new map (UserInfo.Shop.StudioShopLineupNewFlags_A08). GameShop_UnlockNewLineups skips IDs already in that map and appends newly added IDs to its output; callers pass that full output to the unlock dialog.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:13",
@@ -16,7 +17,7 @@
       "status": "verified"
     },
     "Id_ItemSet": {
-      "simple": "ItemSet sold by this listing.",
+      "simple": "The group of items this shop listing sells. Changing this name changes which rewards the player receives.",
       "technical": "FName at row offset 0x10. All 1009 exported values resolve to an ItemSetDataTable row, and in every row the set's first item's ItemType matches the listing's CategoryType. Id_ItemSet drives GameShop_GetItemSetItems, the set-name text, category-list filtering (rows whose set contains a locked item are removed), sorting by the first item's SortingOrder, unlock checks, thumbnail/label/two-line previews, and the purchase grant. Opening the dialog requires at least one progress-reached item; the grant adds PurchaseCount * Quantity[Index] for each set item (money through AddUserMoney, other items clamped to PossessionMax).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:17",
@@ -32,7 +33,7 @@
       "status": "verified"
     },
     "Price": {
-      "simple": "Cost of one purchase of this listing.",
+      "simple": "What the player pays for one purchase. A bigger number costs more of the player's money.",
       "technical": "int32 at row offset 0x18, constructor default 0; no exported row is 0 (range 3000-1800000). The purchase dialog copies it to Price, shows it as a VALUE parameter on SYS_COMMON_LABEL_0116, and computes PurchaseCount * Price for the money display, the UserMoney affordability check, and AddUserMoney(-Total). UGameShopSaleItemListItemDataBase::GetPrice re-resolves the row from the stored lineup ID, and the shop description uses that getter for the same label.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:20",
@@ -47,7 +48,7 @@
       "status": "verified"
     },
     "CategoryType": {
-      "simple": "Shop tab/category this listing belongs to.",
+      "simple": "Which shop tab this listing appears in. It also changes the purchase screen's title, controls, and spoken prompt.",
       "technical": "EGameItemType at row offset 0x1C, constructor default None. GameShop_GetLineupRows keeps rows matching the requested category whose set is unlocked. In the purchase dialog, Costume/Title/Nickname/Emblem/Plate/CursedTools/CursedObjects/CustomVoice/SituationOverviewPose use SYS_SHOP_MODE_MESSAGE_0002 and collapse the owned/quantity controls, Extras uses _0004 and reveals them with HaveCount from item stock; other enum values fall through the switch. The same field selects the unique-item or profile-item open-system voice. The main shop widget also reads CategoryType directly from the lineup row for the preview.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:23",
@@ -62,7 +63,7 @@
       "status": "verified"
     },
     "UnlockConditionsType": {
-      "simple": "Kind of milestone that makes the listing available.",
+      "simple": "What kind of progress makes this listing available. The shop uses this to explain the requirement.",
       "technical": "EGameItemUnlockConditionsType (uint8) at row offset 0x1D, constructor default None (0). Default (1) yields a (0,0) progress pair, so it passes the progression check but the item-set gate still applies. GameItem_GetUnlockProgress converts all three condition fields into (current, required) pairs; GameShop_UnlockNewLineups requires every pair to reach its requirement and the set to be unlocked before adding the ID to the on-sale map, and sets NewFlag.bNew=false for Default. GameShop_GetLineupRowUnlockText switches on this type to choose ITM_UNLOCK_MESSAGE_* text (Default returns none).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:26",
@@ -77,7 +78,7 @@
       "status": "verified"
     },
     "UnlockConditionsValue": {
-      "simple": "Numeric thresholds/counts for the listing's unlock condition.",
+      "simple": "Numbers that set the goal, like a level or count. For rank goals, they choose the rank and required number of high-rank results.",
       "technical": "TArray<float> at row offset 0x20; all 1009 exported rows have three floats. The array is passed unchanged to GameItem_GetUnlockProgress, which uses FMath::CeilToInt for thresholds/counts, and to the unlock-text switch through static_cast<int32>. Interpretation is type-specific: in this export Values[0] can be a required count/level, a story objective index, or a rank selector; for the 39 PvEModeClearRankCount rows Values[0] selects S (1) or S+A (2) and Values[1] is the required count, with other selectors producing the never-passing (-1,0) sentinel. Values[2] is always 0 and is unread by the 13 condition types present here; the shared interpreter does read Values[1] for some other table types.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:29",
@@ -91,7 +92,7 @@
       "status": "verified"
     },
     "UnlockConditionsValueStr": {
-      "simple": "Name parameters (character/stage/mission/rank IDs) for the listing's unlock condition.",
+      "simple": "For goals that name a character or mission, this says which one counts. The shop uses it to explain the needed progress.",
       "technical": "TArray<FName> at row offset 0x30; all 1009 exported rows have three entries. Names are type-specific: a demo ID for the 77 StoryMissionClearRank rows and the 98 StoryMissionTaskClear rows (where Values[0] is the objective index), two character IDs for 18 StoryCharaRelateThreshold rows, and one character ID for the 98 PvEGrowthCharaLevelThreshold, 86 UseCharacterCount and 11 UsePvPCharacterGroupCount rows; the remaining exported types use no names. None is the usual padding sentinel, but 60 rows have '1' in index 2, which no consumer reads for their condition types. The shared interpreter and unlock-text switch also support map/RankPoint IDs and up to three character names for other tables, so the array has no universal meaning.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShopLineup.h:32",

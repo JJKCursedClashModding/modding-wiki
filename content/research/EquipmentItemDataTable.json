@@ -1,8 +1,9 @@
 {
+  "overview": "This table connects Cursed Tools, Cursed Objects, and Extras items to the effects used in battle and item descriptions.",
   "description": "Maps each cursed-tool, cursed-object, or Extras item variant to an equipment grade and an ordered pair of EquipmentItemEffect row IDs used by battle/stat calculations and item-card description text.",
   "fields": {
     "Id": {
-      "simple": "Equipment/item-variant row identifier.",
+      "simple": "The name that connects this Cursed Tool, Cursed Object, or Extras item to its entry in the game's item catalog.",
       "technical": "FName row key (export property ID; ImportKeyField is Id). Runtime equipment lookups do not use the owning Item row's Id: GameEquipment_GetEffectRows takes an Item row key, resolves FGameDataTableRow_Item::VariableId through the first matching ItemDataTables row (None is rejected), and finds this row by that name in EquipmentItemDataTables. The item-description widget starts from the Item row and uses the same VariableId join; SetHitPoint walks each equipped Item ID and repeats both lookups. All 211 exported keys are unique, equal to their exported ID, and are used as VariableId by a same-key Item row of type CursedTools, CursedObjects, or Extras. Exported keys comprise 81 unsuffixed base rows plus 65 _10 and 65 _20 variants; each consuming finder stops after the first EquipmentItemDataTables row match, and a missing row yields no effects.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItem.h:11",
@@ -21,7 +22,7 @@
       "status": "verified"
     },
     "Grade": {
-      "simple": "Serialized grade/variant tag for this equipment row.",
+      "simple": "Marks the item as a base or upgraded form. Extras are always base, and what a higher mark changes is unclear.",
       "technical": "int32 with constructor default 0. The export uses only 0, 1, and 2: for CursedTools and CursedObjects these correspond exactly to the unsuffixed, _10, and _20 row IDs (20/20/20 tool variants and 45/45/45 object variants); all 16 Extras rows are grade 0 and have no suffixed variants. No identified C++ consumer reads Grade: the resolvers select rows by VariableId and then read only Id_EquipmentItemEffect, so this table provides no evidence for a grade-specific bonus, cost, filter, or sort order.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItem.h:15",
@@ -31,7 +32,7 @@
       "status": "observed"
     },
     "Id_EquipmentItemEffect": {
-      "simple": "Ordered list of effect rows applied by this equipment variant.",
+      "simple": "The effects this item brings to battle and lists on its description. One-time Extras effects use up the item when triggered.",
       "technical": "TArray<FName>. The battle resolver walks every entry, skips NAME_None, resolves each remaining ID in EquipmentItemEffectDataTables (first matching effect row, no deduplication), and appends it before stopping at the first EquipmentItemDataTables row match; type-filtered sum/rate/chance/threshold helpers then consume those effect rows. All 211 exported rows have exactly two slots: slot 0 is always non-None and 115 rows have None in slot 1. The 307 non-None references (218 unique) all resolve in the supplied effect-table export, and no row duplicates an effect ID internally. The description path uses slots 0 and 1 for ItemDescriptionText_1/2 for CursedTools, CursedObjects and Extras (invalid index or None produces an empty text request); the Extras-specific line uses slot 0. SetHitPoint checks one-shot effect types at Ratio <= EffectValue[0], gates them by GetItemUseCount(characterIndex, EffectIndex), and, for Extras, clears the equipped slot, calls ConsumeItem and records the use. EffectIndex is a local counter incremented once per array element, including None, across all equipped items; in the supplied two-slot data it advances by two per item. No numeric magnitude is stored here: the rate/chance/threshold units come from the resolved EquipmentItemEffect rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_EquipmentItem.h:18",

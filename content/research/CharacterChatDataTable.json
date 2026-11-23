@@ -1,8 +1,9 @@
 {
+  "overview": "This table gives each character the shown words and spoken lines for preset chat in battles, lobbies, results, and customization.",
   "description": "Per-character predefined chat text and voice IDs used by battle/lobby symbol chat, result and situation-overview bubbles, and customize/profile chat shortcuts. Indexed by the EGameChatLabel on a ChatDataTable row, they supply a text ID that resolves through the active locale's ChatTextDataTable and a VoiceDataTable cue ID.",
   "fields": {
     "ID": {
-      "simple": "Row key and exported ID, always a CP_xxx ID in the provided export; CN character variants reuse CP chat rows.",
+      "simple": "The name that connects a character to their preset chat words and speech. Changing it gives the character a different set.",
       "technical": "FName primary key: the export declares ImportKeyField=Id and serializes the value as ID, and all 27 row keys equal their ID values. AGameDataTableManager loads the CharacterChatDataTable primary asset into CharacterChatDataTables (DTM +0x550), skipping a null table. AGameCharacter::ResolveDataRows (called by ApplyCharacterSetup) looks up CharacterDataTable::Id_CharacterChat directly here, with no chat override, and caches the first found row as AGameCharacter::ChatRow (+0x3E0); a missing/None id has no matching exported row, so the lookup fails and ResolveDataRows returns false. UI paths also search the same table array with the shared row finders.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterChat.h:11",
@@ -17,7 +18,7 @@
       "status": "verified"
     },
     "Id_ChatText": {
-      "simple": "Text-ID slot for each predefined chat label; some paired directional labels deliberately reuse the same text ID.",
+      "simple": "The words shown for each preset chat message, including greetings and Cursed Energy reports. Changing one replaces the words players read for that message.",
       "technical": "TArray<FName>; slot = GameAnimNotify_TypeIndex(Chat->ChatLabel) = static_cast<int32>(Label) - 1. EGameChatLabel::None is 0 (slot -1) and Invalid is 255 (slot 254); neither occurs in the exported ChatDataTable, whose 58 rows use labels 1..58 exactly. All 58 exported arrays are in that label order. Consumers pass the FName to SetTextIdOnly, ShowSymbolChatMessage, FGameChatMessageRequest::TextId or UGameChatListItemData::GetChatTextId. Battle-system, online-chat-message, result and situation-overview paths call IsValidIndex; customize/profile/tile views and ChatListItemData copy or index the array unguarded. Every distinct text ID in this table resolves in all 11 exported ChatTextDataTable_<locale> tables; this table itself has no locale variants.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterChat.h:15",
@@ -38,7 +39,7 @@
       "status": "verified"
     },
     "Id_Voice": {
-      "simple": "VoiceDataTable cue IDs for the same predefined chat messages, parallel to Id_ChatText.",
+      "simple": "The spoken line played with each preset chat message when that chat is allowed. Changing one replaces what players hear.",
       "technical": "TArray<FName> using the same Label-1 slot. All four direct playback paths (battle system, situation-overview bubble, online chat message and result bubble) validate the slot before PlayVoiceById; no unguarded direct Id_Voice indexing was found. PlayVoiceById resolves the FName to a VoiceDataTables row and calls PlayVoice with the caller's character/sender index as the VoicePlayerArray slot, falling back to the first idle player when that slot is unavailable; the ID is not a cue string itself. In FStudioBattleSystem320, voice is gated by CanSpeakChatVoice, a valid Chat row, bPlayVoice (shown message or hidden Provocation/Respect), and absence of the speaker from the player's BlockedCommunicationCharacterIndices; hidden out-of-team non-provocation/respect lines are silent. For Label 0x21..0x23, shown level-report text and voice use the slot recomputed from the clamped cursed-energy level mapping (1=Low, 2=Medium, otherwise High). Every exported voice ID is non-None, unique within its row, and resolves in VoiceDataTable.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterChat.h:18",

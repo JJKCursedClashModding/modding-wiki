@@ -1,8 +1,9 @@
 {
+  "overview": "This table tells the game which sound to play for attacks, footsteps, traps, effects, stages, and story scenes.",
   "description": "Gameplay sound-effect lookup: each row maps an FName ID to a CRI cue name and an optional cue-sheet name. Character, shikigami, trap, effect, map-ground, script and sequencer consumers resolve IDs here for one-shot, looping, ambient and 3D playback; the row itself has no volume, duration, pitch, attenuation or loop flag.",
   "fields": {
     "Id": {
-      "simple": "Row key / sound-effect ID.",
+      "simple": "The name the game uses to find this sound effect when attacks, footsteps, stages, or story scenes call for it.",
       "technical": "FName primary key (exported as ID; the catalog import key is Id) with the default NAME_None. Status_FindSoundEffectRow walks DTM.SoundEffectDataTables (+0x730) in array order, optionally rejects NAME_None (bCheckNone defaults to true in the declaration) and returns the first row found. Script PlaySe/PlayLoopSe/StopLoopSe explicitly pass false. The shared logic has several inlined and aliased forms; most precheck IsNone, but some rely on the caller to do so. The loader currently contributes one table named SoundEffectDataTable, so first-hit precedence matters only if more tables are added. IDs come from hard-coded literals, MapGround arrays indexed by footstep/ground type, Damage rows (including the CP_040 weapon remap), Effect arrays, destructible/trap fields, script commands and sequencer section IDs. Script loop handles are keyed by this same Id.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SoundEffect.h:11",
@@ -20,7 +21,7 @@
       "status": "verified"
     },
     "CueSheetName": {
-      "simple": "CRI Atom cue sheet to use; empty means the built-in SE_System sheet.",
+      "simple": "Which sound collection holds this effect. Blank ones use the standard collection, and damage-hit sounds always use it.",
       "technical": "FString, constructor default empty. Most row-based consumers pass it with CueName to SoundManager PlaySe, PlaySe3D, PlayAmbientSe, PlaySeLoop and PlaySe3DLoop. An empty string resolves to the loaded sheet named SE_System; PlaySe3D's sheet overload delegates to its cue-name-only overload on an empty name, which reaches the same fallback. The shikigami loop-at-socket path performs the same fallback before FindLoadedCueSheet/PlaySe3DLoopCue. GameScriptPlayer preloads only non-empty sheet names collected from ScriptData.SoundEffectList. Not every path honors the field: damage-hit playback and sequencer PlaySystemSe pass only CueName, forcing SE_System. In the companion export all 1,170 rows have an empty CueSheetName, although the runtime still supports named sheets.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SoundEffect.h:15",
@@ -40,7 +41,7 @@
       "status": "verified"
     },
     "CueName": {
-      "simple": "CRI cue name to play inside the selected cue sheet.",
+      "simple": "The exact sound the game plays, such as a footstep, hit, or landing sound. In the supplied data it matches the sound's name.",
       "technical": "FString, constructor default empty. Playback looks it up by exact FString equality in the selected sheet's CueInfos; a missing sheet or cue and an unavailable player produce handle -1. The sequencer SetSeVolume track uses Row->CueName alone to find an active player by UAtomComponent::GetCueName, scanning 2D players first and then 3D players; it does not check CueSheetName. Damage-hit playback and sequencer PlaySystemSe also use CueName alone against SE_System. No observed SE consumer appends a localization suffix; the _En suffix logic belongs to voice playback. All 1,170 exported rows have a non-empty CueName identical to their ID.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SoundEffect.h:18",

@@ -1,8 +1,9 @@
 {
+  "overview": "This table gives a few characters the extra animations used with certain attacks.",
   "description": "Single unsharded table of parallel-attack animation-name pairs reached from AttackDataTable.Id_ParallelAttack. CP_030, CP_140, CP_160, CP_240 and CN_230 action controllers resolve its rows through DataTableManager->ParallelAttackDataTables to play and stop CharacterAnimation; the serialized CharacterAnimation_Lower companion has no identified runtime reader.",
   "fields": {
     "Id": {
-      "simple": "Parallel-animation row key used by AttackDataTable.Id_ParallelAttack.",
+      "simple": "The name that links an attack to its extra animation. Changing it changes which animation pair the game picks.",
       "technical": "FName row/import key (export column ID, ImportKeyField Id; C++ Id at +0x8 of the 32-byte FGameDataTableRow_ParallelAttack). Consumers do not read Row->Id: they read AttackRow->Id_ParallelAttack, reject NAME_None in CP_030, CN_230, CP_240 and through the helper's bCheckNone=true in CP_160, while CP_140 passes bCheckNone=false and relies on FindRow not matching NAME_None. Every reader scans DataTableManager->ParallelAttackDataTables in order and takes the first hit; the manager registers only ParallelAttackDataTable (null loaders are skipped), so precedence is currently moot. A hit is cached in the action's ParallelAttackRow pointer for stop/finish and CP_240 logic, and Reset clears it; a miss caches nothing and plays no parallel animation. All 7 exported row keys are unique and their ID values equal the keys.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ParallelAttack.h:10",
@@ -21,7 +22,7 @@
       "status": "verified"
     },
     "CharacterAnimation": {
-      "simple": "Animation montage key played for the parallel attack; CP_240 also treats the literal name as an auto-aim switch.",
+      "simple": "Chooses the extra animation that plays with certain attacks. Some characters also use it to change how the attack aims.",
       "technical": "FName (NameProperty, +0x10), not an asset path. CP_030, CP_140, CP_160, CN_230 and CP_240 call PlayAnimation(Name, -1.0f, 1.0f, 0.0f, true, false): BlendIn -1 keeps the montage's own blend-in, rate 1.0 is normal speed, start is 0.0 s, bStopAllMontages=true stops other active montages and sets CurrentAnimationName, and bFailOnNone=false is passed. FGameCharacterAction forwards to UGameAnimInstance::PlayAnimationAsset, which looks the name up in the per-instance AssetMap filled from CharacterAnimationDataTable Key/Filename pairs for the character's animation set; an unmapped name silently returns 0. FinishAttackEffects calls StopNamedAnimation(cached Row->CharacterAnimation, 0.0f), i.e. a 0 s blend-out. CP_030 reaches the parallel lookup only when it has not taken its early no-shikigami return. CP_240's EnablesAutoAimOffset compares this field to FName(\"AttackH_01_Order_01\") while the row cache is non-null; that result flows through IsAttackLayerSlot64 into TickAimOffset/AutoAimAlpha, and its FilterRequests adds the controller's default move while the cache is set. All 7 exported names resolve to CharacterAnimationDataTable keys (AttackH_01_Order_01 is shared by CP_240 and CN_230 animation groups).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ParallelAttack.h:14",
@@ -48,7 +49,7 @@
       "status": "verified"
     },
     "CharacterAnimation_Lower": {
-      "simple": "Serialized lower-body animation name with no identified runtime reader.",
+      "simple": "This lower-body animation name is saved with the extra attack animation. What it changes during actual play is unclear.",
       "technical": "FName (NameProperty, +0x18), present and non-None in all 7 exported rows (for example AttackF_01_OrderL_01 paired with AttackF_01_Order_01). Six of the 7 names also appear as a Key in the exported CharacterAnimationDataTable; AttackH_02_OrderL_01 does not. No C++ read of this exact property exists in the reconstructed Source/ or Plugins/ tree, including every identified ParallelAttack row reader, and no asset/Blueprint reference to it was found in the partial Content text survey. The lower-body label is therefore a data/name observation, not verified playback; do not assume the parallel readers play it. The empty row constructor leaves FNames as NAME_None, but no exported row uses that sentinel.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ParallelAttack.h:17",

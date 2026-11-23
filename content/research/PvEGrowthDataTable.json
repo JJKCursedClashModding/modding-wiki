@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets what each PvE growth level gives a character as their experience rises, including stronger stats, more equipment spaces, and more heals.",
   "description": "Ordered PvE progression rows that map cumulative per-character experience to maximum-HP and combat-rate multipliers, cumulative equipment-slot unlocks, and heal-point allowances.",
   "fields": {
     "Id": {
-      "simple": "Growth-level row key (export keys 1 through 35).",
+      "simple": "The table's label for this growth level. It matches the level's place in the list, which is what the game uses.",
       "technical": "FName; the native property is Id and the export serializes it as ID, with ImportKeyField Id. No traced C++ consumer reads the value: GamePvE_GetGrowthRow selects by ExperienceThreshold from the ordered rows returned by PvEGrowthDataTables.GetRows, and VsEnemy widgets derive a displayed level from row index + 1. The export keys happen to match those positions, but the key is not a lookup target in the traced paths.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:11",
@@ -14,7 +15,7 @@
       "status": "observed"
     },
     "ExperienceThreshold": {
-      "simple": "Cumulative per-character PvE experience required to reach this growth level.",
+      "simple": "The total PvE experience one character needs to reach this growth level. A higher number makes the level take longer to reach.",
       "technical": "int32, constructor default 0; exported values are 0..423150 and strictly increasing. GamePvE_GetGrowthRow walks the rows returned by DTM.PvEGrowthDataTables.GetRows, returns the last row with ExperienceThreshold <= Experience, and breaks at the first larger threshold, so the returned sequence must be ascending (nothing validates it). GamePvE_GetLevelFromExperience counts satisfied rows, giving 1 at the level-1 threshold of 0; most UI displays use that count directly, while aggregate level helpers subtract 1 per character. VsEnemy growth UI uses adjacent-row differences as incremental NecessaryExperience, marks Row->ExperienceThreshold <= Experience as released, and sums unsatisfied deltas against ExperiencePool. Extra missions force each GrowthInfoArray experience to at least Rows[24]->ExperienceThreshold through IntervalPvE_GetGrowthExperience(24); that is zero-based array index 24 (the 25th row, 82150 in this export), despite the parameter name Level.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:15",
@@ -35,7 +36,7 @@
       "status": "verified"
     },
     "HitPointMaxRate": {
-      "simple": "Growth factor for maximum hit points.",
+      "simple": "How much this growth level changes maximum health. Higher numbers raise the character's maximum health in PvE.",
       "technical": "float, constructor default 0.0f; exported values 0.60..1.50. GamePvE_CalcHitPoint starts Rate at 1.0, replaces it with this field only when a growth row resolves (so no row leaves 1.0), multiplies by an optional ally-parameter HP rate and vow multiplicative effects, adds equipment and vow additive terms (ally equipment/vow use a maximum rule), and returns max(..., 1.0). Solo/Tag battle setup and interval/character-settings HP displays pass the resolved row directly into that helper, producing HitPointOverride and the displayed maximum; this field is not written into StatusSetup.Rates.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:18",
@@ -52,7 +53,7 @@
       "status": "verified"
     },
     "CursedEnergyExpAddRate": {
-      "simple": "Growth factor for cursed-energy experience gain.",
+      "simple": "How much Cursed Energy experience the character earns at this growth level. Higher numbers make Cursed Energy grow faster in PvE.",
       "technical": "float, constructor default 0.0f; exported values 0.8..1.45. For Solo player/partner slots and Tag members, battle setup adds (rate - 1.0f) to StatusSetup.Rates.CursedEnergyExp on top of any ally-parameter contribution, so exported values below 1 reduce the rate. The final status getter starts at 1.0, folds in Setup.Rates.CursedEnergyExp plus equipment/vow terms, and clamps at 0; the character getter multiplies that by team/stock/level and Scale60 factors before DamageRow->CursedEnergyExp_Add_Attacker. Growth UI flags a level change when adjacent rows differ.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:21",
@@ -67,7 +68,7 @@
       "status": "verified"
     },
     "CursedEnergyRecoverRate": {
-      "simple": "Growth factor for cursed-energy recovery.",
+      "simple": "How quickly the character recovers Cursed Energy at this growth level. Higher numbers refill the Cursed Energy gauge faster during PvE battles.",
       "technical": "float, constructor default 0.0f; exported values 0.8..1.35. Battle setup adds (rate - 1.0f) to StatusSetup.Rates.CursedEnergyRecover alongside any ally-parameter contribution. The final status getter adds that setup rate to a 1.0 base (minus 1.0) plus equipment/vow effects and clamps at 0; the owner getter multiplies battle-team and action-controller rates, and the recovery tick multiplies by the energy row's Recover_Speed, a Solo-side factor and DeltaTime. Growth UI flags adjacent-row changes.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:24",
@@ -84,7 +85,7 @@
       "status": "verified"
     },
     "GuardDurabilityMaxRate": {
-      "simple": "Growth factor for maximum guard durability.",
+      "simple": "How much guard durability the character has at this growth level. Higher numbers let their guard last longer before breaking.",
       "technical": "float, constructor default 0.0f; exported values 0.8..1.35. Added as (rate - 1.0f) to StatusSetup.Rates.GuardDurabilityMax for Solo/Tag player entries. The status getter then adds equipment/vow effects and clamps at 0; the character getter multiplies it by the battle-team rate, and that result scales GuardDurabilityBase for current/maximum durability. Growth UI flags adjacent-row changes.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:27",
@@ -100,7 +101,7 @@
       "status": "verified"
     },
     "DashGaugeMaxRate": {
-      "simple": "Growth factor for maximum dash gauge.",
+      "simple": "How high the character's dash gauge limit is at this growth level. Higher numbers allow more dashing before it empties.",
       "technical": "float, constructor default 0.0f; exported values 0.7..1.4. Added as (rate - 1.0f) to StatusSetup.Rates.DashGaugeMax for Solo/Tag player entries. The status getter adds equipment/vow effects, the character getter multiplies the result by the battle-team rate, and SetDashGauge/GetDashGaugeMax use that owner rate times DashGaugeMaxValue as the cap. Growth UI flags adjacent-row changes.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:30",
@@ -116,7 +117,7 @@
       "status": "verified"
     },
     "DamageRate": {
-      "simple": "Growth factor for sent attack damage.",
+      "simple": "How much damage the character deals at this growth level. Higher numbers make their attacks hit harder in PvE.",
       "technical": "float, constructor default 0.0f; exported values 0.7..1.55. Added as (rate - 1.0f) to StatusSetup.Rates.SendAttackDamage for Solo/Tag player entries. The status getter subtracts the 1.0 base, adds equipment/vow terms and floors the result at 0.01; the character damage accessor multiplies team, action, status and Scale48 factors. Growth UI flags adjacent-row changes.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:33",
@@ -132,7 +133,7 @@
       "status": "verified"
     },
     "EquipmentSlotNumber": {
-      "simple": "Cumulative number of equipment slots available at this growth level.",
+      "simple": "The number of equipment spaces available at this growth level. Higher numbers unlock more spaces in the growth menu.",
       "technical": "int32, constructor default 0; exported values 0..3. The VsEnemy equipment widget iterates rows in returned order and assigns SlotCount from the last row whose ExperienceThreshold is <= the current experience (0 if none); it pads CharacterEquipments with None names to that count. For later rows it adds row index + 1 as an unlock level once for each positive increase over the previous row. No battle-entry consumer of this field was found; growth list/dialog/level-up widgets compare adjacent rows to flag changes.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:36",
@@ -148,7 +149,7 @@
       "status": "verified"
     },
     "HealPointNumber": {
-      "simple": "Cumulative heal-point allowance at this growth level.",
+      "simple": "At the start of a fresh PvE run, this sets each character's heal points. Higher numbers give them more heal points.",
       "technical": "int32, constructor default 0; exported values 0..4. On interval start/re-entry only when PvE.PvEMissionIds is empty, IntervalPvE resolves the growth row for each GrowthInfoArray[i].Experience and writes this field (or 0 when no row) into PvESettings.HealPointNumbers[i], adding the element if needed; an in-progress interval is not reset. The value feeds interval character Info.Value30, is decremented by ConsumeHealPoints, and receives GamePvE_CalcResultHealPoint gains on wins (that helper returns 0 for extra missions). The growth list uses row - previous row for UpHealPointNumber/COUNT; dialog and level-up widgets use target - current.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEGrowth.h:39",

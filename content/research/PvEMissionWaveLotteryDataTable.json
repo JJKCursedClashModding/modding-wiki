@@ -1,8 +1,9 @@
 {
+  "overview": "In normal missions against computer-controlled enemies, this table picks the waves, sets their chances, and puts a chosen boss wave last.",
   "description": "Rank-qualified weighted wave pools used to choose up to three ordered waves for a normal PvE mission, including evaluation bounds and boss-wave flags.",
   "fields": {
     "Id": {
-      "simple": "Wave lottery row id.",
+      "simple": "The name a mission uses to choose this group of possible waves.",
       "technical": "FName import key/row name for FGameDataTableRow_PvEMissionWaveLottery (export metadata: ImportKeyField=Id; all 614 exported row keys match their ID value). PvEMission rows supply Id_PvEMissionWaveLottery ids, which are resolved by UDataTable::FindRow over PvEMissionWaveLotteryDataTables (DTM+0x920), first matching table winning; the member is not otherwise read by the picker.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionWaveLottery.h:12",
@@ -15,7 +16,7 @@
       "status": "observed"
     },
     "Id_MissionWave": {
-      "simple": "Candidate mission-wave ids.",
+      "simple": "Which waves can appear in this mission. Change this list to offer different waves, keeping each wave beside its chance and performance limits.",
       "technical": "TArray<FName>, default empty. The loop is over this array only: each index directly pairs its id with Weights[Index], EvaluationMin[Index], EvaluationMax[Index] and bBoss[Index] into a candidate. All 614 exported rows have 12 slots (4222 non-None ids, 1589 distinct; every non-None id resolves in MissionWaveDataTable); unused slots use the FName string \"None\" and are skipped. Picked ids are written to the boss-reserved last slot or the next earlier output index.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionWaveLottery.h:16",
@@ -28,7 +29,7 @@
       "status": "verified"
     },
     "Weights": {
-      "simple": "Relative chance of selecting each candidate wave.",
+      "simple": "How likely each wave is to appear. Higher numbers raise the chance, and waves seen earlier are less likely to return.",
       "technical": "TArray<float>, default empty. Candidates with Weight <= 0 are dropped; each matching entry in PreviousWaves multiplies the candidate weight by 0.5 (once per match). The local picker mirrors byte-matched GameSound_PickWeightedIndex (0x1316480): sum the remaining candidate weights, multiply by StoryFRand(), select the first interval crossed, and fall back to the last index. A picked non-boss is removed; picking a boss removes all boss candidates. Out starts as three \"PVE_X_WAVE_0000\" placeholders, then is resized to min(candidate count, 3); a missing mission or no candidates leaves the three placeholders. Exported weights range 0..10000 with no negative values; they are relative, not normalized probabilities.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionWaveLottery.h:19",
@@ -47,7 +48,7 @@
       "status": "verified"
     },
     "EvaluationMin": {
-      "simple": "Lower bound on player evaluation for this wave candidate.",
+      "simple": "The lowest performance rank needed for a wave to appear, when a limit is set. With no rank yet, limited waves are left out.",
       "technical": "TArray<EGameBattleResultEvaluation>, default empty. Values are cast to uint8 (enum None=0, C=1, B=2, A=3, S=4, Invalid=255). The same loop index supplies Min and Max; when both are non-zero, a rank-restricted candidate is skipped unless Rank lies in the inclusive [Min, Max] range. A zero bound on either side leaves the candidate unrestricted. Rank 255 (the Reset default) does not include every rank: it makes the picker discard every rank-restricted candidate, leaving only unrestricted candidates. Rank comes from the previous battle result's Key00 and is raised by the bonus rank when one is available.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionWaveLottery.h:22",
@@ -63,7 +64,7 @@
       "status": "verified"
     },
     "EvaluationMax": {
-      "simple": "Upper bound on player evaluation for this wave candidate.",
+      "simple": "Highest performance rank that still allows a wave. Together with the lower limit, it sets the allowed rank range.",
       "technical": "TArray<EGameBattleResultEvaluation>, default empty. Paired with EvaluationMin by index for the inclusive rank test above. Exported upper bounds are None, A or S (never C), forming the pairs None/None, None/A, C/A, C/S, A/S and S/S; None/A remains unrestricted because its Min side is zero. B and Invalid are declared by the enum but do not occur in this export.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionWaveLottery.h:25",
@@ -75,7 +76,7 @@
       "status": "verified"
     },
     "bBoss": {
-      "simple": "Marks a candidate wave as the boss wave.",
+      "simple": "Whether a listed wave is a boss wave. A chosen boss wave goes last, so only one boss appears in a mission.",
       "technical": "TArray<bool>, default empty. Read at the same candidate index; 671 true flags occur across 184 exported rows. A picked boss is written to Out.Last(), then all boss candidates are removed; non-boss picks use OutputIndex++ and remove only themselves. This reserves at most one boss for the final selected-wave slot, and all exported padding slots have bBoss=false.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionWaveLottery.h:28",

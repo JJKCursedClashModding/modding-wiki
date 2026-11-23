@@ -1,8 +1,9 @@
 {
+  "overview": "This table groups the character conversations shown during story battles and sets the conditions that make each group play.",
   "description": "A story-battle talk set: an ordered list of BattleTalk rows, gated by parallel battle-log conditions for normal mission waves, with cue sheets preloaded for its dialogue. The same rows are also queued directly by hardcoded tutorial steps.",
   "fields": {
     "Id": {
-      "simple": "Row key / battle-talk-set ID.",
+      "simple": "The name that finds this conversation group when a story battle or tutorial needs it. The game also uses it when the talk ends.",
       "technical": "FName declared as Id; the export spells the key ID and uses it as the DataTable import key. Normal callers pass an external SetId from StoryMissionWave.Id_BattleTalkSet or a tutorial builder and resolve the first matching table in DTM.BattleTalkSetDataTables (+0xB30). The row's own Id is read only after playback, when FStudioBattleSystem330 passes CurrentSet->Id through NotifyBattleTalkEnd to every character's OnBattleTalkEnd. The observed CP_020 override increments a counter; the other reconstructed controllers use the no-op base implementation.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:15",
@@ -17,7 +18,7 @@
       "status": "verified"
     },
     "CueSheetName": {
-      "simple": "Cue sheets whose audio should be preloaded for this set.",
+      "simple": "Sound collections loaded early for the voices, not the lines. Some tutorial conversations have none.",
       "technical": "TArray<FName>. For the current story mission and retry-indexed wave, StudioBattleNotify368 walks each referenced set, skips None, and appends these names to StudioCueSheetNames_C20; the base phase then calls AGameSoundManager::LoadCueSheets, which de-duplicates names and loads each sheet. The exported values are CRI cue-sheet names and all match VoiceDataTable.CueSheetName values, but they are not Voice row IDs and are not derived from Id_BattleTalk: PlayVoiceById separately resolves each talk's Id_Voice to a Voice row. In the supplied export the first six tutorial sets contain only None placeholders; the other sets list one or two names.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:19",
@@ -33,7 +34,7 @@
       "status": "verified"
     },
     "Id_BattleTalk": {
-      "simple": "Ordered list of BattleTalkDataTable rows to play.",
+      "simple": "The battle talk lines the characters say, in order. Blank entries are skipped, and the talk does not start if no line is found.",
       "technical": "TArray<FName>. QueueBattleTalkSet resolves the first set row in DTM.BattleTalkSetDataTables, clears the playback queue, skips None, and for each remaining ID takes the first BattleTalk row across DTM.BattleTalkDataTables (+0xB40); unresolved IDs are dropped and queue order is array order. If no rows resolve it returns without starting playback and does not try a later duplicate set table; otherwise it disables character battle voice, stores CurrentSet, sets bWaitForInput and starts Queue[0]. Both mission-wave paths pass bWaitForInput=false; tutorial steps pass true. The story phase independently walks the same IDs to add direct or variation-derived portrait textures to the preload list. Exported rows have 20 slots with 1-15 non-None IDs followed by None padding.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:22",
@@ -52,7 +53,7 @@
       "status": "verified"
     },
     "ValueType": {
-      "simple": "Battle-log statistic (or None for unconditional) for each condition slot.",
+      "simple": "What the game measures before the talk plays, such as damage, health, battle time, or Cursed Energy. Blank means it plays at battle start.",
       "technical": "TArray<EGameBattleLogValueType>, indexed in lockstep with TargetType/PassiveType/Value/ConditionType. Only this array classifies a set: FBattleStoryState_Fight::Enter queues a set when every ValueType entry is None (an empty array would also qualify), while Tick evaluates each non-None entry. Invalid is also non-None and therefore makes a set conditional, then EvaluateLog rejects it. EvaluateLog(..., false) reads RoundLogs rather than TotalLogs, requires a valid player and at least one candidate character, and returns false when no log entry exists. SumLogValues sums across those characters except CursedEnergy_Level (maximum) and HitPointRate (average by candidate count). No exported row uses Invalid.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:25",
@@ -69,7 +70,7 @@
       "status": "verified"
     },
     "TargetType": {
-      "simple": "Whose log value is measured: ally, self, enemy, or None.",
+      "simple": "Whose battle record is checked, your team, just you, or the rival team. If nothing is chosen, the condition cannot pass.",
       "technical": "TArray<EGameBattleLogTargetType> read at the same index as ValueType and passed to EvaluateLog. Ally collects the player's team using GAISlot001() as the team; Myself is only PlayerCharacter; Enemy is the player's rival team. After the player-validity check, None, Invalid and any unrecognized value leave the candidate list empty, so SumLogValues is not called and the condition fails.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:28",
@@ -86,7 +87,7 @@
       "status": "verified"
     },
     "PassiveType": {
-      "simple": "Whether the measured value was sent or received by the target.",
+      "simple": "Whether the game counts what the chosen characters did or what happened to them. The received choice checks what happened to them.",
       "technical": "TArray<EGameBattleLogPassiveType> forwarded to EvaluateLog at the same index. SumLogValues selects ReceiveValues only for Receive; None, Send, Invalid and any other value use SendValues, then look up the ValueType key in that map. Exported conditional slots use Send or Receive; the None values in unconditional slots are never evaluated.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:31",
@@ -99,7 +100,7 @@
       "status": "verified"
     },
     "Value": {
-      "simple": "Numeric threshold compared against the measured log value.",
+      "simple": "The number the result must reach or stay below, in that measure's units. A bigger number makes 'at least' harder and 'at most' easier.",
       "technical": "TArray<float> of inclusive thresholds: Success_GreaterThanEquals passes when the evaluated log value >= Value[Index], and Success_LessThanEquals when it is <=. Units are those of the selected ValueType; there is no unit field. Exported conditional rows use HitPointRate fractions (0.5-0.75; averaged per candidate), TimeLimit in seconds of elapsed battle time (10/60/120; the logged TimeLimit field is elapsed time, not remaining time), and count/gauge thresholds of 1 or 2. Unconditional slots are 0.0 and ignored; every exported row has two threshold slots, of which only slot 0 is used.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:34",
@@ -113,7 +114,7 @@
       "status": "verified"
     },
     "ConditionType": {
-      "simple": "Comparison operator that decides whether a condition passes.",
+      "simple": "Chooses whether the result must reach the number or stay below it. Other choices have no known effect on when the talk plays.",
       "technical": "TArray<EGameBattleLogConditionType> consulted only after EvaluateLog succeeds. In the reconstructed consumer only Success_GreaterThanEquals and Success_LessThanEquals add credit; None, Invalid and both Failure_* members fall through with no credit. Conditions counts every ValueType != None (including Invalid), and the set is queued only when Conditions > 0 && Conditions <= Held, so one failed lookup or comparison prevents a conditional set from firing. All exported conditional slots use a Success_* member and every second slot is None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalkSet.h:37",

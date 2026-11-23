@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets the rules for each wave of a Story, Arcade, or computer-opponent mission, including the battlefield, enemies, time, goals, and music.",
   "description": "Shared per-wave configuration for Story, Arcade and PvE battles: spawn layout, time/force-gauge rules, enemy slots and revival flags, order/task links and battle music.",
   "fields": {
     "Id": {
-      "simple": "Mission wave identifier.",
+      "simple": "The name that identifies this wave and connects it to missions, results, and previews.",
       "technical": "FName import key/row name for FGameDataTableRow_MissionWave (the export spells the column `ID`). Waves are looked up by ids from Arcade missions and StoryMissionWave rows, or by ids picked from PvEMissionWaveLottery rows. The PvE picker initializes its output with `PVE_X_WAVE_0000`, which is itself an exported row, so an empty/failed lottery can leave a fallback wave rather than a null. On PvE result entry the wave's Id is appended to PvESettings.PickedWaveIds; that list is later used to halve the weight of previously used waves. The id is also passed as the PvE situation-overview wave id.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:11",
@@ -17,7 +18,7 @@
       "status": "verified"
     },
     "MissionLayoutIndex": {
-      "simple": "Selects which map layout to use for spawn positions.",
+      "simple": "Chooses which prepared battlefield layout provides the fighters' starting positions on stages that support it.",
       "technical": "int32, default 0. It indexes the current Map row's `Id_MissionLayout` array (16 entries in the export), not MissionLayoutDataTables directly. GetCharacterStartTransform applies a layout only when the map row is found, `IsValidIndex(MissionLayoutIndex)` is true and that slot is not None; the id then resolves through MissionLayoutDataTables, overriding translation/rotation components that are valid for the character slot. -1, an out-of-range index or a None slot keeps the battle-area transform. Exported values are -1 (133 rows) and 0-13.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:15",
@@ -29,7 +30,7 @@
       "status": "verified"
     },
     "TimeLimit": {
-      "simple": "Wave-specific battle time limit in seconds.",
+      "simple": "Controls the wave's time limit, with larger values giving more time. Negative means unlimited time and zero uses the mission or level default.",
       "technical": "float, default 0.0f, in seconds. In mission phases, a value > 0 wins over StudioBattleLevelRequest_CA0.TimeLimit and Global TimeLimit[0]; a value < 0 makes GetBattleTimeLimitInfinite return true regardless of the level request's bTimeLimitInfinity; 0 falls back to the level/global setting. The versus-enemy interval widget shows a special infinite label for negative values and, for 0, uses Global TimeLimit[0] only when that array is nonempty. Exported rows use -1, 0 and positive values from 30 to 360.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:18",
@@ -41,7 +42,7 @@
       "status": "verified"
     },
     "ForceGaugeMax": {
-      "simple": "Maximum force gauge stock for side 1 in this wave.",
+      "simple": "Sets the opposing team's shared gauge for the wave. Larger values allow more knockouts, and negative values make the gauge unlimited.",
       "technical": "int32, default 0. Mission and PvE GetBattleSideRule read it for Side==1: 0 becomes the default 4, while any other value is returned unchanged. ApplyBattleRules feeds that result to SetCharacterStockMax/SetCharacterStock and calls SetCharacterStockUnlimited when it is negative, so the exported -1 (113 rows) means unlimited stock. Mission-base Side 0 stays 4; PvE Side 0 is instead computed from binding vows. Exports also use 1-4.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:21",
@@ -54,7 +55,7 @@
       "status": "verified"
     },
     "Id_MissionCharacter_Enemy": {
-      "simple": "Ordered list of enemy mission-character rows for the wave.",
+      "simple": "Names the computer-controlled fighters in this wave, in the order the game adds them. An empty name leaves that place unused.",
       "technical": "TArray<FName>, default empty. Exported rows have four slots padded with None. Story entry setup iterates all slots, skipping None/missing MissionCharacter rows; Arcade and PvE entry builders use slot `Index-2` for battle slots 2+ without bounds or None checks. Several UI previews first resolve the mission's wave 0 and then read this array; IntervalArcade_BattlePairFromWave uses the leading non-None count, while Story_GetBattleLayout uses the total non-None count together with the ally count. Preload paths gather unique character ids from all non-None entries.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:24",
@@ -69,7 +70,7 @@
       "status": "verified"
     },
     "bRevivalEnabled": {
-      "simple": "Per-enemy flag controlling revival/down behaviour.",
+      "simple": "Chooses whether each enemy can recover after being knocked down. On lets them get back up and keep fighting.",
       "technical": "TArray<bool>, default empty; every exported row has four entries. It is aligned with the enemy slots and copied by index into FStudioBattleCharacterSetup::StatusSetup.Byte4D (Story `Index`; Arcade/PvE `Index-2`). Byte4D==1 permits a BounceUp follow-up only when the extra movement/defeated/armor conditions also hold, prevents DownEnd disappearance/deactivation of a defeated character when ActionControllerSlot181(0) is false, and blocks down-recovery completion before Global Dead_Time. Byte4D!=1 allows that disappearance, and CP_150 releases traps on deactivation. Both true and false entries occur in the export.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:27",
@@ -83,7 +84,7 @@
       "status": "verified"
     },
     "Id_MissionOrder": {
-      "simple": "Mission-order row governing the wave.",
+      "simple": "Names the wave's mission goal, such as a boss fight. It also sets the objective text shown during the fight.",
       "technical": "FName, default None. Resolved against MissionOrderDataTables (DTM+0x9D0) in SetupArcade/SetupPvE/SetupStory and in many widgets; Battle_FindMissionOrderRow with bCheckNone=true returns null for None. The order row controls win/result checks, name/detail text, boss versus normal transition variants and boss cost/radar checks, and IntervalPvE uses its ExcludeBindingVowsEffectType to filter vow candidates. The order id, not the wave row id, is what is passed to PlayBattleStartMissionWave/SetMissionWaveInfo.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:30",
@@ -97,7 +98,7 @@
       "status": "verified"
     },
     "Id_MissionTaskLottery": {
-      "simple": "Lottery row used to pick the wave's mission task.",
+      "simple": "Names the group of tasks the game randomly picks from for this wave. The chosen task appears in the battle task display.",
       "technical": "FName, default None. Story and Arcade setup and GamePvE_MakeMissionTasks call BattleArcade_PickLotteryTask on it: a null row or empty task/weight arrays yields NAME_None; otherwise None tasks are removed with their weights and one task is picked randomly in proportion to the remaining weights. Story_GetDemoMissionTask instead takes the first candidate from the lottery row. Exported rows contain None and 134 named lotteries.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:33",
@@ -110,7 +111,7 @@
       "status": "verified"
     },
     "Id_Bgm": {
-      "simple": "Battle music row for this wave.",
+      "simple": "Names the battle music played for this wave. If none is set, the game uses the mission's music or standard battle music.",
       "technical": "FName, default None. Mission-base GetBattleBgmName resolves it through BgmDataTables with bCheckNone=true; if no row is found it retries StudioBattleLevelRequest_CA0.BgmId and finally returns BGM_BATTLE_01. With no current wave it proceeds directly to the level-request path. A found row contributes its CueSheetName string as an FName (empty name when that string is empty). Exported rows contain 11 named BGM ids and None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionWave.h:36",

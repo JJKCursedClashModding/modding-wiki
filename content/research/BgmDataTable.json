@@ -1,8 +1,9 @@
 {
+  "overview": "This table lists each background song, its in-game title and length, where the game uses it, and whether players start with it.",
   "description": "Catalog of background music tracks: their CRI cue-sheet/row names, gallery labels, track length, and whether the music is unlocked from the start.",
   "fields": {
     "Id": {
-      "simple": "Row key / BGM ID used by game phases and the sequencer.",
+      "simple": "The name the game uses to find this song in menus, story chapters, missions, and battles. Keep the names used by those modes matching if you change it.",
       "technical": "FName primary key/exported as ID (DataTable ImportKeyField=Id; all 28 exported row names equal Id). Game phases look it up from request/story-chapter/mission-wave IDs; MainMenuTheme.Id_Bgm also names a BGM directly. The gallery uses it to test the user's heard-BGM set and to start playback; free-battle BgmId, when set, is passed straight to PlayBgm. DTM_CollectBattleBgmRows filters rows by a case-insensitive 'BATTLE' substring of Id and returns these rows to random battle selection, which picks one Id (default BGM_BATTLE_01). The sequencer's PlayBgm resolves a row then forwards Row->Id to SoundManager.PlayBgm, which uses it as the BGM loader/cue-sheet name. Export spells it ID.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:11",
@@ -19,7 +20,7 @@
       "status": "verified"
     },
     "CueSheetName": {
-      "simple": "CRI Atom cue sheet to play for the track.",
+      "simple": "The name of the sound set the game plays for this track. It is used for battle music and for the level sequence testing screen.",
       "technical": "FString, default empty (inline constructor). Battle and level-sequencer/debug paths construct an FName from this string and pass it to PlayBgm; an empty string becomes an empty FName. BattleBase/MissionBase return it as the battle BGM name, falling back to an empty name (or literal BGM_BATTLE_01 when no row exists; MissionBase first retries the request BGM). All 28 exported rows repeat their row ID, but the field is independent: the gallery, sequencer, MainMenuTheme.Id_Bgm, free-battle choices and credit paths pass an Id/name directly without reading it.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:15",
@@ -36,7 +37,7 @@
       "status": "verified"
     },
     "Id_SoundText": {
-      "simple": "Localized text ID shown as the track title in the sound collection.",
+      "simple": "The song title shown in the sound collection after you unlock it. It also appears as a choice in free battle music options.",
       "technical": "FName. UGameCollectionSoundListItem::GetTitleTextId returns this row value; the collection item widget displays it for unlocked entries with SetTextIdOnly and a locked placeholder for unheard music. Non-SYS text IDs are resolved through the language-specific SoundText tables (SoundTextDataTable_<lang>) by GameTextManager: all 28 exported BGM IDs resolve in each of the 11 exported locale shards, and in the export this ID equals the row Id. It is also added as an option string in free-battle BGM option boxes, where an extra Random option is appended and SetUseTextId is enabled; selection uses Settings.BgmId.ToString() (the row Id), not this text ID.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:18",
@@ -51,7 +52,7 @@
       "status": "verified"
     },
     "Duration": {
-      "simple": "Track length in seconds.",
+      "simple": "How long the song lasts, in seconds. The collection slider uses it for song length and progress, and full and short credits use it for scrolling time.",
       "technical": "float, default 0.0f. The credit scroll uses the BGM_DEMO_07 row minus 3.5 s and the BGM_DEMO_01 row directly as ease durations (types 2 and 3 use hardcoded 10/15 s instead). The collection slider sets its maximum to Duration, substituting 1.0f when abs(Duration) <= UE_SMALL_NUMBER; that guarded value also drives the mm:ss text, progress percentage, playback wrapping and the 0.1 s end-of-track check. Exported values are whole-number seconds (30-319 here), but the field itself is a float.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:21",
@@ -67,7 +68,7 @@
       "status": "verified"
     },
     "bInitialReleaseEnabled": {
-      "simple": "Whether the track is unlocked before the player has heard it.",
+      "simple": "Whether the song is available in the sound collection from the start. Turn it on to make a track appear there before you hear it in play.",
       "technical": "bool, default false. Startup (GamePhase_Startup state 0xC after the DLC query; also DebugBoot state 1) calls GM_ReapplyDlcUnlocks_131DC00: every row with this flag true is inserted with FindOrAdd into GameManager.UserInfo.StudioBgmNames_BE8 (new FStudioBgmState has bNew=true), alongside DLC item grants. That map is also populated when AGameSoundManager::PlayBgm broadcasts OnBgmChanged (bound in Boot) and is serialized in the save; the collection widget's unlock state is membership in that map and its NEW marker comes from the saved state. In the exported table only BGM_DEMO_10 is true, so the others start locked unless encountered in play or started by a hardcoded caller.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Bgm.h:24",

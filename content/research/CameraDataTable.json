@@ -1,8 +1,9 @@
 {
+  "overview": "This table controls how far the camera sits from the character, how smoothly it follows, and how far it can look around.",
   "description": "Single global tuning row for the virtual/target camera: per-channel smoothing rates, mode distances and request blends, horizontal/vertical look limits, pivot height and view offset.",
   "fields": {
     "ID": {
-      "simple": "Row name (Only one exported row: Default).",
+      "simple": "The name of this camera settings entry, called Default in the data. Keep it first so these settings stay active.",
       "technical": "FName serialized on the row (export ID = \"Default\"), but the accessor does NOT look up by this value: UGameVirtualCamera::FirstCameraRow (retail 0x104a480) walks DTM->CameraDataTables (+0x310), skips tables with no rows, and returns FindRow<FGameDataTableRow_Camera> on the first row name of the first usable table. No source consumer reads the row's Id member itself; changing the row name alone would not change the selected row as long as it stays first.",
       "evidence": [
         "Source/Abrams/Private/GameVirtualCamera.cpp:20",
@@ -13,7 +14,7 @@
       "status": "observed"
     },
     "GazeLocation_AttenuateRate": {
-      "simple": "Gaze-location smoothing rate.",
+      "simple": "How fast the camera follows what it watches, with bigger values catching up faster. Some animations briefly change this rate, then restore it.",
       "technical": "Float multiplied by 60 at InitVirtualCamera (0.5 in the export -> 30) and stored in GazeLocationAttenuateRateBase/current. UpdateViewTransform uses clamped DeltaTime * rate as the FMath::Lerp alpha between current and target gaze location. UGameAnimNS_CameraGazeSettings can temporarily overwrite only the current rate with its own LocationAttenuateRate * 60 when the notify value is >= 0; on notify end ResetGazeLocationAttenuateRate eases (or snaps) it back to this row-derived base through Interp128.",
       "evidence": [
         "Source/Abrams/Private/GameVirtualCamera.cpp:42",
@@ -24,7 +25,7 @@
       "status": "verified"
     },
     "RotationPitch_AttenuateRate": {
-      "simple": "Pitch smoothing rate.",
+      "simple": "How fast the camera tilts up or down while following the action. Bigger values make the tilt settle faster.",
       "technical": "Float * 60 at init (export 0.5 -> 30). The clamped DeltaTime * rate is the alpha in GameVirtualCamera_LerpRotator for current->target pitch; roll uses a hard-coded 30 instead of a row field.",
       "evidence": [
         "Source/Abrams/Private/GameVirtualCamera.cpp:44",
@@ -34,7 +35,7 @@
       "status": "verified"
     },
     "RotationYaw_AttenuateRate": {
-      "simple": "Yaw smoothing rate.",
+      "simple": "How fast the camera turns left or right while following the action. Bigger values make the turn settle faster.",
       "technical": "Float * 60 at init (export 0.5 -> 30), used as clamped DeltaTime * rate in the yaw rotator lerp inside UpdateViewTransform.",
       "evidence": [
         "Source/Abrams/Private/GameVirtualCamera.cpp:45",
@@ -44,7 +45,7 @@
       "status": "verified"
     },
     "Distance_AttenuateRate": {
-      "simple": "Camera boom distance smoothing rate.",
+      "simple": "How fast the camera moves closer or farther when the wanted distance changes. Bigger values make that move quicker.",
       "technical": "Float * 60 at init (export 0.5 -> 30). Used as clamped DeltaTime * rate alpha when interpolating CurrentDistance toward TargetDistance.",
       "evidence": [
         "Source/Abrams/Private/GameVirtualCamera.cpp:47",
@@ -53,7 +54,7 @@
       "status": "verified"
     },
     "TargetCamera_Distance": {
-      "simple": "Normal third-person camera boom length.",
+      "simple": "How far back the camera normally sits in third-person play. Bigger values pull it farther back.",
       "technical": "Float (export 200 cm). Copied to the base-camera CurrentDistance and to the character-camera TargetCameraDistance in InitCharacterCamera; TargetCameraDistance is restored as distance-request key 0 when movement/downed requests expire. Gameplay actions request a larger distance and then release it back to this value. In target-camera mode the solved boom is OwnerRadius * the eased distance + min(2D gaze distance, 1000), then shortened by the collision trace, so this is not the literal final camera offset.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:449",
@@ -64,7 +65,7 @@
       "status": "verified"
     },
     "FreeCamera_Distance": {
-      "simple": "Free-camera boom length.",
+      "simple": "How far the camera sits from the character while you look around freely. Bigger values pull it farther away.",
       "technical": "Float (export 250 cm) copied to FreeCameraDistance at character-camera init; the free-camera calculation places the camera at Direction * FreeCameraDistance + Base above the owner's height-adjusted base point.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:448",
@@ -73,7 +74,7 @@
       "status": "verified"
     },
     "ShootCamera_Distance": {
-      "simple": "Shoot/aim camera boom length.",
+      "simple": "The saved distance for the camera while the character aims. What it changes on screen is unclear.",
       "technical": "Float (export 200 cm) copied to the character virtual camera's ShootCameraDistance member at init and propagated by the camera copy path (GameCharacterVirtualCamera.cpp:718). No read of that member appears in the available C++/sequencer code (the similarly named debug-menu camera-distance values are separate GameDebugManager fields), so any aiming behavior remains unresolved here.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:452",
@@ -82,7 +83,7 @@
       "status": "observed"
     },
     "TargetCamera_ActionDistance": {
-      "simple": "Camera distance while running/dashing/jumping/stepping.",
+      "simple": "How far back the camera moves while running, dashing, jumping, or stepping, including some characters' special jumps. Bigger values pull it farther back.",
       "technical": "Float (export 320 cm). Movement actions call SetDistanceRequest(1, TargetCamera_ActionDistance, <mode-specific time>) so the longest active request wins. Used by normal run, dash, jump, step, CP_180_Jump and CP_180_RunJump.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction.cpp:746",
@@ -93,7 +94,7 @@
       "status": "verified"
     },
     "TargetCamera_ActionDistanceChangeTime_Run": {
-      "simple": "Blend time for the running camera-distance change.",
+      "simple": "How long the camera takes to move back when the character starts running. Bigger values make the change slower.",
       "technical": "Float seconds (export 1.0) passed as BlendTime to SetDistanceRequest(1, ActionDistance, ...) from the run action; UpdateDistanceRequest starts an EaseInOut float interpolation over that time (scaled by remaining alpha when goals repeat).",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction.cpp:746",
@@ -102,7 +103,7 @@
       "status": "verified"
     },
     "TargetCamera_ActionDistanceChangeTime_Dash": {
-      "simple": "Blend time for the dash camera-distance change.",
+      "simple": "How long the camera takes to move back when the character starts dashing. Bigger values make the change slower.",
       "technical": "Float seconds (export 0.2) passed with TargetCamera_ActionDistance to request key 1 when a dash starts.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:45"
@@ -110,7 +111,7 @@
       "status": "verified"
     },
     "TargetCamera_ActionDistanceChangeTime_Jump": {
-      "simple": "Blend time for the jump camera-distance change.",
+      "simple": "How long the camera takes to move back when jumping, including some characters' special jumps. Bigger values make the change slower.",
       "technical": "Float seconds (export 0.2) used by FGameCharacterAction_JumpBase and by CP_180_Jump / CP_180_RunJump when requesting TargetCamera_ActionDistance.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Jump.cpp:157",
@@ -120,7 +121,7 @@
       "status": "verified"
     },
     "TargetCamera_ActionDistanceChangeTime_Step": {
-      "simple": "Blend time for the step camera-distance change.",
+      "simple": "How long the camera takes to move back when the character steps. Bigger values make the change slower.",
       "technical": "Float seconds (export 0.2) passed to the step action's request for TargetCamera_ActionDistance.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Step.cpp:115"
@@ -128,7 +129,7 @@
       "status": "verified"
     },
     "TargetCamera_DownDistance": {
-      "simple": "Camera distance while knocked down/downed.",
+      "simple": "How far back the camera moves when the character is knocked down. Bigger values pull it farther back.",
       "technical": "Float (export 475 cm). Five blow/down Start states (Blow, BlowSpin, BlowGroundRestraint, GroundRestraint, CentipedeRestraintFall) call SetDistanceRequest(2, DownDistance, DownDistanceChangeTime); this request competes with the movement key 1 by maximum distance.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:612",
@@ -140,7 +141,7 @@
       "status": "verified"
     },
     "TargetCamera_DownDistanceChangeTime": {
-      "simple": "Blend time into the downed camera distance.",
+      "simple": "How long the camera takes to move back after a knockdown. Bigger values make the move slower.",
       "technical": "Float seconds (export 0.2) passed together with TargetCamera_DownDistance to SetDistanceRequest(2, ...) from five blow/down Start sites: Blow, BlowSpin, BlowGroundRestraint, GroundRestraint and CentipedeRestraintFall.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Blow.cpp:612",
@@ -152,7 +153,7 @@
       "status": "verified"
     },
     "TargetCamera_NormalDistanceChangeWaitTime": {
-      "simple": "Delay before the camera returns to normal distance.",
+      "simple": "How long the camera waits after an action ends before returning to normal. Bigger values delay the return.",
       "technical": "Float seconds (export 3.0). When no distance requests remain and UpdateDistanceRequest is called with a negative blend time (the action End handlers pass -1.0f), it sets DistanceRequestWait to this row value once if it is not already counting down and returns without restoring key 0. SolveTargetCamera decrements the wait each tick and, when it reaches zero, calls SetDistanceRequest(0, TargetCameraDistance, NormalDistanceChangeTime). Repeated negative-blend removals do not reset an active wait.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:239",
@@ -161,7 +162,7 @@
       "status": "verified"
     },
     "TargetCamera_NormalDistanceChangeTime": {
-      "simple": "Blend time back to normal camera distance.",
+      "simple": "How long the camera takes to return to its usual distance. Bigger values slow the return.",
       "technical": "Float seconds (export 1.5). Used by SetDistanceRequest(0, TargetCameraDistance, NormalDistanceChangeTime) and passed as RemoveDistanceRequest(2, ...) blend when leaving the knocked-down camera state.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:244",
@@ -171,7 +172,7 @@
       "status": "verified"
     },
     "LimitAngleH_Min": {
-      "simple": "Horizontal camera limit angle at close range.",
+      "simple": "How much the camera may lag sideways when the character is close to the target. Bigger values allow more lag.",
       "technical": "Float degrees (export 25). Interpolated with LimitAngleH_Max by DistanceAlpha = clamp((Dist2D - LimitAngleHDistanceMin)/(LimitAngleHDistanceMax - LimitAngleHDistanceMin), 0..1); the result rotates the ideal gaze heading about the down axis to compute yaw error/slack.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:453",
@@ -180,7 +181,7 @@
       "status": "verified"
     },
     "LimitAngleHDistance_Min": {
-      "simple": "Near distance at which the horizontal limit starts interpolating.",
+      "simple": "How close the target must be before the camera's sideways lag limit starts changing. Bigger values start it farther away.",
       "technical": "Float cm (export 150). Lower bound of the 2D base-to-gaze distance used in the DistanceAlpha clamp for LimitAngleH_Min/Max.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:454",
@@ -189,7 +190,7 @@
       "status": "verified"
     },
     "LimitAngleH_Max": {
-      "simple": "Horizontal camera limit angle at long range.",
+      "simple": "How much the camera may lag sideways when the target is far away. Bigger values allow more lag.",
       "technical": "Float degrees (export 5). Upper end of the distance-based lerp; a larger-horizon gaze permits less horizontal lag than the 25-degree near value.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:455",
@@ -198,7 +199,7 @@
       "status": "verified"
     },
     "LimitAngleHDistance_Max": {
-      "simple": "Far distance at which the horizontal limit reaches its maximum-range value.",
+      "simple": "How far from the target the camera's sideways lag limit finishes changing. Bigger values finish that change farther away.",
       "technical": "Float cm (export 700). Upper bound of the DistanceAlpha denominator; the code divides by (Max - Min) without a zero guard.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:456",
@@ -207,7 +208,7 @@
       "status": "verified"
     },
     "LimitAngleV_Min": {
-      "simple": "Lower vertical gaze limit (negative bound).",
+      "simple": "How high the camera can tilt upward while watching a target. The data records this as a negative angle.",
       "technical": "Float degrees (export -40). Pitch is clamped to [-LimitAngleVMax, -LimitAngleVMin] = [-25, 40] with the export values; the sign is inverted because the code passes -Min as the upper clamp.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:457",
@@ -216,7 +217,7 @@
       "status": "verified"
     },
     "LimitAngleV_Max": {
-      "simple": "Upper magnitude of the vertical gaze limit.",
+      "simple": "How low the camera can tilt while following a target. Bigger values let it see farther downward.",
       "technical": "Float degrees (export 25). Supplies the negative bound of the pitch clamp (-25 degrees); see LimitAngleV_Min for the inverted upper bound.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:458",
@@ -225,7 +226,7 @@
       "status": "verified"
     },
     "OwnerHeightScale": {
-      "simple": "Fraction of owner capsule height used as camera pivot height.",
+      "simple": "How high above the character the camera's view starts. Bigger values raise the camera and what it watches.",
       "technical": "Float (export 0.84). InitCharacterCamera computes OwnerHeight = 2 * GetScaledCapsuleHalfHeight() * OwnerHeightScale; the result offsets the camera/gaze base point and participates in lock-on height difference.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:461",
@@ -235,7 +236,7 @@
       "status": "verified"
     },
     "TargetCamera_OffsetAngleV": {
-      "simple": "Vertical offset applied to the camera direction.",
+      "simple": "A small tilt applied to the camera's final view. Raising it points the camera slightly lower.",
       "technical": "Float degrees (export 1.5). OutDirection = Heading.RotateAngleAxis(Pitch - TargetCamera_OffsetAngleV, HeadingAxis); this is subtracted from the clamp-derived pitch when producing the final view direction.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:462",
@@ -244,7 +245,7 @@
       "status": "verified"
     },
     "CameraModeChange_InterpolationTime": {
-      "simple": "Blend duration when switching camera modes.",
+      "simple": "How slowly the view changes when the camera switches modes. Changing targets uses its own fixed timing.",
       "technical": "Float seconds (export 0.25). Stored by InitCharacterCamera and passed to StartViewBlend when ChangeCameraMode changes the camera mode with bBlendView; target changes use a separate hard-coded 0.25 s blend in OnTargetChanged, not this field.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:459",

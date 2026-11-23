@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets each shop lottery prize, how likely it is to win, how rare it is, and how many times it can be won.",
   "description": "Defines the finite prize pool for the shop lottery: each possible prize's item set, rarity, draw weight, and how many times it can be won before it sells out.",
   "fields": {
     "Id": {
-      "simple": "Lottery lineup/prize row identifier.",
+      "simple": "The unique name of this prize in the lottery lineup. It also connects the prize to how many times you have won it.",
       "technical": "FName row key and draw-pool entry name; the export serializes it as ID (ImportKeyField Id, reconstructed header member Id; retail runtime layout maps Id to ID). Per-row drawn counts are stored in GameManager::UserInfo::Shop::StudioNameInts_A58 keyed by this ID (loaded/saved by GameSaveDataManager); a missing map entry means zero. The weighted pool is built from row IDs, one uniform random index is chosen, and the selected ID is resolved back to its row before granting. UI item data also uses this ID to read the drawn count. DrawLottery increments the in-memory count but does not itself write the save.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShopLotteryLineup.h:12",
@@ -17,7 +18,7 @@
       "status": "verified"
     },
     "Id_ItemSet": {
-      "simple": "ItemSet granted when this prize is drawn.",
+      "simple": "The reward shown for this prize and normally given when it wins. If its featured item reaches its limit, you receive points instead.",
       "technical": "FName resolved through a first-match ItemSetDataTables lookup by GameShop_GetItemSetItems / GameShop_GetItemSetNameText to build preview item type, character name, set name, thumbnail and result dialog; the helper returns an empty array when the set is missing or any contained item is still locked. On a normal draw GameShop_AddItemSetOnce grants one copy of this set. If a StudioItemStocks_590 entry exists for the first set item and its Count is already >= PossessionMax, the draw is flagged bReplaced and a rarity-specific ITM_SET_SHOP_LOTTERY_REPLACE_* point set is granted instead; the draw path reads Items[0] without a guard.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShopLotteryLineup.h:16",
@@ -32,7 +33,7 @@
       "status": "verified"
     },
     "Weight": {
-      "simple": "Relative draw weight of this prize.",
+      "simple": "How likely this prize is to win compared with the other prizes. A bigger number makes it appear more often in the lottery draw.",
       "technical": "float at row offset 0x18, default 0. For the actual draw, each row not marked sold out (no drawn entry or drawn < ContainsCount) contributes FMath::FloorToInt(Weight) copies of its ID to a flat pool; a uniform RNG index selects the winner, so for nonnegative weights fractional parts are truncated and 0 <= Weight < 1 contributes no entries. For display, RefreshLineup sums Weight over non-sold-out rows, divides each row's Weight by max(TotalWeight, 1.0f), sorts ascending by that WeightRate (ties within SMALL_NUMBER by item-set SortingOrder), and formats it as a percent with three decimals for non-sold-out rows only. All 421 exported weights are positive integers, so truncation is not exercised by the supplied data.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShopLotteryLineup.h:19",
@@ -46,7 +47,7 @@
       "status": "verified"
     },
     "Rariry": {
-      "simple": "Rarity tier of the prize (the property is spelled 'Rariry' in retail data and source).",
+      "simple": "The prize's rarity group, shown as Gold, Silver, or Bronze. It sets the list order, header color, and which win animation plays.",
       "technical": "EGameShopLotteryRarityType at row offset 0x1C (None, Bronze=1, Silver=2, Gold=3, Invalid=255), default None. It groups the prize list into Gold -> Silver -> Bronze with sold-out entries last (None/Invalid rows are not listed), chooses the header color by static_cast<int32>(Rariry)-1 with a black fallback for an out-of-range index, and selects the replacement point set and result animation; unhandled rarities get no replacement or animation.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameShopLotteryRarityType.h:6",
@@ -59,7 +60,7 @@
       "status": "verified"
     },
     "ContainsCount": {
-      "simple": "Maximum number of times this prize can be drawn.",
+      "simple": "How many times you can win this prize before it sells out. The lineup shows this as the maximum beside your current wins.",
       "technical": "int32 at row offset 0x20, default 0. The drawn count (zero when the save map has no entry) is compared with it to exclude sold-out rows from the draw pool, label the prize sold out/dim it, and compute remaining lottery boxes as the unclamped sum of ContainsCount - drawn. It is also shown as MAX in the COUNT/MAX text (drawn as COUNT). Exported values are 1 or 3.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShopLotteryLineup.h:25",

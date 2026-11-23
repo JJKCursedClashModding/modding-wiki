@@ -1,8 +1,9 @@
 {
+  "overview": "This table describes each story chapter, including its displayed number and name, artwork, music, videos, voices, DLC access, and playable story missions.",
   "description": "Story chapter catalogue: 1-based ordering, localized title and presentation assets, DLC progress-flag unlock, chapter BGM/background-movie/voice routing, and the ordered demo lists used for progress and resume.",
   "fields": {
     "ID": {
-      "simple": "Chapter row id (CHAP_0001..CHAP_0009 in the export).",
+      "simple": "The unique name the game uses for this chapter. It links the chapter to its progress, music, voices, and story missions.",
       "technical": "FName row key in StoryChapterDataTables (DTM +0x8B0), loaded from the single StoryChapterDataTable primary asset. Consumers use it to re-find the chapter row before reading the first UserProgressFlag, as the key of transient BGM/voice/release/movie maps, and as the result of index- and demo-to-chapter reverse lookups. The nine exported ids are unique and equal their row names.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:11",
@@ -18,7 +19,7 @@
       "status": "verified"
     },
     "ChapterIndex": {
-      "simple": "Exported 1-based chapter number.",
+      "simple": "The chapter number shown in the story menus. Changing it changes which chapter the game finds when it asks for that number.",
       "technical": "int32 (row +0x10), default 0 in the constructor. Story_GetChapterIdByIndex scans table/row order for an exact match; Story_GetResumeDemo uses that index, Story_GetDemoChapterIndex returns this value (or -1 when no chapter lists the demo), and collection/chapter-select UIs insert it as the raw INDEX text parameter. Story_PickRoomPlacement uses the row with value 6 as its checkpoint. Exported values are 1..9; the field itself is an unclamped int32.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:15",
@@ -34,7 +35,7 @@
       "status": "verified"
     },
     "Id_StoryChapterTitle": {
-      "simple": "Localized-text id for the chapter name.",
+      "simple": "The chapter title players see in story menus and dialogs. Change this to change the title shown for the chapter.",
       "technical": "FName (row +0x14). Chapter select, mission select, character-select mission info, script ShowTitle and system dialogs pass it directly as a text id (the system dialog supplies it as the MISSION_NAME parameter). The shop sale-item description returns it as the chapter name and substitutes ERROR only when no chapter row is found. All nine exported ids are keys in every exported StoryTextDataTable locale.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:18",
@@ -50,7 +51,7 @@
       "status": "verified"
     },
     "ThumbnailFileName": {
-      "simple": "Full-size chapter thumbnail texture name.",
+      "simple": "The large chapter picture shown in the mission list. Change this to change the chapter's main artwork.",
       "technical": "FName (row +0x1C). UGameStoryMissionSelectWidget creates WidgetTexture primary-asset loaders from it when a chapter panel has no loaders; the panel resolves that loader into ThumbnailTexture, and SetupChapter installs that texture as the chapter image's ReplacementTexture material parameter. All exported rows set a non-None name.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:21",
@@ -63,7 +64,7 @@
       "status": "verified"
     },
     "SmallThumbnailFileName": {
-      "simple": "Small chapter thumbnail texture name.",
+      "simple": "The small chapter picture shown on story chapter cards. DLC chapters use this same choice for their card artwork.",
       "technical": "FName (row +0x24). UGameStoryWidget creates WidgetTexture loaders for chapter-select and DLC chapter-select cards from it. The cards look up the loader by this key, place the loaded texture in the ReplacementTexture material parameter and set bIsMovie from the texture type. All exported rows use a non-None name ending in _576x324.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:24",
@@ -79,7 +80,7 @@
       "status": "verified"
     },
     "BackgroundMovieFileName": {
-      "simple": "Background movie name for the DLC chapter menu.",
+      "simple": "The background movie played while the player views a DLC chapter menu. Chapters without one have no movie in this menu.",
       "technical": "FName. PrimeDlcBackground rebuilds ChapterMovieFiles as Chapter.Id -> \"<value>.usm\" for every non-None name; SetDlcBackgroundChapter switches only to chapters present in that map and the background widget passes the mapped string to SetMovieFile. Only CHAP_0008 (StoryTop_DLC01) and CHAP_0009 (StoryTop_DLC02) set it; the other seven exported chapters are None and get no map entry.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:27",
@@ -92,7 +93,7 @@
       "status": "verified"
     },
     "Id_Bgm": {
-      "simple": "Chapter-select BGM id.",
+      "simple": "The music played while the player browses this chapter in the story menu. Only DLC story chapters currently set their own music.",
       "technical": "FName. MainMenuStory::PreparePhase resolves non-None ids against every BgmDataTable, stores Bgm->Id in ChapterBgmIds keyed by Chapter.Id and seeds BgmResumes with start time 0; None chapters are skipped. PlayChapterBgm consumes those transient maps and returns when the chapter has no entry. Only CHAP_0008/CHAP_0009 set BGM_BATTLE_DLC_01/BGM_BATTLE_DLC_02; other main-menu-story modes use BGM_STORY.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:30",
@@ -107,7 +108,7 @@
       "status": "verified"
     },
     "UserProgressFlag": {
-      "simple": "First element is the chapter's DLC/user-progress flag; -1 means base story.",
+      "simple": "The DLC unlock check for this chapter. It marks base story chapters, locks unowned DLC chapters, and points to the right store page.",
       "technical": "TArray<int32> (row +0x40); all chapter consumers read only element 0, treating a missing row/empty array as -1. -1 means no DLC flag: MissionSelect_HasProgressFlag returns false, Story_GetChapterFirstUserProgressFlag returns -1, MainMenuStory_IsChapterLocked returns false, and Story_GetProgressFlagChapters_1302FC0 keeps those base-story rows. A set flag is decoded as word = uint32(flag) >> 2 and bit = uint32(flag) & 3 against UserProgressFlagWords[128]; word >= 128 is locked, otherwise an unset bit is locked. Exports use -1 for CHAP_0001..CHAP_0007, 6 for CHAP_0008 and 7 for CHAP_0009, decoding to word 1 / bits 2 and 3; the reconstructed entitlement map associates 6 with DLC07 and 7 with DLC08, and the DLC purchase flow matches the same value to a store page.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:33",
@@ -128,7 +129,7 @@
       "status": "verified"
     },
     "Id_PlayVoice_OnOpenMissionSelect": {
-      "simple": "PlayVoice row used to roll the mission-select voice pick index.",
+      "simple": "The voice group connected to opening the mission list. It helps choose later lines, and DLC chapters use their own group.",
       "technical": "FName (row +0x50). BuildChapterVoicePicks resolves it to the OpenVoice row; RollChapterVoicePicks copies Id_Voice and Weights_VoiceLottery, removes None names and the same-index weights, and rolls a cumulative weighted PickIndex with the last entry as fallback. It does not play this row's PlayVoiceType directly; the index is reused with the OnSelectMission voice type and passed to character select. Exported values are 300 for CHAP_0001..CHAP_0007 and CHAP_0009, and 301 for CHAP_0008; rows 300/301 contain one/two non-None voices with equal positive weights.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:36",
@@ -144,7 +145,7 @@
       "status": "verified"
     },
     "Id_PlayVoice_OnSelectMission": {
-      "simple": "PlayVoice row used when a mission is chosen.",
+      "simple": "The voice played when the player chooses a story mission. DLC chapters use their own voice.",
       "technical": "FName (row +0x58). Story_GetChapterSelectVoiceType_1307CA0 finds the PlayVoice row and returns its PlayVoiceType as uint8, or 0xFF when the chapter/row is missing; UGameStoryMissionSelectWidget::OnMissionDecided plays that type with the chapter's rolled PickIndex when it is not 0xFF. The export uses 310 for all chapters except CHAP_0008, which uses the DLC1 variant 311.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:39",
@@ -158,7 +159,7 @@
       "status": "verified"
     },
     "Id_PlayVoice_StartDialog": {
-      "simple": "PlayVoice row whose key is sent to the story character-select phase.",
+      "simple": "The voice used as the player moves into character selection for the story. DLC chapters use their own voice here.",
       "technical": "FName (row +0x60). BuildChapterVoicePicks resolves it to SelectVoice. On the character-select transition MainMenuStory copies SelectVoice->Id (the PlayVoice table row key, not one of that row's Id_Voice entries) into StudioStoryRequestName_CEC and copies the chapter's rolled PickIndex into StudioStoryRequestInt48_CF4. The export uses 330 for CHAP_0001..CHAP_0007 and CHAP_0009, and the DLC1 variant 331 for CHAP_0008.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:42",
@@ -170,7 +171,7 @@
       "status": "verified"
     },
     "Id_StoryDemo": {
-      "simple": "Ordered StoryDemo ids in this chapter.",
+      "simple": "The story missions that belong to this chapter, in play order. The game uses them to track progress, unlock missions, and resume play.",
       "technical": "TArray<FName> (row +0x68) with 20 exported slots; None slots are padding. The exported lists are chapter-ordered and partition all 115 StoryDemo rows exactly once. Consumers use membership for demo-to-chapter reverse lookup and progress-flag tests, iterate non-None entries for cleared percentage (0..100 truncated; 100 when empty) and objective counts (objective 0 = demo state >=2, objectives 1..2 need a task detail id and task flag >=1), available/resume-demo selection, room-condition selection, chapter lock/unstarted tests and ShowTitle lookup. Main-demo tests use the demo row id ending in M case-insensitively; CHAP_0007 entries are treated as main in several availability/clear checks. Story_GetChapterFirstDemo returns Id_StoryDemo.GetData()[0] without a length check; all exported rows are non-empty.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryChapter.h:45",

@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets each fighter in Story, Arcade and PvE missions, including who they are, how they start, and how the computer plays them.",
   "description": "Stage-specific combatant instance configuration for Story, Arcade and PvE battles: it selects the character/variation and initial status/AI values, supplies per-instance related-row and damage-rate overrides, and is also read by story/arcade selection, battle and situation-overview capture UI.",
   "fields": {
     "Id": {
-      "simple": "Mission-character instance id.",
+      "simple": "The unique name the game uses to find this fighter in a mission.",
       "technical": "FName import key/row name for FGameDataTableRow_MissionCharacter (the supplied export spells the key `ID`, matching each unique row name; the header and catalog call it Id). Rows are found by this id from StoryMissionWave ally lists, MissionWave enemy lists, CharacterArcade->Id_MissionCharacter and arcade mission enemy lists. Besides lookup identity, the only observed direct member read is the Arcade battle-entry diagnostic log; gameplay builders copy Id_Character into the slot instead.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:13",
@@ -14,7 +15,7 @@
       "status": "observed"
     },
     "Id_Character": {
-      "simple": "Base character row to instantiate.",
+      "simple": "Which character this mission fighter is. Changing it changes who appears.",
       "technical": "FName, default None. Copied into Entry.Slot.CharacterId by BattleStory_FillFromMissionCharacter and the Arcade/PvE entry builders, then used to find the FGameDataTableRow_Character in CharacterDataTables (DTM+0x3E0). UI code also uses it to find CharacterImage/glossary/face-icon rows, build unique character-id lists, and populate story-select capture/spawn parameters. All 701 exported values resolve in the supplied CharacterDataTable; several gameplay paths do not guard a missing Character row.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:17",
@@ -27,7 +28,7 @@
       "status": "verified"
     },
     "VariationIndex": {
-      "simple": "Index selecting a character variation/costume.",
+      "simple": "Which costume or variation this fighter uses. A different choice can change their look, weapon, or voice.",
       "technical": "int32, default 0. Copied into Slot.VariationIndex and Setup.VariationIndex. AGameCharacter::ResolveDataRows uses it as an unchecked index into Character.Id_CharacterVariation; BattleBase and Story character-select also index that array for variation BP, weapon and voice previews, and capture parameters receive it. The supplied export uses 0, 2, 4, 5, 10, 12, 14 and 15 (no -1), and every value is within the referenced character's exported variation array. Some preview paths guard the index with IsValidIndex, but ResolveDataRows and capture do not.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:20",
@@ -40,7 +41,7 @@
       "status": "verified"
     },
     "PoseIndex": {
-      "simple": "Index selecting the situation-overview pose.",
+      "simple": "Which pose this fighter uses in the situation overview. That pose also shapes their weapons in the preview.",
       "technical": "int32, default 0. BattleSituationOverview copies it to Enemies[Index].SituationOverviewPoseIndex; situation-overview capture then indexes Character.Id_SituationOverview -> SituationOverview.Id_SituationOverviewPose[PoseIndex] unchecked (recorded as unchecked in the reconstructed source). The supplied export uses 0..5, and every value is in range for the referenced character's exported pose array.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:23",
@@ -52,7 +53,7 @@
       "status": "verified"
     },
     "MaterialPattern": {
-      "simple": "Initial material pattern for the combatant.",
+      "simple": "Which surface look the fighter starts with. Situation overview previews may use the look chosen there.",
       "technical": "int32, default 0. Copied into Slot.MaterialPattern in every mode's battle entry builder; battle base later calls Character.MaterialController->SetMaterialPattern(Entry.Slot.MaterialPattern, nullptr). It is also forwarded into story-select capture parameters; for SituationOverview captures the widget variation parameter can replace the slot value at the final SetMaterialPattern call.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:26",
@@ -65,7 +66,7 @@
       "status": "verified"
     },
     "bDamageMaterialEnabled": {
-      "simple": "Flag whose only observed effect is resetting decal weight.",
+      "simple": "When switched on, the game resets the fighter's damage-mark layer at battle setup. No other effect is confirmed.",
       "technical": "bool, default false. Copied into Setup.Byte9C (a Setup member, not a StatusSetup member) in all battle builders; AGameCharacter::ApplyCharacterSetup calls MaterialController->ResetDecalWeight() when that byte is 1. The field name suggests a damage/decal-material enable, but no broader damage/decal branch is observed here; treat the name as reconstruction nomenclature and the reset call as the concrete effect.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:29",
@@ -76,7 +77,7 @@
       "status": "verified"
     },
     "bSpecialTagComboSoloEnabled": {
-      "simple": "Allows duplicate hit records in solo special-tag combos.",
+      "simple": "Lets a solo special-tag combo count the same hit more than once. Almost every fighter leaves it off.",
       "technical": "bool, default false (one of 701 exported rows sets it true). Copied into Setup.Byte9D, then to AGameCharacter::bSetupSpecialTagComboSoloEnabled. The interface accessor AllowsDuplicateHitRecord returns this byte and battle hit-record logic reads that accessor, so it affects live behaviour rather than being merely serialized.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:32",
@@ -87,7 +88,7 @@
       "status": "verified"
     },
     "HitPoint": {
-      "simple": "Stage-specific maximum hit points.",
+      "simple": "Maximum health for this mission. Higher values make the fighter tougher, and some PvE equipment can add to enemy health.",
       "technical": "float, default 0.0f. Copied to Setup.StatusSetup.HitPointOverride. UGameCharacterStatusController::ApplyHitPointParameters uses it only when > 0; otherwise the base-parameter row supplies HitPoint/HitPoint_Solo. Story enemy setup also computes StatusSetup.HitPointMin as the mission order's rate times Row->HitPoint. GamePvE_CalcMissionCharacterHitPoint reads the row value directly, falls back to the base-parameter row when the override value is <= 0 (using Id_CharacterBaseParameter or, when that is None, Character.Id_CharacterBaseParameter), then adds HitPointMaxEnemy equipment effect values and clamps the result to at least 1.0f; that function does not add binding-vow bonuses.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:35",
@@ -100,7 +101,7 @@
       "status": "verified"
     },
     "Cost": {
-      "simple": "Stock/deployment cost charged when this combatant loses stock.",
+      "simple": "How much stock the team spends when this fighter is knocked out. Boss displays compare enemy costs with the player's.",
       "technical": "int32, default 0. Copied to StatusSetup.Int44 and stored as UGameCharacterStatusController::MissionCharacterCost. Battle systems add it to TeamSpent/CostByTeam, KO and stock functions call GetStockAfterLoss(MissionCharacterCost), and boss-order UI compares enemy row Costs against the player's cost. In PvE enemy setup (Solo and Tag) the row value is the base Cost before binding-vow Cost bonuses are added and the result is cast back to int32.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:38",
@@ -113,7 +114,7 @@
       "status": "verified"
     },
     "CursedEnergyLevel": {
-      "simple": "Initial cursed-energy level.",
+      "simple": "Higher values start this fighter with more Cursed Energy. Some binding vows force a full level.",
       "technical": "int32, default 0 (exported rows use 0..4). Copied to Setup.Int8C and then AGameCharacter::SetupCursedEnergyLevel. AGameCharacterManager::ApplyCharactersStartStatus calls SetCursedEnergyToLevel when it is > 0; binding vows that force a full level can replace it with Setup.StatusSetup.Int40 + 1 and disable round reset.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:41",
@@ -124,7 +125,7 @@
       "status": "verified"
     },
     "bResetCursedEnergyLevelEnabled": {
-      "simple": "Whether cursed energy returns to its initial level on round reset.",
+      "simple": "Whether Cursed Energy returns to its starting level after each round. Some binding vows turn this off.",
       "technical": "bool, default false in the row struct, and every exported row serializes it (435 true / 266 false). Copied to StatusSetup.Byte4C and then UGameCharacterStatusController::bResetCursedEnergyLevelOnRoundReset, which is consulted during round reset; forcing-vow paths can turn the flag off. The controller CDO default is 1, but InitializeStatus overwrites it from the setup.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:44",
@@ -136,7 +137,7 @@
       "status": "verified"
     },
     "TensionLevel": {
-      "simple": "Initial tension level.",
+      "simple": "The tension level this fighter starts with. A higher level starts the tension gauge partway full.",
       "technical": "int32, default 0 (all 701 exported rows are 0). Copied to Setup.Int90 and then SetupTensionLevel. At battle start, values > 0 become SetTensionGauge((level - 1) * 100.0f), so exported 0 leaves the controller's initial gauge untouched.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:47",
@@ -147,7 +148,7 @@
       "status": "verified"
     },
     "PassionGauge": {
-      "simple": "Initial passion gauge value.",
+      "simple": "How much of the Passion gauge this fighter starts with. The supplied entries leave it empty.",
       "technical": "float, default 0.0f. Copied to Setup.Float94 and then SetupPassionGauge; at battle start a value > 0 is passed to SetPassionGaugeValue. Exported rows are all 0.0, which leaves the controller default.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:50",
@@ -158,7 +159,7 @@
       "status": "verified"
     },
     "UniqueMode": {
-      "simple": "Per-character unique-mode variant selector.",
+      "simple": "Chooses a special version of this character's behavior. For some characters it changes a passive skill, attack, or display.",
       "technical": "int32, default 0 (exported rows use 0..3). Copied to Setup.Int98 and stored as AGameCharacter::SetupUniqueMode. Many character action controllers branch on this value (for example CP_051 checks != 1 for a cursed-energy bonus), and the battle player-info widget uses != 1 to choose the adapt-gauge display, so it changes behaviour as well as UI presentation.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:53",
@@ -170,7 +171,7 @@
       "status": "verified"
     },
     "CharacterSpecialTagComboLimit": {
-      "simple": "Numeric limit governing special-tag combo behaviour.",
+      "simple": "Chooses which special-tag pair actions this fighter allows. The unique setting stops pair sequences and the both setting changes which fighter leads.",
       "technical": "EGameCharacterSpecialTagComboLimit stored as uint8, default None (0). Cast into Setup.Byte89 and stored as AGameCharacter::SetupSpecialTagComboLimit. Exported values are None (691 rows), Unique (2; 7 rows) and Both (3; 3 rows); Common and Invalid are not exported. Concrete raw-value consumers are now identified: battle state 6 disables pair sequences when the value is 2, and battle system 310 swaps the first two performers when it is 3. The larger state/effect names remain reconstruction terminology.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:56",
@@ -183,7 +184,7 @@
       "status": "verified"
     },
     "Id_CharacterBaseParameter": {
-      "simple": "Override for the character base-parameter row.",
+      "simple": "The name of the character's base stats to use for this fighter. If blank, the game uses their normal stats.",
       "technical": "FName, default None. GameMissionCharacter_CopyOverrideIds copies it into Setup.Overrides.BaseParameterIdOverride; GameCharacter_Override prefers a non-None override, otherwise the base Character row's Id_CharacterBaseParameter is used to resolve CharacterBaseParameterDataTables. GamePvE_CalcMissionCharacterHitPoint independently starts from this field and falls back to Character.Id_CharacterBaseParameter when None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:59",
@@ -194,7 +195,7 @@
       "status": "verified"
     },
     "Id_CharacterCursedEnergy": {
-      "simple": "Override for the cursed-energy parameter row.",
+      "simple": "The name of the Cursed Energy settings to use for this fighter. If blank, their usual settings apply.",
       "technical": "FName, default None. Copied into Setup.Overrides.CursedEnergyIdOverride; AGameCharacter::ResolveDataRows uses the non-None value instead of Character.Id_CharacterCursedEnergy when resolving CharacterCursedEnergyDataTables (DTM+0x410).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:62",
@@ -204,7 +205,7 @@
       "status": "verified"
     },
     "Id_CharacterSpecialAttack": {
-      "simple": "Override for the character special-attack row.",
+      "simple": "When set, it changes the special move used in battle. The domain map preview uses the character's usual special attack.",
       "technical": "FName, default None. Copied into Setup.Overrides.SpecialAttackIdOverride; ResolveDataRows uses it instead of Character.Id_CharacterSpecialAttack when finding the live CharacterSpecialAttack row (DTM+0x420) and its optional DomainExpansion row. However, RegisterLoadedBattleAssets preloads the domain-expansion mini-map from Character->Id_CharacterSpecialAttack directly, so this stage override is not used for that preload. None means the base character row wins.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:65",
@@ -216,7 +217,7 @@
       "status": "verified"
     },
     "Id_CharacterAnimationSet": {
-      "simple": "Override for the character animation-set row.",
+      "simple": "The name of the animation set this fighter uses. If blank, the character's usual set is used.",
       "technical": "FName, default None. Copied into Setup.Overrides.AnimationSetIdOverride. BattleBase chooses the override when non-None and uses it to preload CharacterAnimationSet montage assets; exported rows with None fall back to Character.Id_CharacterAnimationSet.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:68",
@@ -227,7 +228,7 @@
       "status": "verified"
     },
     "Id_CharacterSound": {
-      "simple": "Override for the character sound row.",
+      "simple": "The name of the sound set this fighter uses. A chosen set replaces the one from the costume variation.",
       "technical": "FName, default None. Copied into Setup.Overrides.SoundIdOverride. ResolveDataRows first tries this override; only when it is None does it use the Variation row's Id_CharacterSound (DTM+0x510) to resolve CharacterSoundDataTables. Thus a non-None stage value replaces the variation's sound set.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:71",
@@ -238,7 +239,7 @@
       "status": "verified"
     },
     "Id_Action": {
-      "simple": "Override for the main action row.",
+      "simple": "The name of the main action set this fighter uses. It also supplies their normal move, jump, dash, step and recovery actions.",
       "technical": "FName, default None. Copied into Setup.Overrides.ActionIdOverride; ResolveDataRows uses it instead of Character.Id_Action for ActionDataTables (DTM+0x5B0). The resolved Action row then supplies Id_ActionMove, Id_ActionJump, Id_ActionBreakFall and the defaults for dash/step.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:74",
@@ -249,7 +250,7 @@
       "status": "verified"
     },
     "Id_ActionDash": {
-      "simple": "Override for the dash action row.",
+      "simple": "The name of the dash actions to use. The supplied entries leave this blank and use the main action set.",
       "technical": "FName, default None. Copied into Setup.Overrides.ActionDashIdOverride; ResolveDataRows resolves ActionDashDataTables (DTM+0x5E0) from this value when non-None, otherwise from the resolved Action row's Id_ActionDash. Exported rows use None, so the Action row normally supplies it.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:77",
@@ -260,7 +261,7 @@
       "status": "verified"
     },
     "Id_ActionStep": {
-      "simple": "Override for the step action row.",
+      "simple": "The name of the step actions to use. The supplied entries leave this blank and use the main action set.",
       "technical": "FName, default None. Copied into Setup.Overrides.ActionStepIdOverride; ResolveDataRows resolves ActionStepDataTables (DTM+0x5F0) from this value when non-None, otherwise from the resolved Action row's Id_ActionStep. Exported rows use None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:80",
@@ -271,7 +272,7 @@
       "status": "verified"
     },
     "Damage_Rate": {
-      "simple": "Per-instance multiplier for sent attack damage.",
+      "simple": "Multiplier for damage this fighter deals. Higher values make their attacks hit harder.",
       "technical": "float, default 0.0f in the row struct; the FGameCharacterRates destination defaults to 1.0f. GameMissionCharacter_CopyOverrideRates copies it to Setup.Overrides.Rates.Scale48, which is copied to AGameCharacter+0x378 and multiplied into the team x action x status damage rate in GAISlot141.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:83",
@@ -282,7 +283,7 @@
       "status": "verified"
     },
     "AutoCombo_Damage_Rate": {
-      "simple": "Per-instance multiplier for auto-combo damage.",
+      "simple": "Multiplier for auto-combo damage. Higher values make auto-combos hit harder.",
       "technical": "float, default 0.0f. Copied to Rates.Scale4C; AGameCharacter::GetAutoComboDamageRate returns CharacterRow->DamageRate_AutoCombo * Rates.Scale4C.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:86",
@@ -292,7 +293,7 @@
       "status": "verified"
     },
     "Armor_Damage_Rate": {
-      "simple": "Per-instance armor damage-rate multiplier.",
+      "simple": "Multiplier for damage to armor. Higher values break armor faster.",
       "technical": "float, default 0.0f. Copied to Rates.Scale50; AGameCharacter::GetArmorDamageRate returns that rate directly to damage processing.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:89",
@@ -302,7 +303,7 @@
       "status": "verified"
     },
     "Down_Damage_Rate": {
-      "simple": "Per-instance down-damage-rate multiplier.",
+      "simple": "Multiplier for damage used when knocking a fighter down. Higher values make down hits stronger.",
       "technical": "float, default 0.0f. Copied to Rates.Scale54; the character interface accessor GetDownDamageRateScale returns it for damage handling.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:92",
@@ -312,7 +313,7 @@
       "status": "verified"
     },
     "GuardDurability_Damage_Rate": {
-      "simple": "Per-instance multiplier for guard-durability damage sent.",
+      "simple": "Multiplier for damage to guard durability. Higher values wear down guards faster.",
       "technical": "float, default 0.0f. Copied to Rates.Scale58. GetSendGuardDurabilityDamageRate multiplies team ally rate x status rate x Scale58.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:95",
@@ -323,7 +324,7 @@
       "status": "verified"
     },
     "Destructible_Attack_Rate": {
-      "simple": "Per-instance multiplier for attacks on destructible objects.",
+      "simple": "Multiplier for attacks against breakable objects. Higher values damage those objects faster.",
       "technical": "float, default 0.0f. Copied to Rates.Scale5C; AGameCharacter::GetDestructibleAttackRate returns that value.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:98",
@@ -333,7 +334,7 @@
       "status": "verified"
     },
     "CursedEnergyExp_Add_Attacker_Rate": {
-      "simple": "Per-instance cursed-energy experience gain multiplier for the attacker.",
+      "simple": "Multiplier for Cursed Energy gained when this fighter lands hits. Higher values build Cursed Energy faster.",
       "technical": "float, default 0.0f. Copied to Rates.Scale60. GetCursedEnergyExpRate multiplies status rate x Scale60 x team/stock/level/buff factors, but returns 1.0f when the receiver is null.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:101",
@@ -343,7 +344,7 @@
       "status": "verified"
     },
     "CursedEnergyExp_Add_Receiver_Rate": {
-      "simple": "Per-instance cursed-energy experience multiplier when receiving an attack.",
+      "simple": "Multiplier for Cursed Energy gained when this fighter is hit. Higher values give them more energy from taking hits.",
       "technical": "float, default 0.0f. Copied to Rates.Scale64; AGameCharacter::GetCursedEnergyExpAddReceiverRate exposes it to the damage/receiver calculation.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:104",
@@ -353,7 +354,7 @@
       "status": "verified"
     },
     "TensionGauge_Add_Attacker_Rate": {
-      "simple": "Per-instance tension-gain multiplier for the attacker.",
+      "simple": "Multiplier for tension gained when this fighter lands hits. Higher values fill the tension gauge faster.",
       "technical": "float, default 0.0f. Copied to Rates.Scale68; GetDealtTensionGaugeGainRate returns it (both damage-row and receiver parameters are unused in the reconstructed body).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:107",
@@ -363,7 +364,7 @@
       "status": "verified"
     },
     "PassionGauge_Add_Attacker_Rate": {
-      "simple": "Per-instance passion-gain multiplier for the attacker.",
+      "simple": "Multiplier for Passion gained when this fighter lands hits. Higher values fill the Passion gauge faster.",
       "technical": "float, default 0.0f. Copied to Rates.Scale6C; GetPassionGaugeAddAttackerRate returns it directly.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:110",
@@ -373,7 +374,7 @@
       "status": "verified"
     },
     "Operation": {
-      "simple": "AI operation/personality enum.",
+      "simple": "The fighting style the computer uses for this fighter. One setting makes it use the character's usual style.",
       "technical": "EGameCharacterOperation stored as uint8, default None (0), with Invalid = 255. Cast into Setup.ByteA4 and passed as CreateBrain's AIType. CreateBrain tests the raw byte: 0xFF (exported Invalid in 234 rows) falls back to CharacterRow->AIType; other values are passed through. Exported values are Normal (419), Invalid (234), Berserker (22), Unique_1 (18), Unique_2 (5), Carefully, Onslaught and Shooter (one each); no exported row uses None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:113",
@@ -385,7 +386,7 @@
       "status": "verified"
     },
     "AILevel": {
-      "simple": "AI difficulty/level value for the brain.",
+      "simple": "How strong the computer's play is. Higher numbers make it harder, and one special value acts as level ten.",
       "technical": "int32, default 0. Copied into Setup.IntA0 and passed as Value174 to CreateBrain/BrainSet174_94; -1 is a sentinel converted to 10 there. Exported values are -1, 1, 2, 3, 4, 5, 6, 7, 8, 9 and 10 (78 rows use -1).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionCharacter.h:116",

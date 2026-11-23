@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets whether a cinematic's main lights cast shadows on the fighting stage where it plays.",
   "description": "Per-map, per-current-file override for whether the cached directional lights used with sequencer playback cast shadows. All 276 exported rows set the flag to false.",
   "fields": {
     "ID": {
-      "simple": "Row name (native Id, exported as ID, e.g. SQ_CONSOLE_PARAM_140_001).",
+      "simple": "The name of this cinematic settings entry, used to tell it apart from the other entries.",
       "technical": "FName native member and DataTable ImportKeyField; all 276 exported row keys equal their ID values. FindSequencerLightRow (retail 0x143cad0) does not look rows up by name: it iterates every row of every SequencerLightDataTables table (DTM +0xB80) with GetRows in table/row-name order and compares only Id_Map and LevelSequenceFileName against the active map and file. No consumer of the row's Id value or of the row key was found in Source.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SequencerLight.h:11",
@@ -13,7 +14,7 @@
       "status": "observed"
     },
     "Id_Map": {
-      "simple": "Map ID this override applies to.",
+      "simple": "Which fighting stage this light setting applies to.",
       "technical": "FName compared with AGameSequencerManager::MapRow->Id; MapRow is the pointer stored by SetMapRow and cleared by ResetSequencer. Both Id_Map and LevelSequenceFileName must match, and GetRows returns the first matching row in table/row-name order across all SequencerLightDataTables tables; no match returns null and no shadow change occurs. The export covers four map IDs (MAP_14, MAP_14_01, MAP_15, MAP_15_01, 69 rows each), all present in MapDataTable; other maps have no row here.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SequencerLight.h:14",
@@ -25,7 +26,7 @@
       "status": "verified"
     },
     "LevelSequenceFileName": {
-      "simple": "Level sequence file name this override applies to.",
+      "simple": "Which cinematic this light setting belongs to, so the change happens only during that scene.",
       "technical": "FName compared with FGameSequencerLoadingFileParameter::Filename, not the row ID and not CurrentRequest.SequenceName. The file parameter is found by matching SequenceName to File.ID in LoadingParameter->GetFileParameters(); if MapRow or that file parameter is absent, the finder returns null. The exact (Id_Map, LevelSequenceFileName) pair selects the cinematic. The export has 71 distinct filenames, each repeated once for each of the four maps with no duplicate pair; example: SQ_Appearance_CP_010_CP_040 on MAP_14.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SequencerLight.h:17",
@@ -37,7 +38,7 @@
       "status": "verified"
     },
     "bDirectionalLightCastShadows": {
-      "simple": "Whether the cinematic's registered directional lights should cast shadows.",
+      "simple": "Whether the cinematic's main lights cast shadows during the scene. Turning this on lets those lights create shadows.",
       "technical": "Bool, constructor default false. On sequence start, a found row overwrites ULightComponent::CastShadows on every ALight in the cached SequencerLights array and records the prior bit in LightCastShadows, a TMap keyed by weak ALight pointer. That array is rebuilt by RefreshMapActors from all ADirectionalLight actors in the world, so the name is accurate and the loop covers the whole cache. On stop, a row is found again and each light is restored from its saved bit, or from !bDirectionalLightCastShadows when no saved entry exists (for example, a light registered after start). If another sequence is queued, OnPlayerStop returns before this block, so no restore happens then; the cache is cleared at the next start. All 276 exported values are false, so configured sequences write false and the unsaved-entry fallback is true.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SequencerLight.h:20",

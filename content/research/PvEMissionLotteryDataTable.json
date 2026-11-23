@@ -1,8 +1,9 @@
 {
+  "overview": "For regular player-versus-environment missions, this table chooses the next mission from risk-based groups with different chances.",
   "description": "Risk-qualified weighted pools that choose the next non-survival PvE mission from a row's candidate missions; each row defines both a pool weight and parallel candidate/weight arrays.",
   "fields": {
     "Id": {
-      "simple": "Mission lottery row id.",
+      "simple": "The name the game uses for this set of missions. The game remembers the last one it used and leaves it out next time.",
       "technical": "Native FName; export metadata sets ImportKeyField=Id and the dump writes the key as ID, with all 223 exported row names unique and matching ID. GamePvE_PickMission does not find a lottery row by this member: it enumerates the loaded rows, then copies the chosen row's Id into the FName& LotteryId argument, which callers pass as FGamePvESettings::PickedLotteryId. FGamePvESettings::Reset initializes that cached id to NAME_None, and the settings copy assignment carries it; on a later non-survival pick a non-None value removes the lottery row whose Id matches before the pool is weighted.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionLottery.h:11",
@@ -15,7 +16,7 @@
       "status": "verified"
     },
     "Id_GlobalThreshold": {
-      "simple": "Risk band selecting which lottery pools are eligible.",
+      "simple": "Which risk level this group of missions is meant for. You only draw from it when your current risk fits that range.",
       "technical": "Native FName with no explicit constructor initializer (NAME_None). After the early extra-mission cutoff, GamePvE_PickMission walks the lottery rows from the end and asks each UDataTable in GlobalThresholdDataTables (DTM+0x300), in array order, for a FGameDataTableRow_GlobalThreshold named this Id; the first table containing the row wins. A row is removed when no threshold row exists or when the cast int32 RiskValue is outside the inclusive [Min, Max] floats (InRange_FloatFloat with both endpoints included). All 223 exported rows use one of the 15 PVE_MISSION_A_01..PVE_MISSION_E_03 names; those rows resolve in GlobalThresholdDataTable and form contiguous integer bands from 0 to 50000. PVE_MISSION_X_0_99999 exists in that asset but is not referenced here; a risk outside 0..50000 therefore leaves no eligible row and the picker falls back to PVE_X_00 without updating LotteryId.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionLottery.h:15",
@@ -30,7 +31,7 @@
       "status": "verified"
     },
     "Weights": {
-      "simple": "Relative weight of choosing this lottery pool.",
+      "simple": "How likely this group of missions is to be drawn compared with the other available groups. A bigger number gives it a better chance each time.",
       "technical": "float, constructor default 0.0f; all 223 exported rows instead set 1000.0. The value is a dimensionless relative weight, not a percent or normalized probability. After threshold filtering and exclusion of the row whose Id equals a non-None LotteryId, one Weights value per surviving row is passed in row order to GamePvE_PickWeightedIndex. That helper returns INDEX_NONE for an empty list; otherwise it sums the floats, rolls StoryFRand()*sum (StoryFRand is approximately [0,1)), returns the first index where the remaining roll is less than that weight after subtracting earlier weights, and returns the last index if no weight wins. With an all-zero sum the roll is zero and the last index is returned, so a zero-weight row is not inherently unpickable. When no row survives, GamePvE_PickMission returns PVE_X_00 and leaves LotteryId unchanged; otherwise it writes the selected row's Id to LotteryId before choosing a mission.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionLottery.h:18",
@@ -45,7 +46,7 @@
       "status": "verified"
     },
     "Id_PvEMission": {
-      "simple": "Candidate PvE mission ids inside the pool.",
+      "simple": "The missions the game can pick from this group. Blank places in the list do not offer a mission.",
       "technical": "Native TArray<FName>, default empty. The selector walks these source indices, skips None, and builds a compressed weight list; after choosing a compressed index it returns Lottery->Id_PvEMission[Pick] directly rather than indexing a separate filtered id list. That reconstructed quirk would shift the result (possibly to a None slot) if a row ever placed None before a later non-None candidate. All 223 exported rows have 12 slots, with 2..12 non-None ids followed only by trailing None padding, so no supplied row triggers the shift; all 996 non-None ids are unique within and across rows and resolve in PvEMissionDataTable. If a row has no non-None candidate, the weighted helper returns INDEX_NONE and the picker returns the PVE_X_00 fallback.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionLottery.h:21",
@@ -59,7 +60,7 @@
       "status": "verified"
     },
     "MissionWeights": {
-      "simple": "Relative weight of each candidate mission.",
+      "simple": "How likely each mission in the group is to be picked. A bigger number helps, while a mission already played in this run gets much less.",
       "technical": "Native TArray<float>, default empty; it must stay parallel to Id_PvEMission. For each non-None candidate at source index i the picker reads MissionWeights[i] with no length check, then multiplies by 0.01f once for every PreviousMissions entry equal to that id (repeated prior ids compound the penalty). The surviving values form a compressed parallel list for GamePvE_PickWeightedIndex; zero weights are still added and can be selected when no weight is positive. The export has 12 floats in every row, with 1000.0 at the 996 non-None ids and 0.0 at every None slot and no other values. The pick index is compressed but the returned id is direct-indexed, as documented under Id_PvEMission.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PvEMissionLottery.h:24",

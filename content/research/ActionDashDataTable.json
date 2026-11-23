@@ -1,8 +1,9 @@
 {
+  "overview": "This table controls how long fighters can dash, how quickly they move and turn, and how soon they can dash again.",
   "description": "Per-character dash tuning: maximum and regenerating dash gauge, up-front and sustained gauge costs, minimum/cancel timings, two-stage S-M-E speed curves with steering and lean, air-dash gravity, homing-dash motion, and animation-rigidity classes. Five exported shards feed one manager array; character, shikigami and character-specific controllers select rows.",
   "fields": {
     "Id": {
-      "simple": "Row key used to select this dash tuning row.",
+      "simple": "The name the game uses to find this dash setup for a fighter or shikigami. Special versions cover weapon-ready stances and beam attacks.",
       "technical": "Unreal DataTable row name (exported as ID). ResolveDataRows searches ActionDashDataTables with ActionDataTable.Id_ActionDash after StudioBattleCharacterOverrides.ActionDashIdOverride and stores the first hit in AGameCharacter.ActionDashRow; a miss fails character setup. Shikigamis resolve their own row with ShikigamiDataTable.Id_ActionDash (a miss fails their setup too). Helper finders also request hard-coded keys: CP_210_2 cached during CP_210 sheathed-row setup and returned while bWeaponDrawn == 1, CP_180_ATTACKG_1/2/3 for the second beam hit, and CP_240_ATTACKG_<level> during CursedEnergyAttack_1/Air_1.",
       "evidence": [
         "Source/Abrams/Private/GameCharacter.cpp:461",
@@ -15,7 +16,7 @@
       "status": "verified"
     },
     "Gauge": {
-      "simple": "Default maximum dash gauge.",
+      "simple": "The usual maximum dash gauge for a fighter. A bigger value allows more dashing before running out.",
       "technical": "Gauge points. UpdateDashGauge selects this value when Setup.SoloSide != 1, then multiplies by GetDashGaugeMaxRate (battle-team rate, equipment and binding-vow DashGaugeMax effects, and a HitPoint-ratio effect). The result seeds DashGauge at setup, revive and round/battle resets. Exports span -1 to 800, including zeroed specialized rows and several NPC rows at -1; the reconstructed consumer has no special case for negative or zero values.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:811",
@@ -26,7 +27,7 @@
       "status": "verified"
     },
     "Gauge_Solo": {
-      "simple": "Maximum dash gauge for a solo-side setup.",
+      "simple": "The maximum dash gauge when the fighter's side has one member. A bigger value allows more dashing.",
       "technical": "Used in place of Gauge only when Setup.SoloSide == 1, the one-member-side flag assigned by battle-phase setup (the shared BattleFree_PairSoloSide table is used by several phases; Aging Online has its own table); it is also passed through GetDashGaugeMaxRate. Most exported rows match Gauge, but CN_081 and CN_150 export 1200 versus 600 in Gauge.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:812",
@@ -37,7 +38,7 @@
       "status": "verified"
     },
     "GaugeRecoverWaitTime": {
-      "simple": "Delay before dash gauge starts regenerating.",
+      "simple": "How long the fighter waits before dash gauge starts coming back. A bigger value makes them wait longer.",
       "technical": "Seconds. SetDashGaugeRecovering(true) copies this into the DashGaugeRecoverWait countdown and stops the active interpolation; dash Start disables recovery and NormalDashEnd Start re-enables it, while many other action hooks toggle the same flag. While recovery is enabled and no DashGaugeNotRecoverItem buff is present, the countdown is reduced by GetActionValue100() * DeltaTime. Exports span -1 to 1.0, with ordinary character rows clustered around 0.3-0.6; the field is used directly as a seconds countdown rather than a gauge cost.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:1258",
@@ -49,7 +50,7 @@
       "status": "verified"
     },
     "GaugeRecover": {
-      "simple": "Dash gauge regeneration speed.",
+      "simple": "How fast dash gauge comes back after the wait ends. A bigger value refills it sooner.",
       "technical": "After the wait expires, Speed = GetDashGaugeRecoverRate() * this field; a nonpositive result is forced to 1.0, then an interpolation from 0 to GetDashGaugeMax() runs for 100 / Speed and its per-tick delta is added to DashGauge. Exports are -1, 0, 450, 500 or 600; nonpositive results are clamped to 1.0 after the rate multiplication, and the 100 / Speed divisor is explicit in the reconstructed code.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:3497",
@@ -60,7 +61,7 @@
       "status": "verified"
     },
     "Dash_GaugeConsumeBegin": {
-      "simple": "Up-front gauge cost of starting a grounded dash.",
+      "simple": "How much dash gauge a grounded dash spends as it starts. A bigger value costs more up front.",
       "technical": "Gauge points, charged once when NormalDashBegin starts. Cost = GetDashGaugeConsumeRate(NormalDashBegin) * this field, where that rate combines the battle ally rate, status/equipment/binding-vow effects and the action's chase-versus-escape rate; bDashGaugeUnlimited forces the cost to zero. Taking the cost also clears the recovery wait and stops interpolation. Exported values range from 0 to 200.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2627",
@@ -71,7 +72,7 @@
       "status": "verified"
     },
     "DashAir_GaugeConsumeBegin": {
-      "simple": "Up-front cost of an air dash; also reused as a CP_180 timing gate.",
+      "simple": "How much dash gauge an air dash spends at the start. For one beam attack, this sets when the flying follow-up ends.",
       "technical": "Gauge points in ConsumeDashGaugeBegin for NormalDashAirBegin, with the same rate and unlimited-gauge handling as Dash_GaugeConsumeBegin. CP_180 overloads it for its selected ATTACKG row: StartAttackHoming immediately starts the homing dash on the second CursedEnergyAttack_1 hit, then TickAttack uses this field as an elapsed-time threshold in seconds to end that follow-up (apply homing inertia and the passive buff, restore the camera and clear aim/action flags). The specialized CP_180_ATTACKG_* exports use 0.45 here (a time gate), whereas ordinary rows export 0-300 (gauge points); the overloaded units are explicit in the consumers.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2631",
@@ -83,7 +84,7 @@
       "status": "verified"
     },
     "NormalDash_Minimum_Time": {
-      "simple": "Minimum grounded dash duration.",
+      "simple": "The shortest time a grounded dash lasts before it can end. A bigger value keeps the dash going longer.",
       "technical": "Seconds. NormalDash::GetMinimumTime returns GetDashMinimumTimeRate() * this field (CP_180 uses the same formula). The dash loop multiplies that result by the owner run-speed rate; only after elapsed time exceeds it can low gauge or released dash input end the dash. Exports span 0-0.5, with ordinary character rows mostly 0.3-0.4.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:305",
@@ -94,7 +95,7 @@
       "status": "verified"
     },
     "NormalDash_CancelInput_Time": {
-      "simple": "Grounded dash input-cancel lockout.",
+      "simple": "How long a grounded dash keeps new button presses waiting. A bigger value delays the next action.",
       "technical": "Seconds multiplied by the owner run-speed rate. NormalDash::UpdateRequests appends queued action requests only after Elapsed reaches that threshold, regardless of whether the dash itself continues; CP_180 overrides UpdateRequests with the same calculation.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:381",
@@ -104,7 +105,7 @@
       "status": "verified"
     },
     "NormalDash_GaugeConsume": {
-      "simple": "Sustained grounded dash gauge drain.",
+      "simple": "How much dash gauge a grounded dash spends each second after its free grace period. Bigger values drain it faster.",
       "technical": "Gauge points per second. After the consume delay elapses, each dash-loop tick calls ConsumeDashGauge(DeltaTime, NormalDash), which deducts GetNormalDashGaugeConsumeRate() * this field * DeltaTime and clamps at zero. That rate includes the battle ally rate, status effects from the forward-versus-camera chase/escape test, equipment/binding vows and the action rate; bDashGaugeUnlimited zeroes it. Exported values span 0-300.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:289",
@@ -116,7 +117,7 @@
       "status": "verified"
     },
     "NormalDash_GaugeConsume_DelayTime": {
-      "simple": "Grace period before grounded dash gauge drain.",
+      "simple": "How long a grounded dash runs before spending dash gauge. A bigger value gives a longer free stretch.",
       "technical": "Seconds. NormalDash::Start stores this as GaugeConsumeDelayTime unless the previous action was NormalDashAir, in which case it inherits the previous loop's remaining delay (previous delay minus previous Elapsed) and sets bFromDashAir. The loop compares the stored delay with Elapsed before charging NormalDash_GaugeConsume. CP_180 has a matching getter.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:289",
@@ -127,7 +128,7 @@
       "status": "verified"
     },
     "NormalDash_Turn_DelayTime": {
-      "simple": "Steering lockout at the start of a grounded dash.",
+      "simple": "How long a grounded dash goes straight before the fighter can steer. Bigger values delay steering.",
       "technical": "Seconds. SetMoveMode copies it into DashTurnDelay for move modes 6, 8, 9, 10 and 30. TickMovement decrements the delay each step; only at zero does input steering update anim-instance lean and call TurnYawToward with NormalDash_Rotation_Speed. Landing mode 12 deliberately preserves the remaining delay.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:412",
@@ -138,7 +139,7 @@
       "status": "verified"
     },
     "NormalDash_Speed_S": {
-      "simple": "Starting speed of the grounded dash speed curve.",
+      "simple": "The speed a grounded dash starts with before building speed. A bigger value makes the opening faster.",
       "technical": "Table speed value used as the From of a FloatInterp28 S-to-M curve with EaseOut. Applied by SetMoveMode cases 6, 8, 9, 10 and 30 and by shikigami move modes 2/20. Exports span 0-6000, including zeroed specialized rows.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:411",
@@ -148,7 +149,7 @@
       "status": "verified"
     },
     "NormalDash_Speed_M": {
-      "simple": "Middle speed of the grounded dash speed curve.",
+      "simple": "The middle speed a grounded dash reaches after its opening. Landing dashes start from current movement speed.",
       "technical": "First interpolation target from NormalDash_Speed_S over NormalDash_InterpolateTime_M, then the From of the second M-to-E curve when the first curve ends. The landing mode 12 curve instead starts from the current speed and targets min(NormalDash_Speed_E, current). Shikigami dash modes use the same S/M split.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:411",
@@ -159,7 +160,7 @@
       "status": "verified"
     },
     "NormalDash_InterpolateTime_M": {
-      "simple": "Duration of the S-to-M grounded speed blend.",
+      "simple": "How long a dash on the ground takes to reach its middle speed. A bigger value makes the change more gradual.",
       "technical": "Seconds passed as the duration of FloatInterp28.Start when a grounded dash move mode starts; shikigami modes 2/20 use it for the same S-to-M blend. The M-to-E blend uses NormalDash_InterpolateTime_E instead.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:411",
@@ -169,7 +170,7 @@
       "status": "verified"
     },
     "NormalDash_Blend_Exp_M": {
-      "simple": "Easing exponent for the S-to-M grounded speed blend.",
+      "simple": "How gently or sharply a grounded dash builds toward its middle speed. It changes the feel of acceleration.",
       "technical": "Passed to FFloatEaseInterpolator.Start together with EaseOut when the S-to-M curve begins; shikigami mode 2/20 uses it identically. It is a shape parameter, not a duration. Exported ordinary rows mostly use 1.0.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:411",
@@ -178,7 +179,7 @@
       "status": "verified"
     },
     "NormalDash_Speed_E": {
-      "simple": "Final speed of the grounded dash speed curve.",
+      "simple": "The speed a grounded dash settles toward near its end. Landing dashes cap this at current speed.",
       "technical": "Target of the M-to-E curve started once the initial S-to-M interpolation is inactive. In landing mode 12 the target is min(this value, current speed) instead. Shikigami dash modes also use it as their M-to-E endpoint.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:660",
@@ -188,7 +189,7 @@
       "status": "verified"
     },
     "NormalDash_InterpolateTime_E": {
-      "simple": "Duration of the M-to-E grounded speed blend.",
+      "simple": "How long a grounded dash takes to reach its ending speed. A bigger value stretches that change.",
       "technical": "Seconds. Used for the second speed interpolation on normal, target and landing dash modes (6/8/9/10/12/30) and for the shikigami dash M-to-E curve; it is not the minimum dash time.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:661",
@@ -198,7 +199,7 @@
       "status": "verified"
     },
     "NormalDash_Blend_Exp_E": {
-      "simple": "Easing exponent for the M-to-E grounded speed blend.",
+      "simple": "How gently or sharply a grounded dash changes toward its ending speed. It changes the feel of that speed change.",
       "technical": "Exponent argument of FloatInterp28.Start with EaseOut for the M-to-E curve; shared by character landing/target dash modes and shikigami dash mode 2/4.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:661",
@@ -208,7 +209,7 @@
       "status": "verified"
     },
     "NormalDash_Rotation_Speed": {
-      "simple": "Grounded dash steering yaw rate.",
+      "simple": "How quickly grounded and shikigami ground dashes turn toward the held direction. Bigger values allow sharper steering.",
       "technical": "Rate passed to TurnYawToward after NormalDash_Turn_DelayTime has expired when there is nonzero input. Used by the normal dash, alternate normal-dash tick, target-dash tick and shikigami ground-dash mode 2. Shikigami follow-dash mode 20 instead uses NormalDashAir_Rotation_Speed; zero removes steering rather than shortening the delay.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:673",
@@ -219,7 +220,7 @@
       "status": "verified"
     },
     "NormalDash_Inertia_Rate": {
-      "simple": "Inertia carry-over rate after a grounded dash.",
+      "simple": "How much grounded dash momentum carries into the next move. Bigger values keep more of that sliding feel.",
       "technical": "Passed as the rate to SetInertia when the previous action is NormalDash and to BlendInertia from FGameCharacterAction::BlendInertiaFromAction; shikigami ApplyPrevInertia uses the same pair for the Dash action type. Specialized controllers also stop their motion and apply it when leaving a dash-like phase: CN_140 phase 3 and CP_240 AttackG phase 2. Rate is a multiplier on the remaining motion, paired with NormalDash_Inertia_Time. CN_060 uses the air counterpart for its airborne transitions.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction.cpp:141",
@@ -231,7 +232,7 @@
       "status": "verified"
     },
     "NormalDash_Inertia_Time": {
-      "simple": "Inertia carry-over duration after a grounded dash.",
+      "simple": "How long grounded dash momentum carries into the next move. A bigger value makes the slide last longer.",
       "technical": "Duration paired with NormalDash_Inertia_Rate in SetInertia/BlendInertia when a NormalDash action ends or is blended out; also applied by CN_140, CP_240 and shikigami Dash actions at their dash-motion stop points. Exports span 0-2.5, with ordinary rows often 0.5-0.8.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction.cpp:141",
@@ -243,7 +244,7 @@
       "status": "verified"
     },
     "NormalDash_Lean_Rate": {
-      "simple": "Body-lean response rate while dashing.",
+      "simple": "How quickly the fighter's upper body tips into a grounded dash turn. Shikigamis use this for body lean too.",
       "technical": "Passed to UpdateLeanRate for the anim instance's left/right lean during grounded-dash steering, once NormalDash_Turn_DelayTime has elapsed; the landing and target dash ticks repeat the same call. Shikigami follow/dash and attack-motion ticks use this field for both LR and UD lean, so it also affects shikigami body roll.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:670",
@@ -254,7 +255,7 @@
       "status": "verified"
     },
     "NormalDash_Lean_Max": {
-      "simple": "Maximum body-lean angle/amount while dashing.",
+      "simple": "How far the fighter's upper body can tip during a grounded dash turn. Shikigamis use this limit too.",
       "technical": "Cap paired with NormalDash_Lean_Rate in UpdateLeanRate on the same grounded steering, landing and target-dash paths. Shikigami follow-dash, attack-approach and attack-motion steps also pass it for both LR and UD lean.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:670",
@@ -265,7 +266,7 @@
       "status": "verified"
     },
     "NormalDashAir_Minimum_Time": {
-      "simple": "Minimum normal air-dash duration.",
+      "simple": "The shortest time a normal air dash lasts before it can end. A bigger value keeps it airborne longer.",
       "technical": "Seconds. NormalDashAir::GetMinimumTime multiplies this field by GetDashMinimumTimeRate(); the shared dash-loop check then multiplies by the owner's run-speed rate before deciding whether low gauge or released input may end the dash.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:305",
@@ -275,7 +276,7 @@
       "status": "verified"
     },
     "NormalDashAir_CancelInput_Time": {
-      "simple": "Normal air-dash input-cancel lockout.",
+      "simple": "How long a normal air dash keeps new button presses waiting. A bigger value delays the next action.",
       "technical": "Seconds multiplied by the owner run-speed rate. NormalDashAir::UpdateRequests appends queued requests only after Elapsed passes this threshold; bFlag14 can instead request an immediate landing dash.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:671",
@@ -285,7 +286,7 @@
       "status": "verified"
     },
     "NormalDashAir_GaugeConsume": {
-      "simple": "Sustained normal air-dash gauge drain.",
+      "simple": "How much dash gauge a normal air dash spends after its free start. Bigger values drain it faster.",
       "technical": "Gauge points per second. The dash loop deducts GetDashAirGaugeConsumeRate() * this field * DeltaTime through ConsumeDashGauge after NormalDashAir_GaugeConsume_DelayTime; the rate includes the battle ally rate, status/equipment effects and the forward-versus-camera chase/escape multiplier, and unlimited gauge zeroes it.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:289",
@@ -296,7 +297,7 @@
       "status": "verified"
     },
     "NormalDashAir_GaugeConsume_DelayTime": {
-      "simple": "Grace period before normal air-dash gauge drain.",
+      "simple": "How long a normal air dash flies before spending dash gauge. A following ground dash keeps the leftover time.",
       "technical": "Seconds. NormalDashAir::GetGaugeConsumeDelayTime exposes it to the shared dash loop. A NormalDash started directly from NormalDashAir inherits the air dash's remaining delay (air dash delay minus air dash Elapsed) rather than reading the grounded delay.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:289",
@@ -306,7 +307,7 @@
       "status": "verified"
     },
     "NormalDashAir_Turn_DelayTime": {
-      "simple": "Steering lockout at the start of a normal air dash.",
+      "simple": "How long a normal air dash flies straight before steering. Bigger values delay the turn.",
       "technical": "Seconds. SetMoveMode case 7 copies it into DashTurnDelay; TickModeNormalDashAir decrements it each step and only steers toward input after it reaches zero. Turning then uses NormalDashAir_Rotation_Speed.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:416",
@@ -315,7 +316,7 @@
       "status": "verified"
     },
     "NormalDashAir_Speed_S": {
-      "simple": "Starting speed of the normal air-dash speed curve.",
+      "simple": "The speed a normal air dash starts with before easing toward its middle speed. Some rows start faster and slow down.",
       "technical": "From value of the S-to-M interpolation when move mode 7 or shikigami air-dash mode 3 starts. Exported values are character-specific and can be higher than the M speed, producing a deceleration into the middle phase.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:415",
@@ -324,7 +325,7 @@
       "status": "verified"
     },
     "NormalDashAir_Speed_M": {
-      "simple": "Middle speed of the normal air-dash speed curve.",
+      "simple": "The middle speed a normal air dash reaches after its opening. Shikigami follow dashes use this too.",
       "technical": "First interpolation target from NormalDashAir_Speed_S, then the From of the M-to-E curve after the first curve finishes. Used by character mode 7, shikigami air dash mode 3 and shikigami follow-dash mode 20.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:415",
@@ -334,7 +335,7 @@
       "status": "verified"
     },
     "NormalDashAir_InterpolateTime_M": {
-      "simple": "Duration of the S-to-M normal air-dash speed blend.",
+      "simple": "How long a normal air dash takes to reach its middle speed. A bigger value makes the change smoother.",
       "technical": "Seconds passed to FloatInterp28.Start when character mode 7 or shikigami mode 3 begins. The later M-to-E transition uses NormalDashAir_InterpolateTime_E.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:415",
@@ -343,7 +344,7 @@
       "status": "verified"
     },
     "NormalDashAir_Blend_Exp_M": {
-      "simple": "Easing exponent for the S-to-M normal air-dash speed blend.",
+      "simple": "How gently or sharply a normal air dash builds toward its middle speed. It changes the feel of acceleration.",
       "technical": "Exponent passed with EaseOut to the S-to-M FloatInterp28 on character mode 7 / shikigami mode 3. It controls curve shape only; exported air-dash rows commonly use 2.0.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:415",
@@ -352,7 +353,7 @@
       "status": "verified"
     },
     "NormalDashAir_Speed_E": {
-      "simple": "Final speed of the normal air-dash speed curve.",
+      "simple": "The speed a normal air dash settles toward near its end. Shikigami follow dashes use this too.",
       "technical": "Endpoint of the M-to-E air-dash curve started when the S-to-M interpolation becomes inactive; used in character mode 7, shikigami mode 3 and shikigami follow-dash mode 20.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:702",
@@ -362,7 +363,7 @@
       "status": "verified"
     },
     "NormalDashAir_InterpolateTime_E": {
-      "simple": "Duration of the M-to-E normal air-dash speed blend.",
+      "simple": "How long a normal air dash takes to reach its ending speed. A bigger value stretches that change.",
       "technical": "Seconds used for the second speed interpolation in character mode 7, shikigami mode 3 and shikigami follow-dash mode 20. It is independent of the gravity delay and minimum dash time.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:703",
@@ -372,7 +373,7 @@
       "status": "verified"
     },
     "NormalDashAir_Blend_Exp_E": {
-      "simple": "Easing exponent for the M-to-E normal air-dash speed blend.",
+      "simple": "How gently or sharply a normal air dash changes toward its ending speed. It changes how that speed change feels.",
       "technical": "Exponent passed with EaseOut to the M-to-E FloatInterp28 on the same character and shikigami air-dash tick paths. Exported rows commonly use 2.0.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:703",
@@ -382,7 +383,7 @@
       "status": "verified"
     },
     "NormalDashAir_Rotation_Speed": {
-      "simple": "Normal air-dash steering yaw rate.",
+      "simple": "How quickly normal air dashes turn toward the held direction. Shikigami air and follow dashes use this too.",
       "technical": "Rate passed to TurnYawToward after NormalDashAir_Turn_DelayTime expires in character mode 7. Shikigami follow-dash mode 20 and shikigami air-dash mode 3 use this same field (not NormalDash_Rotation_Speed for the air follow turn) when steering toward their follow direction.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:721",
@@ -392,7 +393,7 @@
       "status": "verified"
     },
     "NormalDashAir_Inertia_Rate": {
-      "simple": "Inertia carry-over rate after a normal air dash.",
+      "simple": "How much normal air dash momentum carries into the next move. Bigger values keep more of that sliding feel.",
       "technical": "Passed to SetInertia/BlendInertia when the previous action is NormalDashAir; shikigami ApplyPrevInertia uses the same pair for DashAir. CN_060 also applies it when an action leaves the ground and again when it reaches its final phase; a wall-hit branch returns before that second call, so this field affects more than the air-dash End action.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction.cpp:144",
@@ -404,7 +405,7 @@
       "status": "verified"
     },
     "NormalDashAir_Inertia_Time": {
-      "simple": "Inertia carry-over duration after a normal air dash.",
+      "simple": "How long normal air dash momentum carries into the next move. A bigger value makes the slide last longer.",
       "technical": "Duration paired with NormalDashAir_Inertia_Rate in SetInertia/BlendInertia for a previous NormalDashAir action, in the CN_060 airborne action transitions and in shikigami DashAir actions. Exports span 0-2.0, with many rows at 0.9.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction.cpp:144",
@@ -416,7 +417,7 @@
       "status": "verified"
     },
     "NormalDashAir_Gravity": {
-      "simple": "Gravity used by the normal air-dash fall curve.",
+      "simple": "How strongly a normal air dash pulls the fighter downward. A bigger value makes them drop faster.",
       "technical": "Passed as the gravity argument to BuildFallCurve(0, value, Global.DashAirFall_Speed_Max) when character mode 7 or shikigami mode 3 starts; the resulting curve is sampled for vertical speed once the gravity delay expires. A zero value produces no downward acceleration from this curve.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:418",
@@ -425,7 +426,7 @@
       "status": "verified"
     },
     "NormalDashAir_Gravity_Delay_Time": {
-      "simple": "Delay before air-dash gravity applies.",
+      "simple": "How long a normal air dash stays level before gravity pulls it down. A bigger value delays the drop.",
       "technical": "Seconds. SetMoveMode/set shikigami mode stores it in AirDashGravityDelay; each character mode 7 / shikigami mode 3 air-dash tick decrements that countdown and only samples its dash-air fall curve once it reaches zero. The landing reset of MovePhaseElapsed seen in TickModeNormalDash(bAir=true) belongs to the separate mode 9 jump-derived fall curve, not to this AirDashGravityDelay countdown. Exported ordinary rows mostly use 0.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:417",
@@ -438,7 +439,7 @@
       "status": "verified"
     },
     "HomingDashAir_GaugeConsumeBegin": {
-      "simple": "Up-front gauge cost of a homing/auto-attack air dash.",
+      "simple": "How much dash gauge a homing air dash spends as it starts. Automatically aimed dashes use this cost too.",
       "technical": "Gauge points charged once for HomingDashAirBegin and AutoAttackDashAirBegin. The cost uses GetDashGaugeConsumeRate(Type), including the input-direction chase/escape rate, and is forced to zero by bDashGaugeUnlimited. Exported values vary by row; many rows use 0.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2633",
@@ -448,7 +449,7 @@
       "status": "verified"
     },
     "HomingDashAir_Minimum_Time": {
-      "simple": "Minimum homing air-dash duration.",
+      "simple": "The shortest time a homing air dash stays on its target before ending. After that, remaining dash gauge decides.",
       "technical": "Seconds. HomingDashAir::GetMinimumTime multiplies it by GetDashMinimumTimeRate(); HomingDashAir::IsDashContinuing then multiplies by the run-speed rate and keeps the dash active while the warp target is ahead and that threshold has not yet passed. Once it has passed, continuation depends on remaining dash gauge (not held dash input); AutoAttackDashAir inherits this check.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:730",
@@ -458,7 +459,7 @@
       "status": "verified"
     },
     "HomingDashAir_CancelInput_Time": {
-      "simple": "Homing air-dash input-cancel lockout.",
+      "simple": "How long a homing air dash keeps new button presses waiting. The dash can continue during this wait.",
       "technical": "Seconds multiplied by the owner run-speed rate. HomingDashAir::UpdateRequests and the AutoAttackDashAir override both wait until Elapsed reaches this value before appending queued action requests; this does not by itself end the dash.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:743",
@@ -467,7 +468,7 @@
       "status": "verified"
     },
     "HomingDashAir_GaugeConsume": {
-      "simple": "Sustained homing air-dash gauge drain.",
+      "simple": "How much dash gauge a homing air dash spends each second. Automatically aimed dashes use this drain too.",
       "technical": "Gauge points per second. After HomingDashAir_GaugeConsume_DelayTime, each tick of HomingDashAir or AutoAttackDashAir deducts GetDashAirGaugeConsumeRate() * this field * DeltaTime from the gauge; unlimited gauge overrides it to zero.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:289",
@@ -478,7 +479,7 @@
       "status": "verified"
     },
     "HomingDashAir_GaugeConsume_DelayTime": {
-      "simple": "Grace period before homing air-dash gauge drain.",
+      "simple": "How long a homing air dash flies before spending dash gauge. A bigger value gives a longer free stretch.",
       "technical": "Seconds returned by HomingDashAir::GetGaugeConsumeDelayTime to the shared dash loop. Until Elapsed exceeds it, no HomingDashAir_GaugeConsume is charged. AutoAttackDashAir inherits the same getter.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction_Dash.cpp:289",
@@ -487,7 +488,7 @@
       "status": "verified"
     },
     "HomingDashAir_Speed_S": {
-      "simple": "Starting speed of the homing air-dash speed curve.",
+      "simple": "The speed a homing air dash starts with as it closes in. One beam attack uses a special version.",
       "technical": "From value of the S-to-M curve. StartHomingDashAir receives an explicit row (CP_180 can pass its ATTACKG dash row) and caches it as DashRow450; SetMoveMode case 11 instead reads the current owner dash row. Both paths start with this speed and EaseOut.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:312",
@@ -498,7 +499,7 @@
       "status": "verified"
     },
     "HomingDashAir_Speed_M": {
-      "simple": "Middle speed of the homing air-dash speed curve.",
+      "simple": "The middle speed a homing air dash reaches after its opening. One beam attack uses its own version.",
       "technical": "First interpolation target from HomingDashAir_Speed_S at StartHomingDashAir or SetMoveMode 11. When that curve finishes, the homing tick restarts a M-to-E curve from this value using DashRow450 when cached, otherwise the current owner dash row.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:320",
@@ -509,7 +510,7 @@
       "status": "verified"
     },
     "HomingDashAir_InterpolateTime_M": {
-      "simple": "Duration of the S-to-M homing air-dash speed blend.",
+      "simple": "How long a homing air dash takes to reach its middle speed. A bigger value makes the change smoother.",
       "technical": "Seconds passed to FloatInterp28.Start for the S-to-M curve at StartHomingDashAir and move mode 11. The second M-to-E transition uses HomingDashAir_InterpolateTime_E.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:321",
@@ -518,7 +519,7 @@
       "status": "verified"
     },
     "HomingDashAir_Blend_Exp_M": {
-      "simple": "Easing exponent for the S-to-M homing air-dash speed blend.",
+      "simple": "How gently or sharply a homing air dash changes toward its middle speed. It changes how that speed feels.",
       "technical": "Exponent supplied with EaseOut when the homing dash S-to-M interpolation starts from either StartHomingDashAir or SetMoveMode 11. Exported rows commonly use 2.0.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:321",
@@ -527,7 +528,7 @@
       "status": "verified"
     },
     "HomingDashAir_Speed_E": {
-      "simple": "Final speed of the homing air-dash speed curve.",
+      "simple": "The speed a homing air dash settles toward near the end. One beam attack uses its own version.",
       "technical": "Target of the M-to-E curve started when the first homing speed interpolation completes. The row used for this phase is the cached DashRow450 when StartHomingDashAir supplied one, else the current owner dash row.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:840",
@@ -536,7 +537,7 @@
       "status": "verified"
     },
     "HomingDashAir_InterpolateTime_E": {
-      "simple": "Duration of the M-to-E homing air-dash speed blend.",
+      "simple": "How long a homing air dash takes to reach its ending speed. A bigger value stretches that change.",
       "technical": "Seconds used for the second homing speed interpolation in TickModeHomingDashAir. It is distinct from the homing cancel/minimum times and from NormalDashAir_InterpolateTime_E.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:849"
@@ -544,7 +545,7 @@
       "status": "verified"
     },
     "HomingDashAir_Blend_Exp_E": {
-      "simple": "Easing exponent for the M-to-E homing air-dash speed blend.",
+      "simple": "How gently or sharply a homing air dash changes toward its ending speed. It changes how that speed feels.",
       "technical": "Exponent passed with EaseOut to the homing M-to-E FloatInterp28 on the same cached-or-current row used for HomingDashAir_Speed_E.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:849"
@@ -552,7 +553,7 @@
       "status": "verified"
     },
     "HomingDashAir_Rotation_Speed": {
-      "simple": "Homing air-dash yaw rate toward the warp point.",
+      "simple": "How much a homing air dash can turn its body toward the target. Every current data entry leaves this at zero.",
       "technical": "Rate passed to TurnYawToward in TickModeHomingDashAir when bSteerTowardMoveInput is set, turning the owner toward the normalized direction to DashAirWarpLocation. Unlike grounded dash steering, this path does not check a turn-delay field. Every exported row sets this field to 0, so no homing yaw rotation is observed in the cooked data; the travel direction is then fixed by the warp point.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterMovementController.cpp:823",
@@ -561,7 +562,7 @@
       "status": "verified"
     },
     "HomingDashAir_Inertia_Rate": {
-      "simple": "Inertia carry-over rate after a homing air dash.",
+      "simple": "How much sliding continues after a homing dash. Bigger values slide more, including in one beam attack's follow-up.",
       "technical": "Rate used by SetInertia/BlendInertia when the previous action is HomingDashAir. CP_180 also applies it after the DashAir_GaugeConsumeBegin elapsed-time gate in the second beam attack, using the attack-specific dash row it selected.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction.cpp:147",
@@ -571,7 +572,7 @@
       "status": "verified"
     },
     "HomingDashAir_Inertia_Time": {
-      "simple": "Inertia carry-over duration after a homing air dash.",
+      "simple": "How long sliding continues after a homing dash. Bigger values last longer, including in one beam attack's follow-up.",
       "technical": "Duration paired with HomingDashAir_Inertia_Rate for a previous HomingDashAir action and for CP_180's post-gate beam-dash inertia transition. Exports span 0.5-2.0.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterAction.cpp:147",
@@ -581,7 +582,7 @@
       "status": "verified"
     },
     "Rigidity_DashBegin": {
-      "simple": "Rigidity class for grounded dash startup.",
+      "simple": "How heavy the beginning of a grounded dash animation feels. Heavier choices make the start look slower.",
       "technical": "EGameActionRigidityType value converted to a zero-based index into GlobalCorrect.Rigidity_DashBegin; the fetched rate (default 1.0) multiplies the action controller's dash-begin play rate to scale the begin animation. CP_010 passive buffs can further adjust the rate. Constructor default is None; exports use Light/Normal/Heavy.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2791",
@@ -591,7 +592,7 @@
       "status": "verified"
     },
     "Rigidity_DashEnd": {
-      "simple": "Rigidity class for grounded dash ending.",
+      "simple": "How heavy the ending of a grounded dash animation feels. Heavier choices make the finish look slower.",
       "technical": "Indexed into GlobalCorrect.Rigidity_DashEnd; the resulting rate scales GetDashEndPlayRate for the end animation, with CP_010 and CP_240 passive buffs modifying the rate. Default is None in the reconstructed row constructor.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2694",
@@ -601,7 +602,7 @@
       "status": "verified"
     },
     "Rigidity_DashAirBegin": {
-      "simple": "Rigidity class for air-dash startup.",
+      "simple": "How heavy the beginning of an air dash animation feels. Heavier choices make the start look slower.",
       "technical": "Indexed into GlobalCorrect.Rigidity_DashAirBegin; the rate scales GetDashAirBeginPlayRate (which reuses the action controller's dash-begin rate slot) for the air-dash begin animation, with CP_010 passive adjustment. Default is None.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2815",
@@ -611,7 +612,7 @@
       "status": "verified"
     },
     "Rigidity_DashAirEnd": {
-      "simple": "Rigidity class for air-dash ending.",
+      "simple": "How heavy the ending of an air dash animation feels. Heavier choices make the finish look slower.",
       "technical": "Indexed into GlobalCorrect.Rigidity_DashAirEnd; the fetched rate scales GetDashAirEndPlayRate (the action controller's dash-end rate slot), with CP_010 and CP_240 passive adjustments. Default is None.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterStatusController.cpp:2839",

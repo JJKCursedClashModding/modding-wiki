@@ -1,8 +1,9 @@
 {
+  "overview": "These settings decide how characters are posed and dressed for portraits in menus, battles, and customization.",
   "description": "Character portrait/capture configurations for each capture context (character select, story select, versus ally/enemy, free battle, customize). Selects the animation rows, montage keys, shikigami and weapon montages used by AGameCharacterCaptureActor to pose characters for UI scene captures.",
   "fields": {
     "ID": {
-      "simple": "Row key, usually <character>_<capture context> (e.g. CP_010_CHARACTER_SELECT).",
+      "simple": "The name that connects this portrait setup to a character and the screen that uses it.",
       "technical": "FName primary key of the row (the export writes \"ID\" while ImportKeyField is Id). FindCharacterCaptureRow walks the resolved CharacterCaptureSet's Id_CharacterCapture list and calls UDataTable::FindRow<FGameDataTableRow_CharacterCapture>(CaptureId) on each table; a None id or missing row ends the walk without returning a capture.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:113",
@@ -13,7 +14,7 @@
       "status": "verified"
     },
     "CaptureType": {
-      "simple": "Which UI capture context this row configures.",
+      "simple": "Which screen this portrait setup is for, such as character select, versus, free battle, or customization.",
       "technical": "EGameCharacterCaptureType (uint8; None, CharacterSelect, StoryCharacterSelect, VsAlly, VsEnemy, FreeBattle, PvEEquipment, PvEGrowth, Customize, Archive, FreeBattleImage, CP_270_TagCombo, Max, Invalid=255). FindCharacterCaptureRow compares the row value with the requested slot type and returns the first match in the set. AGameWidgetManager::ToWidgetCaptureMask converts the requested character type to widget-capture bits used for pose detection and slot-bit selection; IsSituationOverviewCapture tests the VsAlly/VsEnemy/Customize mask. On those pose-driven rows, Id_CharacterAnimation, both character animation keys, Id_ShikigamiCharacterAnimation, both shikigami animation keys and all three weapon arrays are bypassed (the row lookup itself, Id_ShikigamiCharacter and ShikigamiDefaultMaterialPattern are still used); animation and weapon data come from CharacterRow::Id_SituationOverview -> SituationOverviewPose, Ally only for VsAlly and Enemy for VsEnemy/Customize. Default construction sets None. Exported rows use CharacterSelect (29), StoryCharacterSelect (29), VsAlly (29), VsEnemy (45), FreeBattle (29) and Customize (29); no rows use the other enum values.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCapture.h:15",
@@ -26,7 +27,7 @@
       "status": "verified"
     },
     "Id_CharacterAnimation": {
-      "simple": "CharacterAnimationDataTable row holding this capture's montage keys.",
+      "simple": "The character animations used for this portrait's idle and entrance poses. Versus and customization portraits use a separate pose choice.",
       "technical": "FName joined to CharacterAnimationDataTables (DTM +0x4A0). For non-pose captures GetCharacterAnimationMap resolves this row and keeps only entries whose Key equals CharacterIdleAnimationKey or CharacterEnterAnimationKey, mapping Key -> FileName (montage asset name); entries with a None key or file are skipped. Both arrays are walked in lockstep without an IsValidIndex check. For SituationOverview captures the pose's Id_CharacterAnimation_Ally/Enemy row is used instead and every non-None Key/FileName pair enters the map, so this field and the two keys below are not read on that path. Missing row yields an empty map; later idle/enter playback uses FindChecked on the key.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1232",
@@ -37,7 +38,7 @@
       "status": "verified"
     },
     "CharacterIdleAnimationKey": {
-      "simple": "Animation key selecting the idle montage for this capture.",
+      "simple": "The animation the character plays while resting in the portrait. Versus and customization portraits use the chosen pose instead.",
       "technical": "FName added to the two-key filter list used against the CharacterAnimation row's Key/FileName arrays; the mapped file name is resolved through the slot's AnimMontageLoaders and played by AnimInstance::Montage_Play (play rate 1, MontageLength return type, stop existing montages). PlayIdleMontage uses FindChecked, so a missing key/file is an unchecked lookup. Ignored on SituationOverview pose captures, which play the pose animation row's FileName[0]. Exported values are CharacterSelect_Idle_01 (29), StoryCharacterSelect_Idle_01 (29), FreeBattleCharacterSelect (29) and None (103).",
       "evidence": [
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1230",
@@ -48,7 +49,7 @@
       "status": "verified"
     },
     "CharacterEnterAnimationKey": {
-      "simple": "Animation key selecting the entrance montage for this capture.",
+      "simple": "The animation played when the portrait first appears on a character selection screen. Free battle portraits do not use one.",
       "technical": "FName used like CharacterIdleAnimationKey by PlayEnterMontage, which returns early for SituationOverview captures and is only requested by the traced C++ CharacterSelect (menu) and StoryCharacterSelect phases (SetMontageRequest(2, ...)). The resolved montage is also stored as Slot.Montage. Exported values are CharacterSelect_Enter (29), StoryCharacterSelect_Enter (29) and None (132, including every FreeBattle row); a None value would fail the FindChecked lookup if enter playback were requested.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1231",
@@ -60,7 +61,7 @@
       "status": "verified"
     },
     "Id_ShikigamiCharacter": {
-      "simple": "Shikigami character to spawn alongside the captured character.",
+      "simple": "Which shikigami appears beside the character in the portrait. Only one character's portraits currently use this.",
       "technical": "FName joined to ShikigamiDataTables (DTM +0x6C0). None means no shikigami: SpawnShikigami returns, the shikigami animation map is empty and shikigami montage playback is skipped. Otherwise the Shikigami row's FileName_BP is loaded through a Shikigami-primary asset loader as an AGameShikigami, set up, positioned, given material parameters and a capture-only visible mesh. A missing Shikigami row aborts LoadCharacter entirely for the slot. In the export only the six CP_160 rows use CN_080; the other 184 rows are None.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:448",
@@ -73,7 +74,7 @@
       "status": "verified"
     },
     "ShikigamiDefaultMaterialPattern": {
-      "simple": "Material pattern index applied to the captured shikigami.",
+      "simple": "Which color and material style the shikigami shows in the portrait. Current setups all use the first style.",
       "technical": "int32 passed directly as Pattern to Shikigami->GetMaterialController()->SetMaterialPattern(Pattern, nullptr). The null row makes the controller resolve the spawned shikigami row's Id_ShikigamiMaterial; pattern 0 selects MaterialName_P1 and values outside 0..7 are ignored (only P1..P5 have names in a ShikigamiMaterial row). Default construction sets 0, and all 190 exported rows are 0, including the six CP_160 rows that spawn CN_080. Only affects the spawned shikigami, not the captured character (whose pattern comes from slot/variation parameters).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterCapture.h:24",
@@ -85,7 +86,7 @@
       "status": "verified"
     },
     "Id_ShikigamiCharacterAnimation": {
-      "simple": "ShikigamiAnimationDataTable row holding the shikigami's capture montage keys.",
+      "simple": "The shikigami animations used for its idle and entrance poses. Versus and customization portraits use a separate pose choice.",
       "technical": "FName joined to ShikigamiAnimationDataTables (DTM +0x6E0). For non-pose captures GetShikigamiAnimationMap resolves this row and filters its Key/FileName arrays by the two shikigami animation keys below; missing row yields an empty map (and later FindChecked can fail). Both arrays are walked in lockstep without an IsValidIndex check. For SituationOverview captures the pose's Id_ShikigamiCharacterAnimation_Ally/Enemy row replaces this field and every non-None Key/FileName pair enters the map. Only consulted when Id_ShikigamiCharacter is non-None.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1279",
@@ -96,7 +97,7 @@
       "status": "verified"
     },
     "ShikigamiCharacterIdleAnimationKey": {
-      "simple": "Animation key selecting the shikigami's idle montage.",
+      "simple": "The shikigami's resting animation in the portrait. Versus and customization portraits use the chosen pose instead.",
       "technical": "FName used to filter the ShikigamiAnimation row into Key -> FileName and then FindChecked on the resulting map in PlayShikigamiIdleMontage; the resolved montage is played on the shikigami's AnimInstance. Returns early when no shikigami was spawned or Id_ShikigamiCharacter is None; pose captures use the pose animation row's FileName[0] instead. Exported values are CharacterSelect_Idle_01, StoryCharacterSelect_Idle_01 and FreeBattleCharacterSelect on one CP_160 row each; 187 rows are None.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1285",
@@ -106,7 +107,7 @@
       "status": "verified"
     },
     "ShikigamiCharacterEnterAnimationKey": {
-      "simple": "Animation key selecting the shikigami's entrance montage.",
+      "simple": "The shikigami's entrance animation when the portrait first appears. Only character selection screens currently play it.",
       "technical": "FName used like the shikigami idle key in PlayShikigamiEnterMontage, which also returns early for SituationOverview captures. Requires a valid spawned shikigami AnimInstance and a non-None Id_ShikigamiCharacter. Exported values are CharacterSelect_Enter and StoryCharacterSelect_Enter on one CP_160 row each; the other 188 rows are None.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1286",
@@ -116,7 +117,7 @@
       "status": "verified"
     },
     "Id_AnimationWeapon": {
-      "simple": "Weapon IDs whose montages are loaded for this capture (parallel to the two animation-name arrays).",
+      "simple": "Which weapons need their own idle and entrance animations for this portrait. Versus and customization use the chosen pose's weapons instead.",
       "technical": "TArray<FName> with exactly two entries in every exported row (both None on 187 rows). For each non-None entry, GetWeaponAnimationNames adds WeaponIdleAnimationName[i] and WeaponEnterAnimationName[i] to the slot's AnimMontage loader list; the names are not None-checked there, and loader creation drops None names. The IDs are also matched against attached weapon actors: GetWeaponFileNamePrefix(AttachName, false) takes the first 6 characters of the actor's AttachName (the WP_000 template length, e.g. WP_010) and a case-insensitive StartsWith test selects every Id_AnimationWeapon entry beginning with that prefix. PlayWeaponIdleMontages/PlayWeaponEnterMontages index all three arrays by that same WeaponIndex without IsValidIndex, so they must stay parallel. In non-pose captures, if any WeaponIdleAnimationName entry is non-None (regardless of the corresponding weapon ID), SpawnCharacter overrides every spawned weapon socket with \"root\"; otherwise the CharacterWeapon row socket (or its \"root\" fallback) is kept. SituationOverview poses instead use Id_AnimationWeapon_Ally/Enemy for weapon spawning and WeaponAnimationName_Ally/Enemy for montages, so this row array is unused on that path.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:132",
@@ -129,7 +130,7 @@
       "status": "verified"
     },
     "WeaponIdleAnimationName": {
-      "simple": "Montage asset name played on an attached weapon's skeletal mesh for the idle pose.",
+      "simple": "The animation a weapon plays while the character rests in the portrait. Setting one also attaches portrait weapons at the character's base.",
       "technical": "TArray<FName> indexed by Id_AnimationWeapon; all exported rows have two entries. GetWeaponAnimationNames adds the value at each non-None weapon ID to the AnimMontage loader list without a None check (loader creation ignores None). PlayWeaponIdleMontages matches attached weapon actors by taking the 6-character WP_000-style prefix of the actor's AttachName and selecting Id_AnimationWeapon entries that start with it, FindChecked's the loader by this name, then calls OverrideAnimationData(montage, true, true, 0.0f, 1.0f) and PlayAnimation(montage, true). A non-None value anywhere in this array (not just at populated weapon IDs) makes SpawnCharacter attach all spawned weapons to \"root\" for non-pose captures. SituationOverview poses use WeaponAnimationName_Ally/Enemy instead.",
       "evidence": [
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:708",
@@ -139,7 +140,7 @@
       "status": "verified"
     },
     "WeaponEnterAnimationName": {
-      "simple": "Montage asset name played on an attached weapon's skeletal mesh for the entrance pose.",
+      "simple": "The animation a weapon plays when the portrait first appears. Versus and customization portraits use the chosen pose's weapon animations instead.",
       "technical": "TArray<FName> indexed by Id_AnimationWeapon; all exported rows have two entries. It is added to the AnimMontage loader list for every non-None weapon ID (without a None check on the name), and PlayWeaponEnterMontages repeats the attached-weapon prefix match, loader FindChecked, OverrideAnimationData(montage, true, true, 0.0f, 1.0f) and PlayAnimation. It does not affect socket selection (only WeaponIdleAnimationName does). Not used on SituationOverview captures (there the pose row's WeaponAnimationName_Ally/Enemy supplies the names).",
       "evidence": [
         "Source/Abrams/Private/GameCharacterCaptureActor.cpp:1336",

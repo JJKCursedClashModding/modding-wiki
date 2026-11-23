@@ -1,8 +1,9 @@
 {
+  "overview": "This table holds the health, guard, down-gauge, and timing settings used for fighters in battle.",
   "description": "Core per-character/per-mission combat parameters: a single 122-row FName-keyed table supplying health, guard durability, down-gauge values and several timing constants to character setup and status controllers. Three fields have no traced native consumer in the reconstructed source.",
   "fields": {
     "Id": {
-      "simple": "Parameter row ID (exported as ID; native FName Id) used as the DataTable row key.",
+      "simple": "The name that picks which fighter or mission uses these combat values. Missions can choose a different name to use another set.",
       "technical": "FName at row offset 0x8, declared UPROPERTY(BlueprintReadWrite, EditAnywhere) and named by ImportKeyField=Id; the export writes the key as ID and all 122 rows have row name == ID. AGameCharacter::ResolveDataRows searches the ordered CharacterBaseParameterDataTables array using GameCharacter_Override(Overrides.BaseParameterIdOverride, CharacterRow->Id_CharacterBaseParameter): NAME_None means use the default, and a miss returns false from ResolveDataRows and then ApplyCharacterSetup (no assertion in the reconstruction). Mission overrides reach BaseParameterIdOverride through GameMissionCharacter_CopyOverrideIds(MissionCharacter.Id_CharacterBaseParameter); PvE and UI paths separately look up the same row from Character.Id_CharacterBaseParameter. Lookup stops at the first matching table; no duplicate-key handling is present.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:10",
@@ -16,7 +17,7 @@
       "status": "verified"
     },
     "HitPoint": {
-      "simple": "Base maximum health (HP) before PvE/equipment/vow or explicit setup overrides.",
+      "simple": "The fighter's normal maximum health. A larger number means more health, and solo or mission settings can change the final total.",
       "technical": "float at row offset 0x10 (constructor default 0). ApplyHitPointParameters first uses Setup.HitPointOverride when > 0; otherwise it uses HitPoint_Solo when Setup.SoloSide == 1 and HitPoint in all other cases, assigning both HitPointMax and current HitPoint. GamePvE_CalcMissionCharacterHitPoint uses HitPoint_Solo/HitPoint only when MissionCharacter.HitPoint <= 0 (not only when the side is non-solo), while PvE ally/Tag setup passes GamePvE_CalcHitPoint(Base->HitPoint, ...) as a positive override that supersedes the solo selection. Command-list and versus-enemy UI also read this raw column as a gauge base. Export values span 150-2000 across 36 distinct positive values.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:15",
@@ -33,7 +34,7 @@
       "status": "verified"
     },
     "HitPoint_Solo": {
-      "simple": "Maximum health used for a character alone on its side.",
+      "simple": "Maximum health when the fighter has no teammate. A larger value means more health in that situation.",
       "technical": "float at row offset 0x14 (constructor default 0). It is selected by the same ApplyHitPointParameters branch as HitPoint when Setup.SoloSide == 1, and by GamePvE_CalcMissionCharacterHitPoint's fallback for mission characters; a positive Setup.HitPointOverride wins in both paths. In the export it equals HitPoint in all 122 rows (CP_010: 440), and PvE ally/Tag setups compute their override from Base->HitPoint, so the exported Solo column is not independently exercised there. BattleFree's SoloSide table marks exactly the one-member sides with true.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:18",
@@ -47,7 +48,7 @@
       "status": "verified"
     },
     "AttackRange": {
-      "simple": "Serialized attack-range number with no traced native consumer; meaning unresolved.",
+      "simple": "A stored attack reach value for each fighter. What distance it affects in play is unclear.",
       "technical": "float at row offset 0x18 (constructor default 0); exported values are 1000.0 (67 rows), 1250.0 (51), 1050.0 (3) and 2000.0 (1), with CP_010 = 1250.0. No named read of FGameDataTableRow_CharacterBaseParameter::AttackRange was found in reconstructed Source/Plugins. Nearby distance logic instead uses Character.AutoAttackDash_Distance, AttackSet.AttackRangeType plus the action controller's bInEnemyAttackRange/bInAllyAttackRange flags, and per-AI hard-coded CloseAttackRange values; none reads this row. The unit and gameplay purpose are therefore not asserted, and retail Blueprint/engine-side references were not inspected.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:21",
@@ -60,7 +61,7 @@
       "status": "unresolved"
     },
     "Guard_Minimum_Time": {
-      "simple": "Minimum guard-hold time before the guard-end transition can run.",
+      "simple": "The shortest time a ground or aerial guard must be held before release can finish. A larger value slows the release.",
       "technical": "float seconds at row offset 0x1C (constructor default 0); all 122 exported rows use 0.2. FGameCharacterAction_Guard::Tick and FGameCharacterAction_GuardAir::Tick enter the release branch only when Elapsed > this value and GuardRigidityTime <= 0.0f; if the Guard key is no longer held they play the guard-end animation and signal GAISlot186(9,3,false,false) (GuardAir also sets its finished flag). CP_180's GuardAir override repeats the same predicate with its own animations. The comparison is strict, so a value exactly equal to the threshold does not yet qualify.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:24",
@@ -73,7 +74,7 @@
       "status": "verified"
     },
     "GuardDurability": {
-      "simple": "Base guard gauge depleted by blocked hits.",
+      "simple": "The guard gauge's starting strength. A larger value lets the fighter block more before the guard breaks.",
       "technical": "float at row offset 0x20 (constructor default 0). UpdateGuardDurability caches it as GuardDurabilityBase and sets CurrentGuardDurability = GetGuardDurabilityMaxRate() * GuardDurability; SetGuardDurability and the regen tick clamp to the same rate-scaled maximum. AI value conditions 23 and 31 divide self/target CurrentGuardDurability by this unscaled row value. Guard-hit FX use NewHitPoint / GuardDurability with FX_CP_000_03111 for >= 0.6, FX_CP_000_03121 for >= 0.3 and FX_CP_000_03131 below that. Blocked-hit damage is subtracted from the current gauge in GameBattleDamage. Export values are 150.0 in 119 rows and 160.0 in 3; no exported row is zero, although the CDO default would be a zero denominator for the AI divisions.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:27",
@@ -89,7 +90,7 @@
       "status": "verified"
     },
     "GuardDurability_Solo": {
-      "simple": "Serialized solo guard-durability value; no native consumer was traced.",
+      "simple": "A separate guard value is stored for fighters fighting alone. It matches the normal guard value, and its effect is unclear.",
       "technical": "float at row offset 0x24 (constructor default 0), exported 150.0 in 119 rows and 160.0 in the same 3 rows as GuardDurability; it always equals GuardDurability in this export (CP_010: 150.0). Every named native row read found uses GuardDurability for the status cache, AI denominators and guard-hit FX; no Source/Plugins read of GuardDurability_Solo or solo-side substitution for durability was found. Its native purpose is therefore unresolved rather than proven unused, and retail Blueprint/engine-side references were not inspected.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:30",
@@ -101,7 +102,7 @@
       "status": "unresolved"
     },
     "GuardDurability_RecoverWaitTime": {
-      "simple": "Serialized guard-regeneration wait value; no native consumer was traced.",
+      "simple": "A saved guard recovery timing value for every fighter. What it changes in play is unclear.",
       "technical": "float at row offset 0x28 (constructor default 0), exported 3.0 in all 122 rows including CP_010. The name suggests seconds, but no C++ condition, timer or delay consumes it: the Tick checks only bGuardDurabilityRegenEnabled == 1 and bGuardDurabilityRegenBlocked == 0, then reads GuardDurability_Recover. No named Source/Plugins read of this field was found and the reconstructed Tick has no hidden wait timer; retail Blueprint/engine references were not inspected. The serialized value is retained, but its native purpose is unresolved.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:33",
@@ -112,7 +113,7 @@
       "status": "unresolved"
     },
     "GuardDurability_Recover": {
-      "simple": "Reciprocal-style rate controlling guard-durability regeneration.",
+      "simple": "How quickly the guard gauge refills when the fighter recovers. A larger number makes it refill more slowly.",
       "technical": "float at row offset 0x2C (constructor default 0), exported 15.0 in all 122 rows. When regen is enabled and not blocked, CurrentGuardDurability is below the rate-scaled maximum, and Recover > 0, Tick adds (100.0 / Recover) * DeltaTime (about 6.67 durability units per second for 15.0) and clamps to [0, GetGuardDurabilityMaxRate() * GuardDurability]. A zero CDO would skip the division and disable this path; no exported row is zero.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:36",
@@ -125,7 +126,7 @@
       "status": "verified"
     },
     "DownValue": {
-      "simple": "Down gauge: stamina-like value depleted by blows before a character is knocked down.",
+      "simple": "The stamina-like gauge that wears down before a fighter is knocked down. A larger value lets them take more hits.",
       "technical": "float at row offset 0x30 (constructor default 0). ApplyDownValueParameters copies it to DownValueMax and SetDownValue (current gauge); InitializeStatus and ResetDownValue also copy it to AdaptDownValue/AdaptDownValueMax and set AdaptHitPoint = max(HitPoint - DownValue, 0). Armor/blocked-hit processing subtracts attackerScale * DamageRow.Down_Damage * receiver GetDownDamageRate from the current gauge; the shikigami damage path subtracts DamageRow.Down_Damage directly. Zero triggers down handling and RestartDownValueRecover, and AI checks current DownValue against DownValueMax. Export values span 180.0-2000.0, with 1000.0 in 112 rows; later DownValue reads on the status controller are cached state, not row reads.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:39",
@@ -141,7 +142,7 @@
       "status": "verified"
     },
     "LargeCharacterDownRecoverTime": {
-      "simple": "Timed down-gauge refill delay for large characters; also reused as a CN_240 adaptation delay.",
+      "simple": "For large fighters, this sets the wait before the down gauge refills, and zero gives no timed refill. One fighter uses this for adaptation.",
       "technical": "float seconds at row offset 0x34 (constructor default 0). RestartDownValueRecover, when DownValueMax > DownValue and bRefill == false, sets DownRecoverTime from this column if Owner.Get()->GetActionSlot146() is nonzero, otherwise from Global.DownValue_Recover_Time. Tick counts that timer down by DeltaTime * DownRecoverRate and calls ApplyDownValueParameters only after it crosses from positive to <= 0; therefore CP_010's exported 0.0 does not mean an immediate refill in this reconstruction - with the large-character flag set and bRefill false it leaves the timer at zero and no timed refill is started. bRefill true still refills immediately and returns. CN_240's ATTACKK_1 also passes this row value to BeginAdaptation as AdaptDelayTime. Export: 0.0 in 111 rows, 5.0/7.0/10.0/15.0 in the remaining 11.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterBaseParameter.h:42",

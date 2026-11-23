@@ -1,8 +1,9 @@
 {
+  "overview": "This table gives each shikigami an ordered set of voice lines for different actions.",
   "description": "Sparse per-shikigami, per-action voice-group indirection: a row ID chosen from ShikigamiDataTable holds positional FName slots that resolve to VoiceGroupDataTable rows for the actual cue lottery.",
   "fields": {
     "ID": {
-      "simple": "Row key / shikigami voice-group ID.",
+      "simple": "The name that connects this voice set to a shikigami.",
       "technical": "FName UPROPERTY (native member Id; export/catalog column ID; DataTable ImportKeyField Id). All exported row keys equal ID. AGameShikigami caches its ShikigamiDataTable row in ShikigamiRow; the five Id_ShikigamiVoiceGroup_DefaultAction/_Attack/_Damage/_Down/_Unique FNames supply request-specific lookup IDs. ShikigamiAction_FindRow rejects NAME_None when bCheckNone is true (all five calls pass true), then scans DTM.ShikigamiVoiceGroupDataTables (+0x6F0) in registration order and returns the first typed match; a missing row ends the request. The manager registers the primary-asset name ShikigamiVoiceGroupDataTable and appends its resolved UDataTable after all loaders complete; this build registers one such table. PlayVoice is only forwarded when AGameShikigami's bActionVoiceEnabled and bVoiceGroupPlaybackEnabled are both set; SetBattleVoiceEnabled sets the latter only when at least one of the five upstream fields is non-None. The empty C++ constructor leaves Id at NAME_None; exports are explicit.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiVoiceGroup.h:10",
@@ -27,7 +28,7 @@
       "status": "verified"
     },
     "Id_VoiceGroup": {
-      "simple": "VoiceGroupDataTable IDs indexed by shikigami action/event step.",
+      "simple": "The voice sets for each shikigami action in order, with blank places meaning no line. The game plays one random line from them.",
       "technical": "TArray<FName> UPROPERTY; the empty C++ constructor leaves it empty, but all 10 exported rows have 13 slots (47 non-None, 83 None). PlayVoice indexes this array with no upper/negative bounds check: request Id 1 (DefaultAction), 8 (Down) and 10 (Unique) use Value directly; Id 3 (Attack) and 6 (Damage) reject Value<=0 and use Value-1. Attack values come from EGameCharacterAttackVoiceType (Weak=1 through Charge=7) via GameAnimNotify_PlayActionVoice, and Damage values from EGameCharacterDamageVoiceType (Weak=1 through Blow=5); None=0 is filtered by Value<=0, while Invalid=255 has no guard. Observed shikigami callers use DefaultAction 1/2/3, Down 1/4/5 and Unique 0/1/2/3. Exported slot order is START/DASH/JUMP/STEP for DefaultAction; weak..charge for Attack; weak..blow for Damage; BOUNDED/DOWN/None/BREAKFALL/DEAD for Down; and per-shikigami lines for Unique. CN_080_DOWN has a real None hole at index 2, so Value 2 selects None and aborts. The chosen FName is resolved in DTM.VoiceGroupDataTables (+0x750) by the same None-rejecting first-match finder; all 47 referenced group IDs exist in the supplied VoiceGroup export/shards. VoiceGroup.Id_Voice is counted for non-None entries, GameManager random stream 0 draws GetFraction()*Count, and the raw (unfiltered) array is indexed without an explicit clamp: every reachable exported group has its non-None entries contiguous from index 0, so the supplied data picks a non-None entry, but 11 distinct downstream Voice IDs are absent from the VoiceDataTable export and a selected missing row returns without playback. When bFlag is false, an already-playing voice on the owner character's Voice3D slot CharacterIndex+6 can be suppressed/replaced using LastPlayedVoiceId/LastPlayedVoicePriority; bFlag true skips that gate. The cue is played on slot CharacterIndex+6 attached to the shikigami mesh; bSituationCheck is ignored by the shikigami wrapper.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiVoiceGroup.h:14",

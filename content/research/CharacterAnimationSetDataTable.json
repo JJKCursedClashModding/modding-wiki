@@ -1,8 +1,9 @@
 {
+  "overview": "This table groups the animations a character needs in battles and story scenes, so their moves and reactions appear correctly.",
   "description": "Per-character (plus six suffixed) bundle of CharacterAnimation row IDs. A Character row selects a set by name; battle and level-sequencer preload expands its entries into AnimMontage primary-asset loader names, and spawn paths bind the loaded montages into a character anim instance.",
   "fields": {
     "Id": {
-      "simple": "Set row key, normally the character ID, used to select this bundle.",
+      "simple": "The name that picks which animation set a character uses. During battle, a mission can specify the set for that character.",
       "technical": "FName row identity exported as ID; all 52 aggregate rows have Id equal to their DataTable row name, and no traced consumer reads the struct property as a value. Callers pass the row name from CharacterDataTable.Id_CharacterAnimationSet, or a non-None FStudioBattleCharacterOverrides.AnimationSetIdOverride, to a first-match FindRow over AGameDataTableManager.CharacterAnimationSetDataTables (+0x4B0). Battle PreparePhase case 1 and SpawnBattleCharacter prefer the override and otherwise use Character.Id_CharacterAnimationSet; MissionCharacter.Id_CharacterAnimationSet fills that override in PvE/story/arcade setup. BattlePreload and both level-sequencer paths use only the Character value. The manager requests one DataTable primary asset named CharacterAnimationSetDataTable, resolves it to UDataTable after all DataTable loaders complete, and adds it to that array. The constructor is empty, so there is no code-level default; an absent or None name returns no row under the checked finders. The 46 per-character export shards partition the same 52 rows and repeat the aggregate Properties, including ImportKeyField=Id.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterAnimationSet.h:11",
@@ -24,7 +25,7 @@
       "status": "verified"
     },
     "Id_CharacterAnimation": {
-      "simple": "Ordered CharacterAnimation row IDs whose montages belong to this set; None marks an unused slot.",
+      "simple": "The animation groups this character uses, such as attacks, guarding, jumping and reactions. Empty places are skipped, and missing groups are left out in battles and story scenes.",
       "technical": "TArray<FName>; the empty constructor supplies no defaults, all 52 exported rows have exactly 31 slots with interspersed None placeholders (5-29 per row), and no traced consumer uses the slot position as an index. Every non-None entry is looked up by row name in the first matching table of CharacterAnimationDataTables (+0x4A0). BattleAssets_AnimMontages_12BC030 appends each resolved row's whole FileName array (including None names, without checking Key) to the preload list; loader creation drops None names and deduplicates by name before FPrimaryAssetId(AnimMontage, FileName) populates caches such as StudioAnimMontageLoaders_270/_810/_7C0. Battle and sequencer spawn paths instead iterate Key.Num(), pair Key[Index] with FileName[Index], skip None IDs or either-None pairs, resolve the loader with FindChecked, and call SetAnimationAsset; battle requests a transient duplicate only for the two seeded names Idle and Fall_01, while the sequencer passes false. A missing set row, None ID, or missing animation row is skipped; a missing montage loader is fail-fast, and ragged Key/FileName arrays would be unsafe because no length comparison is made. Of 904 non-None references in the export, 15 occurrences (12 unique IDs, including CN_080_ATTACKD through CN_080_ATTACKL and CP_010_ATTACKA_AIR/ATTACKF_AIR/ATTACKF_AIR_SOLO) have no exported CharacterAnimation row and are skipped by these consumers.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterAnimationSet.h:15",

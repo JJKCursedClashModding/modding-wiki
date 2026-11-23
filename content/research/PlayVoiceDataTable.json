@@ -1,8 +1,9 @@
 {
+  "overview": "This table decides which spoken line plays when a menu choice, story moment, tutorial step, or other game event asks for one.",
   "description": "Defines context-triggered system voice lines (title logo, menus, tutorial, story, PvP/PvE, lobby and shop) as weighted candidate sets with PlayIndexOrder sequences, start delay and save-flag gating.",
   "fields": {
     "Id": {
-      "simple": "DataTable row name / system-voice definition ID.",
+      "simple": "The name that connects this group of lines to the game moment that asks for them.",
       "technical": "FName key in a BlueprintType row struct; the export serializes it as ID and declares ImportKeyField Id, while runtime FindRow uses the FName row key rather than the struct member. All 181 exported keys are unique numeric strings (50 through 1680) and match their ID value. StoryChapter Id_PlayVoice_OnOpenMissionSelect, Id_PlayVoice_StartDialog and Id_PlayVoice_OnSelectMission, plus GameManager.StudioStoryRequestName_CEC (set from a cached SelectVoice->Id), are resolved with first-table-with-a-match precedence through DTM.PlayVoiceDataTables (+0x760).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:12",
@@ -18,7 +19,7 @@
       "status": "verified"
     },
     "PlayVoiceType": {
-      "simple": "UI/game event that triggers this voice definition.",
+      "simple": "Which game moment calls for the line, such as a menu choice, story scene, or Cursed Energy tutorial task.",
       "technical": "EGamePlayVoiceType (uint8, constructor default None=0), cast to uint8 and compared with the requested VoiceId in PlaySystemVoice; VoiceId 0 is rejected before any table read. The export contains 166 distinct valid symbolic enum values and no None or Invalid rows. The same enum filters the config screen's title-logo sample, is compared directly by PickLobbyVoiceIndex, is read from cached chapter rows for PlaySystemVoice, and identifies the CP_051/CP_121 pair-character row (type 0x22 = Story_MemberSelect_OnSelectStartDialog). The StoryLaunchHelpers chapter helper returns 0xFF on a missing row, which the mission-select caller suppresses. Enum names encode screen and event, such as MainMenu_Story_OnFocus and Story_Tutorial_OnAchieveTask.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:16",
@@ -37,7 +38,7 @@
       "status": "verified"
     },
     "PlayIndexOrder": {
-      "simple": "Ordering/grouping key for voice variations that play in sequence.",
+      "simple": "How the lines are grouped into a short voice sequence. Bigger numbers play later.",
       "technical": "int32, constructor default 0. After type/flag filtering, rows are grouped in a TMap by this key: the first row copied into a group keeps its DelayTime, and Id_Voice and Weights_VoiceLottery from later rows with the same key are appended. Groups are stable-sorted ascending by key, so Keys[0] supplies the variation lottery and the validation bound, and each group in sorted order contributes at most one in-bounds, non-None voice at that variation. The export has 172 rows at order 0, six at order 1 and one each at orders 2, 3 and 4.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:19",
@@ -53,7 +54,7 @@
       "status": "verified"
     },
     "DelayTime": {
-      "simple": "Seconds to wait before the queued voice sequence starts.",
+      "simple": "How long the player waits before hearing the voice sequence. A bigger number means a longer wait.",
       "technical": "float, constructor default 0.0f. Exported values are -1.0f on 156 rows and 0.4f on 25 rows. PlaySystemVoice reads only the first sorted group: DelayTime >= 0 is used verbatim, otherwise DefaultDelayTime is used (0.15f set in AGameManager::BootInitialize). SetQueue stores FMath::Max(DelayTime, 0) in DelayTimer; Tick starts the head when the countdown expires and advances through the queue as each cue finishes. This is one start delay for the whole sequence, not a per-group or inter-line delay.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:22",
@@ -68,7 +69,7 @@
       "status": "verified"
     },
     "UserProgressFlag": {
-      "simple": "Save-data condition controlling whether the row is eligible.",
+      "simple": "Whether the player must have reached a certain point in the game to hear this line. Some lines are always available.",
       "technical": "int32, constructor default 0; a negative value means no condition (179 exported rows use -1). For Flag >= 0, Word = Flag>>2 and Bit = Flag&3; the row is kept only when Word < 128 and bit (1u<<Bit) of UserProgressFlagWords[Word] is set. The two exported nonnegative values, 6 and 7, therefore test word 1 bits 2 and 3. Flag 0 is not a sentinel: it tests word 0 bit 0. The config-volume picker applies the equivalent test with negative treated as set; PickLobbyVoiceIndex performs no flag filtering.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:25",
@@ -84,7 +85,7 @@
       "status": "verified"
     },
     "Id_Voice": {
-      "simple": "Candidate VoiceDataTable IDs for this voice event.",
+      "simple": "The pool of spoken lines this event may choose from, such as a character's title or story line.",
       "technical": "TArray<FName> of candidate VoiceDataTable row names. Every exported row has 18 slots (2776 None fillers, 482 non-None references, 480 unique; all resolve in VoiceDataTable). If the caller supplies a Variation inside the first group's Id_Voice bounds, that index is used and weights are ignored; otherwise the weighted pick from the first group is used. Each sorted group then contributes Id_Voice[variation] only when the index is in bounds and the name is not None; those IDs are resolved in DTM.VoiceDataTables (+0x740) with the first matching table winning, and the resulting cue sheet/cue strings are queued. Upstream helpers also index the array directly: a case-insensitive character-ID substring match for CP_051/CP_121, and unguarded First.Id_Voice[Index] in the config-volume and lobby pickers.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:28",
@@ -101,7 +102,7 @@
       "status": "verified"
     },
     "Weights_VoiceLottery": {
-      "simple": "Per-candidate weights for choosing the voice variation.",
+      "simple": "How likely each spoken line is to be heard. A bigger number makes that line more likely.",
       "technical": "TArray<float> parallel to Id_Voice; every exported row has 18 aligned weights: 100.0 for ordinary active candidates, 30.0 in six shop rows, and 0.0 for None fillers. GameSound_PickWeightedIndex returns -1 only for an empty array; otherwise it computes Sum(Weights)*StoryFRand(), walks weights in order subtracting until Roll < weight, and falls back to the last index if no entry wins. There is no exact length or positivity validation: PlaySystemVoice checks the picked/supplied index against First.Id_Voice.Num() only, while the config-volume and lobby pickers use the weight-derived index to read First.Id_Voice directly.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_PlayVoice.h:31",

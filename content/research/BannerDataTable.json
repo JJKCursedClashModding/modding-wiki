@@ -1,8 +1,9 @@
 {
+  "overview": "This table controls the downloadable content banners in the main menu, including their titles, pictures, and which appear first.",
   "description": "Defines the main-menu DLC store banners: localized DLC-name text keys, full and small resolution-dependent texture IDs, and the save-progress bit that marks a DLC acquired and controls carousel ordering.",
   "fields": {
     "Id": {
-      "simple": "Banner row identifier (native field Id, serialized in the export as ID).",
+      "simple": "The name the game uses to find this banner in its main-menu banner list.",
       "technical": "FName declared as FGameDataTableRow_Banner::Id and named as the DataTable ImportKeyField; the export spells the stored value ID. RefreshBanners collects rows with FGameDataTableArray::GetRows in table/row-name order, skips UserProgressFlag == -1, partitions the surviving Row->Id values by the current flag bit, appends unacquired IDs before acquired ones, and passes BannerIds[0] to SetBanner when the resulting list is non-empty. SetBanner calls UDataTable::FindRow<FGameDataTableRow_Banner>(BannerId, TEXT(\"\"), false) on each BannerDataTables entry and stops at the first hit; a miss returns before changing CurrentBannerId, the acquired/new icons, caption, pagination, or textures, and emits no warning. The ID is otherwise used only as the row key and as the value carried through BannerIds / SlideBanner.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Banner.h:11",
@@ -19,7 +20,7 @@
       "status": "verified"
     },
     "Id_BannerMessage": {
-      "simple": "Localized DLC-name text key displayed as the banner caption.",
+      "simple": "The translated title shown on the banner, such as the name of a downloadable story or outfit pack.",
       "technical": "FName passed unchanged to BannerText->SetTextIdOnly when SetBanner selects the row. SetTextIdOnly creates a parameterless FGameTextRequest; GameTextManager routes only SYS_-prefixed IDs to SystemTextDataTable and resolves GLS_NAME_DLC_* from the current-language TextDataTables, whose first table is GlossaryTextDataTable_<language>. The export uses GLS_NAME_DLC_0110, GLS_NAME_DLC_0120, GLS_NAME_DLC_0210 and GLS_NAME_DLC_0220; the English glossary resolves them to Hidden Inventory/Premature Death, Anime Season 1 Ending Theme 1 Outfits, The Shibuya Incident and Kyoto Jujutsu High School Girls' Outfits respectively. These are localization keys, not literal display strings. The same keys appear in GameDlcContentDisplayNames for DLC07, DLC10, DLC08 and DLC11, matching the rows' progress flags.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Banner.h:15",
@@ -36,7 +37,7 @@
       "status": "verified"
     },
     "BannerTextureName": {
-      "simple": "Large/high-resolution banner texture asset name.",
+      "simple": "The name of the full-size banner picture. The game uses it on very high-resolution screens.",
       "technical": "FName used as a WidgetTexture primary-asset ID. MainMenuTop state 0 collects this field and SmallBannerTextureName from every collected banner row, creates WidgetTexture loaders, waits for them in state 1, then inserts each loaded UTexture2D into GameWidgetManager::DynamicLoadTextureMap under its FName key. SetBanner resolves both names with FindDynamicLoadTexture (null on a miss) and passes them to BannerButton->SetBannerTextures. The variable named LargeTexture is selected when the current screen-resolution X is at least HighResolutionThreshold (3840); below that threshold the small variant is selected instead, so the two fields are resolution alternatives rather than two simultaneously displayed images.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Banner.h:18",
@@ -57,7 +58,7 @@
       "status": "verified"
     },
     "SmallBannerTextureName": {
-      "simple": "Small/low-resolution banner texture asset name.",
+      "simple": "The name of the smaller banner picture. The game uses it on screens that are not very high resolution.",
       "technical": "FName resolved through the same WidgetTexture-loader and GameWidgetManager::DynamicLoadTextureMap chain as BannerTextureName. SetBanner supplies it as SmallTexture to BannerButton->SetBannerTextures, which selects it when the current screen-resolution X is below HighResolutionThreshold (3840); at or above 3840 the large texture is used. MainMenuTop prefetches this name for every exported banner row, including any row with UserProgressFlag -1 that RefreshBanners excludes from the carousel.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Banner.h:21",
@@ -75,7 +76,7 @@
       "status": "verified"
     },
     "UserProgressFlag": {
-      "simple": "Saved DLC-entitlement bit index that marks a banner's DLC acquired and groups it in the carousel.",
+      "simple": "Which downloadable content the banner checks for ownership. Owned banners show an acquired mark, and unowned banners appear first.",
       "technical": "int32 bit index, defaulted to 0 by the reconstructed row constructor; exported values are 6, 7, 9 and 10. IsProgressFlagSet computes word = uint32(Flag) >> 2 and bit = uint32(Flag) & 3, rejects word >= 128 (the 128-word progress array), and otherwise tests GameManager::UserInfo.UserProgressFlagWords[word]. SetBanner uses the result only to swap NewIcon and AcquiredIcon visibility. RefreshBanners skips the exact -1 sentinel, partitions all other rows by the same bit, and puts unset flags before set ones; other negative values cast to a huge unsigned word and read as unset. Each exported flag is an entitlement bit set/cleared by GM_DiffDlcEntitlements from Steam receipts: 6 = DLC07 (BANNER_0110), 7 = DLC08 (BANNER_0210), 9 = DLC10 (BANNER_0120), 10 = DLC11 (BANNER_0220). Those DLC IDs have the same GLS text keys used by the rows' Id_BannerMessage fields. The DataTable manager loads the table into BannerDataTables only after all primary-asset DataTable loads complete.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_Banner.h:24",

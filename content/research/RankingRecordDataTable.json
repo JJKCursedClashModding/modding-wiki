@@ -1,8 +1,9 @@
 {
+  "overview": "This table lists the ranking achievements players can earn, what earns each one, and what helps decide their order on online leaderboards.",
   "description": "Catalog of ranking achievements, the battle/run values required to earn them, and their priority when the top three online-leaderboard records are selected.",
   "fields": {
     "Id": {
-      "simple": "Ranking record row id.",
+      "simple": "The name that distinguishes this ranking achievement from the others.",
       "technical": "FName at retail offset 0x8 and the DataTable ImportKeyField; the export writes it as ID and uses the same RANKING_RECORD_nn string as the row-map key. No reconstructed consumer reads the embedded Id member: the battle evaluator enumerates every row, while the PvE tally and leaderboard sorter find rows by RankingRecord. AGameDataTableManager loads the single RankingRecordDataTable asset into RankingRecordDataTables (+0x370), and FGameDataTableArray::GetRows returns non-null rows in table order then row-name order.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankingRecord.h:12",
@@ -16,7 +17,7 @@
       "status": "observed"
     },
     "RankingRecord": {
-      "simple": "Enum identifying which ranking achievement this row represents.",
+      "simple": "Which ranking achievement this record describes, such as dealing damage, charging Cursed Energy, or using a character's special move.",
       "technical": "uint8 EGameRankingRecord (None=0, Invalid=255), default None; all 51 exports use a distinct live value. EvaluateRankingRecords enumerates every row and switches on this value: log-type records require EvaluateLog(..., Target=Myself, bTotal=true) to find the player's total log and meet PrizeThreshold; FirstDown instead compares the player with GetFirstKillCharacter() and ignores PrizeThreshold; OverwhelmingBattle, Finisher and Runner only check for the matching EGameResultScore bonus; Scorer uses the 1..4 result rank; numbered SuperCursedEnergyAttack_* rows match the player's cached SpecialAttackRow->RankingRecord (resolved from CharacterSpecialAttackDataTable, with SpecialAttackIdOverride) and still require a SuperCursedEnergyAttack_Hit threshold. PvE tallying FindByPredicate-matches NoRecovery, BindingVowsWelcome and AnnihilationKing rows for their thresholds, adds CursedSpiritsHunter/BossKiller directly from MissionKind, and the leaderboard sorter matches each persisted count key back to a row. DomainExpansionMania has an exported row and a hardcoded UI label but no case in the reconstructed battle evaluator; unlisted enum values fall through to default.",
       "evidence": [
         "Source/AbramsDataTable/Public/EGameRankingRecord.h:6",
@@ -36,7 +37,7 @@
       "status": "verified"
     },
     "PrizeThreshold": {
-      "simple": "Value needed to earn the record; its units follow the corresponding log counter, result rank, or PvE tally.",
+      "simple": "The damage, hits, Cursed Energy, or similar progress needed for most achievements, or the result grade needed for the scoring achievement. More means harder.",
       "technical": "int32, default 0. In EvaluateRankingRecords, log-based records first require EvaluateLog to find the player's total (Target=Myself, bTotal=true), then compare static_cast<int32>(float log value) >= PrizeThreshold; the float is truncated toward zero. Scorer compares the 1..4 result rank (C/B/A/S mapped to 1/2/3/4) directly. FirstDown and the three bonus-flag records do not read it, while the 27 numbered super-attack rows do. In PvE tallying, NoRecoveryCount, BindingVowCountTotal and the summed per-result int32 player Dead total must be >= the matched row's threshold; CursedSpiritsHunter/BossKiller are unconditional. Exported values range from 1 to 9000: SendDamage 1000, AceAttacker 3, Scorer 4, DomainExpansionMania 3 despite Priority 0, and every numbered super attack 1.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankingRecord.h:19",
@@ -56,7 +57,7 @@
       "status": "verified"
     },
     "Priority": {
-      "simple": "Ordering weight for leaderboard display.",
+      "simple": "A higher value gives this achievement preference among equally common records when choosing the three shown on online leaderboards.",
       "technical": "int32, default 0. PvEResult_WriteTopRankingRecords copies the persisted count map (GameUserInfo+0x820), KeyStableSorts its keys by the matched row's Priority descending (larger first), then ValueStableSorts by count descending; the stable second sort makes Priority the tie-breaker for equal counts. If either key has no matching row it compares the raw uint8 enum values. The first three keys with count > 0 are written to the online score's ExtBytes[0..2], and those same three bytes are copied to the other PvE/PvP leaderboard entries. Ties retain the count map's current order; the export has 27 rows at 30 and values from 0 to 30 overall, with DomainExpansionMania at 0. Visible label text is then resolved from the separate hardcoded GGameRankingRecordLabels map, not from this table.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_RankingRecord.h:22",

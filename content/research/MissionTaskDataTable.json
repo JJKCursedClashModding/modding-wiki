@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets the objectives the player sees in battle, including what to do and how much, and shapes Binding Vow choices between fights.",
   "description": "Parallel-array mission objectives: each indexed slot pairs a battle-log value, target, passive classification and comparison threshold, producing per-index progress for the battle HUD and PvE completion counters; story objectives/rewards read the same rows by a shifted index, and the row can also ban binding-vow effects.",
   "fields": {
     "Id": {
-      "simple": "Mission task row identifier.",
+      "simple": "The name the game uses to pick this task for a stage or story battle.",
       "technical": "FName import key / DataTable row name (export property `ID`); no runtime consumer reads the row's Id member as data. GameDataTableManager loads the named MissionTaskDataTable into `MissionTaskDataTables` (DTM+0x9E0). Arcade, story and PvE wave setup resolve the id from `MissionWave.Id_MissionTaskLottery` through `BattleArcade_PickLotteryTask` (weighted, None candidates dropped), and PvE caches the picked ids in `FGamePvESettings::MissionTaskIds`. The story-demo helper instead takes `MissionTaskLottery.Id_MissionTask[0]` without using its weight.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:16",
@@ -17,7 +18,7 @@
       "status": "observed"
     },
     "ValueType": {
-      "simple": "Battle-log value measured for each indexed task condition.",
+      "simple": "What the fight measures for each objective, such as hits, Cursed Energy, health, or who attacks first.",
       "technical": "TArray<EGameBattleLogValueType>, default empty. `ValueType.Num()` is the authoritative condition count in `Tick`, `FailFirstAttackTasks` and `OnEvent13`; all exported rows have three slots and the third is always `None`. Slot i is passed with `TargetType[i]` and `PassiveType[i]` to `AGameBattleManager::EvaluateLog` (GM 0x1015A80 forwards to FStudioBattleSystem350 with bTotal=false). `None` and `Invalid` return false, so `None` slots are inert on every tick. Any pending `FirstAttack` slot is force-failed by `FailFirstAttackTasks` when the attacker team is not 0 (team A/Playable). Units follow the selected log value: hit/finish/combo entries are counts, HitPoint is raw HP, HitPointRate is 0..1, TimeLimit is elapsed seconds, MovedDistance is metres, and CursedEnergy_Level is aggregated by maximum rather than by sum.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:20",
@@ -32,7 +33,7 @@
       "status": "verified"
     },
     "TargetType": {
-      "simple": "Whose battle-log value is evaluated.",
+      "simple": "Who the game watches for that objective, the player, their allies, or the rival team.",
       "technical": "TArray<EGameBattleLogTargetType>, default empty. Read at the same index as ValueType, PassiveType, Value and ConditionType. `Ally` collects the focused player's team characters, `Myself` only the player's character index, and `Enemy` the rival team; `None`/`Invalid` produces no character list, so EvaluateLog returns false. Evaluation uses the per-round log blocks (bTotal=false) and returns false when the player pointer is invalid or no characters resolve.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:23",
@@ -46,7 +47,7 @@
       "status": "verified"
     },
     "PassiveType": {
-      "simple": "Whether the logged value is sent or received.",
+      "simple": "Whether the game counts what the chosen fighter deals out or what they receive.",
       "technical": "TArray<EGameBattleLogPassiveType>, default empty. Passed at the same index to EvaluateLog. Only `Receive` selects a character's `ReceiveValues` map; `Send`, `None` and `Invalid` all select `SendValues`, so `None` is not itself a skip. The selected entries are summed over resolved characters, except `CursedEnergy_Level` (maximum) and `HitPointRate` (mean). In the export, 77 rows pair a slot-0 `ForceGauge` condition with `Receive`; hit/combo finishers are mostly `Send`, although `Attack_Hit` and `CursedEnergyAttack_Finish` use `Receive`.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:26",
@@ -59,7 +60,7 @@
       "status": "verified"
     },
     "Value": {
-      "simple": "Threshold for each indexed task condition.",
+      "simple": "The goal for each objective, like a hit count or Cursed Energy amount. Bigger numbers change how much must happen before the objective finishes or fails.",
       "technical": "TArray<float>, default empty. `Value[i]` is copied to `FStudioMissionTaskProgress.Target`. Success conditions set `Current` to the evaluated log value and clamp it to the target when satisfied; `Failure_GreaterThanEquals` uses `max(ceil(Target-Value), 0)` and `Failure_LessThanEquals` uses `max(Value-Target, 0)`, and both fail when that value reaches zero. The HUD reset passes the authored `Value[i]` as the detail text's `VALUE` parameter, while live progress text formats runtime `Current`/`Target` as `VALUE`/`MAX_VALUE` (cast to int at reset, float thereafter). Story objective text uses `Value[i-1]` for objective index >0, and the interval wave-info widget uses `Value[0]` only. Exported thresholds are in the selected log value's units and range from 0 to 300.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:29",
@@ -76,7 +77,7 @@
       "status": "verified"
     },
     "ConditionType": {
-      "simple": "Comparison rule that decides success or failure.",
+      "simple": "Decides whether reaching the goal completes the objective or triggers a failure. Winning the fight clears failure objectives still pending.",
       "technical": "TArray<EGameBattleLogConditionType>, default empty. Read at the same index in `Tick` and `OnEvent13`. `Success_GreaterThanEquals`/`Success_LessThanEquals` set State=1 when the evaluated value crosses `Value[i]`; `Failure_GreaterThanEquals`/`Failure_LessThanEquals` set State=-1 when their computed `Current` reaches zero. `None`/`Invalid` leave the condition pending. Pending failure conditions are converted to successes only by event 13 when `BattleResult == Win_TeamA`. Success notifications increment `CompletedCount`, call `OnPvETaskCleared(1)` and play the HUD success animation; failures play only the HUD failure animation. The export uses only `Success_GreaterThanEquals` and `Failure_GreaterThanEquals`; slot 2 in every row is `None`.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:32",
@@ -93,7 +94,7 @@
       "status": "verified"
     },
     "Id_BattleText_TaskDetail": {
-      "simple": "Per-condition HUD and story-objective text id.",
+      "simple": "The battle message shown for each objective. A blank message hides it, and story tasks follow the general mission goal.",
       "technical": "TArray<FName>, default empty. The battle mission-task list loops over this array (capped by the number of child task widgets) and uses the same index for `Value[i]` and `TaskProgress[i]`; `None` hides that widget. This array, not ValueType.Num(), therefore controls how many HUD slots are considered. Story objective helpers require objective index >0, validate `Index-1` in this array and reject None; index 0 is a generic mission-clear objective that does not read the row. The story reward helper applies the same `Index-1` gate. Completed story progress is persisted by task index into `FGameUserStoryMissionInfo::TaskFlags`, not by this FName.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:35",
@@ -109,7 +110,7 @@
       "status": "verified"
     },
     "ExcludeBindingVowsEffectType": {
-      "simple": "Binding-vow effect types disallowed by this task.",
+      "simple": "Binding Vows removed from between-fight choices in solo or tag play. Choosing more effects removes more Vows from those choices.",
       "technical": "TArray<EGameBindingVowsEffectType>, default empty. This is not part of the condition-indexed evaluation. During interval-PvE setup, each candidate vow's effect rows are collected and the candidate is removed if any `EffectType` is contained in this array; `MissionOrder.ExcludeBindingVowsEffectType` is applied to the same candidate list before the task exclusions. `None` never matches an effect. Unlike the three-slot condition arrays, all 151 exported rows carry exactly eight slots here (1184 `None` entries), with 20 rows containing real exclusions; the C++ default is an empty array and the enum defines `Invalid = 255` as its out-of-range sentinel.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_MissionTask.h:38",

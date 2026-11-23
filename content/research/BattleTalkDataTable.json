@@ -1,8 +1,9 @@
 {
+  "overview": "This table holds the scripted lines characters speak during battle, including the speaker, subtitle, voice, portrait, and wait before each line.",
   "description": "One pre-scripted in-battle character talk line: who speaks, which localized text and voice to present, an optional portrait override, and the pauses around playback.",
   "fields": {
     "Id": {
-      "simple": "Row key / battle-talk ID.",
+      "simple": "The game uses this name to find this exact line when a battle conversation reaches it.",
       "technical": "FName row property (declared Id, exported as ID). QueueBattleTalkSet passes each set-array ID to FindRow, and the playback state machine passes CurrentTalk->Id to OpenTalk, which resolves the row again across DTM.BattleTalkDataTables in order. The finished queue does not report this ID: it passes the owning BattleTalkSetDataTable Id to NotifyBattleTalkEnd, which fans the set ID out to every character action controller's OnBattleTalkEnd. Export keys and exported ID values match for all rows.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:11",
@@ -15,7 +16,7 @@
       "status": "verified"
     },
     "WaitTime": {
-      "simple": "Delay before the line is shown.",
+      "simple": "How long the character waits before this line appears. A larger number makes the wait longer.",
       "technical": "float seconds; constructor default 0.0f. State 1 copies it verbatim into Timer, state 2 subtracts DeltaTime, and the line opens on the first tick with Timer <= 0.0f. There is no clamp: zero (and any negative value) therefore opens on the tick after state 1, not during queueing. Exported values range 0.0-5.0 s; 225 of 288 rows are 0.0, 50 are 1.5, and single rows use 0.5, 0.8, 1.0, 2.5 and 5.0.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:15",
@@ -26,7 +27,7 @@
       "status": "verified"
     },
     "Id_Character": {
-      "simple": "Character row whose story name is used as the speaker label.",
+      "simple": "Chooses the character whose story name appears above the subtitle. The game also uses this character when choosing the speaking voice.",
       "technical": "FName into CharacterDataTable; non-None in all 288 exported rows, with 31 distinct IDs that all resolve. Widget lookup skips None and collapses the speaker text when no row is found; otherwise it passes Character.Id_GlossaryText_StoryName to SetTextIdOnly, which resolves localized text through AGameTextManager. Separately, playback scans non-hidden managed characters (GetCharacters(false)) and uses the first whose CharacterRow.Id matches this field for the voice player slot; no match falls back to slot 0. The story-name lookup and voice-slot choice are independent.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:18",
@@ -39,7 +40,7 @@
       "status": "verified"
     },
     "Id_CharacterVariation": {
-      "simple": "Variation used to find a fallback battle-talk portrait.",
+      "simple": "Which version of the character this line uses, such as an alternate costume. If no portrait is chosen here, the game uses this version's battle-talk picture.",
       "technical": "FName into CharacterVariationDataTable; non-None in all exported rows, and all 33 distinct values resolve. It is consulted only when BattleTalkImageFileName is None: the widget follows Variation.Id_CharacterImage -> CharacterImage.BattleTalkImageFileName -> FindDynamicLoadTexture. In the export every variation in this path has a resolvable CharacterImage row with a non-None portrait name. None or any missing link leaves ImageName None and the portrait collapsed; the story phase's texture preload follows the same join with its own finders and simply adds no name on a miss.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:21",
@@ -52,7 +53,7 @@
       "status": "verified"
     },
     "BattleTalkImageFileName": {
-      "simple": "Direct portrait texture name, overriding the variation-derived portrait.",
+      "simple": "The character portrait shown while this line plays. Set this to use a specific picture for this line.",
       "technical": "FName texture-cache key, not a CharacterDataTable row ID. Non-None wins verbatim and bypasses the variation/CharacterImage join; one exported row uses T_UI_Character_BattleTalk_Image_CN_122_00. UGameWidgetManager::FindDynamicLoadTexture is only a DynamicLoadTextureMap lookup, so an unpreloaded key yields a null brush even though the widget is made visible. None selects the fallback; if the fallback also yields None the portrait is collapsed. The story phase AddUnique-collects the resolved non-None key for the current wave so it can be loaded into that cache.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:24",
@@ -66,7 +67,7 @@
       "status": "verified"
     },
     "TextId": {
-      "simple": "Localized game-text ID for the spoken line.",
+      "simple": "The words shown as the subtitle for this line. The game picks the right language using this name.",
       "technical": "FName passed to SerifText->SetTextIdOnly; no subtitle string is stored on this row. That setter builds a text request and AGameTextManager resolves the first matching row in its ordered current-language GameText tables (Glossary, Battle, Item, CommandList, Chat, Stamp, Story, StoryDemo, ShortStoryDemo, Tutorial, BattleSubTitle, Sound, Dlc1, Dlc2), returning empty text on a miss. All 288 exported IDs are unique and present in each of the 11 locale shards: 191 in StoryDemoTextDataTable, 68 in DlcStoryDemoTextDataTable2, 16 in TutorialTextDataTable and 13 in DlcStoryDemoTextDataTable1, with no overlap; none are in BattleSubTitleTextDataTable or BattleTextDataTable. Typing/advance is separate: the widget resets TalkVisibleCharacters, IsTalkFinished checks SerifText->IsTyping, and the queue also requires the 0.5 s hold and voice completion unless Decision is used for a bWaitForInput set.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:27",
@@ -82,7 +83,7 @@
       "status": "verified"
     },
     "Id_Voice": {
-      "simple": "Voice row ID played with the line.",
+      "simple": "Which spoken voice plays with the subtitle during battle. The game plays it using the speaker chosen for the line.",
       "technical": "FName into VoiceDataTable; all 288 exported IDs resolve to non-None cue-sheet/cue rows, and the alternate voice shards are not consulted by this path. PlayVoiceById rejects None, resolves the row, then PlayVoice requires a loaded cue sheet and a usable player (the requested slot if present, otherwise the first non-playing player) and returns -1 if neither is available. It uses the slot computed from Id_Character (0 when no character matches), appends _En to the cue name when bAppendEnVoiceSuffix is set and applies a VoiceVolume row override before playing. State 4 waits for typing, the 0.5 s hold and IsVoicePlaying(handle) to finish unless Decision skips those checks for bWaitForInput; it then stops the voice with a 0.0 s fade. OnEvent05 stops it only when still in state 4, OnEvent13 stops it unconditionally, and OnPrepareBattle only clears the stored handle to -1.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_BattleTalk.h:30",

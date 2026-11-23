@@ -1,8 +1,9 @@
 {
+  "overview": "This table tells the game which animations a shikigami uses in battle and which poses appear in character views and Situation Overview.",
   "description": "Shikigami animation-set rows: parallel FName arrays pairing named animation slots (for example Idle, Run or AttackA_01_01) with AnimMontage primary-asset names. Battle sets are attached to ShikigamiDataTable rows; separate rows supply character-capture and Situation Overview poses.",
   "fields": {
     "ID": {
-      "simple": "Shikigami animation-set row ID, e.g. CN_010, CN_010_DAMAGE or CN_080_SITUATION_OVERVIEW_ALLY_01.",
+      "simple": "The name that identifies this group of shikigami animations. The game uses it to connect the group to a shikigami, a character view, or a Situation Overview pose.",
       "technical": "Export field ID is native Id (FName) and the DataTable row key (ImportKeyField=Id); no runtime consumer reads the Id member of this struct directly. ShikigamiDataTable.Id_ShikigamiAnimation holds these IDs: the 20 exported Shikigami rows reference 71 battle sets (base, _DAMAGE and per-_ATTACK* rows), with None padding skipped. The other 13 rows are reached from CharacterCaptureDataTable.Id_ShikigamiCharacterAnimation (CN_080_CHARACTER_CAPTURE) or SituationOverviewPoseDataTable.Id_ShikigamiCharacterAnimation_Ally/_Enemy (six ally and six enemy poses). Lookups use FindRow<T> over ShikigamiAnimationDataTables (DTM +0x6E0): the shared collector in battle preload and level-sequence preload, an inline search in battle spawn, and FindRow in capture. All finders return the first matching row while walking the table array; the manager registers one table and the export contains 84 unique row keys.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiAnimation.h:10",
@@ -15,7 +16,7 @@
       "status": "verified"
     },
     "Key": {
-      "simple": "Animation slot names (Idle, Run, DashBegin, AttackA_01_01, SituationOverview_Ally, ...), index-aligned with Filename.",
+      "simple": "The action an animation belongs to, such as idle, running, jumping, or attacking. Situation Overview uses these names for ally or enemy poses, and other character views use only idle and entry animations.",
       "technical": "Export Key is native TArray<FName> Key. All 84 exported rows have 33 Key entries and 33 Filename entries, right-padded with NAME_None (2,451 None pairs); no row repeats a non-None key. Battle spawn walks Key.Num(), skips a pair when either Key[i] or FileName[i] is None, and calls UGameAnimInstance::SetAnimationAsset(Key[i], Montage, false). That stores the montage pointer and its BlendIn/BlendOut times in the anim instance's FName-keyed AssetMap without duplicating the object; a later duplicate key would overwrite the earlier entry. Capture setup builds a Key->FileName TMap: Situation Overview keeps every non-None pair from the pose's ally/enemy row, while other capture types keep at most the idle and enter key names from CharacterCapture (ShikigamiCharacterIdleAnimationKey and ShikigamiCharacterEnterAnimationKey). Playback helpers that consume those keys use FindChecked. CN_010 starts Idle, Run, DashBegin, Dash, DashEnd, JumpBegin, JumpUp, JumpTop, Summon, SummonAir.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiAnimation.h:14",
@@ -29,7 +30,7 @@
       "status": "verified"
     },
     "Filename": {
-      "simple": "AnimMontage asset names corresponding to Key[i], e.g. AM_CN_010_00_Idle_01 for Idle.",
+      "simple": "The name a modder changes to swap the animation used for an action, such as idle or attacking. In Situation Overview, the first animation in the list sets the shikigami's pose.",
       "technical": "Export Filename is native TArray<FName> FileName (the catalog spelling differs from the header). Values are exact FName keys for GamePrimaryAssetType_AnimMontage loaders, not object paths. Battle preload's collector appends the entire FileName array, including None padding, to the animation-name list; GamePrimaryAssetLoader_CreateLoaders then skips None names, deduplicates repeats and creates StudioShikigamiAnimLoaders_400, which is later retained in StudioRetainedLoaders_90. BattleBase independently builds StudioAnimMontageLoaders_810 from the same collector; at spawn it uses FindChecked on each non-None filename, resolves the loaded montage through the Abrams asset manager and installs it under Key[i]. A null montage is a no-op in SetAnimationAsset. Capture puts the mapped names into per-slot AnimMontageLoaders and plays them directly; Situation Overview pose playback indexes FileName[0] without checking array length or None. Every exported row has equal 33-element arrays, but the indexed consumers trust Key.Num(): a shorter FileName array would be out of bounds, while extra filenames beyond Key.Num() are ignored there (though preload still collects them).",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_ShikigamiAnimation.h:17",

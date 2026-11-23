@@ -1,8 +1,9 @@
 {
+  "overview": "This table changes which spoken line a character uses during certain story missions and story scenes, and makes sure that audio is ready.",
   "description": "Overrides the normal voice chosen for a character in a specific story demo or story mission, and lets game phases preload the override voice cue sheets.",
   "fields": {
     "Id": {
-      "simple": "Row key for one voice-override rule.",
+      "simple": "The name you give this voice change so you can find it among other voice changes.",
       "technical": "FName row key. No behavioral read of this member was found in the available consumers; rows are collected wholesale from DTM.StoryVoiceOverrideDataTables (+0x8F0) and filtered by Id_StoryDemo and Id_Character. Export spells it ID.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryVoiceOverride.h:11",
@@ -14,7 +15,7 @@
       "status": "observed"
     },
     "Id_StoryDemo": {
-      "simple": "Story demo/mission ID that the override applies to.",
+      "simple": "Which story mission this voice change belongs to. It applies only while that mission is playing.",
       "technical": "FName (row +0x10). Battle-story cue-sheet collection keeps rows whose value equals GameManager.StudioStoryMissionId_CE0 and does not check Id_Character. The sequencer evaluator instead uses StudioStoryDemoId_CD8, falling back to StudioStoryDiagramDemoId_CF8 only when the former is None; it skips the override block when a current file parameter exists and GameSequence_TypeFromName maps its name to type 2 (SQ_Result_), and it also requires a non-None resolved character ID plus valid section/target. All 18 exported demo values are STMSN_* keys that resolve in both StoryDemoDataTable and StoryMissionDataTable; the DiagramDemo fallback is a STDM_SS_* short-story key in the supplied export, so no override row matches it.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryVoiceOverride.h:15",
@@ -32,7 +33,7 @@
       "status": "verified"
     },
     "Id_Character": {
-      "simple": "Target character whose voice is overridden.",
+      "simple": "Which character gets this voice change. In story scenes, the character on screen must match.",
       "technical": "FName (row +0x18). The sequencer evaluator requires it to equal the resolved target character ID from GetTargetCharacterId (the cached target actor's model/NPC ID) and requires that ID to be non-None; it takes the first match in GetRows order (table order, then row-name order). Level-sequence preparation resolves CharacterIds to Character rows, requires a non-None input ID and a CharacterVariation row, then adds every matching override's voice cue sheet with Add rather than AddUnique and applies no demo filter. Battle-story preload does not filter by character.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryVoiceOverride.h:18",
@@ -47,7 +48,7 @@
       "status": "verified"
     },
     "Id_Voice": {
-      "simple": "Replacement VoiceDataTable row to use.",
+      "simple": "Choose the spoken line the character should say instead of their usual one. If that line is missing, no voice plays.",
       "technical": "FName (row +0x20), naming a VoiceDataTable row. ResolveVoiceId assigns the first matching override's raw Id_Voice and breaks, so a non-None value outranks the cached unique-pair voice and the VoiceGroup common fallback; a None value falls through to those later picks. Downstream, the sequencer sound module resolves the ID with FindSoundRow(2, SoundId) to Voice.CueSheetName/CueName (queued IDs resolve through PlayNextQueuedVoice), and the same ID derives the subtitle ID and CharacterMouthAnim lookups, with _En appended for English voice. Both preload paths resolve it in VoiceDataTables and add Voice.CueSheetName: battle uses AddUnique, level sequence uses Add. A missing Voice row for a non-None ID contributes no cue sheet and no playback; the evaluator does not retry its fallbacks in that case.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryVoiceOverride.h:21",

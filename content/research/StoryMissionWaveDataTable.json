@@ -1,8 +1,9 @@
 {
+  "overview": "This is the setup for one wave of a story battle, including the allies, the character you control, the enemies, and the dialogue.",
   "description": "Per-wave story battle setup: allied MissionCharacter rows, playable-character slot, MissionWave link and battle-talk sets.",
   "fields": {
     "ID": {
-      "simple": "Story mission wave row id, normally the mission id.",
+      "simple": "The name the game uses to connect this wave with its story mission.",
       "technical": "FName row key (row +0x8) in StoryMissionWaveDataTables (DTM +0x8E0), reached through StoryMission.Id_StoryMissionWave[WaveIndex] or, in several first-wave helpers, [0]. Consumers search the loaded tables by this key; the reconstructed code does not read the row’s Id value directly. GamePhase_BattleStory builds the per-mission wave array, and FStudioBattleMissionTaskSystem::SetupStory caches the resolved rows in StoryMissionWaves with the RetryCount-selected pointer exposed as StoryMissionWave / GetStoryMissionWave. Exported row keys equal their ID values; four STMSN_09112M_0N rows are wave variants of one mission rather than separate mission ids.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMissionWave.h:11",
@@ -17,7 +18,7 @@
       "status": "verified"
     },
     "Id_MissionCharacter_Ally": {
-      "simple": "Allied MissionCharacter rows taking part in this wave.",
+      "simple": "Which allies fight alongside the player in this story battle. Their order decides which one can become the character you control.",
       "technical": "TArray<FName> (row +0x10), with three slots in every exported row. None is an empty sentinel at a retained index. Story_GetBattleLayout removes None before counting allies; Story_GetPlayableCharacterIndex counts only non-None allies for its fallback. Story_GetMissionAllyCharacters resolves each slot to a MissionCharacter row, skips unresolved and already-collected rows, and inserts the slot equal to Wave->PlayableCharacterIndex at the front of that wave’s result. Story_ResolveDemoLaunch indexes the first wave to set the player battle-character slot from the resolved playable index; SetupBattleCharacterEntries indexes the current cached wave with the runtime StudioStoryPlayableIndex_CE8 and skips None and the player slot when adding computer-controlled allies.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMissionWave.h:15",
@@ -36,7 +37,7 @@
       "status": "verified"
     },
     "PlayableCharacterIndex": {
-      "simple": "Index in Id_MissionCharacter_Ally that the player controls.",
+      "simple": "Which ally in the list the player controls. If not set, the game uses the only ally or lets the player choose.",
       "technical": "int32 (row +0x20), constructor default 0; exported values are -2 (one row), -1 (87), 0 (four) and 1 (one). Story_GetPlayableCharacterIndex returns the first wave’s raw value only when it is > -1; otherwise it returns 0 when exactly one ally is non-None and -1 for zero or multiple allies (also -1 for a missing mission/wave). Story_ResolveDemoLaunch stores that resolved index in the launch request and, when it is not -1, uses it to index the first wave’s ally array for the player battle slot. Story_HasPlayableCharacterIndex tests the first wave value > -2; false routes to character select and suppresses the extra allies in SetupBattleCharacterEntries. Story_GetMissionAllyCharacters compares the raw value against each slot index, while Story_GetBattleLayout uses the first wave’s value even for a later wave and forces the ally count to 1 when it is <= -2. Several first-wave helpers dereference [0] or GetData()[0] without a Num check, and character-select battle settings use the runtime StudioStoryPlayableIndex_CE8 rather than this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMissionWave.h:18",
@@ -55,7 +56,7 @@
       "status": "verified"
     },
     "Id_MissionWave": {
-      "simple": "Generic MissionWave row for enemy/order data.",
+      "simple": "Which battle setup supplies the enemies, time limit, and mission goal for this wave. Changing it changes what the player faces.",
       "technical": "FName (row +0x24) used as the key into MissionWaveDataTables (DTM +0x9A0) by Story_GetBattleLayout, Story_GetDemoMissionTask, SetupBattleCharacterEntries and the story-mission info widget. The linked MissionWave row supplies enemy ids, layout/time/order data and Id_MissionTaskLottery, whose first task id provides objective text and cleared-state checks. All exported rows name a same-id MissionWave. A missing StoryMissionWave or MissionWave makes Story_GetBattleLayout return EGameBattlePair::Invalid (255); the demo-task chain instead returns no task. The supplied export has no MissionWave row for STMSN_06090S.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMissionWave.h:21",
@@ -70,7 +71,7 @@
       "status": "verified"
     },
     "Id_BattleTalkSet": {
-      "simple": "Battle-talk sets attached to this wave.",
+      "simple": "What the characters say during this story battle. Some lines wait for a condition, and each group plays only once.",
       "technical": "TArray<FName> (row +0x30), with ten slots in every exported row. FBattleStoryState_Fight reads the cached current wave: None is skipped; a set with no non-None BattleTalkSet::ValueType entries is queued on entry, once per set, while a set with at least one condition is queued in Tick only when battle talk is enabled, each non-None condition passes EvaluateLog and Success_GreaterThanEquals/Success_LessThanEquals against its threshold, and the set has not already been queued. BattleStoryNotify368/360 resolve the wave by MissionRetryCount (not necessarily wave 0) and preload the referenced sets’ non-None cue sheets and battle-talk image names. Array order is preserved; unresolved set ids are skipped.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_StoryMissionWave.h:24",

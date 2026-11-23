@@ -1,8 +1,9 @@
 {
+  "overview": "This table sets the pictures, resting animations, and weapon poses used for each character in the game's situation overview and customization screens.",
   "description": "Pose-row setup used by SituationOverview captures: UI art, ally/enemy character and shikigami idle montages, and parallel per-weapon socket, montage and variation settings. Ally columns are read only for VsAlly; the other SituationOverview capture types, including Customize, read the Enemy columns.",
   "fields": {
     "ID": {
-      "simple": "Pose row id (e.g. CP_010_POSE_00).",
+      "simple": "The name the game uses to identify this pose and connect it to its item and character selections.",
       "technical": "FName key in SituationOverviewPoseDataTables (DTM +0xAE0), loaded from the SituationOverviewPoseDataTable primary asset. Capture paths resolve Character -> SituationOverview.Id_SituationOverviewPose[PoseIndex] with an unchecked pose index. Item-icon/ownership paths use Item.VariableId for EGameItemType::SituationOverviewPose: GameItemIconWidget rejects None before lookup, while GameItem_FindRow's pose specialization only rejects None when its caller passes bCheckNone=true (the full/thumbnail accessors pass false or default). The tile widget resolves each pose id to the Item row whose VariableId equals it and compares it with CurrentSettings[CharacterId]. Customization treats index 0, or a pose absent from the overview, as free; non-first poses require an owned Item with the matching VariableId.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:11",
@@ -21,7 +22,7 @@
       "status": "verified"
     },
     "Id_CustomizeLabelText": {
-      "simple": "Exported localization-style text key for the customization pose label; no runtime read identified.",
+      "simple": "A text name intended for the pose's customization label. Its exact effect is unclear because no use of it was found.",
       "technical": "Serialized FName (row +0x10). All 190 exported values follow ITM_SITUATION_OVERVIEW_POSE_0N_<character> (N=1..6), but no read of this property exists anywhere in the available Source/ or Plugins/ tree, and none of those keys appears in the exported ItemTextDataTable_* rows. Its consumer and exact presentation are therefore unresolved. This is an evidence gap, not proof that no shipped UI ever uses it.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:15"
@@ -29,7 +30,7 @@
       "status": "observed"
     },
     "ImageFileName": {
-      "simple": "Full-size pose item icon texture name.",
+      "simple": "The large picture used for this pose when the smaller thumbnail is not shown. Leaving it blank supplies no picture.",
       "technical": "FName (row +0x18). GameItemIconWidget selects it for EGameItemType::SituationOverviewPose when bShowThumbnail is false and requests it as a WidgetTexture; GameItem_GetFullImageFileName also returns it for that item type. NAME_None leaves no named texture to resolve. Exported names follow T_UI_Item_SituationOverviewPose_*.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:18",
@@ -44,7 +45,7 @@
       "status": "verified"
     },
     "ThumbnailImageFileName": {
-      "simple": "Thumbnail pose item icon texture name.",
+      "simple": "The small picture shown for this pose in menus and item lists. This is used instead of the large picture when thumbnails are shown.",
       "technical": "FName (row +0x20). GameItemIconWidget selects it when bShowThumbnail is true. GameItem_GetImageFileName (despite its short name, the thumbnail accessor here) returns it for the same item type; Gallery preload collects those names as WidgetTextures, and UGameItemThumbnailWidget::SetThumbnail requests the supplied thumbnail name. Exported names follow T_UI_ItemThumbnail_SituationOverviewPose_*.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:21",
@@ -60,7 +61,7 @@
       "status": "verified"
     },
     "Id_CharacterAnimation_Ally": {
-      "simple": "CharacterAnimation row used for the ally-side (VsAlly only) pose.",
+      "simple": "Which standing animation the ally uses for this pose in a situation overview. This applies only when the ally side is being shown.",
       "technical": "FName; read only by SituationOverview captures (VsAlly, VsEnemy and Customize), and only from this field for VsAlly. Resolved in CharacterAnimationDataTables (DTM +0x4A0). GetCharacterAnimationMap adds each Key -> FileName pair where both names are non-None (duplicate keys overwrite) and preloads those files as AnimMontage loaders; PlayIdleMontage plays FileName[0] without a length check. A missing pose row makes the map empty and LoadCharacter/SpawnCharacter return; a missing animation row leaves the map empty and idle playback returns before weapon montages.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:24",
@@ -74,7 +75,7 @@
       "status": "verified"
     },
     "Id_ShikigamiCharacterAnimation_Ally": {
-      "simple": "ShikigamiAnimation row used for the ally-side (VsAlly only) shikigami pose.",
+      "simple": "Which standing animation the ally's Shikigami uses for this pose. It applies only when a Shikigami is present on the ally side.",
       "technical": "FName; read only for SituationOverview captures whose CharacterCapture row has a non-None Id_ShikigamiCharacter, and only from this field for VsAlly. Resolved in ShikigamiAnimationDataTables (DTM +0x6E0); non-None Key/FileName pairs become montage loader entries. If a shikigami was spawned, PlayIdleMontage looks up FileName[0] and plays it; a missing row, missing loader, or no shikigami actor leaves that animation unset (and, with an actor, returns before weapon montages). Without a spawned shikigami, weapon montage handling proceeds directly.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:27",
@@ -89,7 +90,7 @@
       "status": "verified"
     },
     "Id_AnimationWeapon_Ally": {
-      "simple": "Weapon ids posed and attached for the ally-side (VsAlly only) pose.",
+      "simple": "Which weapons the ally character carries or shows for this pose. Weapons not listed here are hidden on the ally side.",
       "technical": "TArray<FName> (four slots in every export), selected only for VsAlly; the other SituationOverview captures use the Enemy array. Parallel by index to the three Ally weapon arrays; runtime reads socket and variation flags with unchecked GetData()[index]. None ids are skipped. A listed id already in the CharacterWeapon variation list has its socket replaced and is unhidden; unlisted variation weapons are hidden. An id absent from that list is spawned as a pose-only weapon only when bVariationWeapon_Ally[index] is false, it is not already carried, and its Weapon/FileName_BP assets resolve. The ids also drive Weapon.FileName_BP preload (deduplicated by a case-insensitive nine-character WP_000_00 prefix) and idle montage prefix matching.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:30",
@@ -107,7 +108,7 @@
       "status": "verified"
     },
     "WeaponSocketName_Ally": {
-      "simple": "Attachment sockets for ally-side (VsAlly only) pose weapons.",
+      "simple": "Where each ally-side weapon attaches on the character. It also sets the position for weapons added just for this pose.",
       "technical": "TArray<FName>, index-aligned with Id_AnimationWeapon_Ally. Replaces the socket of a listed character weapon and supplies the SpawnWeapon socket for a spawned pose-only weapon. Unlike non-SituationOverview captures, there is no \"root\" fallback; exported values are None, root, R_Weapon or R_weapon, and None is passed through. Existing-weapon and pose-only paths index the array without length checks.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:33",
@@ -121,7 +122,7 @@
       "status": "verified"
     },
     "WeaponAnimationName_Ally": {
-      "simple": "Idle montage loader names for ally-side (VsAlly only) pose weapons.",
+      "simple": "Which resting weapon animation plays on each ally-side weapon in this pose. Leave it blank when that weapon should not play one.",
       "technical": "TArray<FName>, index-aligned with Id_AnimationWeapon_Ally. GetWeaponAnimationNames appends this value whenever the weapon id is non-None, even when the montage name itself is None, and those names are turned into AnimMontage loaders. PlayIdleMontage matches an attached weapon by case-insensitive nine-character id prefix, looks up WeaponAnimationName_Ally at that same index in the loader map, then applies the montage with OverrideAnimationData and Play. The export has 25 non-None names in this array; many slots are intentionally None.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:36",
@@ -136,7 +137,7 @@
       "status": "verified"
     },
     "bVariationWeapon_Ally": {
-      "simple": "Whether an ally-side (VsAlly only) pose weapon is expected from the character variation.",
+      "simple": "Whether each ally-side weapon should already come from the character's chosen outfit variation. When off, the game can add it for the pose.",
       "technical": "TArray<bool>, index-aligned with Id_AnimationWeapon_Ally (24 true slots in the export). For a non-None id absent from the merged CharacterWeapon list, true skips spawning a pose-only copy; false spawns one on the pose socket if assets resolve. The flag is not consulted when the id is already in that list. The later transform test is separate and uses CharacterWeaponRow->Id_Weapon.Contains(Entry.WeaponId); when false it applies the NAME_None entry from AnimationWeaponTransformMap.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:39",
@@ -148,7 +149,7 @@
       "status": "verified"
     },
     "Id_CharacterAnimation_Enemy": {
-      "simple": "CharacterAnimation row used for the enemy-side pose (VsEnemy and Customize).",
+      "simple": "Which standing animation the enemy uses for this pose in a situation overview. This applies on the enemy side and in customization.",
       "technical": "FName; for SituationOverview captures it is selected whenever the capture type is not VsAlly, which includes VsEnemy and Customize; other capture types do not use this table. Resolution, non-None Key/FileName mapping, montage preload, FileName[0] idle playback and missing-row behavior are the same as for the ally field. The export has one dangling reference here: CN_260_POSE_00 names CN_260_SITUATION_OVERVIEW_ENEMY_01, which has no exported CharacterAnimation row.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:42",
@@ -161,7 +162,7 @@
       "status": "verified"
     },
     "Id_ShikigamiCharacterAnimation_Enemy": {
-      "simple": "ShikigamiAnimation row used for the enemy-side (VsEnemy and Customize) shikigami pose.",
+      "simple": "Which standing animation the enemy's Shikigami uses for this pose. It applies on the enemy side and in customization when a Shikigami is present.",
       "technical": "FName; for SituationOverview captures it is selected whenever the type is not VsAlly (including Customize), subject to the same non-None Id_ShikigamiCharacter and spawned-shikigami gates as the ally field. It resolves in ShikigamiAnimationDataTables (DTM +0x6E0); non-None Key/FileName pairs become loader entries and FileName[0] is played on an attached shikigami. A missing row leaves the shikigami animation unset and returns before weapon montages when a shikigami exists.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:45",
@@ -175,7 +176,7 @@
       "status": "verified"
     },
     "Id_AnimationWeapon_Enemy": {
-      "simple": "Weapon ids posed and attached for the enemy-side (VsEnemy and Customize) pose.",
+      "simple": "Which weapons the enemy character carries or shows for this pose. Weapons not listed here are hidden on the enemy side and in customization.",
       "technical": "TArray<FName> (four exported slots); for SituationOverview captures it takes the same weapon hiding/spawning, unchecked index-aligned reads, Weapon.FileName_BP preload and case-insensitive prefix matching path as the ally array whenever the capture type is not VsAlly. None ids are skipped; spawned pose-only weapons additionally require false bVariationWeapon_Enemy[index], no already-carried copy and resolvable assets.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:48",
@@ -190,7 +191,7 @@
       "status": "verified"
     },
     "WeaponSocketName_Enemy": {
-      "simple": "Attachment sockets for enemy-side (VsEnemy and Customize) pose weapons.",
+      "simple": "Where each enemy-side weapon attaches on the character. It also positions weapons added just for this pose in enemy and customization views.",
       "technical": "TArray<FName>, index-aligned with Id_AnimationWeapon_Enemy; used for the same existing-weapon override and pose-only SpawnWeapon socket in SituationOverview captures whose type is not VsAlly. The \"root\" substitution is still limited to non-SituationOverview captures, so None, root, R_Weapon and R_weapon are passed through as exported.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:51",
@@ -204,7 +205,7 @@
       "status": "verified"
     },
     "WeaponAnimationName_Enemy": {
-      "simple": "Idle montage loader names for enemy-side (VsEnemy and Customize) pose weapons.",
+      "simple": "Which resting weapon animation plays on each weapon in enemy and customization views. Leave it blank when that weapon should not play one.",
       "technical": "TArray<FName>, index-aligned with Id_AnimationWeapon_Enemy. GetWeaponAnimationNames appends it for every non-None enemy weapon id (even if the montage name is None), and PlayIdleMontage uses the attached weapon's case-insensitive id prefix to select the index whose loader name is applied with OverrideAnimationData and Play. The export has 25 non-None names in this array.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:54",
@@ -219,7 +220,7 @@
       "status": "verified"
     },
     "bVariationWeapon_Enemy": {
-      "simple": "Whether an enemy-side (VsEnemy and Customize) pose weapon is expected from the character variation.",
+      "simple": "Whether each weapon in enemy and customization views should come from the character's outfit variation. When off, the game can add it.",
       "technical": "TArray<bool>, index-aligned with Id_AnimationWeapon_Enemy (24 true slots in the export). For SituationOverview captures whose type is not VsAlly, true skips spawning a pose-only copy of an id absent from the merged CharacterWeapon list; false spawns it using WeaponSocketName_Enemy when assets resolve. As on the ally side, the later transform test uses CharacterWeaponRow->Id_Weapon rather than this flag.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_SituationOverviewPose.h:57",

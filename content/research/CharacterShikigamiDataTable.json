@@ -1,8 +1,9 @@
 {
+  "overview": "This table tells the game which shikigami join each character in battles and cutscenes.",
   "description": "Per-character shikigami spawn sets: CharacterDataTable.Id_CharacterShikigami selects one or more rows here, and each row's ordered Id_Shikigami list selects ShikigamiDataTable rows for battle/level-sequence preload and spawning. The row struct contains only the row key and the ID list; no timings, stats, or capture-only data live here.",
   "fields": {
     "ID": {
-      "simple": "Row key (CP_xxx or CN_xxx) used by CharacterDataTable.Id_CharacterShikigami to select a shikigami set.",
+      "simple": "The name the game uses to find this character's shikigami group.",
       "technical": "Native FName Id (the export writes the property as ID; ImportKeyField is Id). All ten exported row keys equal their ID value. Runtime consumers do not read the struct member: they pass the key from Character.Id_CharacterShikigami to FindRow<T> over AGameDataTableManager::CharacterShikigamiDataTables (DTM +0x4F0), which walks the table array in registration order and returns the first matching row. The manager registers one CharacterShikigamiDataTable primary asset (GameDataTableManager.cpp:357; loader map built at line 488), resolves it into +0x4F0 in Tick (line 209), and the canonical export plus asset registry contain one table, with no numbered or localized shards. Every Character row with a non-None set reference resolves.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterShikigami.h:11",
@@ -16,7 +17,7 @@
       "status": "verified"
     },
     "Id_Shikigami": {
-      "simple": "Ordered list of ShikigamiDataTable row IDs spawned for the character.",
+      "simple": "Change this list to choose which shikigami join the character in battle or cutscenes. Repeating a name brings that shikigami in more than once.",
       "technical": "TArray<FName>; all ten exported rows have nine entries, with NAME_None right-padding where fewer than nine shikigami are used. The shared collector (retail 0x12bd9b0) and level-sequence spawn loop skip None and resolve each remaining ID in ShikigamiDataTables (+0x6C0); BattleBase passes IDs straight to FindRow, which also rejects a None key. BattleBase loads ShikigamiRow.FileName_BP from StudioShikigamiLoaders_950, spawns one AGameShikigami per entry (GameCharacter.cpp:1829) and installs its ShikigamiAnimation.Key/FileName montages; the level-sequencer path spawns through the same loader map but does not install those shikigami montages. Preload adds FileName_BP and ShikigamiAnimation.FileName names to loader maps; GamePrimaryAssetLoader_CreateLoaders drops None and duplicate names, but the array iteration itself is not deduplicated, so duplicate IDs (CN_050 x3 in CP_120, CN_110 x6 in CP_130, CN_220 x9 in CP_240, etc.) produce repeated collector entries and repeated spawns. All 20 distinct non-None IDs resolve in the 20-row ShikigamiDataTable export. The array is iterated in order, but no consumer interprets a slot index or applies index-parallel data.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterShikigami.h:15",

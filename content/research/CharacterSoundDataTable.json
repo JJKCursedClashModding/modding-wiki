@@ -1,8 +1,9 @@
 {
+  "overview": "This table gathers each character's sound setup, including audio that loads early, footstep sounds, battle voices, and menu or result lines.",
   "description": "Per-character/variation sound bundle: cue sheets to preload, the footstep family, candidate CharacterVoiceGroupSet rows for battle voices, and system/menu VoiceGroup IDs.",
   "fields": {
     "Id": {
-      "simple": "Row key / character-sound ID (native `Id`, exported as `ID`).",
+      "simple": "The name that identifies this sound setup. The game follows it from a character version or shikigami, and also when a menu or result voice is requested.",
       "technical": "FName FindRow key; the single export has 56 unique keys and its IDs all equal their row keys. AGameCharacter::ResolveDataRows selects CharacterVariation.Id_CharacterVariation[InVariationIndex] without an index check, then uses Overrides.SoundIdOverride when non-None, otherwise Variation.Id_CharacterSound; mission-character setup can copy MissionCharacter.Id_CharacterSound into that override. The result is cached at AGameCharacter+0x3D0 and a miss fails the whole character setup. AGameShikigami resolves Shikigami.Id_CharacterSound through the shared finder (with None rejected) and caches a possibly null row at +0x350. Sequencer NPCs use the skinned-model name as the key, while UGameSoundVoicePlayer first resolves a supplied CharacterVariation ID and then uses that variation's Id_CharacterSound. Every finder walks DTM.CharacterSoundDataTables (+0x510) and returns the first typed row.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:12",
@@ -19,7 +20,7 @@
       "status": "verified"
     },
     "CueSheetName": {
-      "simple": "Cue-sheet asset names to load for this character/variation before its audio is needed.",
+      "simple": "Changes which sound collections load before a match or character preview so their audio is ready. Blank entries are ignored, and some characters also load a second collection.",
       "technical": "TArray<FName>; it is a preload list, not an index into the other voice arrays. BattleAssets_CueSheets_12BC230 finds the row from CharacterVariation.Id_CharacterSound and appends every entry verbatim; battle preload, IntervalPvE and LevelSequencer feed such lists to LoadCueSheets. The situation-overview widget filters None before LoadCueSheets, UnloadCueSheets and AreCueSheetsLoaded; the sound manager also ignores None and de-duplicates names, so an unfiltered placeholder does not create a load. All 56 exported rows have two entries: 46 are [named sheet, None], 8 pair a second (often another character's) sheet, and 2 are [None, None]. These collectors use the base variation's Id_CharacterSound and do not apply the battle SoundIdOverride.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:16",
@@ -38,7 +39,7 @@
       "status": "verified"
     },
     "FootstepType": {
-      "simple": "Which family of footstep sounds the actor uses.",
+      "simple": "Changes whether footsteps sound like men's shoes, women's shoes, bare feet, zori, gorilla steps, or Totality. Choosing no type plays no footstep sound.",
       "technical": "EGameFootstepType (uint8): None=0, ShoesMan=1, ShoesWoman=2, BareFoot=3, Zori=4, Gorilla=5, Totality=6, Invalid=255; the row constructor defaults it to None. AGameCharacter::GetFootstepType returns the cached row value with no null guard; AGameShikigami::GetFootstepType returns 0 if its cached row is null; sequencer NPCs read the row directly by model-name key and return 0 when no row is found. The footstep notify needs a MapGround row, converts the value with GameAnimNotify_TypeIndex (value - 1), and indexes GroundRow.Id_SoundEffect_Footstep only when 0 <= Index < Num: values 1-6 select indices 0-5, None gives -1 and Invalid gives 254, both selecting nothing. All 56 exported rows populate this field: 19 ShoesMan, 14 BareFoot, 7 ShoesWoman, 6 Zori, 4 Gorilla, 4 Totality and 2 None; Invalid is unused. Each of the eight MapGround rows supplies six valid SoundEffect IDs.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:19",
@@ -55,7 +56,7 @@
       "status": "verified"
     },
     "Id_CharacterVoiceGroupSet": {
-      "simple": "Candidate CharacterVoiceGroupSet IDs selected by battle-voice mode (normal, alternates and low HP).",
+      "simple": "Chooses which sets of spoken lines the fighter uses for attacks, other actions, and low health.",
       "technical": "TArray<FName>; all 56 exported rows have four entries (three rows are all None), commonly default/TypeA/TypeB/PINCH. ActionController slot 90 normally returns this array by value from the cached SoundRow. AGameCharacter::FindCharacterVoiceGroupSetRow(Mode) uses Mode 0 and 3 directly as indices, but Mode 1 substitutes NormalAttackVoiceIndex and Mode 2 CursedEnergyAttackVoiceIndex; those setup values come from UserCustomizeVoiceInfo and default to 0. Out-of-range or None entries resolve to no row, and the first matching CharacterVoiceGroupSetDataTables row wins. In PlayVoice, kinds 1/3/4 choose Mode 1, kind 2 takes the attack action's mode, kinds 5/10 choose Mode 2, others use Mode 0; when the applicable HP check passes (max HP <= 0 or HP/max <= 0.3) Mode becomes 3. Kind 1 disables that check, kind 4 checks only Index 2, and kind 5 checks only Indexes 2, 5 and 6. CP_051 is an alias: while its passive is active, its controller overrides slot 90 with hardcoded CP_051_2 / CP_051_TYPEA_2 / CP_051_TYPEB_2 / CP_051_PINCH_2 instead of this field.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:22",
@@ -71,7 +72,7 @@
       "status": "verified"
     },
     "Id_VoiceGroup": {
-      "simple": "VoiceGroup IDs for system/menu/result lines, indexed by request kind.",
+      "simple": "Chooses the spoken lines for moments like picking a character, seeing results, or asking for a rematch. A blank leaves that moment silent.",
       "technical": "TArray<FName>; every exported row has exactly 20 entries, matching EGameCharacterSoundVoiceGroupType values 1-20 positionally. UGameSoundVoicePlayer::PlayCharacterVoice resolves the supplied CharacterVariation ID, finds this row through that variation's Id_CharacterSound, computes GroupKind - 1 with GameAnimNotify_TypeIndex, and reads Sound->Id_VoiceGroup[GroupIndex] without a bounds check: GroupKind 0 gives -1 and values above 20 read past the end. A None ID stops the VoiceGroup lookup (bCheckNone=true). A VoiceGroup's Id_Voice entries are weighted 1.0 when non-None and 0.0 when None; the weighted lottery therefore picks uniformly among its non-None voices and returns nothing if all are None. All exported VoiceGroups referenced here have one non-None voice plus four None entries, and 21 sound rows have all 20 IDs set to None. The enum order is select/reselect, ready, two lobby lines, S/A/B-or-lower rank, four win-streak tiers, result item, two rank changes and five rematch outcomes. Traced requests use 1, 3, 4, 5, 6-15 and 16-20 via character select/menu, lobby, result widgets and the rematch-outcome mapping.",
       "evidence": [
         "Source/AbramsDataTable/Public/GameDataTableRow_CharacterSound.h:25",
