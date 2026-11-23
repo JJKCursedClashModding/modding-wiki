@@ -37,44 +37,49 @@ const refs = Object.entries(group.references);
       </details>
 
       <section id="fields" class="doc-section">
-        <h2>What each setting does</h2>
-        <label class="filter-label" for="field-filter">Filter fields</label>
-        <input class="filter" type="search" id="field-filter" placeholder="Field name, type, or definition" autocomplete="off" />
-        <p id="field-empty" class="muted" hidden>No fields match this filter.</p>
-        <div class="field-list">
-          {group.fields.map((field) => (
-            <article class="field" id={fieldAnchor(field.name)}>
-              <h3 class="field-heading"><a href={`#${fieldAnchor(field.name)}`}><code>{field.name}</code></a></h3>
-              <p class="simple"><InlineText value={field.simple ?? 'Definition pending review.'} /></p>
-              <details class="field-details">
-                <summary>Technical details</summary>
-                <div class="field-type"><code>{field.type || 'Type unknown'}</code>
-                  <span class:list={['badge', field.status]}>{statuses[field.status] ?? field.status}</span>
-                  {field.nativeName && field.nativeName !== field.name && !field.name.includes('.') && <span>Unreal property <code>{field.nativeName}</code></span>}
-                  {!field.exportKinds.length && <span>Declaration only</span>}
-                  {field.exportOnly && <span>Export representation</span>}
-                  {field.seenInVariants > 0 && field.seenInVariants < group.variants.length && (
-                    <span>Present in {field.seenInVariants} of {group.variants.length} exports</span>
-                  )}
-                </div>
-                {field.technical && <p class="technical"><InlineText value={field.technical} /></p>}
-                {field.enum && (
-                  <details class="field-evidence">
-                    <summary>Enum values{field.enum.underlying ? ` · ${field.enum.underlying}` : ''}</summary>
-                    <ul class="enum-values">{field.enum.values.map(([name, value]) => <li><code>{name}</code> <span>{value}</span></li>)}</ul>
-                    <p><code>{field.enum.source}</code></p>
-                  </details>
-                )}
-                {(field.source || field.evidence?.length) && (
-                  <details class="field-evidence">
-                    <summary>Evidence</summary>
-                    <ul>{[...new Set([field.source, ...(field.evidence ?? [])].filter(Boolean))].map((ref) => <li><code>{ref}</code></li>)}</ul>
-                  </details>
-                )}
-              </details>
-            </article>
-          ))}
+        <h2>Settings</h2>
+        <div class="field-tools">
+          <input class="filter" type="search" id="field-filter" aria-label="Filter settings" placeholder="Filter by name, type, or description" autocomplete="off" />
+          <p class="field-count" id="field-count" role="status">{formatCount(group.fields.length)} settings</p>
         </div>
+        <div class="field-columns" aria-hidden="true"><span>Setting</span><span>What it does</span></div>
+        <p id="field-empty" class="field-empty" hidden>No settings match this filter.</p>
+        <dl class="field-list">
+          {group.fields.map((field) => (
+            <div class="field" id={fieldAnchor(field.name)}>
+              <dt class="field-heading"><a href={`#${fieldAnchor(field.name)}`}><code>{field.name}</code></a></dt>
+              <dd class="field-body">
+                <p class="simple"><InlineText value={field.simple ?? 'Definition pending review.'} /></p>
+                <details class="field-details">
+                  <summary>Technical details</summary>
+                  <div class="field-type"><code>{field.type || 'Type unknown'}</code>
+                    <span class:list={['badge', field.status]}>{statuses[field.status] ?? field.status}</span>
+                    {field.nativeName && field.nativeName !== field.name && !field.name.includes('.') && <span>Unreal property <code>{field.nativeName}</code></span>}
+                    {!field.exportKinds.length && <span>Declaration only</span>}
+                    {field.exportOnly && <span>Export representation</span>}
+                    {field.seenInVariants > 0 && field.seenInVariants < group.variants.length && (
+                      <span>Present in {field.seenInVariants} of {group.variants.length} exports</span>
+                    )}
+                  </div>
+                  {field.technical && <p class="technical"><InlineText value={field.technical} /></p>}
+                  {field.enum && (
+                    <details class="field-evidence">
+                      <summary>Enum values{field.enum.underlying ? ` · ${field.enum.underlying}` : ''}</summary>
+                      <ul class="enum-values">{field.enum.values.map(([name, value]) => <li><code>{name}</code> <span>{value}</span></li>)}</ul>
+                      <p><code>{field.enum.source}</code></p>
+                    </details>
+                  )}
+                  {(field.source || field.evidence?.length) && (
+                    <details class="field-evidence">
+                      <summary>Evidence</summary>
+                      <ul>{[...new Set([field.source, ...(field.evidence ?? [])].filter(Boolean))].map((ref) => <li><code>{ref}</code></li>)}</ul>
+                    </details>
+                  )}
+                </details>
+              </dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       <section id="variants" class="doc-section">
@@ -127,21 +132,26 @@ const refs = Object.entries(group.references);
   </div>
   <script>
     const fieldFilter = document.querySelector('#field-filter');
+    const fieldCount = document.querySelector('#field-count');
+    const fieldEmpty = document.querySelector('#field-empty');
     const fields = [...document.querySelectorAll('.field-list .field')];
-    fieldFilter.addEventListener('input', () => {
+    const unfilteredCount = fieldCount.textContent;
+    function filterFields() {
       const query = fieldFilter.value.trim().toLowerCase();
       let visible = 0;
       for (const field of fields) {
         field.hidden = !field.textContent.toLowerCase().includes(query);
         if (!field.hidden) visible++;
       }
-      document.querySelector('#field-empty').hidden = visible > 0;
-    });
+      fieldCount.textContent = query ? `${visible} of ${fields.length} settings` : unfilteredCount;
+      fieldEmpty.hidden = visible > 0;
+    }
+    fieldFilter.addEventListener('input', filterFields);
     window.addEventListener('hashchange', () => {
       const target = document.getElementById(location.hash.slice(1));
       if (target?.hidden && target.classList.contains('field')) {
         fieldFilter.value = '';
-        fieldFilter.dispatchEvent(new Event('input'));
+        filterFields();
         target.scrollIntoView();
       }
     });
