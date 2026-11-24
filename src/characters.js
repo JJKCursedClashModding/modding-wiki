@@ -27,6 +27,7 @@ export const characters = roster.map((record) => {
   });
   return {
     ...record,
+    title: `${record.id} - ${record.name}`,
     rows,
     rowCount: record.rows.length,
     emptySlots: record.rows.flatMap((row, index) => row ? [] : [index]),
