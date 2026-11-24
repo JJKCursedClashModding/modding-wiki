@@ -1,0 +1,110 @@
+{
+  "overview": "Transfigured Human D has custom follow-ups for its second and third normal attacks. Its export leaves all unique slots empty.",
+  "technicalOverview": "Transfigured Human D (CN_111) is a non-selectable enemy with no populated character-unique rows: all nine Id_CharacterUnique entries are None, so there are no unique floats exposed for this character. Its character row gives it its own action controller and AI type, its own movement/jump/dash and CN_111_ATTACKA/B/C normal-attack sets, and borrows animation, effect, camera, UI and special-attack data from CN_110 plus cursed-energy data from CP_010. The controller only replaces the second and third normal attacks, ground and air, with four local action classes; those use two internal bytes and the shared attack flag 159 to decide when chained attacks can be requested while grounded. No CN_111 source file calls the character-unique float helpers, so the notes below describe behaviour traced from action, controller and AI code rather than tunable row values.",
+  "rows": {},
+  "notes": [
+    {
+      "text": "No unique-float tuning is wired for this character. The three CN_111 source files contain no call to GetOwnerUniqueFloat, GetCharacterUniqueFloatValue or MakeUniqueCameraRequest; the generic reader is an unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] over rows that the character setup fills with null entries for missing IDs. The UniqueAction hooks in the action classes are animation-notify handlers, not unique-row readers.",
+      "evidence": [
+        "Source/Abrams/Private/CN_111_ActionController.cpp:157",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:169",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:14",
+        "Source/Abrams/Public/CN_111_Actions.h:20",
+        "Source/Abrams/Private/GameCharacter.cpp:561",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933"
+      ]
+    },
+    {
+      "text": "CN_111 does not borrow CN_110's controller. The character row's controller and AI enums select UCN_111_ActionController and FGameCharacterAIThinkNode_CN_111 explicitly; it is CN_110's data rows (effects, special attacks, action fallbacks) that are shared, not the controller object. Both enums give CN_111 its own values (action controller 36, AI type 23).",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:621",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:198",
+        "Source/Abrams/Private/GameCharacter.cpp:507",
+        "Source/Abrams/Private/GameCharacter.cpp:527",
+        "Source/Abrams/Private/GameCharacter.cpp:557",
+        "Tools/verify/CHAR/GameCharacterAIThinkNode.md:142"
+      ]
+    },
+    {
+      "text": "Only four action types get local classes. CreateAction handles NormalAttackAir_3, NormalAttackAir_2, NormalAttack_3 and NormalAttack_2; every other requested action falls through to the base factory, so CN_111 has no character-specific special attack, dash or projectile action code of its own.",
+      "evidence": [
+        "Source/Abrams/Private/CN_111_ActionController.cpp:157",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:161",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:163",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:169"
+      ]
+    },
+    {
+      "text": "The two air attacks reuse the ground attack sets. Both air classes override the attack-set lookup to return the same row the ground class uses (Id_AttackSet_Normal_2 for the second hit, Id_AttackSet_Normal_3 for the third), found through Action_FindAttackSetRow in the manager's AttackSetDataTables. This is shared data use by CN_111's own air action types, not another character's action.",
+      "evidence": [
+        "Source/Abrams/Private/CN_111_ActionController.cpp:73",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:77",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:142",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:146"
+      ]
+    },
+    {
+      "text": "The second and third hits use two private bytes rather than data settings. Animation notify 0 sets the start flag; Reset clears both bytes and sets the guard window; the second homing start clears the guard window; and IsGrounded simply returns that guard-window byte. The same retail body RVAs are recorded as shared with CN_120's normal attacks, but the classes described here are the CN_111 ones.",
+      "evidence": [
+        "Source/Abrams/Public/CN_111_Actions.h:26",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:14",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:24",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:31",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:40",
+        "Tools/verify/CHAR/CN_120_ActionController.md:97"
+      ]
+    },
+    {
+      "text": "Finishing windows differ between the two hits. The second-hit TickAttack calls the base tick only on start counts 0 and 1 and raises flag 159 on count 0; the third-hit tick calls the base tick on counts 0 and 2 and raises flag 159 on count 1 without ticking the base that frame. Both require the start flag to be set and a nonzero ground trace hit. Flag 159 is the gate the shared attack-transition filter checks before forwarding queued or input requests, so this controls when a grounded follow-up can be accepted.",
+      "evidence": [
+        "Source/Abrams/Private/CN_111_ActionController.cpp:53",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:59",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:61",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:122",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:131",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:553",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:569",
+        "Source/Abrams/Private/GameCharacterAction_Attack.cpp:588"
+      ]
+    },
+    {
+      "text": "The controller changes dash cancels and a few global permissions. InitCharacterSpecificState copies the shared cancel table, removes DashJumpBegin from the NormalDash entry and adds RunJumpBegin; that per-controller map is returned by GetActionCancelTable and is read when processing requests. The header also hard-disables tag-combo joining, revival buffs and situation voices. Caution: the matching record marks the slot-298 body HOLD (bytes equal but absent from the linked executable), so the runtime reach of this edit is reconstruction-only.",
+      "evidence": [
+        "Source/Abrams/Private/CN_111_ActionController.cpp:176",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:179",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:180",
+        "Source/Abrams/Private/CN_111_ActionController.cpp:181",
+        "Source/Abrams/Public/GameCharacterActionTables.h:300",
+        "Source/Abrams/Public/CN_111_ActionController.h:29",
+        "Source/Abrams/Public/CN_111_ActionController.h:31",
+        "Source/Abrams/Private/GameCharacterAction.cpp:248",
+        "Tools/verify/LANES/w21-cn-a.md:81"
+      ]
+    },
+    {
+      "text": "The AI reacts to airborne rivals. Every rival except the current target that is in an air action and at least 500 units high gets Unknown20 set to 200; everyone else gets 0. Its SetupRandomParameters adds just one jump-air leaf parameter (11) before the common setup calls. Some think-parameter builders are byte-identical and shared with CN_120/CN_130/CN_160, but this node is the CN_111 one.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:237",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:244",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:249",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:251",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:255",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeRandomParameters.cpp:626",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeRandomParameters.cpp:628",
+        "Source/Abrams/Public/GameCharacterAIThinkNode.h:541"
+      ]
+    },
+    {
+      "text": "Verification status supports the traced mechanics: CreateAction, both TickAttack templates, the air attack-set lookups and the CN_111 AI setup/tick functions are recorded as MATCH. One layout caveat from another lane flags the CN_111 action objects' static_assert size against the retail 0x210 MakeShared allocation; it concerns object size, not any gameplay value or row index.",
+      "evidence": [
+        "Tools/verify/CHAR/CN_111_ActionController.md:31",
+        "Tools/verify/CHAR/CN_111_ActionController.md:46",
+        "Tools/verify/CHAR/ai-family-verified.md:71",
+        "Tools/verify/CHAR/ai-family-verified.md:98",
+        "Tools/verify/CHAR/CN_120_ActionController.md:144"
+      ]
+    }
+  ]
+}

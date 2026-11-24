@@ -1,0 +1,522 @@
+{
+  "overview": "This cursed spirit marks a spot and fires a beam down at it. Its unique settings control the delay, reach, and collision of the beam.",
+  "technicalOverview": "Great Nose Cursed Spirit (CN_071) is a non-selectable AGameCharacter with the CN_071 action controller, but its CharacterDataTable row points its unique, animation, effect, camera and UI IDs at CN_070. AGameCharacter therefore resolves seven CharacterUniqueDataTable4 rows into UniqueRows by numeric index; the eighth and ninth Id_CharacterUnique slots are None. Every setting below is a raw zero-based float read through the owner. This character's niche is a marker-and-downward-beam effect web: place a marker and DCL_80100 decal, wait, fire an FX_CN_070 beam, clip it with traces, and resize Niagara plus capsule collision. Rows 1-6 tune that web; row 0 has no CN_071-specific read identified. The behavior and bone controllers are shells, and no shikigami, trap, GUF or projectile path forwards these rows for CN_071.",
+  "rows": {
+    "CN_070": {
+      "title": "Base row - no identified CN_071 read",
+      "overview": "Row 0 is the first Id_CharacterUnique entry and is all zero. No CN_071 action, behavior, bone, AI, camera, trap, GUF or projectile reader was found for it. General row-0 readers that do exist in the tree belong to other families or require a trap source and are not reached by this character's code.",
+      "values": {},
+      "untraced": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Do not copy CN_070 the shikigami's row-0 behavior here. AGameShikigami fills its UniqueRows from ShikigamiUniqueDataTables and has its own GetCharacterUniqueFloatValue override; CN_071 is an AGameCharacter reading CharacterUniqueDataTable4. The CN_070 summon/release material fades belong to that separate shikigami table.",
+          "evidence": [
+            "Source/Abrams/Private/GameShikigami.cpp:874",
+            "Source/Abrams/Private/GameShikigami.cpp:1251"
+          ]
+        },
+        {
+          "text": "The generic row-0 CursedEnergyAttack hold timers are installed by behavior-controller overrides such as CP_040; CN_071's override is a pure Super forward. The shared SteerTowardSecondaryTarget row-0 divisor is called from CN_041/CN_140 code, not this TU. Trap GetUniqueFloat (GUF) forwards to a source interface and only matters when a trap owner exists.",
+          "evidence": [
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+            "Source/Abrams/Private/CN_071_BehaviorController.cpp:5",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:391",
+            "Source/Abrams/Private/GameTrapActionController.cpp:182"
+          ]
+        }
+      ]
+    },
+    "CN_070_ATTACKA": {
+      "title": "Normal attack 1 - marker and one downward beam",
+      "overview": "Row 1 drives the first normal attack: it places a marker near the target, waits one beat, drops FX_CN_070_00132 onto it, and reuses the same scale for the decal, ground impact effect, Niagara parameters and beam collision.",
+      "values": {
+        "0": {
+          "label": "Beam scale and minimum marker distance",
+          "simple": "Sets how large the beam effect looks and how far the marker is pushed away from the fighter.",
+          "technical": "unique(0,1)=800. GetBeamScale() divides it by 3000; that scale is applied to the marker effect, beam effect, ground effect and decal, while 5000/scale and 3500/scale set Niagara reach and capsule length. The raw value is also passed to SpawnMarkerEffect (whose Scale argument is unused) and gives MinDistance = 800*0.5 + owner capsule radius; a marker closer than that is pushed out along its horizontal offset. The Niagara BeamScale parameter is later set back to the raw 800. Scale is dimensionless; distances use world-space units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Public/CN_071_Actions.h:143",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:468",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:476",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:522",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:616"
+          ]
+        },
+        "1": {
+          "label": "Maximum target snap distance",
+          "simple": "When a secondary target exists, the marker follows it only up to this distance.",
+          "technical": "unique(1,1)=50000. If the horizontal distance from the owner to the target vector is strictly greater than 50000, the marker is clamped to 50000 along that direction; at exactly 50000 the target position is retained. World-distance units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:460",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:462"
+          ]
+        },
+        "2": {
+          "label": "Beam wind-up time",
+          "simple": "How long the fighter waits after placing the marker before the beam falls.",
+          "technical": "unique(2,1)=1.0. Phase 1 resets ActionElapsedTime to 0, adds DeltaTime, and breaks while 1.0 > ActionElapsedTime; on the first tick with elapsed >= 1.0 it plays attack 2 and fires the beam. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:509"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "CursedEnergyAttack_2 reuses the same Reset/StartHoming/Finish pattern and even shares ICF-shaped bodies with this action, but it reads row 6 for its own marker-beam values; the shared body is not a shared row.",
+          "evidence": [
+            "Source/Abrams/Public/CN_071_Actions.h:161",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:651"
+          ]
+        }
+      ]
+    },
+    "CN_070_ATTACKB": {
+      "title": "Normal attack 2 - three sequential charged beams",
+      "overview": "Row 2 is the three-shot variant. Each shot spawns a charge effect at an offset point, fires a beam from it, clips the beam, and plays a burst when it finishes.",
+      "values": {
+        "0": {
+          "label": "Charge and beam width scale",
+          "simple": "Controls how big the charge looks and how wide each beam and its burst appear.",
+          "technical": "unique(0,2)=200. The charge actor scale is 200*0.005 = 1.0. SetBeamWidth writes the raw value to Niagara BeamWidthScale and requests capsule radius Width*0.5 while preserving the current half height; it is called when each beam spawns and again for each finish burst. Dimensionless width multiplier.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:89",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:108",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1134",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1195",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1239"
+          ]
+        },
+        "1": {
+          "label": "Beam clip length",
+          "simple": "Starting length of each beam before geometry traces shorten it.",
+          "technical": "unique(1,2)=3500. ClipBeam traces from the effect along its local X for this length; the first hit that fails EffectPassesContact shortens it to Hit.Distance + 1.0. The final length sets Niagara BeamEndPoint and each attack/nullifies capsule half-length. World-distance units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:39",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:63",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:81",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1297"
+          ]
+        },
+        "2": {
+          "label": "Charge time and Niagara scaling time",
+          "simple": "How long each charge builds before firing; also shown by the charge effect itself.",
+          "technical": "unique(2,2)=0.2. SpawnChargeEffect sets the charge Niagara ScalingTime to this value. Phase 1 adds DeltaTime and waits while 0.2 > ActionElapsedTime, spawning FX_CN_070_00112 on the first tick with elapsed >= 0.2. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1198",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1226"
+          ]
+        },
+        "3": {
+          "label": "Charge aim angle limit",
+          "simple": "Stops the charge from turning too far toward the secondary target.",
+          "technical": "unique(3,2)=5 degrees. Passed as MaxAngle: horizontal Yaw is clamped inclusively to [-5, 5] and sign-corrected by the side-of test; elevation is GameAnimNotify_ClampedElevation(From, To, 5, 5).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1189",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1343",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1347",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1352"
+          ]
+        },
+        "4": {
+          "label": "Recharge interval",
+          "simple": "Pause before the next charge appears.",
+          "technical": "unique(4,2)=0.1. Phase 2 adds DeltaTime and waits while 0.1 > ActionElapsedTime before calling SpawnChargeEffect. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1250"
+          ]
+        },
+        "5": {
+          "label": "Charge forward offset",
+          "simple": "How far in front of the fighter the charge point sits.",
+          "technical": "unique(5,2)=150; multiplied by the owner's facing forward vector and added to the owner location when building From. World-distance units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1163"
+          ]
+        },
+        "6": {
+          "label": "Charge right offset",
+          "simple": "Sideways position of the charge point.",
+          "technical": "unique(6,2)=0; multiplied by the owner's right vector in the same From expression. Zero means no right-side displacement in this row, but the slot is read.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1164"
+          ]
+        },
+        "7": {
+          "label": "Charge up offset",
+          "simple": "Height of the charge point above the fighter.",
+          "technical": "unique(7,2)=100; multiplied by the owner's up vector in the same From expression. World-distance units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1164"
+          ]
+        },
+        "8": {
+          "label": "Per-beam spread offset",
+          "simple": "Separates the three charges so they do not occupy the same point.",
+          "technical": "unique(8,2)=120, applied dynamically by BeamIndex: index 0 adds -120 along right, index 1 adds +120 along up, index 2 adds +120 along right, and the default branch adds nothing. BeamIndex starts at 0 and increments after each fired beam in the three-shot sequence. World-distance units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1168",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1171",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1174",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1244"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": []
+    },
+    "CN_070_ATTACKC": {
+      "title": "Normal attack 2_1 - one charged beam",
+      "overview": "Row 3 is the shorter alternate second normal attack: one charge, one beam, then follow-up animations. It mirrors much of row 2 but leaves several row-2 timing/offset slots unused.",
+      "values": {
+        "0": {
+          "label": "Charge, beam and burst width scale",
+          "simple": "Controls charge size and the visible/collision width of the beam and its burst.",
+          "technical": "unique(0,3)=200. Charge actor scale is 200*0.005 = 1.0; SetBeamWidth receives the raw value for both the live beam and the FX_CN_070_00113 burst. Dimensionless width multiplier.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:124",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1407",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1477"
+          ]
+        },
+        "1": {
+          "label": "Beam clip length",
+          "simple": "Starting beam length before contact traces shorten it.",
+          "technical": "unique(1,3)=2000. Passed to ClipBeam for the live beam and to the finish burst; first non-passing contact shortens it to Hit.Distance + 1.0. World-distance units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:123",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1438"
+          ]
+        },
+        "2": {
+          "label": "Charge scaling time and fire delay",
+          "simple": "How long the charge builds before the beam fires.",
+          "technical": "unique(2,3)=0.2. Sets the charge Niagara ScalingTime, and phase 1 waits while 0.2 > ActionElapsedTime before firing FX_CN_070_00112_2. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1410",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1464"
+          ]
+        },
+        "3": {
+          "label": "Charge aim angle limit",
+          "simple": "Limits the charge's turn toward the secondary target.",
+          "technical": "unique(3,3)=5 degrees; same SpawnChargeEffect clamp as row 2: yaw in [-5, 5] and elevation clamped with 5/5.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1401",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1347",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1352"
+          ]
+        },
+        "5": {
+          "label": "Charge forward offset",
+          "simple": "How far in front of the fighter the charge point sits.",
+          "technical": "unique(5,3)=150; facing-forward multiplier in the charge From vector. World-distance units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1389"
+          ]
+        },
+        "6": {
+          "label": "Charge right offset",
+          "simple": "Sideways charge offset.",
+          "technical": "unique(6,3)=0; right-vector multiplier in From. Zero means no side offset here, but the slot is read.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1390"
+          ]
+        },
+        "7": {
+          "label": "Charge up offset",
+          "simple": "Height of the charge point.",
+          "technical": "unique(7,3)=100; up-vector multiplier in From. World-distance units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1390"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Unlike row 2, this row's index 4 (0) and index 8 (0) have no identified reader in the CN_071 source: the single-shot variant has no recharge phase and no per-beam spread switch.",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1464",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1489"
+          ]
+        }
+      ]
+    },
+    "CN_070_ATTACKD": {
+      "title": "Normal attack 3 - landing search radius",
+      "overview": "Row 4 supplies one observed value to the NormalAttack_3 warp helper. The action searches around the secondary target, chooses the farthest workable side and drops that point to the ground.",
+      "values": {
+        "0": {
+          "label": "Landing search radius",
+          "simple": "How far the fighter probes around the secondary target when choosing where to land.",
+          "technical": "unique(0,4)=3500. In FindLandingLocation, four candidate points are built every 90 degrees around the secondary-target direction as Start + Side*3500, before capsule traces, collision push-out and the final ground trace. World-distance units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:184",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:207",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:210"
+          ]
+        }
+      },
+      "untraced": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The action table associates CN_070_ATTACKD with NormalAttack_2_1, but this unique row is read by the NormalAttack_3 landing helper. Row names are data labels; the runtime accessor uses the numeric row index, so the name does not determine the consuming action.",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:184",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:210"
+          ]
+        }
+      ]
+    },
+    "CN_070_ATTACKE": {
+      "title": "Cursed energy attack 1 - repeated marker beams",
+      "overview": "Row 5 is the multi-round cursed-energy attack. Each round places a marker, waits, fires a beam down onto it, then places the next marker; after the configured number of rounds it plays the finisher.",
+      "values": {
+        "0": {
+          "label": "Beam scale and minimum marker distance",
+          "simple": "Sets the marker/beam visual scale and the no-overlap distance from the fighter.",
+          "technical": "unique(0,5)=1100. GetBeamScale() is 1100/3000 and drives marker scale, ground effect scale, Niagara reach and capsule sizes; the Niagara BeamScale parameter is set to the raw 1100. The raw value is also passed to SpawnMarkerEffect (Scale unused) and gives MinDistance = 1100*0.5 + capsule radius. Scale is dimensionless; distances are world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Public/CN_071_Actions.h:209",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:892",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:903",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1115"
+          ]
+        },
+        "1": {
+          "label": "Maximum target snap distance",
+          "simple": "Caps how far the marker follows a secondary target.",
+          "technical": "unique(1,5)=50000. If the horizontal owner-to-target distance is strictly greater than 50000, the marker is clamped to that range; equality leaves it unchanged. World-distance units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:884",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:886"
+          ]
+        },
+        "2": {
+          "label": "Per-round firing delay",
+          "simple": "Wait between placing a marker and firing its beam.",
+          "technical": "unique(2,5)=0.8. Phase 1 adds DeltaTime and waits while 0.8 > ActionElapsedTime before FireBeam(). Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1015"
+          ]
+        },
+        "3": {
+          "label": "Number of beam rounds",
+          "simple": "How many markers and beams fire before the finisher.",
+          "technical": "unique(3,5)=3. After firing, BeamIndex is incremented and Phase becomes 2 + !(float(BeamIndex) < 3): rounds 1 and 2 return to marker placement, while round 3 (BeamIndex >= 3) goes to phase 3. Strict less-than boundary, so the value is an exact round count here.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1023"
+          ]
+        },
+        "4": {
+          "label": "Next-marker delay",
+          "simple": "Wait after a beam before the next marker appears.",
+          "technical": "unique(4,5)=0.18. Phase 2 adds DeltaTime and waits while 0.18 > ActionElapsedTime before placing the next marker. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:1027"
+          ]
+        }
+      },
+      "untraced": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": []
+    },
+    "CN_070_ATTACKF": {
+      "title": "Cursed energy attack 2 - one split-step marker beam",
+      "overview": "Row 6 drives the second cursed-energy attack. Its phase machine walks through four attacks, placing the marker as attack 2 starts and firing FX_CN_070_00132_3 as attack 3 starts.",
+      "values": {
+        "0": {
+          "label": "Beam scale and minimum marker distance",
+          "simple": "Sets the marker/beam scale and how far the marker is kept from the fighter.",
+          "technical": "unique(0,6)=2000. GetBeamScale() is 2000/3000 and is used for marker, ground effect, decal and beam geometry; the Niagara BeamScale parameter receives the raw 2000. The raw value is also passed to SpawnMarkerEffect (Scale unused) and gives MinDistance = 2000*0.5 + capsule radius. Scale is dimensionless; distances are world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Public/CN_071_Actions.h:177",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:659",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:670",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:844"
+          ]
+        },
+        "1": {
+          "label": "Maximum target snap distance",
+          "simple": "Caps the marker's outward clamp toward a secondary target.",
+          "technical": "unique(1,6)=50000. A strictly greater horizontal distance is clamped to 50000; equality leaves the target position. World-distance units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:651",
+            "Source/Abrams/Private/CN_071_ActionController.cpp:653"
+          ]
+        },
+        "2": {
+          "label": "Beam fire delay",
+          "simple": "How long to wait after the marker appears before firing.",
+          "technical": "unique(2,6)=1.3. Phase 2 adds DeltaTime and waits while 1.3 > ActionElapsedTime, then plays attack 3 and calls FireBeam(). Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_071_ActionController.cpp:781"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": []
+    }
+  },
+  "notes": [
+    {
+      "text": "The accessor chain has no checks or fallback: GetOwnerUniqueFloat forwards to AGameCharacter::GetCharacterUniqueFloatValue, which directly dereferences UniqueRows[RowIndex]->FloatValue[ValueIndex]. UniqueRows is built one-for-one from Id_CharacterUnique, with missing rows stored as null, so any out-of-range index or missing row would be a bad dereference rather than a zero default.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Public/GameCharacter.h:245"
+      ]
+    },
+    {
+      "text": "MakeUniqueCameraRequest was checked because it can read subvalues 0-10 of an arbitrary unique row, but no CN_071 action or controller calls it; its camera settings are not part of these rows.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction.cpp:941"
+      ]
+    },
+    {
+      "text": "CN_071's CreateAction override registers all 14 specialist attack classes (ground and air versions of normal 1, 2, 2_1, 3, 3_1 and cursed energy 1/2). The verification ledger records this as a 14-arm retail factory; current source builds the CN_071 classes for every arm and falls back to the base factory otherwise.",
+      "evidence": [
+        "Source/Abrams/Private/CN_071_ActionController.cpp:1537",
+        "Tools/verify/CHAR/CN_071_ActionController.md:3"
+      ]
+    },
+    {
+      "text": "The shared marker web is worth knowing when editing these numbers: FX_CN_070_00131 is spawned facing up with unit scale, DCL_80100 is a manual-fade decal whose X size is 5000/GetBeamScale(), and the ground impact FX_CN_070_00134 uses the first downward hit that is not GameTraceChannel3, has a named surface and slopes at most 70 degrees; otherwise the marker itself is used.",
+      "evidence": [
+        "Source/Abrams/Private/CN_071_ActionController.cpp:333",
+        "Source/Abrams/Private/CN_071_ActionController.cpp:367",
+        "Source/Abrams/Private/CN_071_ActionController.cpp:390",
+        "Source/Abrams/Private/CN_071_ActionController.cpp:476"
+      ]
+    },
+    {
+      "text": "AI is independent of these float rows: CN_071's think node increments brain key 0 while the nearest team-A character is within squared 2D distance 250000 and clears it on NormalAttack_3; its behavior controller only forwards CreateThinkParam to Super.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:167",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:176",
+        "Source/Abrams/Private/CN_071_BehaviorController.cpp:5"
+      ]
+    },
+    {
+      "text": "A control quirk outside the unique rows: the controller copies the shared cancel table and removes Idle's cancels into RunBegin, NormalDashBegin, Guard, JumpBegin and RunJumpBegin.",
+      "evidence": [
+        "Source/Abrams/Private/CN_071_ActionController.cpp:1576",
+        "Source/Abrams/Private/CN_071_ActionController.cpp:1580"
+      ]
+    },
+    {
+      "text": "Reconstruction caveat: these are traced consumers in the current reconstructed source, not a claim that every body is byte-matched. The CN_071 verification note still records several effect-web slots as parked on unlanded callees, so exact retail codegen for those paths remains outside this document.",
+      "evidence": [
+        "Tools/verify/CHAR/CN_071_ActionController.md:102",
+        "Tools/verify/CHAR/CN_071_ActionController.md:113"
+      ]
+    }
+  ]
+}

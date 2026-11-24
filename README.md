@@ -1,6 +1,6 @@
 # Jujutsu Kaisen CC Modding Wiki
 
-A static Astro reference for the Jujutsu Kaisen Cursed Clash Unreal project. The site builds DataTable, enum, and Data Blueprint pages from JSON and indexes them for browser-side search.
+A static Astro reference for the Jujutsu Kaisen Cursed Clash Unreal project. The site builds character, DataTable, enum, and Data Blueprint pages from JSON and indexes them for browser-side search.
 
 Read the [modding wiki](https://jjkcursedclashmodding.github.io/modding-wiki/). GitHub Actions builds, verifies, and publishes the site on pushes to `main`.
 
@@ -53,8 +53,15 @@ Use the Unreal project and the community DataTables exports as read-only inputs.
 
 ```sh
 python tools/catalog.py --project "path/to/Jujutsu Kaisen CC" --exports "path/to/JJKCCDatatables"
+python tools/character_catalog.py --exports "path/to/JJKCCDatatables/datatables"
 ```
 
 The code reference index records text matches for table names, types, and accessors. Research files describe the runtime paths and their evidence. The source snapshot and assets have gaps, so retail behavior may need additional verification.
 
 Exports are from [JJKCursedClashModding/DataTables](https://github.com/JJKCursedClashModding/DataTables). Names and stubs are attributed to the [community UE5 Mod Kit](https://github.com/JJKCursedClashModding/UE5-Mod-Kit).
+
+## Edit a character page
+
+Edit `content/character-research/<CharacterCode>.json`. The generated `content/characters.json` supplies the localized name, ordered `Id_CharacterUnique` entries, source shard names, and exported numbers. A character's research has a plain `overview`, an optional `technicalOverview`, a `rows` map keyed by exact exported row key, and `notes` with `text` and `evidence`.
+
+Each row has a `title`, an `overview`, a `values` map keyed by zero-based float slot, an `untraced` array of zero-based slots, and `notes`. Each value explanation has a short `label`, `simple` and `technical` descriptions, a review `status`, and `evidence`. Account for every float slot exactly once. An untraced slot reports a limit of the available source. A zero export can be an active value.

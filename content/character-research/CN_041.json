@@ -1,0 +1,229 @@
+{
+  "overview": "Rika’s unique setting controls how quickly her first normal attack turns toward a secondary target.",
+  "technicalOverview": "Rika (CN_041) has one populated unique row: zero-based CharacterUniqueDataTable3 row 0 named CN_040. Its only nonzero value is float 0 = 180, used directly as the turn-time divisor when her first normal attack steers toward a valid secondary target. The remaining zero floats are positions that shared camera and AI helpers know how to read, but no active CN_041 caller was found for them; generic projection-sorcery damage fallback can also read float 0. CN_041 uses its own UCN_041 action controller, a behavior override that makes the cursed-energy AI action a one-shot Idle executor, and a bone controller that disables several skeleton systems; its Super retargeting and grounded attack effects do not consume this row.",
+  "rows": {
+    "CN_040": {
+      "title": "Rika's shared CN_040-named unique row (CharacterUniqueDataTable3 row 0)",
+      "overview": "This row contains the 180 homing-turn divisor at value index 0 and zeros everywhere else. It is reached through the raw owner accessor UniqueRows[0]->FloatValue[n], with no bounds or null checks. The shared camera builder would read values 0-10 if called with row 0, but CN_041's actions and controller do not call it; the generic AI timed-hold executors read values 0-2, but CN_041 replaces their 0x11 slot with a non-timed Idle executor.",
+      "values": {
+        "0": {
+          "label": "Homing turn-time divisor",
+          "simple": "Controls how long Rika's first normal attack spends turning toward a secondary target. A larger number makes the computed turn time smaller; changing it to zero or a negative value disables that turn instead of making it instant.",
+          "technical": "Traced use: all eight custom normal-attack classes built by UCN_041_ActionController::CreateAction inherit TCN_041_NormalAttack::StartAttackHoming. On start count 0, a valid secondary target, and a controller that is UCN_041_ActionController, they call UGameCharacterActionController::SteerTowardSecondaryTarget(&ActionElapsedTime). That helper rechecks target validity, takes the unsigned angle in degrees between the owner's forward and the safe-normalized 2-D target delta, reads GetCharacterUniqueFloatValue(0, 0), and requires the value to be strictly greater than 0. Otherwise it writes 0 and does not rotate. On success it writes turnTime = angle / 180 and calls RotateTowardLocation(target location, turnTime, Linear, 2.0f). Secondary read: the inherited generic ProjectionSorceryReceive action uses this same owner row 0 float 0 as RestraintTime only when the incoming DamageTableRow pointer is null; it advances ActionElapsedTime and triggers the stagger/cleanup when RestraintTime <= ActionElapsedTime. The generic timed-hold AI executors also read float 0 as a base duration, but CN_041's behavior factory does not instantiate those Hold executors.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_041_ActionController.cpp:242",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:377",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3492",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:203",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:875",
+            "Source/Abrams/Private/GameCharacter.cpp:1759"
+          ]
+        },
+        "1": {
+          "label": "Shared camera X-side offset / unused AI hold scale",
+          "simple": "No active CN_041 use was found. Generic code can use this as a camera side-offset or as a level-scaled AI hold duration, but neither path is taken by this character's traced setup.",
+          "technical": "FGameCharacterAction::MakeUniqueCameraRequest(CameraMode=2, RowIndex) reads FloatValue[1] as Request.CameraOffset.Y; CN_041 has no call to that helper in its controller or action classes. FGameCharacterAIAction_CursedEnergyAttack1Hold::Reset reads FloatValue[0] + FloatValue[1] * CursedEnergyLevel, but UCN_041_BehaviorController::CreateThinkParam replaces ordinal 0x11 with FGameCharacterAIAction_CursedEnergyAttack1Idle, and the base factory creates no Hold executor. The current 0 is not evidence that the slot is inherently unused.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:118",
+            "Source/Abrams/Private/CN_041_BehaviorController.cpp:8",
+            "Source/Abrams/Private/GameCharacterBehaviorController.cpp:99"
+          ]
+        },
+        "2": {
+          "label": "Shared camera height offset / unused AI hold scale",
+          "simple": "No active CN_041 use was found. Generic code can use this as a camera vertical offset or as a level-scaled cursed-energy-2 hold duration; CN_041 does not reach either path.",
+          "technical": "MakeUniqueCameraRequest(2, RowIndex) reads FloatValue[2] as Request.CameraOffset.Z. FGameCharacterAIAction_CursedEnergyAttack2Hold::Reset reads FloatValue[0] + FloatValue[2] * CursedEnergyLevel, but CN_041's behavior factory does not create that Hold executor and the action controller explicitly rejects CursedEnergyAttack_2 / CursedEnergyAttackAir_2 requests.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:123",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:129",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:493"
+          ]
+        },
+        "3": {
+          "label": "Shared camera lower-angle limit",
+          "simple": "No active CN_041 use was found; a shared camera helper would assign this to the lower angle limit if a CN_041 action requested camera mode 2 with row 0.",
+          "technical": "MakeUniqueCameraRequest reads Owner row FloatValue[3] into Request.LimitAngleDown only when CameraMode == 2. No CN_041 action or controller call site passes row 0 to that helper.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:226"
+          ]
+        },
+        "4": {
+          "label": "Shared camera upper-angle limit",
+          "simple": "No active CN_041 use was found; a shared camera helper would assign this to the upper angle limit if called for row 0.",
+          "technical": "MakeUniqueCameraRequest reads FloatValue[4] into Request.LimitAngleUp only when CameraMode == 2. No CN_041 caller was traced.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:226"
+          ]
+        },
+        "5": {
+          "label": "Shared camera field of view",
+          "simple": "No active CN_041 use was found; this is the field-of-view value the shared camera builder would read for row 0.",
+          "technical": "MakeUniqueCameraRequest reads FloatValue[5] into Request.FieldOfView only when CameraMode == 2. No CN_041 caller was traced.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:226"
+          ]
+        },
+        "6": {
+          "label": "Shared camera FOV blend time",
+          "simple": "No active CN_041 use was found; this is the field-of-view blend time the shared camera builder would read for row 0.",
+          "technical": "MakeUniqueCameraRequest reads FloatValue[6] into Request.FieldOfViewBlendTime only when CameraMode == 2. No CN_041 caller was traced.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:226"
+          ]
+        },
+        "7": {
+          "label": "Shared camera FOV easing selector",
+          "simple": "No active CN_041 use was found. If the shared camera builder were called for row 0, the current 0 would select linear FOV easing.",
+          "technical": "MakeUniqueCameraRequest casts FloatValue[7] to int32 and maps exactly 0 -> Linear, 1 -> EaseIn, 2 -> EaseOut, 3 -> EaseInOut; any other value leaves FieldOfViewEasing at its default. This occurs only for CameraMode == 2 and no CN_041 caller was traced.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:955",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:226"
+          ]
+        },
+        "8": {
+          "label": "Shared camera orbit yaw",
+          "simple": "No active CN_041 use was found; this is the orbit-yaw value the shared camera builder would read for row 0.",
+          "technical": "MakeUniqueCameraRequest reads FloatValue[8] into Request.OrbitYaw only when CameraMode == 2. No CN_041 caller was traced.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:226"
+          ]
+        },
+        "9": {
+          "label": "Shared camera orbit pitch",
+          "simple": "No active CN_041 use was found; this is the orbit-pitch value the shared camera builder would read for row 0.",
+          "technical": "MakeUniqueCameraRequest reads FloatValue[9] into Request.OrbitPitch only when CameraMode == 2. No CN_041 caller was traced.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:226"
+          ]
+        },
+        "10": {
+          "label": "Shared camera roll",
+          "simple": "No active CN_041 use was found; this is the roll value the shared camera builder would read for row 0.",
+          "technical": "MakeUniqueCameraRequest reads FloatValue[10] into Request.Roll only when CameraMode == 2. No CN_041 caller was traced.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:226"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The accessor is a raw unchecked array dereference: RowIndex selects UniqueRows and ValueIndex selects that row's FloatValue. Row 0 is valid for CN_041, and FloatValue has 14 entries; values 11-13 have no identified row-0 read in the shared helper or in CN_041's own code.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:559",
+            "Source/Abrams/Private/GameCharacter.cpp:1758",
+            "Source/Abrams/Public/GameCharacterActionInline.h:7",
+            "Tools/verify/CHAR/UniqueRowsInline.md:19"
+          ]
+        },
+        {
+          "text": "The row name CN_040 is data reuse, not an instruction to use UCN_040_ActionController. CN_041 uses UCN_041_ActionController, while the similarly named CN_040 controller is a shikigami-family controller.",
+          "evidence": [
+            "Source/Abrams/Public/CN_041_ActionController.h:7",
+            "Source/Abrams/Public/CN_040_ActionController.h:7",
+            "Source/Abrams/Private/GameDataTableManager.cpp:220"
+          ]
+        },
+        {
+          "text": "No trap or spawner forwarding from CN_041 was found. The generic trap GetUniqueFloat forwards to a trap source actor's interface, but CN_041's controller and action source contain no trap/spawner calls; do not mix in trap unique tables.",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:182",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:1"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Normal attacks 1, 1_1, 2, 3_1 and their air variants are all custom CN_041 classes. Their first-start steering is what gives float 0 its ordinary effect; later starts use the base attack tick instead.",
+      "evidence": [
+        "Source/Abrams/Private/CN_041_ActionController.cpp:242",
+        "Source/Abrams/Private/CN_041_ActionController.cpp:377",
+        "Source/Abrams/Private/CN_041_ActionController.cpp:395"
+      ]
+    },
+    {
+      "text": "The Super attack is separate from this row's main use: its first start zeroes cursed energy and can add the owner as a focus candidate; finish effects request the event state on the second finish and repick the target by lowest hit-point ratio (or nearest unlocked target if that one is collision-locked). No unique float is read in those bodies.",
+      "evidence": [
+        "Source/Abrams/Private/CN_041_ActionController.cpp:122",
+        "Source/Abrams/Private/CN_041_ActionController.cpp:158",
+        "Source/Abrams/Private/CN_041_ActionController.cpp:201"
+      ]
+    },
+    {
+      "text": "AI setup is CN_041-specific: EGameCharacterAIType::CN_041 creates FGameCharacterAIThinkNode_CN_041, and its Tick only adjusts AI state value 0 for an active Super or empty HP. The behavior controller overrides ordinal 0x11 with the one-shot CursedEnergyAttack1Idle executor, which presses the key when idle and clears input otherwise; it has no unique-row read.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:193",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:89",
+        "Source/Abrams/Private/CN_041_BehaviorController.cpp:8",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:314"
+      ]
+    },
+    {
+      "text": "CN_041's attack notify effects are grounded trace/spawn effects named FX_CN_040_00301_1, _2 and _3. They use the notify's FloatParameter as the trace half-height and a shared shot-blocker object list; they do not read CharacterUnique row values.",
+      "evidence": [
+        "Source/Abrams/Private/CN_041_ActionController.cpp:334",
+        "Source/Abrams/Private/CN_041_ActionController.cpp:348",
+        "Source/Abrams/Private/CN_041_ActionController.cpp:413",
+        "Source/Abrams/Private/CN_041_ActionController.cpp:423"
+      ]
+    },
+    {
+      "text": "Movement and skeleton quirks are controller code, not row values: Run and NormalDash force move modes 4 and 8 at start; Down and DownEnd always use face-down animation names; the bone controller resolves both ankle bones to 'hip', empties foot IKs, and folds lean/aim-offset/foot-bend updates to no-ops.",
+      "evidence": [
+        "Source/Abrams/Private/CN_041_ActionController.cpp:35",
+        "Source/Abrams/Private/CN_041_ActionController.cpp:49",
+        "Source/Abrams/Private/CN_041_ActionController.cpp:65",
+        "Source/Abrams/Private/CN_041_BoneController.cpp:8",
+        "Source/Abrams/Private/CN_041_BoneController.cpp:21"
+      ]
+    },
+    {
+      "text": "The reconstruction status is mixed: the row lookup and normal-attack homing helper are source-traced, but CN_041's Super slot-3 effect path is documented as a formerly blocked helper in the verification note. Treat any gameplay interpretation beyond the traced formulas as observed, not proven balance intent.",
+      "evidence": [
+        "Tools/verify/CHAR/CN_041_ActionController.md:58",
+        "Tools/verify/CHAR/CN_041_ActionController.md:82",
+        "Tools/verify/CHAR/ActionControllerDependencies.md:29"
+      ]
+    }
+  ]
+}

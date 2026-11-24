@@ -1,0 +1,114 @@
+---
+import Reference from '../../layouts/Reference.astro';
+import InlineText from '../../layouts/InlineText.astro';
+import CharacterNotes from '../../layouts/CharacterNotes.astro';
+import { characterHref, characterRowOwners, characters, charactersById, uniqueRowAnchor, uniqueValueAnchor } from '../../characters.js';
+import { fieldAnchor, hrefFor, slugFor } from '../../data.js';
+
+export function getStaticPaths() {
+  return characters.map((record) => ({ params: { slug: slugFor(record.id) }, props: { record } }));
+}
+
+const { record } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const statuses = { verified: 'Consumer traced', observed: 'Observed', unresolved: 'Unresolved' };
+const transformation = charactersById.get(record.transformation);
+---
+<Reference title={`${record.name} (${record.id})`} description={record.overview} current={record.id} section="characters">
+  <div class="doc-grid">
+    <article class="doc">
+      <div class="breadcrumb"><a href={base}>Overview</a><span aria-hidden="true">/</span><a href={`${base}characters/`}>Characters</a></div>
+      <h1 class="table-title">{record.name}</h1>
+      {record.overview && <p class="lead"><InlineText value={record.overview} /></p>}
+      <dl class="specs character-specs">
+        <div><dt>Character code</dt><dd><code>{record.id}</code></dd></div>
+        <div><dt>Unique rows</dt><dd>{record.rows.length} of {record.rowCount}</dd></div>
+        <div><dt>Variations</dt><dd>{record.variantCount}</dd></div>
+        {record.controller && record.controller !== 'None' && <div><dt>Action controller</dt><dd><code>{record.controller}</code></dd></div>}
+        {record.storyName && <div><dt>Story name</dt><dd>{record.storyName}</dd></div>}
+        {transformation && <div><dt>Linked form</dt><dd><a href={characterHref(transformation.id)}>{transformation.name}</a></dd></div>}
+      </dl>
+      {record.technicalOverview && (
+        <details class="table-details">
+          <summary>Technical overview</summary>
+          <p class="technical"><InlineText value={record.technicalOverview} /></p>
+        </details>
+      )}
+
+      <section class="doc-section" id="unique-rows">
+        <h2>Unique settings</h2>
+        {record.rows.length ? (
+          <>
+            <p class="section-intro">Each row is an entry in <a href={`${hrefFor('CharacterDataTable')}#${fieldAnchor('Id_CharacterUnique')}`}><code>Id_CharacterUnique</code></a>. Row indices and <code>FloatValue</code> indices start at 0. The numbers shown come from the public DataTable exports.</p>
+            <ul class="unique-jump-list">
+              {record.rows.map((row) => <li><a href={`#${uniqueRowAnchor(row.index)}`}><code>{row.index}</code> {row.title}</a></li>)}
+            </ul>
+            {record.rows.map((row) => (
+              <section class="unique-row" id={uniqueRowAnchor(row.index)} aria-labelledby={`${uniqueRowAnchor(row.index)}-title`}>
+                <h3 id={`${uniqueRowAnchor(row.index)}-title`}>{row.title}</h3>
+                <p class="unique-row-source"><code>{row.key}</code><span>Row index {row.index}</span><a href={`${hrefFor('CharacterUniqueDataTable')}#variants`}><code>{row.asset}</code></a></p>
+                {characterRowOwners.get(row.key).filter((owner) => owner.id !== record.id).map((owner) => (
+                  <p class="unique-row-source">Also used by <a href={`${characterHref(owner.id)}#${uniqueRowAnchor(owner.index)}`}>{owner.name}</a></p>
+                ))}
+                {row.overview && <p class="technical"><InlineText value={row.overview} /></p>}
+                <table class="value-table unique-values reference-index" aria-labelledby={`${uniqueRowAnchor(row.index)}-title`}>
+                  <thead><tr><th scope="col">Slot</th><th scope="col">Export value</th><th scope="col">What it does</th></tr></thead>
+                  <tbody>
+                    {row.slots.map((slot) => (
+                      <tr class="field" id={uniqueValueAnchor(row.index, slot.index)}>
+                        <th scope="row" class="field-heading"><a href={`#${uniqueValueAnchor(row.index, slot.index)}`} aria-label={`FloatValue[${slot.index}]`} title={`FloatValue[${slot.index}]`}><code>[{slot.index}]</code></a></th>
+                        <td class="value-number"><code>{String(slot.value)}</code></td>
+                        <td>
+                          {slot.label ? (
+                            <>
+                              <p><strong>{slot.label}</strong></p>
+                              <p class="simple"><InlineText value={slot.simple} /></p>
+                              <details class="field-details">
+                                <summary>Technical details</summary>
+                                <div class="field-metadata"><span class:list={['badge', slot.status]}>{statuses[slot.status]}</span></div>
+                                <p class="technical"><InlineText value={slot.technical} /></p>
+                                <details class="field-evidence">
+                                  <summary>Evidence</summary>
+                                  <ul>{slot.evidence.map((ref) => <li><code>{ref}</code></li>)}</ul>
+                                </details>
+                              </details>
+                            </>
+                          ) : <p class="muted">No read traced in the available source.</p>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!!row.notes.length && <CharacterNotes notes={row.notes} />}
+              </section>
+            ))}
+            {record.emptySlots.length > 0 && <p class="section-intro">Empty row slots (<code>None</code>) · {record.emptySlots.join(', ')}.</p>}
+          </>
+        ) : <p class="section-intro">All {record.rowCount} slots in <a href={`${hrefFor('CharacterDataTable')}#${fieldAnchor('Id_CharacterUnique')}`}><code>Id_CharacterUnique</code></a> contain <code>None</code> in this character’s export.</p>}
+      </section>
+
+      {record.related.length > 0 && (
+        <section class="doc-section" id="related-settings">
+          <h2>Related settings</h2>
+          <ul class="reference-list character-related">
+            {record.related.map(({ table, label, keys }) => (
+              <li><a href={hrefFor(table)}>{label}</a><span class="muted">{keys.map((key) => <code>{key}</code>)}</span></li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {record.notes.length > 0 && (
+        <section class="doc-section" id="notes">
+          <h2>Notes</h2>
+          <CharacterNotes notes={record.notes} />
+        </section>
+      )}
+    </article>
+    <nav class="toc" aria-label="On this page">
+      <strong>On this page</strong>
+      <a href="#unique-rows">Unique settings</a>
+      {record.related.length > 0 && <a href="#related-settings">Related settings</a>}
+      {record.notes.length > 0 && <a href="#notes">Notes</a>}
+    </nav>
+  </div>
+</Reference>

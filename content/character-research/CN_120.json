@@ -1,0 +1,187 @@
+{
+  "overview": "A single turn-angle threshold helps decide which follow-up Transfigured Human A uses during a normal attack.",
+  "technicalOverview": "Transfigured Human A (CN_120) has a deliberately small unique-data setup: one named row with a single meaningful tuning value. The character's action controller specializes ground and air NormalAttack_1, NormalAttack_3 and NormalAttack_3_1 actions, and the one traced unique value is a strict angle cut-off that decides whether an index-3 normal-attack branch changes to index 4 when the secondary target is missing or far off the facing. The other 13 slots are zero; no reachable CN_120 action, AI, effect, projectile, trap or shikigami reader was found for them. The descriptions below name reconstructed code by its observed behavior; row and float indices are zero-based and follow the supplied data.",
+  "rows": {
+    "CN_120": {
+      "title": "Single attack-targeting angle",
+      "overview": "This row supplies one secondary-target angle limit for CN_120 normal attacks. The remaining slots are zero, but zero is not treated as proof of disuse: they are listed as untraced after checking the character-specific and shared consumers.",
+      "values": {
+        "0": {
+          "label": "Secondary-target angle limit",
+          "simple": "Changes the normal-attack branch when there is no second target, or when that target is more than this many degrees away from where the character is facing.",
+          "technical": "In TCN_120_NormalAttack_1<TBase>::GetAttackRow (used by both ground and air NormalAttack_1), the check runs only when the requested attack row Index is exactly 3. If a valid secondary target exists, the code takes that target's GAISlot014 location, subtracts the owner's GAISlot014 location, calls GetSafeNormal() on the 3-D delta, and compares AngleBetweenDegrees(owner facing forward, that direction) with unique(0,0). A strict '>' test remaps Index to 4; a target at exactly the stored angle does not remap, and indices other than 3 are untouched. With no valid secondary target, Index 3 remaps to 4 unconditionally. The traced unit is degrees; the supplied value is 90. A separate shared damage-reaction path, FGameCharacterAction_ProjectionSorceryReceive::Tick, uses unique(0,0) as RestraintTime only when Request.DamageTableRow is null; ActionElapsedTime accumulates DeltaTime and the reaction advances when that elapsed time reaches or exceeds the value. That fallback is not a CN_120-owned action.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_120_ActionController.cpp:227",
+            "Source/Abrams/Private/CN_120_ActionController.cpp:229",
+            "Source/Abrams/Private/CN_120_ActionController.cpp:231",
+            "Source/Abrams/Private/CN_120_ActionController.cpp:233",
+            "Source/Abrams/Private/CN_120_ActionController.cpp:234",
+            "Source/Abrams/Private/CN_120_ActionController.cpp:235",
+            "Source/Abrams/Private/CN_120_ActionController.cpp:237",
+            "Source/Abrams/Private/CN_120_ActionController.cpp:242",
+            "Source/Abrams/Private/CN_120_ActionController.cpp:245",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:213",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:215"
+          ]
+        }
+      },
+      "untraced": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The row has no fallback sentinel or extra guard: the CN_120 read is a plain strict angle comparison, and only the missing-secondary-target case takes the unconditional branch.",
+          "evidence": [
+            "Source/Abrams/Private/CN_120_ActionController.cpp:229",
+            "Source/Abrams/Private/CN_120_ActionController.cpp:235",
+            "Source/Abrams/Private/CN_120_ActionController.cpp:242"
+          ]
+        },
+        {
+          "text": "Shared helpers that read other row-0 slots were checked but are not counted here. MakeUniqueCameraRequest reads slots 0-10 only when CameraMode is 2 and a caller supplies the row index; no CN_120 action calls it. The generic steering helper divides an angle by slot 0, and its only traced call sites are CN_041 and CN_140 action bodies, not CN_120.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:391",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:97",
+            "Source/Abrams/Private/CN_120_ActionController.cpp:266",
+            "Source/Abrams/Private/CN_120_ActionController.cpp:283"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Character setup resolves every Id_CharacterUnique name in order into UniqueRows, and the accessor is an unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference. CN_120 has one populated entry in the supplied nine-entry list, so any dynamic row index above 0 would not select another CN_120 setting.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:560",
+        "Source/Abrams/Private/GameCharacter.cpp:561",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Source/Abrams/Public/GameCharacter.h:245",
+        "Tools/verify/CHAR/UniqueRowsInline.md:20",
+        "Tools/verify/CHAR/UniqueRowsInline.md:21",
+        "Tools/verify/CHAR/UniqueRowsInline.md:22"
+      ]
+    },
+    {
+      "text": "The only unique-float read in the CN_120 action TU is the NormalAttack_1 attack-row selection above. The shared notify-0 body for NormalAttack_3 and NormalAttack_3_1 instead sets a homing-invalidate timer from ActionStepRow->Step_HomingInvalidateDistance, resets inertia, and calls GAISlot186; it does not read this row.",
+      "evidence": [
+        "Source/Abrams/Private/CN_120_ActionController.cpp:28",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:32",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:33",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:34",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:35",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:227",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:235"
+      ]
+    },
+    {
+      "text": "UCN_120_ActionController creates only six specialized actions: ground and air NormalAttack_1, NormalAttack_3 and NormalAttack_3_1. Every other action type falls through to the shared base factory, so no other character-specific CN_120 action body was found that could read the remaining slots.",
+      "evidence": [
+        "Source/Abrams/Private/CN_120_ActionController.cpp:266",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:270",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:272",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:274",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:276",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:278",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:280",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:283",
+        "Tools/verify/CHAR/CN_120_ActionController.md:4",
+        "Tools/verify/CHAR/CN_120_ActionController.md:6"
+      ]
+    },
+    {
+      "text": "Two nearby combat quirks do not use the unique row: NormalAttack_3 plays StepR for a nonzero stick input whose flat camera-relative angle is greater than 45 degrees and less than 135 degrees with a positive cross product, and first-start NormalAttack_1 probes behind the owner (capsule radius plus 50) before resetting vector tweens when a level-facing wall or blocked follow-ground test is found.",
+      "evidence": [
+        "Source/Abrams/Private/CN_120_ActionController.cpp:90",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:105",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:107",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:111",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:117",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:119",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:121",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:198",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:206",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:207",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:215",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:216",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:219"
+      ]
+    },
+    {
+      "text": "Controller-level movement and social behavior are fixed rather than unique-row driven: NormalDash removes DashJumpBegin and adds RunJumpBegin to its cancel set; JumpAir and RunJumpAir add JumpAirBegin and RunJumpAirBegin; the controller allows two air jumps and refuses tag combo, revival buff and situation voice.",
+      "evidence": [
+        "Source/Abrams/Private/CN_120_ActionController.cpp:287",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:290",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:293",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:294",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:295",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:296",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:297",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:298",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:299",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:300",
+        "Source/Abrams/Private/CN_120_ActionController.cpp:301",
+        "Source/Abrams/Public/CN_120_ActionController.h:31",
+        "Source/Abrams/Public/CN_120_ActionController.h:32",
+        "Source/Abrams/Public/CN_120_ActionController.h:34",
+        "Source/Abrams/Public/CN_120_ActionController.h:35",
+        "Source/Abrams/Public/CN_120_ActionController.h:36"
+      ]
+    },
+    {
+      "text": "The AI type creates FGameCharacterAIThinkNode_CN_120. Its tick publishes only whether NormalAttack_3 or NormalAttack_3_1 is active, and its setup is the nine-slot normal-attack/movement set shared with CN_111 and CN_130. The timed hold executors that do read row-0 slots 0, 1 and 2 are selected by CP_040's behavior controller, so their duration reads are not assigned to CN_120.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:199",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:267",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:273",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:275",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:2962",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:2964",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:2966",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:2969",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:2972",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:118",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:119",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:129",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:130",
+        "Source/Abrams/Private/CP_040_BehaviorController.cpp:8",
+        "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+        "Source/Abrams/Private/CP_040_BehaviorController.cpp:11"
+      ]
+    },
+    {
+      "text": "Delegated unique-float paths were kept separate: trap actions forward GetUniqueFloat to the spawner's source interface, returning 0 when there is no source, while AGameShikigami's same-named accessor indexes its own UniqueRows from ShikigamiUniqueDataTable. Neither is a read of this AGameCharacter row.",
+      "evidence": [
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/GameTrapActionController.cpp:184",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188",
+        "Source/Abrams/Private/GameShikigami.cpp:1251",
+        "Source/Abrams/Private/GameShikigami.cpp:1253",
+        "Source/Abrams/Private/GameDataTableManager.cpp:220"
+      ]
+    }
+  ]
+}

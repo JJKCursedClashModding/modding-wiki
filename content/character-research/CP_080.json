@@ -1,0 +1,222 @@
+{
+  "overview": "Panda’s unique settings control how much health he recovers on revival and how often part of his first cursed-energy attack repeats.",
+  "technicalOverview": "Panda (CP_080) has two character-unique rows. The row named CP_080 is almost empty: float 0 is a 0.5 revival-health multiplier, and the same slot is also read by the inherited projection-sorcery receive action as a fallback restraint time when no damage row is present. The row named CP_080_ATTACKG holds three level-indexed repeat counts used only on the third CursedEnergyAttack_1 start; both Panda and his transformation partner list that same row, but each has a different row 0. CP_080's other distinctive behavior -- a one-shot revival state and a CE_2 self-down that triggers the transformation -- is implemented in the controller without additional unique-float reads.",
+  "rows": {
+    "CP_080": {
+      "title": "Panda base row: revival fraction",
+      "overview": "Only subvalue 0 has a traced CP_080 read. It is the fraction of maximum HP restored by the armed revival, with a secondary use as a generic projection-sorcery restraint fallback. Subvalues 1 and 2 are read by AI hold nodes for other characters, not by any traced Panda path; subvalues 3-13 have no identified reader.",
+      "values": {
+        "0": {
+          "label": "Revival HP fraction; projection restraint fallback",
+          "simple": "When Panda's one revival is used, he comes back with half of his maximum health. If the shared projection-sorcery receive action starts without a damage row, the same 0.5 is treated as a short wait before the stagger ends.",
+          "technical": "CP_080 revival: CP_080_RevivalHitPoint is GetCharacterUniqueFloatValue(0, 0) * HitPointMax. UCP_080_ActionController::ApplyRevivalBuff calls SetHitPoint with that product only while bRevivalArmed == 1, then clears bRevivalArmed, sets bRevivalSpent, and clears bRevivalEffect; the base ApplyRevivalBuff runs first. AGameCharacter::ResetForRound is the traced call site for this slot. Arming occurs when the lethal-hit pass sees ActionControllerSlot181(Cost) return true and then calls ActionControllerSlot278; CP_080 slot 181 returns false once spent, true while armed, and otherwise GetStockAfterLoss(Value) <= 0. Secondary, inherited read: FGameCharacterAction_ProjectionSorceryReceive::Tick uses GetOwnerUniqueFloat(0, 0) as RestraintTime only when Request.DamageTableRow is null, comparing it inclusively (<=) with ActionElapsedTime; this is time in seconds, not a multiplier. The underlying getter is an unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference. Higher values restore a larger fraction of max HP in the revival use and delay the fallback release in the projection use; lower values do the opposite.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_080_ActionController.cpp:362",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:366",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:371",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:374",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:376",
+            "Source/Abrams/Private/GameBattleSystems_A.cpp:867",
+            "Source/Abrams/Private/GameBattleSystems_A.cpp:869",
+            "Source/Abrams/Private/GameCharacter.cpp:2645",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214",
+            "Source/Abrams/Private/GameCharacter.cpp:1761"
+          ]
+        },
+        "1": {
+          "label": "CE-1 AI hold increment (not traced to CP_080)",
+          "simple": "Nothing in Panda's own controller uses this zero. A generic AI hold node uses row 0 float 1 as a per-level time addition, but the only traced factory for that node belongs to CP_040.",
+          "technical": "FGameCharacterAIAction_CursedEnergyAttack1Hold::Reset builds Duration from row 0 float 0 and then adds row 0 float 1 multiplied by CursedEnergyLevel. CP_080 has no BehaviorController source file, and the character-brain AI factory maps CP_080 to FGameCharacterAIThinkNode_CP_080 rather than to that hold action. No CP_080 controller, action, effect, projectile, trap forwarding, or generated helper reads (1, 0). The zero therefore has no established Panda-specific meaning; it is not treated as proof that the slot is globally unused.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:119",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+            "Source/Abrams/Private/GameCharacterBrain_AI.cpp:171",
+            "Source/Abrams/Public/GameCharacterAIThinkNode.h:413"
+          ]
+        },
+        "2": {
+          "label": "CE-2 AI hold increment (not traced to CP_080)",
+          "simple": "Panda's CE-2 transformation handoff does not use this zero. A generic AI hold node uses row 0 float 2 as a per-level time addition, but only CP_040's behavior factory creates that node.",
+          "technical": "FGameCharacterAIAction_CursedEnergyAttack2Hold::Reset builds Duration from row 0 float 0 and then adds row 0 float 2 multiplied by CursedEnergyLevel. The CP_040 behavior factory constructs this node for its ordinal; CP_050 uses a different CE-2 hold node. CP_080's own CE_2 overrides read status CursedEnergy/CursedEnergyMax and call AddDowned, not this float. No Panda path to (2, 0) was traced.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:123",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:130",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:11",
+            "Source/Abrams/Private/CP_050_BehaviorController.cpp:11",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:248",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:258"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "A shared steering helper also reads (0, 0), dividing the unsigned angle to the secondary target by that float and skipping the turn when it is not > 0. Its only traced callers are CN_041 and CN_140 actions; no CP_080 caller was found, so it is not attributed to Panda.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3492",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:391",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:97"
+          ]
+        },
+        {
+          "text": "Trap and spawner code can forward GetCharacterUniqueFloatValue to the source actor, but CP_080 has no trap row in the supplied character data and no CP_080 trap action path was traced. Shikigami unique rows are a separate table and are not used by these values.",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:182",
+            "Source/Abrams/Private/GameTrapActionController.cpp:188",
+            "Source/Abrams/Private/GameShikigami.cpp:1251"
+          ]
+        }
+      ]
+    },
+    "CP_080_ATTACKG": {
+      "title": "Cursed-energy attack repeat bounds",
+      "overview": "The three nonzero subvalues are integer stopping counts for the third CursedEnergyAttack_1 start at attack level 1, 2, or 3. They are shared with CP_081 because both transformation forms list this row at unique row index 1. The remaining subvalues are zero with no traced CP_080 reader.",
+      "values": {
+        "0": {
+          "label": "Level 1 third-hit stopping count",
+          "simple": "At level 1, the third cursed-energy hit uses 4 as its stop count and plays three more attack animations before ending.",
+          "technical": "On the third start of TCP_080_CursedEnergyAttack_1 (GetActionStartCount(action type) == 2), level 1 sets TickCountMax = static_cast<int32>(GetOwnerUniqueFloat(0, 1)) = 4. The level is the attack-base level: AttackIndex when it is 1-3, otherwise the controller's CursedEnergyLevel. TickAttack waits while the current animation plays, increments TickCount, and ends inclusively when TickCount == TickCountMax by setting Phase to INT_MAX and Byte16 to 1. It plays the attack-set row 4 animation at TickCount == TickCountMax - 1 and rows 2/3 alternately before that (even count: row 2; odd count: row 3). With 4, the extra plays are counts 1, 2, and 3, with count 3 using row 4; count 4 ends without a play. Reset clears both counters. This applies to all four CE_1 classes built by UCP_080_ActionController::CreateAction (ground, air, and both Auto forms). Larger values directly cause more extra plays; smaller values cause fewer.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_080_ActionController.cpp:145",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:155",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:183",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:184",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:192",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:132",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:295",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+            "Source/Abrams/Private/GameCharacterAction.cpp:935",
+            "Tools/verify/CHAR/CP_080_ActionController.md:51"
+          ]
+        },
+        "1": {
+          "label": "Level 2 third-hit stopping count",
+          "simple": "At level 2, the third cursed-energy hit uses 6 as its stop count and plays five more attack animations before ending.",
+          "technical": "Same third-start path as subvalue 0, but level 2 reads GetOwnerUniqueFloat(1, 1) and truncates it to int32 (6). The inclusive stop is TickCount == 6; the final extra animation is played at count 5 from attack-set row 4, and counts 1-4 alternate rows 2/3. Only the third start uses this override; other starts run the base attack tick.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_080_ActionController.cpp:152",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:158",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:174",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:184",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:192",
+            "Tools/verify/CHAR/CP_080_ActionController.md:74"
+          ]
+        },
+        "2": {
+          "label": "Level 3 third-hit stopping count",
+          "simple": "At level 3, the third cursed-energy hit uses 10 as its stop count and plays nine more attack animations before ending.",
+          "technical": "Same third-start path, but level 3 reads GetOwnerUniqueFloat(2, 1) and truncates it to int32 (10). The inclusive stop is TickCount == 10; the final extra animation is played at count 9 from attack-set row 4, and counts 1-8 alternate rows 2/3. Levels outside 1-3 execute the default branch and leave TickCountMax as Reset set it (0), so this row supplies no extra loops there.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_080_ActionController.cpp:160",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:161",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:163",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:133",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:184",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:192",
+            "Tools/verify/CHAR/CP_080_ActionController.md:74"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The same third start also caches attack-set rows 2, 3, and 4, and the four CE_1 variants select their attack set by the level-indexed CursedEnergy_1 / _1_Auto fields. The unique floats change only the repeat counter, not the attack-set choice or damage row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_080_ActionController.cpp:149",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:205",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:211",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:224"
+          ]
+        },
+        {
+          "text": "This row is shared by the transformed form: UCP_081_ActionController falls through to CP_080's factory for the CE_1 types, while CP_081 uses its own row 0 for its revival multiplier and drain rate. Do not attribute CP_081's row-0 values to Panda's CP_080 row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_081_ActionController.cpp:84",
+            "Source/Abrams/Private/CP_081_ActionController.cpp:90",
+            "Source/Abrams/Private/CP_081_ActionController.cpp:164",
+            "Source/Abrams/Private/CP_081_ActionController.cpp:218",
+            "Source/Abrams/Private/CP_080_ActionController.cpp:293"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Row indices are positional and unchecked. AGameCharacter builds UniqueRows in the order of CharacterDataTable.Id_CharacterUnique, and GetCharacterUniqueFloatValue indexes UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds check. CP_080's supplied mapping puts CP_080 at row 0 and CP_080_ATTACKG at row 1.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_Character.h:54",
+        "Source/Abrams/Private/GameCharacter.cpp:560",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Tools/verify/CHAR/UniqueRowsInline.md:21"
+      ]
+    },
+    {
+      "text": "The revival is one-shot and survives CP_080 <-> CP_081 transformation: slot 181 blocks a second revival once spent, slot 267 emits FX_CP_080_00401 at the waist only once, and CopyStateFrom carries the three revival flags before InheritStateFrom spawns FX_CP_080_08201. CP_081 inherits the lethal-survival and down-recovery slots but overrides ApplyRevivalBuff to its own controller logic.",
+      "evidence": [
+        "Source/Abrams/Private/CP_080_ActionController.cpp:317",
+        "Source/Abrams/Private/CP_080_ActionController.cpp:333",
+        "Source/Abrams/Private/CP_080_ActionController.cpp:343",
+        "Source/Abrams/Private/CP_080_ActionController.cpp:395",
+        "Source/Abrams/Private/CP_080_ActionController.cpp:403",
+        "Source/Abrams/Private/CP_080_ActionController.cpp:413",
+        "Source/Abrams/Private/CP_081_ActionController.cpp:167",
+        "Source/Abrams/Private/GameCharacterTransformationController.cpp:108",
+        "Tools/verify/LANES/wave10-SWAP.md:45"
+      ]
+    },
+    {
+      "text": "CP_080's CE_2 self-down is a transformation handoff, not a unique-value tune: its notify calls AddDowned(Owner), slot 83 refuses the transition while CursedEnergy < CursedEnergyMax (reason 1), and slot 143 returns CursedEnergyMax. Verification notes state that the next knocked-out pass swaps to CP_081.",
+      "evidence": [
+        "Source/Abrams/Private/CP_080_ActionController.cpp:248",
+        "Source/Abrams/Private/CP_080_ActionController.cpp:256",
+        "Source/Abrams/Private/CP_080_ActionController.cpp:268",
+        "Tools/verify/LANES/wave10-SWAP.md:45"
+      ]
+    },
+    {
+      "text": "Other generic unique-float helpers were checked and not attributed here: MakeUniqueCameraRequest reads floats 0-10 of a caller-supplied row, but no CP_080 source calls it; GetOwnerUniqueFloatInline exists in a shared inline header but CP_080 uses the out-of-line GetOwnerUniqueFloat; and there are no CP_080-named .inl files or CP_080 references in the .inl files in Source. Shared CP_080 action bodies reused by CP_200 do not read unique floats.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction.cpp:941",
+        "Source/Abrams/Private/GameCharacterAction.cpp:948",
+        "Source/Abrams/Public/GameCharacterActionInline.h:10",
+        "Source/Abrams/Private/GameCharacterAction.cpp:935",
+        "Tools/verify/CHAR/CP_080_ActionController.md:9"
+      ]
+    }
+  ]
+}

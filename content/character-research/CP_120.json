@@ -1,0 +1,988 @@
+{
+  "overview": "Geto’s settings control when and where his summons appear and how his staged projectile volley fires.",
+  "technicalOverview": "Suguru Geto (CP_120) uses UCP_120_ActionController and the CP_120 AI think node. CharacterUniqueDataTable4 stores a block of tuning floats per mechanic: the normal-attack rows place and time shikigami 0/1/4/5 or a third effect, the cursed-energy rows place shikigami 2/3 or drive a staged projectile volley, and the base CP_120 row is all zeros. The runtime does not look up these rows by name in action code: AGameCharacter builds UniqueRows in Id_CharacterUnique order, so zero-based row index 1 means ATTACKA, 2 means ATTACKB, 3 means ATTACKC, 4 means ATTACKD, 5 means ATTACKF, 6 means ATTACKG and 7 means ATTACKH. FGameCharacterAction::GetOwnerUniqueFloat(ValueIndex, RowIndex) then reads UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds check. Ground and air action twins use the same row. Effects below are traced from reconstructed source; where a generic helper could read a row but no CP_120 call was found, it is left unresolved instead of claimed as a setting.",
+  "rows": {
+    "CP_120": {
+      "title": "All-zero base row",
+      "overview": "This is row 0 of Id_CharacterUnique and every float is zero. No CP_120-specific action body in the traced source indexes row 0. Generic helpers can read row 0 of any character, but the CP_120 call sites found all use rows 1-7, so no runtime meaning is assigned to these zeros.",
+      "values": {
+        "0": {
+          "label": "Generic turn / fallback time value",
+          "simple": "No CP_120-specific visible change was traced for this zero.",
+          "technical": "Generic readers exist: SteerTowardSecondaryTarget divides the unsigned horizontal angle by GetCharacterUniqueFloatValue(0,0) and calls RotateTowardLocation with that time, but its traced callers are CN_041, CN_140 and CP_060 actions, not CP_120. Projection-sorcery restraint also uses column 0 as a restraint-time fallback only when the damage row is missing; MakeUniqueCameraRequest would use it as camera X only if called. No such CP_120 call was found.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3492",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3523",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:215",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948"
+          ]
+        },
+        "1": {
+          "label": "Generic AI hold / camera Y value",
+          "simple": "No CP_120-specific visible change was traced for this zero.",
+          "technical": "CursedEnergyAttack1Hold::Reset computes Duration = F(1,0) * CursedEnergyLevel + F(0,0), and MakeUniqueCameraRequest reads column 1 as camera Y. The hold executor is explicitly built by CP_040 behavior code; no CP_120 registration or camera-request call was found in the traced Source.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:119",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947"
+          ]
+        },
+        "2": {
+          "label": "Generic AI hold / camera Z value",
+          "simple": "No CP_120-specific visible change was traced for this zero.",
+          "technical": "CursedEnergyAttack2Hold::Reset computes Duration = F(2,0) * CursedEnergyLevel + F(0,0), and MakeUniqueCameraRequest reads column 2 as camera Z. CP_050 registers a different 2-hold executor; no CP_120 registration or camera-request call was found.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:123",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:130",
+            "Source/Abrams/Private/CP_050_BehaviorController.cpp:11",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "A zero value is not evidence that the slot is unused; these entries are unresolved because only generic, non-CP_120 call paths were found.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Private/GameCharacterAction.cpp:933",
+            "Source/Abrams/Public/GameActorInterface.h:451"
+          ]
+        },
+        {
+          "text": "The exported character list has a trailing None after ATTACKH; AGameCharacter adds optional rows, so a missing row becomes a null UniqueRows entry. CP_120 code does not index that position.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:555",
+            "Source/Abrams/Private/GameCharacter.cpp:563",
+            "Source/Abrams/Public/GameCharacter.h:245"
+          ]
+        }
+      ]
+    },
+    "CP_120_ATTACKA": {
+      "title": "NormalAttack_1 summon and third-shot tuning",
+      "overview": "Row 1 shapes the first normal-attack group: two shikigami placed left and right, then a third start that creates an FX_CP_120_04101_1 fade effect at a collision-adjusted point.",
+      "values": {
+        "0": {
+          "label": "Shikigami attack time",
+          "simple": "Sets the attack timing passed to both summoned shikigami.",
+          "technical": "On G1 start counts 0 and 1, FShikigamiDamageActionParam.Value64 is assigned F(0,1) = 0.6 before ChangeAction(Attack_1). The request header documents Value64 as a time; the CP_120 body forwards it without further arithmetic.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:741",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:784",
+            "Source/Abrams/Public/GameShikigamiActionController.h:47"
+          ]
+        },
+        "1": {
+          "label": "Shikigami side distance",
+          "simple": "Controls how far the two shikigami stand to either side of Geto.",
+          "technical": "Candidate local Y offset = positive F(1,1) = 90. Start count 0 negates it (-90, left), start count 1 keeps it (+90, right). StateCondition_ClampLocalOffset traces around the candidate with extent (50,50,0), possibly moving it before it is rotated into world space as F*X + R*Y + U*Z.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:712",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:714",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:718",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:724",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:755",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:757",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:190"
+          ]
+        },
+        "2": {
+          "label": "Shikigami aim pitch limit (degrees)",
+          "simple": "Limits how high or low the summoned shikigami aims.",
+          "technical": "On both summon starts this is passed as MaxPitch and MaxDown to CN122_AimRotation: FMath::Clamp elevation to [-30, 30] degrees when the helper reports a positive pitch sign, and to the mirrored interval for the negative sign. FMath::Clamp boundaries are inclusive.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:731",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:733",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:774",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:776",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1084",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:13",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:44"
+          ]
+        },
+        "3": {
+          "label": "Shikigami aim yaw limit (degrees)",
+          "simple": "Effectively prevents the summoned shikigami from turning sideways.",
+          "technical": "Passed as MaxYaw = F(3,1) = 0. CN122_AimRotation takes FMath::Min(angle, 0) for a nonnegative angle and uses 0 for a negative angle, so the resulting yaw is 0 degrees.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:732",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:733",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:775",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:776",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1087",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1090",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1098"
+          ]
+        },
+        "4": {
+          "label": "Maximum target elevation (degrees)",
+          "simple": "Caps how far above or below Geto the third-shot aim point may sit.",
+          "technical": "On G1 start count 2, raw clamped elevation is compared with abs(F(4,1)) = 30 degrees. Only when abs(elevation) > 30 does the code rotate the horizontal target vector about the right axis by 30 degrees (sign chosen from target Z) to rebuild the target Z; otherwise the original target is kept.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:798",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:799",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:800",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:808",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:809"
+          ]
+        },
+        "5": {
+          "label": "Maximum effect distance",
+          "simple": "Keeps the third-shot aim point within a fixed distance of Geto.",
+          "technical": "After elevation handling, if the delta from Geto to the target exceeds F(5,1) = 1800 world units, the target becomes owner location + delta.GetSafeNormal() * 1800. A delta equal to or below 1800 is unchanged.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:811",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:812",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:813",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:815"
+          ]
+        },
+        "6": {
+          "label": "Effect upward offset",
+          "simple": "Raises the third-shot effect above the aim point.",
+          "technical": "Added as owner up vector * F(6,1) = 220 world units to form the effect transform translation. The same offset vector is negated to build the transform X axis.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:817",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:819",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:821",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:822"
+          ]
+        },
+        "7": {
+          "label": "Effect forward offset",
+          "simple": "Shifts the third-shot effect backward relative to Geto’s facing.",
+          "technical": "Added as owner facing forward * F(7,1) = -50 world units. The negative value moves the effect opposite the facing direction; together with column 6 it forms Offset, and -Offset is used as the rotation X axis.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:817",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:820",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:821",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:822"
+          ]
+        },
+        "8": {
+          "label": "Summon height offset",
+          "simple": "Helps choose a safe height for the first two shikigami.",
+          "technical": "Candidate local Z offset = F(8,1) = 15 world units for both start count 0 and 1, passed to StateCondition_ClampLocalOffset before rotation into world space. The Z probe extent is 0 here, so only the forward and side traces can adjust the candidate.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:712",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:713",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:718",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:190",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:219"
+          ]
+        },
+        "9": {
+          "label": "Unresolved extra normal-attack value",
+          "simple": "The export stores an extra number in this slot. Its effect is still unknown.",
+          "technical": "The traced first-normal-attack effect placement reads row 1 slots 0 through 8 across its phases. Slot 9 is outside those reads. The negative export value alone gives no reliable unit or role.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:700-833"
+          ]
+        }
+      },
+      "untraced": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The two summon placements use different signs of the same side value: shikigami 0 is left, shikigami 1 is right.",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:714",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:757"
+          ]
+        },
+        {
+          "text": "Verification records confirm the retail association: column 2 is the aim pitch passed as MaxUp/MaxDown, column 3 is the yaw limit.",
+          "evidence": [
+            "Tools/verify/BEHAV/records/Y01.json:1085"
+          ]
+        },
+        {
+          "text": "The first two starts use shikigami 0 and 1 and Attack_1; the third start makes an effect and a fade effect instead of another summon.",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:704",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:742",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:747",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:785",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:790",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:822",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:825"
+          ]
+        }
+      ]
+    },
+    "CP_120_ATTACKB": {
+      "title": "NormalAttack_1_1 shikigami placement",
+      "overview": "Row 2 controls the single shikigami 4 summoned by the 1_1 normal-attack group, including its local placement, aim limits and Attack_5 timing.",
+      "values": {
+        "0": {
+          "label": "Shikigami attack time",
+          "simple": "Sets the attack timing for shikigami 4.",
+          "technical": "F(0,2) = 1.0 is written to FShikigamiDamageActionParam.Value64 before ChangeAction(Attack_5). Value64 is documented as a time in the request struct; no CP_120 arithmetic is applied.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:926",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:927",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:928",
+            "Source/Abrams/Public/GameShikigamiActionController.h:47"
+          ]
+        },
+        "1": {
+          "label": "Local forward offset",
+          "simple": "Places the summon slightly behind Geto along the facing axis.",
+          "technical": "Candidate local X = F(1,2) = -20 world units. It is passed with Y and Z to StateCondition_ClampLocalOffset, which traces clearance with extent (50,50,0) before the offset is rotated into world space.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:900",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:901",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:905",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:910",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:190"
+          ]
+        },
+        "2": {
+          "label": "Local right offset",
+          "simple": "Places the summon to Geto’s right.",
+          "technical": "Candidate local Y = F(2,2) = 70 world units, processed by the same collision-adjusted local-offset path as columns 1 and 3.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:899",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:901",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:905",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:910"
+          ]
+        },
+        "3": {
+          "label": "Local up offset",
+          "simple": "Raises the summon above Geto.",
+          "technical": "Candidate local Z = F(3,2) = 95 world units. With Z extent 0, the third probe leg is skipped and only X/Y obstacle traces can change the candidate.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:898",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:901",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:905",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:190",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:219"
+          ]
+        },
+        "4": {
+          "label": "Shikigami aim pitch limit (degrees)",
+          "simple": "Limits how high or low the summon aims.",
+          "technical": "Passed as MaxPitch and MaxDown to CN122_AimRotation with value 20 degrees, so elevation is clamped inclusively to the appropriate [-20, 20] signed interval.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:917",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:919",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1084",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:13",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:44"
+          ]
+        },
+        "5": {
+          "label": "Shikigami aim yaw limit (degrees)",
+          "simple": "Limits sideways turning when the summon aims.",
+          "technical": "Passed as MaxYaw = F(5,2) = 20 degrees. Positive horizontal angles are capped at 20 degrees and mirrored by GameRotation_SideOf when the target is on the other side; negative horizontal angles produce yaw 0 in this helper.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:918",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:919",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1087",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1090",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1094",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1098"
+          ]
+        }
+      },
+      "untraced": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Verification records confirm the retail association: column 4 is pitch (MaxUp/MaxDown) and column 5 is yaw (MaxYaw).",
+          "evidence": [
+            "Tools/verify/BEHAV/records/Y01.json:1144"
+          ]
+        },
+        {
+          "text": "After placement, FX_CP_120_00111 is played 25 units up and 50 units forward of the summon with scale 1.5; those numbers are constants, not values from this row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:929",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:930"
+          ]
+        }
+      ]
+    },
+    "CP_120_ATTACKC": {
+      "title": "NormalAttack_2 paired-shikigami and cross-attack tuning",
+      "overview": "Row 3 sets the ground/air NormalAttack_2 pair: it places shikigami 0 and 1, aims a shared target, and records cross locations used by the second start.",
+      "values": {
+        "0": {
+          "label": "First attack time",
+          "simple": "Sets the attack timing for the initial shikigami 2 requests.",
+          "technical": "F(0,3) = 0.6 is copied into Value64 on the Attack_2 requests issued to shikigami 0 and 1. Value64 is documented as a request time.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1058",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1059",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1060",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1087",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1088",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1089",
+            "Source/Abrams/Public/GameShikigamiActionController.h:47"
+          ]
+        },
+        "1": {
+          "label": "Side separation",
+          "simple": "Controls how far left and right the two shikigami appear.",
+          "technical": "F(1,3) = 60 is used as right-vector magnitude. Shikigami 0 starts at owner location - side; shikigami 1 starts at owner location + side.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1048",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1049",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1077",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1078"
+          ]
+        },
+        "2": {
+          "label": "Elevation limit (degrees)",
+          "simple": "Caps the elevation of the shared aiming point.",
+          "technical": "F(2,3) = 25 supplies both MaxElevation and MinElevation = -MaxElevation. GameAnimNotify_ClampedElevation at 90/90 is then clamped inclusively to [-25, 25] degrees before the forward vector is rotated to get the target point.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1033",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1034",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1035",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:13",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:44"
+          ]
+        },
+        "3": {
+          "label": "Aim distance",
+          "simple": "Sets how far in front of Geto the shared aim point is placed.",
+          "technical": "The elevation-rotated facing vector is multiplied by F(3,3) = 800 world units and added to the owner location.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1036",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1037",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1038"
+          ]
+        },
+        "4": {
+          "label": "Cross attack time",
+          "simple": "Sets the attack timing for the later crossing attack.",
+          "technical": "On start count 1, F(4,3) = 0.8 is written to Value64 on the Attack_3 requests for each non-releasing shikigami, together with the stored cross location and direction.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:959",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:962",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:967",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:970",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:971",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:976",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:979",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:980"
+          ]
+        },
+        "5": {
+          "label": "Cross-location distance",
+          "simple": "Sets how far toward the target each crossing point is recorded.",
+          "technical": "Cross locations are owner location + normalized direction to the shared target * F(5,3) = 300 world units, then adjusted by column 6.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1062",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1063",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1091",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1092"
+          ]
+        },
+        "6": {
+          "label": "Cross-location up shift",
+          "simple": "Offsets the two recorded crossing points vertically in opposite directions.",
+          "technical": "F(6,3) = -50 is multiplied by the aim quaternion up vector. Shikigami 0’s stored point subtracts it and shikigami 1’s adds it; the same value also lowers/raises their initial placement along that aim-up axis.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1051",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1063",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1064",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1080",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1092",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1093"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The cross request is issued only on the second attack start and is skipped for a shikigami already performing a release action.",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:962",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:965",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:974"
+          ]
+        },
+        {
+          "text": "Columns 0 and 4 are separate timings: column 0 is used for the initial Attack_2 pair, column 4 for the later Attack_3 pair.",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1059",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:970"
+          ]
+        }
+      ]
+    },
+    "CP_120_ATTACKD": {
+      "title": "NormalAttack_2_1 third-shot placement and aim",
+      "overview": "Row 4 tunes the extra shot created by the 2_1 normal-attack group: a local offset is collision-adjusted, then aimed at the secondary target.",
+      "values": {
+        "0": {
+          "label": "Shot pitch limit (degrees)",
+          "simple": "Limits how high or low the extra shot aims.",
+          "technical": "F(0,4) = 30 is passed as MaxUp and MaxDown to CN122_AimRotation with MaxYaw = 0.0f, so yaw is forced to 0 and elevation is clamped inclusively to the appropriate signed [-30, 30] interval.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1227",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1228",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1084",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1090",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:13"
+          ]
+        },
+        "1": {
+          "label": "Local up offset",
+          "simple": "Raises the candidate shot position above Geto.",
+          "technical": "F(1,4) = 200 is the Z component of FVector(F(2,4), F(3,4), F(1,4)). It is collision-probed with extent Z = 100; on a qualifying hit the Z candidate is rewritten from the hit distance and that extent.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1219",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1220",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1222",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:219",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:231"
+          ]
+        },
+        "2": {
+          "label": "Local forward offset",
+          "simple": "Moves the candidate shot position in front of Geto.",
+          "technical": "F(2,4) = 80 is the X component of the local offset. StateCondition_ClampLocalOffset probes forward by X - 50 and can rewrite X from the first filtered hit distance.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1219",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1220",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:193",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:201"
+          ]
+        },
+        "3": {
+          "label": "Local right offset",
+          "simple": "Moves the candidate shot position to Geto’s left.",
+          "technical": "F(3,4) = -55 is the Y component. Because it is negative, StateCondition_ClampLocalOffset probes toward negative Y; on a qualifying hit, Y is reconstructed as extent - hit distance rather than hit distance - extent.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1219",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1220",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:205",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:215"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The extents (50,50,100) are trace clearance distances, not numeric clamps on the raw row values.",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1220",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1222",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:190"
+          ]
+        },
+        {
+          "text": "The shot uses FX_CP_120_04101_2 with a sub effect via SpawnFadeEffect; the effect IDs and the +25/-50/1.5 constants elsewhere are not unique-row values.",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1229",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1232"
+          ]
+        }
+      ]
+    },
+    "CP_120_ATTACKF": {
+      "title": "NormalAttack_3_1 shikigami timing",
+      "overview": "Row 5 has one traced setting: the attack timing on the shikigami 5 request made by the 3_1 normal-attack group.",
+      "values": {
+        "0": {
+          "label": "Shikigami attack time",
+          "simple": "Sets the attack timing for shikigami 5.",
+          "technical": "F(0,5) = 0.45 is assigned to Value64 before ChangeAction(Attack_4). The summon itself stays at the saved summon location and faces opposite Geto’s forward; no other column of this row is read in the CP_120 bodies.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1184",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1192",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1193",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1194",
+            "Source/Abrams/Public/GameShikigamiActionController.h:47"
+          ]
+        }
+      },
+      "untraced": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The row name is F because the exported Id_CharacterUnique order skips an E entry; the runtime row index is still 5.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:559",
+            "Source/Abrams/Private/GameCharacter.cpp:561",
+            "Source/Abrams/Private/GameCharacter.cpp:563"
+          ]
+        }
+      ]
+    },
+    "CP_120_ATTACKG": {
+      "title": "CursedEnergyAttack_1 summon and staged volley",
+      "overview": "Row 6 drives CursedEnergyAttack_1/its air twin: it spawns shikigami 3 with target-aware aim and creates a multi-stage FX_CP_120_04101 volley with configurable origin, pitch, spacing, scale and lead.",
+      "values": {
+        "0": {
+          "label": "Shikigami forward spawn distance",
+          "simple": "Sets how far in front of Geto shikigami 3 starts.",
+          "technical": "The spawn origin is owner location + facing forward * F(0,6) + world up * 100. With the stored value 0, the shikigami starts at the owner location plus the fixed 100-unit height. The default target is one unit in front of that origin, replaced by the secondary target’s actor location when valid.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:344",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:345",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:367",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:368",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:369",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:372"
+          ]
+        },
+        "1": {
+          "label": "Fallback aim pitch limit (degrees)",
+          "simple": "Limits vertical aim when the target was not down or blown away.",
+          "technical": "The target-down/blown condition is captured in StartAttackHoming. If it was false, F(1,6) = 20 is passed as MaxPitch and MaxDown to CN122_AimRotation. If it was true, the code substitutes fixed 90/90 instead of reading this value.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:234",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:241",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:242",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:358",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:424",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:428",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:433",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:436"
+          ]
+        },
+        "2": {
+          "label": "Fallback aim yaw limit (degrees)",
+          "simple": "Limits sideways aim when the target was not down or blown away.",
+          "technical": "Used only in the same non-condition branch: MaxYaw = F(2,6) = 20 degrees. In the down/blown branch MaxYaw is fixed at 90 instead.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:424",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:428",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:429",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:434",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:436",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1084"
+          ]
+        },
+        "3": {
+          "label": "Projectile pitch limit (degrees)",
+          "simple": "Limits vertical aim of the queued shot request.",
+          "technical": "F(3,6) = 30 is passed as both MaxUp and MaxDown to CN122_AimRotation for the shot transform, with MaxYaw fixed at 0.0f. The request is queued only for UniqueAction parameter 1 and only when the action controller casts to UCP_120_ActionController.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:288",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:289",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:302",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:303",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:304",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:331"
+          ]
+        },
+        "4": {
+          "label": "Projectile origin height",
+          "simple": "Raises the projectile volley above Geto.",
+          "technical": "F(4,6) = 150 is multiplied by the owner up vector when building ShotRequest.Transform translation, in addition to owner forward * F(5,6) and the owner location.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:296",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:297",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:298",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:300",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:330"
+          ]
+        },
+        "5": {
+          "label": "Projectile origin distance",
+          "simple": "Pushes the projectile volley in front of Geto.",
+          "technical": "F(5,6) = 1800 is multiplied by the owner facing forward vector for the same origin calculation. The target defaults to owner location + one forward unit, or the secondary target’s actor location when valid.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:291",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:294",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:296",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:299",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:300"
+          ]
+        },
+        "6": {
+          "label": "Offset interval",
+          "simple": "Controls the delay between effects inside one volley stage.",
+          "technical": "F(6,6) = 0.02 is stored as ShotRequest.Interval. TickShotRequests subtracts delta time divided by a positive CustomTimeDilation (or 1.0 otherwise), fires the next offset once the timer reaches 0 or below, then resets the timer to Interval until all offsets in that stage are used.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:306",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:326",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1395",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1396",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1400",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1458",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1461"
+          ]
+        },
+        "7": {
+          "label": "Stage interval",
+          "simple": "Controls the delay between volley stages.",
+          "technical": "F(7,6) = 0.05 is stored as ShotRequest.StageInterval. When a stage’s offsets are exhausted, Stage advances, SubIndex resets and the timer becomes this value; the request is removed once Stage reaches StageCount.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:307",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:328",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1465",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1466",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1467",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1468",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1470"
+          ]
+        },
+        "8": {
+          "label": "Volley offset scale",
+          "simple": "Scales the spacing of the effect offsets.",
+          "technical": "F(8,6) = 0.6 is stored as ShotRequest.Scale. TickShotRequests multiplies each static offset translation by this scalar before composing it with the request transform; rotation and the base request transform are not scaled.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:305",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:329",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1365",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1448",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1449",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1450"
+          ]
+        },
+        "9": {
+          "label": "Target lead factor",
+          "simple": "Extends the shikigami’s simulated flight time for a moving target.",
+          "technical": "When the down/blown condition is true and the ahead trace is clear, Lead = F(9,6) * (distance from spawn origin to target * 0.001). That lead is added to the remaining distance as Lead * target horizontal speed and is also added to the simulated flight Time used to lead the target’s vertical fall; greater stored values increase both terms.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:376",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:382",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:386",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:388",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:389",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:390",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:401"
+          ]
+        }
+      },
+      "untraced": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "A ShotRequest starts with Timer = -1.0f, so the first volley effect fires on the first action tick that sees the timer at or below zero.",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:322",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:327",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1400",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:1401"
+          ]
+        },
+        {
+          "text": "StageCount is not in this row: controller CursedEnergyLevel maps 1 to 1 stage, 2 to 2 stages and 3 or 4 to 3 stages.",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:308",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:309",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:310",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:311",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:312",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:313",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:314",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:315",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:316",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:317",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:318",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:319",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:320",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:321",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:323"
+          ]
+        },
+        {
+          "text": "The dynamic index used for CP_120_ATTACKG_1_n / _2_n selects AttackSetDataTables rows by cursed-energy level and left-stick direction; it is not a unique-row index. The unique row stays 6.",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:224",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:227",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:228",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:252",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:253",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:254",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:256",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:259",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:29"
+          ]
+        },
+        {
+          "text": "Verification notes describe the same target-aware shikigami 3 trajectory and two line traces; the source transcription is the source of the exact formulas above.",
+          "evidence": [
+            "Tools/verify/CHAR/CP_120_ActionController.md:274"
+          ]
+        }
+      ]
+    },
+    "CP_120_ATTACKH": {
+      "title": "CursedEnergyAttack_2 shikigami placement",
+      "overview": "Row 7 positions shikigami 2 for all four CursedEnergyAttack_2 variants before the shared start/reset and summon behavior runs.",
+      "values": {
+        "0": {
+          "label": "Forward summon offset",
+          "simple": "Sets how far in front of Geto shikigami 2 appears.",
+          "technical": "On the first start with a pending summon, F(0,7) = 118 becomes the X component of the shikigami SummonOffset vector and is also multiplied by the owner facing forward vector for FindSummonLocation. The vector’s Z is explicitly 0; the summon height itself comes from the shikigami’s FollowHeightOffset.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:111",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:112",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:138",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:142",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:143",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:145",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:148"
+          ]
+        },
+        "1": {
+          "label": "Right summon offset",
+          "simple": "Sets how far to Geto’s right shikigami 2 appears.",
+          "technical": "F(1,7) = 10 becomes the Y component of SummonOffset and is multiplied by the owner right vector in the same world-offset calculation. The placement result is passed to RequestLocation with priority 3.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:142",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:143",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:146",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:148"
+          ]
+        }
+      },
+      "untraced": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The row is shared by normal, air, auto and air-auto CursedEnergyAttack_2. Auto variants send Attack_2 and mark +0xA2; the other two send Attack_1.",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:124",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:126",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:127",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:129",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:132",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:134",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:151",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:152",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:153",
+            "Source/Abrams/Public/CP_120_Actions.h:25"
+          ]
+        },
+        {
+          "text": "For a player-controlled Geto, the +0x449 camera-bounds-test flag is cleared after the summon; that flag is not sourced from this row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:155",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:157"
+          ]
+        },
+        {
+          "text": "The start and reset bodies are CP_030-shared, while the finish effect is the generic AttackBase finisher plus shikigami release handling; none of those shared bodies adds another read of row 7.",
+          "evidence": [
+            "Source/Abrams/Private/CP_120_ActionController.cpp:79",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:99",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:176",
+            "Source/Abrams/Private/CP_120_ActionController.cpp:182",
+            "Source/Abrams/Public/CP_120_Actions.h:25",
+            "Source/Abrams/Public/CP_120_Actions.h:30"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "The six shikigami indices have different roles in this controller: 0 and 1 are the normal-attack pair, 2 is the cursed-energy-2 summon, 3 is the cursed-energy-1 trajectories summon, 4 is the 1_1 summon and 5 is the 3_1 summon.",
+      "evidence": [
+        "Source/Abrams/Private/CP_120_ActionController.cpp:138",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:361",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:706",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:749",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:892",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:1042",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:1071",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:1178"
+      ]
+    },
+    {
+      "text": "Cursed-energy staging is a controller/action-state mechanic, not a unique-float value: the base normal-attack tick stages CursedEnergyAttack_1 and _2 while staging is active, and notify parameters 20/30 arm it at level 2/3.",
+      "evidence": [
+        "Source/Abrams/Private/CP_120_ActionController.cpp:453",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:455",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:456",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:457",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:458",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:577",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:580",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:582",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:586",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:608",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:613",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:1208",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:1210"
+      ]
+    },
+    {
+      "text": "Some action bodies are deliberately shared with other character codes (CP_030 start/reset, CP_060 request removal, generic NormalAttack_3 bodies). Unlisted action types are delegated to UGameCharacterActionController::CreateAction; none of those shared paths was found to add another CP_120 unique-float read.",
+      "evidence": [
+        "Source/Abrams/Private/CP_120_ActionController.cpp:79",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:99",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:262",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:557",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:621",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:628",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:1314",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:1354",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:1355"
+      ]
+    },
+    {
+      "text": "The CP_120 AI think node is distinct from a CP_120 behavior controller: it enables advanced behavior and weights several normal attacks, and setup group 211 uses fixed AI conditions rather than unique floats.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:176",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1338",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1340",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1345",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1360",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:6740",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:6748"
+      ]
+    },
+    {
+      "text": "CP_120_ATTACKC_02_01 in CN_050 code is a DamageDataTables row used by the shikigami character CN_050, not this unique row C; row-name prefixes can be reused across tables.",
+      "evidence": [
+        "Source/Abrams/Private/CN_050_ActionController.cpp:280",
+        "Source/Abrams/Private/CN_050_ActionController.cpp:291",
+        "Source/Abrams/Private/CN_050_ActionController.cpp:297"
+      ]
+    },
+    {
+      "text": "The raw accessor is unchecked: GetCharacterUniqueFloatValue dereferences UniqueRows[RowIndex] and FloatValue[ValueIndex] directly. The verification note records that the retail body matches this raw dereference.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:1758",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Tools/verify/CHAR/UniqueRowsInline.md:19",
+        "Tools/verify/CHAR/UniqueRowsInline.md:51"
+      ]
+    },
+    {
+      "text": "The CP_120 effect spawner queues fade effects with FX_CP_120_00133, but its inputs are effect IDs and transforms; no trap or MakeUniqueCameraRequest forwarding from CP_120 was found.",
+      "evidence": [
+        "Source/Abrams/Private/CP_120_ActionController.cpp:1512",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:1514",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:1528",
+        "Source/Abrams/Private/CP_120_ActionController.cpp:1538",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941"
+      ]
+    }
+  ]
+}

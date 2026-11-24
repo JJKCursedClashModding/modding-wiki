@@ -1,0 +1,263 @@
+{
+  "overview": "Yuta’s settings tune his Passion gauge, his interactions with Rika, and the cursed energy drained by his second cursed-energy attack buff.",
+  "technicalOverview": "Yuta Okkotsu is a playable Jujutsu Sorcerer built around a Passion gauge, a CP_110 passive buff, and one summoned shikigami in slot 0 (Rika, CN_040). UCP_110_ActionController supplies custom normal, cursed-energy, super and extra actions; its own action bodies also arm shikigami follow-ups when a hit lands on the secondary target. The two populated unique rows are CharacterUniqueDataTable4's 'CP_110' (row index 0: Passion economy, two shikigami counters, camera distance and a collision lock) and 'CP_110_ATTACKH' (row index 1: the cursed-energy drain of the CE-2 buff). All readers use zero-based row and value indexes through AGameCharacter::GetCharacterUniqueFloatValue, which is a direct, unchecked row/value lookup. The shikigami's own AGameShikigami/ShikigamiUniqueDataTable values are a separate system and are not described here.",
+  "rows": {
+    "CP_110": {
+      "title": "Core Yuta tuning: Passion gauge, Rika counters, camera and lock",
+      "overview": "Row index 0 is the main tuning block. Most slots change how fast Yuta's Passion gauge (+0x2AC) fills or empties, or control when shikigami 0 counter-attacks; the rest set a temporary camera distance and a collision-lock duration. The values are read from the row named CP_110 in CharacterDataTable.Id_CharacterUnique[0].",
+      "values": {
+        "0": {
+          "label": "Shikigami-out Passion drain divisor",
+          "simple": "Sets how quickly the Passion gauge empties while Rika is out; a larger divisor drains more slowly.",
+          "technical": "Read as unique (0, 0) = 150. UCP_110_ActionController::UnknownSlot120 returns 100 / 150 = about 0.667 only when shikigami 0 reports out. It returns 0 if shikigami 0 is not out, if the Attack-layer action is ExtraAttack_1, or if GetSetupUniqueMode() == 2. The status tick subtracts this rate times DeltaTime from PassionGaugeValue only when the rate is > 0, clamping the gauge to 0..PassionGaugeValueMax (100 in this character's status setup).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:672",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3584",
+            "Tools/verify/LANES/wave10-CHc.md:15"
+          ]
+        },
+        "1": {
+          "label": "Passion gained from damage dealt",
+          "simple": "Landing a hit builds Passion equal to 0.02 times the damage before other rate bonuses.",
+          "technical": "OnDamageDealt calls Super first, then adds unique (1, 0) * Damage * GetPassionGainRate() to PassionGaugeValue when StatusController.EventStateCount <= 0 and shikigami 0 is not out (GetShikigamiUnknown374(0) != 1). GetPassionGainRate() reads the owner's +0x39C float and is forced to 0 in setup unique mode 1. SetPassionGaugeValue clamps the result to 0..100.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:713",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:676",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3110",
+            "Tools/verify/LANES/wave10-CHc.md:22"
+          ]
+        },
+        "2": {
+          "label": "Passion gained from damage received",
+          "simple": "Taking a hit builds Passion equal to 0.045 times the damage received, before rate bonuses.",
+          "technical": "OnDamageReceived calls Super, then adds unique (2, 0) * Damage * GetPassionGainRate() when EventStateCount <= 0 and shikigami 0 is not out. The same mode-1 rate suppression and 0..100 clamp apply.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:729",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:676",
+            "Tools/verify/LANES/wave10-CHc.md:21"
+          ]
+        },
+        "3": {
+          "label": "Passion gained from teammate damage",
+          "simple": "When a teammate is hit, Yuta gains 0.065 times that damage value as Passion.",
+          "technical": "OnTeammateReceivedDamage adds unique (3, 0) * Value * GetPassionGainRate() when EventStateCount <= 0 and shikigami 0 is not out. Value is the callback's damage value, not re-derived by this controller.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1043",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:676",
+            "Tools/verify/LANES/wave10-CHc.md:19"
+          ]
+        },
+        "4": {
+          "label": "Passion gained when Yuta is knocked out",
+          "simple": "Being knocked out adds 15 times the normal gain rate to Passion, if Rika is not already able to answer the hit.",
+          "technical": "OnOwnerKnockedOut saves the cursed-energy gauge and stops the active weapon effect, then returns on EventStateCount > 0. If shikigami 0 is out and is not in a Release action, it sends the shikigami voice/action request GAISlot186(10, 2, false, false) and returns without any gain. Otherwise it adds unique (4, 0) * GetPassionGainRate() (a flat 15 before the rate), clamped to the gauge maximum.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:807",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:794",
+            "Tools/verify/LANES/wave10-CHc.md:24"
+          ]
+        },
+        "5": {
+          "label": "Passion gained when an ally is knocked out",
+          "simple": "An ally's knockout adds 40 times the normal gain rate to Passion.",
+          "technical": "OnAllyKnockedOut adds unique (5, 0) * GetPassionGainRate() when EventStateCount <= 0 and shikigami 0 is not out; the clamp to 0..100 is in SetPassionGaugeValue.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1027",
+            "Tools/verify/LANES/wave10-CHc.md:20"
+          ]
+        },
+        "6": {
+          "label": "Camera distance while Rika is out",
+          "simple": "Pushes the camera out to 400 units when Rika appears, and removes that request when she goes away.",
+          "technical": "ActionTick compares bPrevShikigamiOut with the current shikigami-0-out flag. Only on a change it uses unique (6, 0) as the distance for SetDistanceRequest(3, ...) when the shikigami is out, or RemoveDistanceRequest(3, ...) when it is not. The virtual camera uses the largest active distance request; key 3 is Yuta's shikigami override.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1197",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1202",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:474",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:490",
+            "Tools/verify/LANES/wave10-CHc.md:94"
+          ]
+        },
+        "7": {
+          "label": "Camera distance blend time for Rika transitions",
+          "simple": "The 400-unit camera change eases over 1 second.",
+          "technical": "On the same shikigami-out transition, unique (7, 0) is the BlendTime passed to SetDistanceRequest or RemoveDistanceRequest. The camera interpolator uses it as an EaseInOut duration (or the remaining fraction of that time when the goal is unchanged). This is a time value in seconds at the camera layer.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1198",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:474",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:513",
+            "Tools/verify/LANES/wave10-CHc.md:94"
+          ]
+        },
+        "8": {
+          "label": "Guard-side shikigami counter range",
+          "simple": "Rika can answer a guarding hit when the attacker is within 1000 units.",
+          "technical": "TryShikigamiCounter returns early unless shikigami 0 is out and DamageRow is non-null, the unique (10, 0) cost is affordable, a target is valid and is the attacker's actor, and the shikigami is not already in an attack action. It then uses FVector::Dist between owner and target and returns only if Distance > unique (8, 0); equality passes. On success it orders shikigami Attack_8 and sends GAISlot186(10, 1, false, false).",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:922",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:892",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:929",
+            "Tools/verify/LANES/wave10-CHc.md:34"
+          ]
+        },
+        "9": {
+          "label": "Damage-layer shikigami counter range",
+          "simple": "While being hit and holding an attack button, Rika counter-attacks only if the last attacker is within 550 units.",
+          "technical": "UpdateShikigamiCounterAttack checks that shikigami 0 exists and is out, is not attacking, the Damage layer is Damage/DamageAir/Blow/BlowSmall/BlowLarge, the unique (11, 0) cost is affordable, one of five attack keys is held, a valid target exists, and the target is the status controller's LastAttacker. FVector::Dist from owner to target must be <= unique (9, 0); equality passes. On success it orders shikigami Attack_9 with a rotated offset request, sends GAISlot186(10, 1, false, false) and spends the cost.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1136",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1085",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1140",
+            "Tools/verify/LANES/wave10-CHc.md:95"
+          ]
+        },
+        "10": {
+          "label": "Guard-side shikigami counter Passion cost",
+          "simple": "The guard-side counter spends 5 Passion.",
+          "technical": "TryShikigamiCounter computes Cost = unique (10, 0) * Rate, where Rate is 0 in setup unique mode 2 and 1 otherwise. It aborts when Cost > current PassionGaugeValue (so equal is affordable) and subtracts Cost only after ordering Rika's Attack_8. The same cost is used for the guard-durability callback path.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:903",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:899",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:933",
+            "Tools/verify/LANES/wave10-CHc.md:34"
+          ]
+        },
+        "11": {
+          "label": "Damage-layer shikigami counter Passion cost",
+          "simple": "The while-taking-hits counter spends 10 Passion.",
+          "technical": "UpdateShikigamiCounterAttack computes Cost = unique (11, 0) * CostScale, with CostScale 0 in setup unique mode 2 and 1 otherwise, requires Cost <= PassionGaugeValue, and subtracts it after ordering shikigami Attack_9.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1111",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1109",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1153",
+            "Tools/verify/LANES/wave10-CHc.md:95"
+          ]
+        },
+        "12": {
+          "label": "ExtraAttack_1 collision-lock duration",
+          "simple": "After Yuta's shikigami-summoning extra attack finishes, collision lock 9 stays for 1.5 seconds.",
+          "technical": "FCP_110_ExtraAttack_1::FinishAttackEffects calls SetCollisionLock(9, true, GetOwnerUniqueFloat(12, 0)) after the base finish. The lock's stored value is ticked down by DeltaTime and removed at or below zero; the same lock is set with -1.0 (no countdown) when the extra attack starts.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1282",
+            "Source/Abrams/Private/GameActorStatusController.cpp:61",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1264",
+            "status/verdicts.json:17123"
+          ]
+        }
+      },
+      "untraced": [
+        13
+      ],
+      "notes": [
+        {
+          "text": "A zero in slot 13 is not evidence that it is unused. The CP_110 TU and its action header use literal unique indexes only; no CP_110-specific reader for value index 13 was identified, so it is left untraced rather than labelled inert.",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:672",
+            "Source/Abrams/Private/GameCharacter.cpp:1759"
+          ]
+        }
+      ]
+    },
+    "CP_110_ATTACKH": {
+      "title": "Cursed-energy technique sub-row (CE-2 upkeep)",
+      "overview": "Row index 1 is named CP_110_ATTACKH and is also reused as an animation-set ID, but its only identified unique-float reader is the CE-2 cursed-energy drain. The remaining thirteen floats have no identified CP_110-specific read after checking the controller, action classes, shared helpers and verification notes; their zero defaults must not be read as proof that they do nothing.",
+      "values": {
+        "0": {
+          "label": "CE-2 cursed-energy drain per second",
+          "simple": "While the CE-2 technique is active and its own attack is not running, Yuta loses 10 cursed energy each second.",
+          "technical": "GetCursedEnergyDrainRate (controller slot 113) returns unique (0, 1) = 10 only when shikigami 0 is not out (GetShikigamiUnknown374(0) != 1), EGameBuffDebuff::CP_110_CursedEnergyAttack2 has a stack > 0, and the Attack-layer action is neither CursedEnergyAttack_2 nor CursedEnergyAttackAir_2; every other case returns 0. The status tick subtracts Drain * DeltaTime from CursedEnergy when Drain >= 0. The body was re-homed to CP_110 and its bytes are equal at retail RVA 0x10ECCB0, but the verification record keeps it as HOLD because it is not linked in our executable.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1213",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1228",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3434",
+            "Tools/verify/LANES/w21-cp-100s.md:54",
+            "Tools/verify/LANES/wave10-CHb.md:58"
+          ]
+        }
+      },
+      "untraced": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Do not assume this row is a camera block: MakeUniqueCameraRequest(2, RowIndex) reads indexes 0..10 of whichever row is passed, but no CP_110 call site passes row 1 to that helper. The traced row-1 reader is the CE-2 drain only.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/CP_110_ActionController.cpp:1228"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "The CP_110 passive is a two-state swap driven by shikigami 0 and the Passion gauge. In setup mode 2 SetupPassives activates the shikigami, sets Passion to 100 and turns the passive on; SetPassiveActive saves the cursed-energy gauge, fills it and CursedEnergy to the last level threshold, and adds BUFF_CP_110_PASSIVE. With the shikigami out, ActionTick requests its release, restores the saved gauge and removes the passive once no attack is active and Passion reaches 0.",
+      "evidence": [
+        "Source/Abrams/Private/CP_110_ActionController.cpp:1310",
+        "Source/Abrams/Private/CP_110_ActionController.cpp:865",
+        "Source/Abrams/Private/CP_110_ActionController.cpp:1182"
+      ]
+    },
+    {
+      "text": "The CE-2 state changes several mechanics at once: CursedEnergyAttack_2 and Air_2 homing toggles BUFF_CP_110_CURSEDENERGYATTACK2; NormalAttack_2_1 then uses the CP_110_ATTACKD_2 set, homing IDs ATTACKA..I _01 (and G's AUTO) remap to _01_2 variants, the CE-2 attack row index becomes 1, and FX_CP_110_00211 trails use the passive colour. ActionTick also removes the buff and weapon effect if cursed energy reaches 0.",
+      "evidence": [
+        "Source/Abrams/Private/CP_110_ActionController.cpp:516",
+        "Source/Abrams/Private/CP_110_ActionController.cpp:206",
+        "Source/Abrams/Private/CP_110_ActionController.cpp:936",
+        "Source/Abrams/Private/CP_110_ActionController.cpp:522",
+        "Source/Abrams/Private/CP_110_ActionController.cpp:740",
+        "Source/Abrams/Private/CP_110_ActionController.cpp:1164"
+      ]
+    },
+    {
+      "text": "There are two distinct shikigami counters. A guarding hit (or guard-durability callback with Flag != 1) can trigger Attack_8 with the row-10 cost and row-8 range; being in a Damage/Blow action while holding an attack key can trigger Attack_9 with the row-11 cost and row-9 range, provided the last attacker equals the current target. Both are disabled by setup unique mode 2, and neither reads ShikigamiUniqueDataTable values in this controller.",
+      "evidence": [
+        "Source/Abrams/Private/CP_110_ActionController.cpp:892",
+        "Source/Abrams/Private/CP_110_ActionController.cpp:1085",
+        "Source/Abrams/Private/CP_110_ActionController.cpp:733"
+      ]
+    },
+    {
+      "text": "CP_110's ExtraAttack_1 is requested from ActionTick only when the Default-layer action is neither BreakFall nor BounceUp, no attack is active, the character is not defeated and Passion is at least 100. Its homing start sets up the passive, holds collision lock 9 and places shikigami 0 100 units behind the owner; the lock's finite time comes from unique value 12.",
+      "evidence": [
+        "Source/Abrams/Private/CP_110_ActionController.cpp:1178",
+        "Source/Abrams/Private/CP_110_ActionController.cpp:1245",
+        "Source/Abrams/Private/CP_110_ActionController.cpp:1282"
+      ]
+    },
+    {
+      "text": "CP_110 has its own AI think-node setup (fixed ranges/weights such as 800 and 1400 units) and its own battle HUD widget showing the Passion gauge, but neither of those readers uses the unique-float rows; the HUD widget reads the status controller's PassionGaugeValue/ratio directly. CP_110 also has no per-character included .inl file in this source tree.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1234",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_110.cpp:20",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_110.cpp:27"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,417 @@
+{
+  "overview": "Mahoraga’s unique settings shape how it adapts to attacks, when its shockwaves trigger, and how the adaptation ring appears.",
+  "technicalOverview": "Mahoraga (CN_240) is a non-selectable adaptation boss. In plain terms, attacks that hit it are remembered by type, a gauge fills toward a shockwave adaptation, and a separate damage pool triggers the down-value adaptation attack. Technically, its three unique rows are bound in order from CharacterDataTable.Id_CharacterUnique: the main row holds adaptation-gauge rates, combat thresholds and shockwave radii; CN_240_NORMALATTACK holds combo and grab timing; CN_240_RING drives the adaptation ring and ShadowRimOffset timeline. It uses UCN_240_ActionController and a CN_240-specific AI leaf, with unlisted action types falling back to the shared controller factory.",
+  "rows": {
+    "CN_240": {
+      "title": "Core adaptation and shockwave tuning",
+      "overview": "Main row for the two gauge-fill modes, the aerial Super follow-up height gate, and the ground shockwave that damages opponents in a ring.",
+      "values": {
+        "0": {
+          "label": "Normal adaptation gauge gain",
+          "simple": "How fast the adaptation gauge fills in the normal setup.",
+          "technical": "When SetupUniqueMode != 1, AdaptDamage is nonempty, bAdapting is true, and the current attack-layer action is non-null and is neither ExtraAttack_1 nor ExtraAttack_2, UnknownSlot125 returns this value (3.0). AGameCharacter::GetActionValue125 forwards it to the status tick, which computes AdaptGaugeValue = clamp(AdaptGaugeValue + value * DeltaTime, 0, AdaptGaugeValueMax); larger values fill faster. A gauge >=100 is one of the gates for starting ExtraAttack_1. The exact meaning of SetupUniqueMode values is unresolved; the branch condition and data flow are verified.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:601",
+            "Source/Abrams/Private/GameCharacter.cpp:3036",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3629",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3630",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1563",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1599"
+          ]
+        },
+        "1": {
+          "label": "Mode-1 adaptation gauge gain",
+          "simple": "Alternative gauge-fill rate when the character is in SetupUniqueMode 1.",
+          "technical": "When SetupUniqueMode == 1 and AdaptCount >= 2, with a non-null attack-layer action that is not ExtraAttack_1 or ExtraAttack_2, UnknownSlot125 returns this value (3.0). It reaches the same status-tick multiply by DeltaTime and clamp as index 0. The >=2 completed-adaptation gate applies only to this mode. The HUD hides the normal adapt gauge in mode 1, supporting the two-path split; the user-facing purpose of mode 1 itself is unresolved.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:601",
+            "Source/Abrams/Private/GameCharacter.cpp:3036",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3629",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3630",
+            "Source/Abrams/Private/GameBattlePlayerInfoWidget.cpp:126"
+          ]
+        },
+        "2": {
+          "label": "Aerial Super follow-up height limit",
+          "simple": "How much height difference is still allowed for the third-hit aerial follow-up.",
+          "technical": "In TCN_240_SuperCursedEnergyAttack tick for action start count 3, Phase 1, a valid non-defeated secondary target, ActionElapsedTime <= 3.0 s and target vertical speed < 0, the code stays in Phase 1 while abs(owner Z - target Z) >= this value (400 world units). It advances and plays AttackI_02_02 when the gap is <400, or when another listed gate fails (for example elapsed >3.0). A larger value permits a larger gap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1752"
+          ]
+        },
+        "3": {
+          "label": "Shockwave repeat interval",
+          "simple": "How often the adaptation shockwave checks for and hits enemies in its ring.",
+          "technical": "FCN_240_ExtraAttack_1 advances ActionElapsedTime by DeltaTime / Dilation, where Dilation is CustomTimeDilation when >0 and 1 otherwise. While 0.1 > elapsed it returns; at elapsed >=0.1 it resets elapsed to 0 and scans opponents and their active shikigami. Larger values mean slower repeat hits. This runs only while the damage flag is armed: UniqueActionBegin arms it and seeds elapsed to 1000.0f, so the first armed tick immediately passes the interval, while the first action start clears the pending/active flags.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1199",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1225",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1248"
+          ]
+        },
+        "4": {
+          "label": "Shockwave outer radius and reach",
+          "simple": "The outer size of the shockwave and how far its damage reaches.",
+          "technical": "Three traced uses: (1) StartShockwave is called with a hardcoded start radius of 300, this value as EndRadius (3000 world units) and the action TotalDuration; the battle system prefilters destructibles within EndRadius and linearly tweens radius 300 -> 3000. (2) FX_CN_240_10112 spawns FX_CN_240_10113 with uniform scale 1 - (0.5 * ring-effect Z) / this value. (3) The damage scan skips characters and active shikigami whose 2D distance from the owner is > this value. The comparison is strict, so exactly 3000 still passes; larger values make the visual ring, destructible sweep and damage reach larger.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1215",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1240",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1276",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1293",
+            "Source/Abrams/Private/GameBattleManager.cpp:1913",
+            "Source/Abrams/Private/GameBattleSystems_A.cpp:147",
+            "Source/Abrams/Private/GameBattleSystems_A.cpp:155"
+          ]
+        },
+        "5": {
+          "label": "Shockwave secondary range gate",
+          "simple": "A second range check that behaves differently for characters and shikigami.",
+          "technical": "For active, non-defeated, non-releasing shikigami the code computes Height but tests 2D Distance again: skip when Distance >2000; the computed Height is not used (an explicit retail quirk noted in source). For enemy characters it uses Height = abs(target Z - owner Z) and skips when Height >2000. Tests are strict, so equality passes. Larger values tolerate greater separation on the applicable axis.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1281",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1298"
+          ]
+        }
+      },
+      "untraced": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Indices 6-13 are zero here and no CN_240-specific read was identified. The accessor is an unchecked array dereference, so zero alone is not evidence that a slot is unused.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Private/GameCharacter.cpp:559"
+          ]
+        }
+      ]
+    },
+    "CN_240_NORMALATTACK": {
+      "title": "Normal-combo and grab timing",
+      "overview": "Timing for the delayed NormalAttack_1_1 finish and the NormalAttack_2_1 grab: recognition delay, reach, forced end, and the pull sent through the shared battle push-request system.",
+      "values": {
+        "0": {
+          "label": "Delayed second-attack finish",
+          "simple": "How long the second NormalAttack_1_1 waits before it is allowed to finish.",
+          "technical": "On action start count exactly 1 and Phase 2, TickAttack adds DeltaTime to its own ActionElapsedTime and returns while 3.0 > elapsed. At elapsed >=3.0 s it sets Byte16 and calls SetFlag159(true). Start counts 0 and 2 use FGameCharacterAction_AttackBase::TickAttack; other counts do nothing. This variant has no ground-test gate.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:204",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:221"
+          ]
+        },
+        "1": {
+          "label": "Grab recognition reach",
+          "simple": "How close the secondary target must be before the grab can end early.",
+          "technical": "Distance is Size() between target and owner GAISlot014 locations minus the owner scaled capsule radius. During Phase 2, after the row1 index-2 time gate, Distance <200 world units sets bTargetInReach and returns early. The first-start shortcut also tests Distance <200 but only when row1 index 2 is <=0, which is false for the default 0.8. The comparison is strict: exactly 200 does not qualify. A larger value makes early recognition easier.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1678",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1680",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1812"
+          ]
+        },
+        "2": {
+          "label": "Grab recognition delay",
+          "simple": "Earliest time the grab can recognize that the target is in reach.",
+          "technical": "Phase 2 applies the reach test only after 0.8 <= ActionElapsedTime (seconds); equality already qualifies. A larger value delays early completion. The same number is checked as <=0.0 in the first-start shortcut; with the default 0.8 that shortcut cannot fire. Once set, bTargetInReach makes FilterRequests add another request for the same action type.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1680",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1812",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1775"
+          ]
+        },
+        "3": {
+          "label": "Grab forced end time",
+          "simple": "When the grab gives up and plays its end animation.",
+          "technical": "In Phase 2, when 1.5 <= ActionElapsedTime (seconds), the action increments Phase and plays AttackD_01_End_01. A larger value extends the maximum grab window. The earlier in-reach branch returns before this test, so a target caught after the index-2 delay can avoid the forced end.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1686"
+          ]
+        },
+        "4": {
+          "label": "Grab pull movement speed",
+          "simple": "Speed used to pull the grabbed target into place.",
+          "technical": "On Phase 2 ticks with no blocking line trace, the action requests AddPushOutRequest(target, forward-offset location, 2200, 0.2, -1). The 2200 is Param20/Strength, forwarded through ApplyExternalForce as InSpeed and stored as PendingMoveToSpeed; each movement tick moves the target by that speed along the computed direction. The CN_240 local name \"PushTime\" is misleading. The -1 radius fails the >0 radius check, so no radius limit is applied. Larger values move the target farther per tick.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1668",
+            "Source/Abrams/Private/GameBattleManager.cpp:1605",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:284",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:113",
+            "Source/Abrams/Private/GameCharacter.cpp:4151",
+            "Source/Abrams/Private/GameActorMovementController.cpp:419",
+            "Source/Abrams/Private/GameActorMovementController.cpp:533"
+          ]
+        },
+        "5": {
+          "label": "Grab pull move-phase scale",
+          "simple": "Scale applied to the pulled target while its move phase counts down.",
+          "technical": "The 0.2 is AddPushOutRequest Param24, forwarded as GravityCorrect to ApplyExternalForce and then as InScale / PendingMoveToScale. While a move-to request is active, MovePhaseElapsed decreases by scale * Step, or by (scale + 1) * Step when VerticalSpeed <0. The CN_240 local name \"PushSpeed\" is misleading; larger values drain the move phase faster.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1668",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:284",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:113",
+            "Source/Abrams/Private/GameCharacter.cpp:4151",
+            "Source/Abrams/Private/GameActorMovementController.cpp:419",
+            "Source/Abrams/Private/GameActorMovementController.cpp:482"
+          ]
+        }
+      },
+      "untraced": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "CN_240 never calls MakeUniqueCameraRequest. The shared helper would read a chosen row's indices 0-10 for camera mode 2, so the zeros here should not be labelled camera values merely because the helper exists.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941"
+          ]
+        },
+        {
+          "text": "The grab line trace uses GCP_030_MoveObjectTypes, a shared CP_030 data list included by the CN_240 controller TU; this is shared surface, not a CP_030 controller taking over the character.",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:35",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1665"
+          ]
+        }
+      ]
+    },
+    "CN_240_RING": {
+      "title": "Adaptation ring and rim visual timeline",
+      "overview": "Values for the wobbling ring rotation and the ShadowRimOffset fade used while Mahoraga adapts. Ease durations are seconds because the interpolators are advanced with DeltaTime.",
+      "values": {
+        "0": {
+          "label": "Ring wobble start amplitude",
+          "simple": "Starting size of the sine wobble added to the adaptation ring rotation.",
+          "technical": "RestartAdaptation starts Ease28 from this value (2.5) to row2 index 1 over row2 index 2 seconds. Each tick copies Ease28.GetCurrent() into RingWobbleAmplitude while Phase 0 or 3 is active; the final ring rotation is sin(RingPhase) * RingWobbleAmplitude + RingAngle. Larger amplitudes make the sinusoidal offset bigger.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:326",
+            "Source/Framework/Public/StudioFloatEaseInterpolator.h:100",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1550"
+          ]
+        },
+        "1": {
+          "label": "Ring wobble entry target",
+          "simple": "Amplitude the entry wobble eases down to.",
+          "technical": "Ease28 targets this value (1.0) in RestartAdaptation. During Phase 0 the current value feeds RingWobbleAmplitude, then the phase advances when the linear ease is no longer active.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:326",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1440"
+          ]
+        },
+        "2": {
+          "label": "Entry duration and initial ring rate",
+          "simple": "How long the entry wobble lasts and how quickly it oscillates at first.",
+          "technical": "This value (100) is both the Ease28 duration in RestartAdaptation and the initial Adaptation.RingPhaseRate. RingPhase accumulates DeltaTime * RingPhaseRate, so larger values complete the ease sooner and increase the initial sine frequency. The rate is overwritten by row2 index 7 when adaptation completes.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:326",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1490",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1550"
+          ]
+        },
+        "3": {
+          "label": "Post-entry hold time",
+          "simple": "Pause between the ring settling and the rim-rotation flourish.",
+          "technical": "Phase 1 accumulates PhaseTime and stays there while 0.5 > PhaseTime. At PhaseTime >=0.5 s it advances to Phase 2, sets bPhaseStarted false, starts Ease58 from 0 to 45 over row2 index 4, and plays SE_CN_240_02012. Larger values lengthen the hold.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1468"
+          ]
+        },
+        "4": {
+          "label": "Rim rotation ease duration",
+          "simple": "How quickly the rim turns to its 45-degree pose.",
+          "technical": "Ease58 linearly moves RingAngle from 0 to a hardcoded 45 over 0.075 s; its current value is written to PostProcess RingRotate. Larger durations make the turn slower. On completion the phase advances and FinishAdaptation is called.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1468",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1440",
+            "Source/Abrams/Public/CN_240_PostProcessAnimInstance.h:28"
+          ]
+        },
+        "5": {
+          "label": "Exit wobble start amplitude",
+          "simple": "Starting size of the wobble after adaptation completes.",
+          "technical": "After Ease58 finishes, Ease28 is restarted from this value (3.0) toward row2 index 6 over row2 index 7 seconds. Phase 3 copies its current value into RingWobbleAmplitude. Larger values start a bigger settling wobble.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1489"
+          ]
+        },
+        "6": {
+          "label": "Exit wobble target amplitude",
+          "simple": "Amplitude the settling wobble eases down to.",
+          "technical": "Ease28 targets this value (0.2) in the exit ease started at adaptation completion. Larger targets leave a larger persistent sine offset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1489",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1550"
+          ]
+        },
+        "7": {
+          "label": "Exit duration and replacement ring rate",
+          "simple": "How long the settling wobble lasts and its new oscillation rate.",
+          "technical": "This value (50) is the exit Ease28 duration and is also assigned to Adaptation.RingPhaseRate immediately after that ease starts. It therefore replaces the entry rate from row2 index 2. Larger values slow the ease and speed the sine phase accumulation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1489",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1490"
+          ]
+        },
+        "8": {
+          "label": "ShadowRimOffset ease endpoint",
+          "simple": "Middle value used for both rim highlight fades.",
+          "technical": "Ease88 fades ShadowRimOffset from hardcoded -1 to this value (0) with EaseIn over row2 index 10 seconds, then from this value back to -1 with EaseOut over row2 index 12 seconds. The current value is written to the material parameter every adaptation tick. A larger value would raise the bright midpoint.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1517",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1537",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1559"
+          ]
+        },
+        "9": {
+          "label": "Delay before rim fade-in",
+          "simple": "How long the rim highlight waits before appearing.",
+          "technical": "Adaptation Step 0 accumulates StepTime and stays there while 1.25 > StepTime. At StepTime >=1.25 s it starts the fade-in ease. Larger values delay the effect.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1511"
+          ]
+        },
+        "10": {
+          "label": "Rim fade-in duration",
+          "simple": "How long the rim highlight takes to appear.",
+          "technical": "Ease88 uses 0.25 s with EaseIn for the -1 -> row2 index 8 transition. Larger durations make the appearance slower.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1517",
+            "Source/Framework/Public/StudioFloatEaseInterpolator.h:182"
+          ]
+        },
+        "11": {
+          "label": "Delay before rim fade-out",
+          "simple": "Hold at the bright rim value before it disappears.",
+          "technical": "Step 2 accumulates StepTime and starts the fade-out once StepTime >= this value. With the default 0, the first Step 2 tick that adds a positive DeltaTime starts the fade-out immediately. Larger values hold the highlight longer.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1531"
+          ]
+        },
+        "12": {
+          "label": "Rim fade-out duration",
+          "simple": "How long the rim highlight takes to disappear.",
+          "technical": "Ease88 uses 1.0 s with EaseOut for the row2 index 8 -> -1 transition. When it ends the collision lock is released. Larger durations make the disappearance slower.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1537"
+          ]
+        }
+      },
+      "untraced": [
+        13
+      ],
+      "notes": [
+        {
+          "text": "The final RingRotate value is stored on UCN_240_PostProcessAnimInstance; the separate ring-rotate alpha is toggled by battle-sequence start/stop hooks rather than by this row.",
+          "evidence": [
+            "Source/Abrams/Public/CN_240_PostProcessAnimInstance.h:28",
+            "Source/Abrams/Private/CN_240_ActionController.cpp:1440"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Row mapping is mechanical: AGameCharacter builds UniqueRows in CharacterDataTable.Id_CharacterUnique order, and the unchecked accessor reads UniqueRows[RowIndex]->FloatValue[ValueIndex]. That is why row 0, 1 and 2 here correspond to CN_240, CN_240_NORMALATTACK and CN_240_RING.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Character.h:54",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUnique.h:15",
+        "Source/Abrams/Private/GameCharacter.cpp:1759"
+      ]
+    },
+    {
+      "text": "The controller and AI are explicitly selected by the character row: ActionControllerType CN_240 constructs UCN_240_ActionController, and AIType CN_240 constructs FGameCharacterAIThinkNode_CN_240. The controller factory supplies dedicated action classes for idle, normal attacks, ExtraAttack_1/2, Super and reaction actions, then delegates unlisted types to the shared base factory.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:630",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:206",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:372",
+        "Tools/verify/CHAR/CN_240_ActionController.md:58"
+      ]
+    },
+    {
+      "text": "Adaptation is a full damage-driven loop: hits with a valid DamageAdaptType are tallied per attacker and type, the normal down-value pool is drained by damage and starts ExtraAttack_2 at <=0, a >=100 gauge helps start ExtraAttack_1, and completion refills to the next cursed-energy level while giving the strongest matching attacker an Adapt debuff.",
+      "evidence": [
+        "Source/Abrams/Private/CN_240_ActionController.cpp:843",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:888",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:1599",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:1125"
+      ]
+    },
+    {
+      "text": "Control quirks are substantial: an attacker holding the matching Adapt buff deals zero damage to Mahoraga; CN_240_ATTACKI_01_01 deals no damage to non-CursedSpirits; while adapting, Guard/GuardAir are refused but hyper armor is enabled; and played projectiles get collision delegates that spawn FX_CN_240_03103.",
+      "evidence": [
+        "Source/Abrams/Private/CN_240_ActionController.cpp:423",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:452",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:488",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:515",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:707"
+      ]
+    },
+    {
+      "text": "The CN_240 AI leaf seeds rival scores from the current target, then retargets when that target is defeated or holds an Adapt buff. Its setup weights normal and cursed-energy behaviours; the traced CN_240 AI functions do not read these unique rows.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:1029",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:6247"
+      ]
+    },
+    {
+      "text": "The normal HUD shows the adapt gauge only when SetupUniqueMode != 1, and battle widgets enable adapt icons whenever a CN_240 is present. The shockwave scan can target shikigami, but it reads the owner AGameCharacter's unique rows; AGameShikigami uses its own ShikigamiUniqueDataTable accessor and is not the source of these values.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattlePlayerInfoWidget.cpp:126",
+        "Source/Abrams/Private/GameBattleAdaptIconListWidget.cpp:61",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:1260",
+        "Source/Abrams/Public/GameShikigami.h:350"
+      ]
+    },
+    {
+      "text": "A generic SteerTowardSecondaryTarget helper also reads unique float (0,0), but its traced callers are CN_041/CN_140 actions, not CN_240; it is not counted as a reader of this row. The CN_240 controller and action headers include no per-character .inl file; the shared inline GUF variant exists for hot callers elsewhere, while this TU calls the out-of-line GetOwnerUniqueFloat helper.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3492",
+        "Source/Abrams/Private/CN_041_ActionController.cpp:391",
+        "Source/Abrams/Private/CN_240_ActionController.cpp:1",
+        "Source/Abrams/Public/CN_240_Actions.h:1",
+        "Source/Abrams/Public/GameCharacterAction.h:201",
+        "Source/Abrams/Public/GameCharacterActionInline.h:10"
+      ]
+    }
+  ]
+}

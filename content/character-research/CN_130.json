@@ -1,0 +1,103 @@
+{
+  "overview": "Transfigured Human C can jump twice in the air and uses different attacks at different ranges. Its export leaves all unique slots empty.",
+  "technicalOverview": "Transfigured Human C (CN_130) is a non-selectable, single-variant AI human enemy with no character-unique data at all: all nine Id_CharacterUnique entries on its CharacterDataTable row are None, so its UniqueRows array holds null entries and no CN_130-specific code reads a unique float or makes a unique camera request. Its behaviour instead comes from a small, mostly shared controller set: UCN_130_ActionController gives it two air jumps and its own action-cancel map while turning off tag combos, revival buffs and situation voices; UCN_130_BoneController registers no foot IK and leaves lean, aim-offset and foot-bend updates empty; and FGameCharacterAIThinkNode_CN_130 reuses CN_111/CN_120 parameter groups and adds its own weighted, distance-banded attack choices. The row borrows CP_010 cursed-energy numbers and a couple of CP_010 action IDs, but the CP_010 controller is not the controller used for this character.",
+  "rows": {},
+  "notes": [
+    {
+      "text": "There are no unique rows to configure. The CharacterDataTable export lists nine `None` entries in `Id_CharacterUnique`. AGameCharacter still reserves one UniqueRows entry per name (missing names become null), and the shared reader GetCharacterUniqueFloatValue is an unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference, but no CN_130 source calls that reader, the FGameCharacterAction wrapper GetOwnerUniqueFloat, or MakeUniqueCameraRequest. So there are no 14 subvalues, and no zero values, to report for this character; a future editor adding a row would be a new setup rather than a change to an existing one.",
+      "evidence": [
+        "JJKCCDatatables/datatables/CharacterDataTable.json:3678",
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Public/GameCharacter.h:245",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941"
+      ]
+    },
+    {
+      "text": "The action controller is a compact 0x1B8-byte class with eight overrides and no slot-86 override. It owns a cancel map (ActionCancelTable at +0x168, the same member design as CN_060), returns that map from GetActionCancelTable instead of the translation-unit table, allows two air jumps, and explicitly answers false to tag-combo joining, revival-buff application and situation-voice playback. The verification ledger records the footprint/shape as passing.",
+      "evidence": [
+        "Source/Abrams/Public/CN_130_ActionController.h:15",
+        "Source/Abrams/Public/CN_130_ActionController.h:23",
+        "Source/Abrams/Public/CN_130_ActionController.h:29",
+        "Source/Abrams/Public/CN_130_ActionController.h:31",
+        "Source/Abrams/Public/CN_130_ActionController.h:33",
+        "Source/Abrams/Private/CNControllerRegistrationHelpers.cpp:41",
+        "Tools/verify/CHAR/batches/batch-action-band3.md:89"
+      ]
+    },
+    {
+      "text": "Two controller bodies are still unresolved, so do not infer behaviour from their names: slot 173 is noted only as a switch at 0x141077770, and slot 298 at 0x14107D180 fills the cancel table from the TU table and edits entries. The claims ledger marks UCN_130_ActionController's overall bodies as BLOCKED even though the member footprint and override list landed.",
+      "evidence": [
+        "Source/Abrams/Public/CN_130_ActionController.h:36",
+        "Tools/verify/CHAR/claims.csv:22"
+      ]
+    },
+    {
+      "text": "The bone controller is a no-IK shell. It clears the FootIK list and returns true (the source comment says this skeleton has no IK bones), and its lean-alpha, aim-offset and foot-bend overrides are empty. AGameCharacter still passes the auto-aim yaw/pitch limits and FootIKLimit into InitBoneController97, but this leaf does not consume the IK list.",
+      "evidence": [
+        "Source/Abrams/Private/CN_130_BoneController.cpp:6",
+        "Source/Abrams/Private/CN_130_BoneController.cpp:9",
+        "Source/Abrams/Private/CN_130_BoneController.cpp:13",
+        "Source/Abrams/Private/CN_130_BoneController.cpp:17",
+        "Source/Abrams/Private/CN_130_BoneController.cpp:21",
+        "Source/Abrams/Private/GameCharacter.cpp:766",
+        "Source/Abrams/Private/GameCharacter.cpp:770"
+      ]
+    },
+    {
+      "text": "AI type 25 builds FGameCharacterAIThinkNode_CN_130 (factory 0x14119b9b0, 0x1A8-byte object). Its SetupThinkParameters is ICF-identical with CN_111 and CN_120 and installs slots 06, 09, 18, 19, 23, 24, 27, 28 and 34. Slots 18 and 19 are shared with CN_120 (19 also with CN_111), slot 24 with CN_111/CN_120/CN_160, while slot 27 and the weighted slot 34 are CN_130's own; these are AI behaviour groups, not character-unique float readers.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:201",
+        "Source/Abrams/Public/GameCharacterAIThinkNode.h:563",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:2975",
+        "Source/Abrams/Private/GameCharacterAIThinkNode.cpp:2252",
+        "Source/Abrams/Private/GameCharacterAIThinkNode.cpp:3929",
+        "Source/Abrams/Private/GameCharacterAIThinkNode.cpp:4336",
+        "Source/Abrams/Private/GameCharacterAIThinkNode.cpp:4516",
+        "Tools/verify/CHAR/ai-factory-table.md:25"
+      ]
+    },
+    {
+      "text": "The AI's random-parameter builder is a verified byte match (0x11D9690, 1727 B). It gates jump-air parameters on AI value 0xC being equal or not equal to 8 and on value 0xD being at least 4, and the reconstruction notes single out CN_130's condition-grouped but declaration-ordered condition adds (P13 first). This changes which air behaviours the AI may pick; it does not consult any unique row.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAIThinkNodeRandomParameters.cpp:21",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeRandomParameters.cpp:30",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeRandomParameters.cpp:651",
+        "Tools/verify/CHAR/ai-family-verified.md:103"
+      ]
+    },
+    {
+      "text": "CN_130's own AI slot 34 is one weighted group at evaluation order 280. It divides AI value 0xD into bands 1-3, 4-6 and 7-10: basic attack behavior 1 carries weights 45, 45 and 30; behavior 0xB carries 15, 15 and 10; behavior 0xD carries 0, 10 and 30; behavior 0xF carries 0, 5 and 20. Extra conditions on value 0xC (== 8 / != 8), close-range value 3, self-target and flag checks are added to the parameters, and a separate value 0xC == 8 branch adds behavior 1 (10), behavior 1 with move mode 3 (20) and behavior 0xD (40).",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:8308",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:8319",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:8331",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:8466",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:8489",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:8533"
+      ]
+    },
+    {
+      "text": "The CP_010 reference is data, not controller inheritance. CN_130's character row sets Id_CharacterCursedEnergy to CP_010 (thresholds 100/200/300/400 and recovery wait 1.5, speed 75) while keeping ActionControllerType CN_130, so the CP_010 passive buffs in UCP_010_ActionController::OnCursedEnergyLevelChanged do not apply here. The only shared controller code is the pass-through CreateAction at slot 290 (0x141073750), which the ICF notes list for both classes.",
+      "evidence": [
+        "JJKCCDatatables/datatables/CharacterDataTable.json:3678",
+        "JJKCCDatatables/datatables/CharacterCursedEnergyDataTable.json:15",
+        "Source/Abrams/Private/CP_010_ActionController.cpp:7",
+        "Source/Abrams/Private/CP_010_ActionController.cpp:26",
+        "Source/Abrams/Public/CP_010_ActionController.h:14",
+        "Source/Abrams/Public/CN_130_ActionController.h:17"
+      ]
+    },
+    {
+      "text": "Its data role is a stripped, AI-only brawler: no special attack row entries (no tag-combo damage, solo special, domain expansion or ranking record), no command list, one variation (CN_130_00), auto-combo damage rate 0.7 and no link-combo cursed-energy experience rate. Its action row uses CN_130_ATTACKA/B/C for normal ground and air attacks but borrows CP_010's step and break-fall actions; that reuse is data-level and does not bring CP_010 unique values with it.",
+      "evidence": [
+        "JJKCCDatatables/datatables/CharacterDataTable.json:3678",
+        "JJKCCDatatables/datatables/CharacterSpecialAttackDataTable.json:222",
+        "JJKCCDatatables/datatables/ActionDataTable.json:3359",
+        "Source/Abrams/Public/CN_130_ActionController.h:33"
+      ]
+    }
+  ]
+}

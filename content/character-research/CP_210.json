@@ -1,0 +1,868 @@
+{
+  "overview": "Miwa’s settings control the timing, energy cost, and reach of her charged sword attack, with a separate camera for each cursed-energy level.",
+  "technicalOverview": "Kasumi Miwa (CP_210) is a sword-user whose action controller switches normal attacks between sheathed and drawn sets, while her cursed-energy level (1-3) selects three charged Cursed Energy Attack 2 tuning rows and three matching mode-2 camera presets. The character-unique rows are the zero-based entries of CharacterDataTable.Id_CharacterUnique, fetched through the owner's UniqueRows array; the charge rows time the hold, its cursed-energy cost, the growth of the charge effect, and the capsule/area used to pick targets for the burst, and the camera rows shape the view while charging. Ground and air versions of the charge use the same rows. Summoned shikigami have a separate ShikigamiUniqueDataTable and are not part of these values.",
+  "rows": {
+    "CP_210": {
+      "title": "Core unique row (no Miwa-specific charge use)",
+      "overview": "All 14 slots are zero. No CP_210 action or controller in the traced source indexes this row directly. The only traced reader that can apply to Miwa is a generic Projection Sorcery stagger fallback: when the receiver is hit without a damage row, it reads the receiver's row 0 value 0 as the stagger duration. Every other slot has no identified reader.",
+      "values": {
+        "0": {
+          "label": "Projection-stagger fallback time",
+          "simple": "Fallback stagger duration used only when Projection Sorcery damage has no damage row; it is zero for Miwa.",
+          "technical": "FGameCharacterAction_ProjectionSorceryReceive::Tick chooses Request.DamageTableRow->RestraintTime when that row exists, and otherwise GetOwnerUniqueFloat(0, 0) from the struck character's own unique rows. Miwa's controller treats ProjectionSorceryReceive as a possible damage-state follow-up, so this fallback can apply to her; with value 0 the restraint ends at the first elapsed-time check (RestraintTime <= ActionElapsedTime). No CP_210-specific writer or other reader of this slot was found. GetOwnerUniqueFloat is the out-of-line helper that calls AGameCharacter::GetCharacterUniqueFloatValue, an unchecked UniqueRows[0]->FloatValue[0] dereference.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:203-215",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:1700-1708",
+            "Source/Abrams/Private/GameCharacterAction.cpp:933-936",
+            "Source/Abrams/Private/GameCharacter.cpp:1759-1762"
+          ]
+        }
+      },
+      "untraced": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Two other generic row-0 readers were checked and are not Miwa consumers: the CursedEnergyAttack1/2Hold AI executors that read row 0 slots 0-2 are specialised by CP_040/CP_050, not CP_210; SteerTowardSecondaryTarget reads row 0 slot 0 but is called from CN_041/CN_140 actions. This row's zeros are therefore not claimed as a confirmed off switch for those unrelated systems.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112-130",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:8-13",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3492-3525"
+          ]
+        }
+      ]
+    },
+    "CP_210_ATTACKH_1": {
+      "title": "Charged attack tuning, cursed-energy level 1",
+      "overview": "Tuning for level-1 Cursed Energy Attack 2 on the ground or in the air. Slot 0 is the free hold time, slot 1 the energy drain, slot 2 the 0.2 s delay before the charge effect grows, slots 3-6 size the effect and the target/hit area, and slot 7 is an extra half-height. The row is chosen only by cursed-energy level; the weapon-drawn variation changes animations and attack sets instead.",
+      "values": {
+        "0": {
+          "label": "Hold time before energy drain",
+          "simple": "How long the charge can be held before it starts costing cursed energy; it also decides whether the charged hit still comes out.",
+          "technical": "Read twice from the level-selected charge row (level 1 -> row 1, 2 -> row 2, 3 -> row 3; the helpers return -1 for any other level). In TickChargeState states 0/1, cursed energy is drained only when ActionElapsedTime > slot 0 (strict); at or before that time no cost is applied. In state 3, after the animation ends, bWithinCharge = ActionElapsedTime <= slot 0 (inclusive); if that is true, or the CursedEnergyAttack_2 key is still held, the attack goes to charge-hit state 4, otherwise it goes to the no-hit finish state 5. Compared with ActionElapsedTime, which advances by DeltaTime, so the unit is seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:50-60",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:227-237",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:260-269",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:303-322"
+          ]
+        },
+        "1": {
+          "label": "Cursed energy drain per second",
+          "simple": "How much cursed energy the held charge consumes each second after the free hold time.",
+          "technical": "After ActionElapsedTime has passed slot 0, while IsGameKeyHeld(CursedEnergyAttack_2) is true, status cursed energy is set to current minus slot 1 * DeltaTime. If the remaining value is > 0 the charge continues; if it reaches 0 or below the charge is abandoned (collision lock 9 released, camera restored, finish animation CP_210_ATTACKH_01_END_01, state 7). The multiplier by DeltaTime makes this cursed-energy units per second.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:260-285",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:50-60"
+          ]
+        },
+        "2": {
+          "label": "Charge-effect start delay",
+          "simple": "How long Miwa must stay grounded before the charging effect appears (level 1: 0.2 s).",
+          "technical": "In UpdateChargeEffect state 0, ChargeTime is reset to 0 whenever GetGroundTraceHit() == 0; with a ground hit ChargeTime += DeltaTime and when ChargeTime >= slot 2 (inclusive) FX_CP_210_00102 is attached at the owner, a sound plays, the size ease starts, and BeamState advances. The value is an elapsed time in seconds. In this row the stored value is 0.2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:75-101"
+          ]
+        },
+        "3": {
+          "label": "Charge effect scale target and hit half-height",
+          "simple": "The size the charge effect grows toward, also used as part of the attack capsule's half-height.",
+          "technical": "Two reads of the same level row. At effect start, slot 3 is the target argument of ChargeEffectScaleEase.Start(owner capsule radius, target, 0.25 s, EaseOut, exponent 2, steps 2); the eased BeamScale is later written to the effect actor's uniform scale multiplied by 0.01, and BeamState 2 is entered when the ease stops. At OnAttackCollisionBegin, requested capsule half-height = slot 3 + slot 7. Components tagged Attack_multi_v skip the resize; other capsule components get RequestCapsuleSize. The code mixes the same value into an effect-scale input and a capsule half-height; no other CP_210 read of slot 3 was found.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:97-115",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:556-584"
+          ]
+        },
+        "4": {
+          "label": "Vertical target tolerance",
+          "simple": "How much vertical separation is allowed when choosing targets for the charged burst.",
+          "technical": "At collision begin, requested capsule radius = slot 4 * 0.5 + slot 6. While BeamState == 2, enemy characters and their active, unreleased shikigami are considered: vertical gap = |owner.Z - target.Z| - target capsule half-height, and a target is accepted when that gap <= slot 4 * 0.5 (inclusive) together with the horizontal beam-scale test. The stored 1 therefore contributes 0.5 world units to both calculations.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:357-385",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:573-583"
+          ]
+        },
+        "5": {
+          "label": "Horizontal search radius multiplier",
+          "simple": "Scales each candidate's capsule radius when deciding whether the charge reaches it.",
+          "technical": "For each other character, and for active shikigami of enemy teams, radius = slot 5 * that target's GetScaledCapsuleRadius(); 2D distance is Dist2D(target, owner) - radius and a candidate is accepted when that remaining distance <= BeamScale (the live eased charge scale). Slot 5 is a multiplier of the target capsule radius, not an absolute distance in the data; 75 is the stored multiplier in all three rows.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:357-371",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:375-397"
+          ]
+        },
+        "6": {
+          "label": "Hit capsule radius addend",
+          "simple": "Adds a fixed amount to the radius of the attack's hit capsules.",
+          "technical": "At OnAttackCollisionBegin (type 74/78 slot 6), requested capsule radius = slot 4 * 0.5 + slot 6, applied to capsule components without the Attack_multi_v tag. With slot 4 = 1 and slot 6 = 75 this requests 75.5 world units. Slot 6 of the camera rows is a different setting (FOV blend time) and is not read here.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:556-584"
+          ]
+        },
+        "7": {
+          "label": "Hit half-height addend",
+          "simple": "Extra height added to the charged attack's hit capsule.",
+          "technical": "At OnAttackCollisionBegin, requested capsule half-height = slot 3 + slot 7. This row stores 0, so the requested half-height is just slot 3's contribution; no other CP_210 read of charge-row slot 7 was found. (Camera-row slot 7 selects FOV easing elsewhere; that is a different row.)",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:556-584"
+          ]
+        }
+      },
+      "untraced": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "When BeamState is 2, the charged burst collects enemy characters and their active shikigami, then plays CP_210_ATTACKH_02_01_<level> damage and FX_CP_210_08112/22/32 at each target; allies in range only get SetInAllyAttackRange. Slots 4/5 decide which targets enter that list, while slots 3/6/7 resize the actual hit capsules. A generic JugonStunReceive reads row 3 slots 5-8 from its attacker, but CP_210's damage rows are not JugonStun, so those reads are not counted here.",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:350-397",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:790-838",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271-295"
+          ]
+        }
+      ]
+    },
+    "CP_210_ATTACKH_2": {
+      "title": "Charged attack tuning, cursed-energy level 2",
+      "overview": "Tuning for level-2 Cursed Energy Attack 2 on the ground or in the air. Slot 0 is the free hold time, slot 1 the energy drain, slot 2 the 0.15 s delay before the charge effect grows, slots 3-6 size the effect and the target/hit area, and slot 7 is an extra half-height. The row is chosen only by cursed-energy level; the weapon-drawn variation changes animations and attack sets instead.",
+      "values": {
+        "0": {
+          "label": "Hold time before energy drain",
+          "simple": "How long the charge can be held before it starts costing cursed energy; it also decides whether the charged hit still comes out.",
+          "technical": "Read twice from the level-selected charge row (level 1 -> row 1, 2 -> row 2, 3 -> row 3; the helpers return -1 for any other level). In TickChargeState states 0/1, cursed energy is drained only when ActionElapsedTime > slot 0 (strict); at or before that time no cost is applied. In state 3, after the animation ends, bWithinCharge = ActionElapsedTime <= slot 0 (inclusive); if that is true, or the CursedEnergyAttack_2 key is still held, the attack goes to charge-hit state 4, otherwise it goes to the no-hit finish state 5. Compared with ActionElapsedTime, which advances by DeltaTime, so the unit is seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:50-60",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:227-237",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:260-269",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:303-322"
+          ]
+        },
+        "1": {
+          "label": "Cursed energy drain per second",
+          "simple": "How much cursed energy the held charge consumes each second after the free hold time.",
+          "technical": "After ActionElapsedTime has passed slot 0, while IsGameKeyHeld(CursedEnergyAttack_2) is true, status cursed energy is set to current minus slot 1 * DeltaTime. If the remaining value is > 0 the charge continues; if it reaches 0 or below the charge is abandoned (collision lock 9 released, camera restored, finish animation CP_210_ATTACKH_01_END_01, state 7). The multiplier by DeltaTime makes this cursed-energy units per second.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:260-285",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:50-60"
+          ]
+        },
+        "2": {
+          "label": "Charge-effect start delay",
+          "simple": "How long Miwa must stay grounded before the charging effect appears (level 2: 0.15 s).",
+          "technical": "In UpdateChargeEffect state 0, ChargeTime is reset to 0 whenever GetGroundTraceHit() == 0; with a ground hit ChargeTime += DeltaTime and when ChargeTime >= slot 2 (inclusive) FX_CP_210_00102 is attached at the owner, a sound plays, the size ease starts, and BeamState advances. The value is an elapsed time in seconds. In this row the stored value is 0.15.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:75-101"
+          ]
+        },
+        "3": {
+          "label": "Charge effect scale target and hit half-height",
+          "simple": "The size the charge effect grows toward, also used as part of the attack capsule's half-height.",
+          "technical": "Two reads of the same level row. At effect start, slot 3 is the target argument of ChargeEffectScaleEase.Start(owner capsule radius, target, 0.25 s, EaseOut, exponent 2, steps 2); the eased BeamScale is later written to the effect actor's uniform scale multiplied by 0.01, and BeamState 2 is entered when the ease stops. At OnAttackCollisionBegin, requested capsule half-height = slot 3 + slot 7. Components tagged Attack_multi_v skip the resize; other capsule components get RequestCapsuleSize. The code mixes the same value into an effect-scale input and a capsule half-height; no other CP_210 read of slot 3 was found.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:97-115",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:556-584"
+          ]
+        },
+        "4": {
+          "label": "Vertical target tolerance",
+          "simple": "How much vertical separation is allowed when choosing targets for the charged burst.",
+          "technical": "At collision begin, requested capsule radius = slot 4 * 0.5 + slot 6. While BeamState == 2, enemy characters and their active, unreleased shikigami are considered: vertical gap = |owner.Z - target.Z| - target capsule half-height, and a target is accepted when that gap <= slot 4 * 0.5 (inclusive) together with the horizontal beam-scale test. The stored 1 therefore contributes 0.5 world units to both calculations.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:357-385",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:573-583"
+          ]
+        },
+        "5": {
+          "label": "Horizontal search radius multiplier",
+          "simple": "Scales each candidate's capsule radius when deciding whether the charge reaches it.",
+          "technical": "For each other character, and for active shikigami of enemy teams, radius = slot 5 * that target's GetScaledCapsuleRadius(); 2D distance is Dist2D(target, owner) - radius and a candidate is accepted when that remaining distance <= BeamScale (the live eased charge scale). Slot 5 is a multiplier of the target capsule radius, not an absolute distance in the data; 75 is the stored multiplier in all three rows.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:357-371",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:375-397"
+          ]
+        },
+        "6": {
+          "label": "Hit capsule radius addend",
+          "simple": "Adds a fixed amount to the radius of the attack's hit capsules.",
+          "technical": "At OnAttackCollisionBegin (type 74/78 slot 6), requested capsule radius = slot 4 * 0.5 + slot 6, applied to capsule components without the Attack_multi_v tag. With slot 4 = 1 and slot 6 = 75 this requests 75.5 world units. Slot 6 of the camera rows is a different setting (FOV blend time) and is not read here.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:556-584"
+          ]
+        },
+        "7": {
+          "label": "Hit half-height addend",
+          "simple": "Extra height added to the charged attack's hit capsule.",
+          "technical": "At OnAttackCollisionBegin, requested capsule half-height = slot 3 + slot 7. This row stores 0, so the requested half-height is just slot 3's contribution; no other CP_210 read of charge-row slot 7 was found. (Camera-row slot 7 selects FOV easing elsewhere; that is a different row.)",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:556-584"
+          ]
+        }
+      },
+      "untraced": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "When BeamState is 2, the charged burst collects enemy characters and their active shikigami, then plays CP_210_ATTACKH_02_01_<level> damage and FX_CP_210_08112/22/32 at each target; allies in range only get SetInAllyAttackRange. Slots 4/5 decide which targets enter that list, while slots 3/6/7 resize the actual hit capsules. A generic JugonStunReceive reads row 3 slots 5-8 from its attacker, but CP_210's damage rows are not JugonStun, so those reads are not counted here.",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:350-397",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:790-838",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271-295"
+          ]
+        }
+      ]
+    },
+    "CP_210_ATTACKH_3": {
+      "title": "Charged attack tuning, cursed-energy level 3",
+      "overview": "Tuning for level-3 Cursed Energy Attack 2 on the ground or in the air. Slot 0 is the free hold time, slot 1 the energy drain, slot 2 the 0.1 s delay before the charge effect grows, slots 3-6 size the effect and the target/hit area, and slot 7 is an extra half-height. The row is chosen only by cursed-energy level; the weapon-drawn variation changes animations and attack sets instead.",
+      "values": {
+        "0": {
+          "label": "Hold time before energy drain",
+          "simple": "How long the charge can be held before it starts costing cursed energy; it also decides whether the charged hit still comes out.",
+          "technical": "Read twice from the level-selected charge row (level 1 -> row 1, 2 -> row 2, 3 -> row 3; the helpers return -1 for any other level). In TickChargeState states 0/1, cursed energy is drained only when ActionElapsedTime > slot 0 (strict); at or before that time no cost is applied. In state 3, after the animation ends, bWithinCharge = ActionElapsedTime <= slot 0 (inclusive); if that is true, or the CursedEnergyAttack_2 key is still held, the attack goes to charge-hit state 4, otherwise it goes to the no-hit finish state 5. Compared with ActionElapsedTime, which advances by DeltaTime, so the unit is seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:50-60",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:227-237",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:260-269",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:303-322"
+          ]
+        },
+        "1": {
+          "label": "Cursed energy drain per second",
+          "simple": "How much cursed energy the held charge consumes each second after the free hold time.",
+          "technical": "After ActionElapsedTime has passed slot 0, while IsGameKeyHeld(CursedEnergyAttack_2) is true, status cursed energy is set to current minus slot 1 * DeltaTime. If the remaining value is > 0 the charge continues; if it reaches 0 or below the charge is abandoned (collision lock 9 released, camera restored, finish animation CP_210_ATTACKH_01_END_01, state 7). The multiplier by DeltaTime makes this cursed-energy units per second.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:260-285",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:50-60"
+          ]
+        },
+        "2": {
+          "label": "Charge-effect start delay",
+          "simple": "How long Miwa must stay grounded before the charging effect appears (level 3: 0.1 s).",
+          "technical": "In UpdateChargeEffect state 0, ChargeTime is reset to 0 whenever GetGroundTraceHit() == 0; with a ground hit ChargeTime += DeltaTime and when ChargeTime >= slot 2 (inclusive) FX_CP_210_00102 is attached at the owner, a sound plays, the size ease starts, and BeamState advances. The value is an elapsed time in seconds. In this row the stored value is 0.1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:75-101"
+          ]
+        },
+        "3": {
+          "label": "Charge effect scale target and hit half-height",
+          "simple": "The size the charge effect grows toward, also used as part of the attack capsule's half-height.",
+          "technical": "Two reads of the same level row. At effect start, slot 3 is the target argument of ChargeEffectScaleEase.Start(owner capsule radius, target, 0.25 s, EaseOut, exponent 2, steps 2); the eased BeamScale is later written to the effect actor's uniform scale multiplied by 0.01, and BeamState 2 is entered when the ease stops. At OnAttackCollisionBegin, requested capsule half-height = slot 3 + slot 7. Components tagged Attack_multi_v skip the resize; other capsule components get RequestCapsuleSize. The code mixes the same value into an effect-scale input and a capsule half-height; no other CP_210 read of slot 3 was found.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:97-115",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:556-584"
+          ]
+        },
+        "4": {
+          "label": "Vertical target tolerance",
+          "simple": "How much vertical separation is allowed when choosing targets for the charged burst.",
+          "technical": "At collision begin, requested capsule radius = slot 4 * 0.5 + slot 6. While BeamState == 2, enemy characters and their active, unreleased shikigami are considered: vertical gap = |owner.Z - target.Z| - target capsule half-height, and a target is accepted when that gap <= slot 4 * 0.5 (inclusive) together with the horizontal beam-scale test. The stored 1 therefore contributes 0.5 world units to both calculations.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:357-385",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:573-583"
+          ]
+        },
+        "5": {
+          "label": "Horizontal search radius multiplier",
+          "simple": "Scales each candidate's capsule radius when deciding whether the charge reaches it.",
+          "technical": "For each other character, and for active shikigami of enemy teams, radius = slot 5 * that target's GetScaledCapsuleRadius(); 2D distance is Dist2D(target, owner) - radius and a candidate is accepted when that remaining distance <= BeamScale (the live eased charge scale). Slot 5 is a multiplier of the target capsule radius, not an absolute distance in the data; 75 is the stored multiplier in all three rows.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:357-371",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:375-397"
+          ]
+        },
+        "6": {
+          "label": "Hit capsule radius addend",
+          "simple": "Adds a fixed amount to the radius of the attack's hit capsules.",
+          "technical": "At OnAttackCollisionBegin (type 74/78 slot 6), requested capsule radius = slot 4 * 0.5 + slot 6, applied to capsule components without the Attack_multi_v tag. With slot 4 = 1 and slot 6 = 75 this requests 75.5 world units. Slot 6 of the camera rows is a different setting (FOV blend time) and is not read here.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:556-584"
+          ]
+        },
+        "7": {
+          "label": "Hit half-height addend",
+          "simple": "Extra height added to the charged attack's hit capsule.",
+          "technical": "At OnAttackCollisionBegin, requested capsule half-height = slot 3 + slot 7. This row stores 0, so the requested half-height is just slot 3's contribution; no other CP_210 read of charge-row slot 7 was found. (Camera-row slot 7 selects FOV easing elsewhere; that is a different row.)",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:556-584"
+          ]
+        }
+      },
+      "untraced": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "When BeamState is 2, the charged burst collects enemy characters and their active shikigami, then plays CP_210_ATTACKH_02_01_<level> damage and FX_CP_210_08112/22/32 at each target; allies in range only get SetInAllyAttackRange. Slots 4/5 decide which targets enter that list, while slots 3/6/7 resize the actual hit capsules. A generic JugonStunReceive reads row 3 slots 5-8 from its attacker, but CP_210's damage rows are not JugonStun, so those reads are not counted here.",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:350-397",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:790-838",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271-295"
+          ]
+        }
+      ]
+    },
+    "CP_210_ATTACKH_CAMERA_1": {
+      "title": "Charged-attack camera preset 1",
+      "overview": "Mode-2 camera request used when the level-1 charged attack starts. It sets a gaze-space offset of (-600, 0, 150), gaze limits of 30 down / 20 up, a 100-degree FOV blended over 0.3 s with Linear easing, and no orbit or roll. Leaving the charge restores the saved camera mode with FOV 90 and the same 0.3 s blend. The three level presets currently hold identical values.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "Camera sits 600 units back along the gaze frame's forward axis (offset X = -600) for camera preset 1.",
+          "technical": "When the charge enters camera mode 2, MakeUniqueCameraRequest(2, cameraRow) reads this value and assigns it to FVirtualCameraRequest.CameraOffset.X. The mode-2 camera rotates CameraOffset by the gaze rotation and adds it to the eye base, so the value is an offset magnitude expressed in the gaze frame; a ThroughCamera trace can then pull the camera in.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941-948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:383-387",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:147",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:36-47"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "Sideways camera offset is 0 for camera preset 1.",
+          "technical": "Read as OffsetY and written to FVirtualCameraRequest.CameraOffset.Y by MakeUniqueCameraRequest(2, cameraRow); zero means no sideways component in the gaze-rotated offset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946-948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:147",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:36-47"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "Camera offset along the gaze frame's vertical axis is 150 for camera preset 1.",
+          "technical": "Read as OffsetZ and written to FVirtualCameraRequest.CameraOffset.Z by MakeUniqueCameraRequest(2, cameraRow); the whole FVector is then rotated into the gaze frame by the mode-2 camera update.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946-948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:383-387",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:147",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:36-47"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "Maximum downward gaze angle is 30 degrees for camera preset 1.",
+          "technical": "Assigned to FVirtualCameraRequest.LimitAngleDown. In UpdateRequestCamera, when the gaze point is below the eye base and the elevation angle is strictly greater than this limit, the gaze is rotated back to the limit; a gap equal to the limit is left unchanged.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:32",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370-381"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "Maximum upward gaze angle is 20 degrees for camera preset 1.",
+          "technical": "Assigned to FVirtualCameraRequest.LimitAngleUp and applied when the gaze point is above the eye base and the elevation is strictly greater than the limit. The downward and upward limits are independent; the data does not require them to match.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:33",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370-381"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "Charged-attack camera requests a 100-degree field of view for camera preset 1.",
+          "technical": "Assigned to FVirtualCameraRequest.FieldOfView. ChangeCameraMode only applies a new FOV when it is > 0; with 100 and a positive blend time of 0.3 the FOV is interpolated to 100 rather than snapped. On RestoreCameraMode Miwa instead sends 90 with this row's slot 6 as the blend time.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:34",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573-585",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:411-425"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "FOV change takes 0.3 seconds for camera preset 1.",
+          "technical": "Assigned to FVirtualCameraRequest.FieldOfViewBlendTime by MakeUniqueCameraRequest and also read directly by RestoreCameraMode, which builds a request with FOV 90 and this slot as its blend time before restoring the saved camera mode (only while still in mode 2). In ChangeCameraMode a blend time > 0 starts FovInterp; 0 would snap the FOV.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:417-425",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:35",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573-585"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "FOV interpolation uses Linear easing for camera preset 1.",
+          "technical": "MakeUniqueCameraRequest casts this float to int and switches: 0 -> Linear, 1 -> EaseIn, 2 -> EaseOut, 3 -> EaseInOut; any other value leaves the request's default easing unchanged. The stored 0 selects Linear, which is passed to FovInterp.Start together with the 0.3 s blend.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:939-968",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:36",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573-579"
+          ]
+        },
+        "8": {
+          "label": "Camera orbit yaw",
+          "simple": "Gaze orbit yaw is 0 for camera preset 1.",
+          "technical": "Assigned to FVirtualCameraRequest.OrbitYaw. The mode-2 camera builds an orbit rotator from OrbitPitch/OrbitYaw and only rotates the gaze about the camera when that rotator is non-zero, so 0 leaves the gaze unrotated on this axis.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:419-427"
+          ]
+        },
+        "9": {
+          "label": "Camera orbit pitch",
+          "simple": "Gaze orbit pitch is 0 for camera preset 1.",
+          "technical": "Assigned to FVirtualCameraRequest.OrbitPitch; it participates in the same optional orbit rotator as slot 8 and is zero here.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:419-427"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Camera roll is 0 for camera preset 1.",
+          "technical": "Assigned to FVirtualCameraRequest.Roll and passed to SetViewTarget87 (slot 87 roll) when the view is committed; 0 means no extra roll from this request.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:429-431"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The camera request is issued at both entry sites (ChangeChargeState 0 and TickChargeState case 2) and only when the camera is not already in mode 2; the level-to-row mapping is inlined in RestoreCameraMode. MakeUniqueCameraRequest reads only slots 0-10 and returns a default request for any camera mode other than 2, so no read of camera slots 11-13 was identified.",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:143-148",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:292-298",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:410-425",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941-975"
+          ]
+        }
+      ]
+    },
+    "CP_210_ATTACKH_CAMERA_2": {
+      "title": "Charged-attack camera preset 2",
+      "overview": "Mode-2 camera request used when the level-2 charged attack starts. It sets a gaze-space offset of (-600, 0, 150), gaze limits of 30 down / 20 up, a 100-degree FOV blended over 0.3 s with Linear easing, and no orbit or roll. Leaving the charge restores the saved camera mode with FOV 90 and the same 0.3 s blend. The three level presets currently hold identical values.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "Camera sits 600 units back along the gaze frame's forward axis (offset X = -600) for camera preset 2.",
+          "technical": "When the charge enters camera mode 2, MakeUniqueCameraRequest(2, cameraRow) reads this value and assigns it to FVirtualCameraRequest.CameraOffset.X. The mode-2 camera rotates CameraOffset by the gaze rotation and adds it to the eye base, so the value is an offset magnitude expressed in the gaze frame; a ThroughCamera trace can then pull the camera in.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941-948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:383-387",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:297",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:36-47"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "Sideways camera offset is 0 for camera preset 2.",
+          "technical": "Read as OffsetY and written to FVirtualCameraRequest.CameraOffset.Y by MakeUniqueCameraRequest(2, cameraRow); zero means no sideways component in the gaze-rotated offset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946-948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:297",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:36-47"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "Camera offset along the gaze frame's vertical axis is 150 for camera preset 2.",
+          "technical": "Read as OffsetZ and written to FVirtualCameraRequest.CameraOffset.Z by MakeUniqueCameraRequest(2, cameraRow); the whole FVector is then rotated into the gaze frame by the mode-2 camera update.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946-948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:383-387",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:297",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:36-47"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "Maximum downward gaze angle is 30 degrees for camera preset 2.",
+          "technical": "Assigned to FVirtualCameraRequest.LimitAngleDown. In UpdateRequestCamera, when the gaze point is below the eye base and the elevation angle is strictly greater than this limit, the gaze is rotated back to the limit; a gap equal to the limit is left unchanged.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:32",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370-381"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "Maximum upward gaze angle is 20 degrees for camera preset 2.",
+          "technical": "Assigned to FVirtualCameraRequest.LimitAngleUp and applied when the gaze point is above the eye base and the elevation is strictly greater than the limit. The downward and upward limits are independent; the data does not require them to match.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:33",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370-381"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "Charged-attack camera requests a 100-degree field of view for camera preset 2.",
+          "technical": "Assigned to FVirtualCameraRequest.FieldOfView. ChangeCameraMode only applies a new FOV when it is > 0; with 100 and a positive blend time of 0.3 the FOV is interpolated to 100 rather than snapped. On RestoreCameraMode Miwa instead sends 90 with this row's slot 6 as the blend time.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:34",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573-585",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:411-425"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "FOV change takes 0.3 seconds for camera preset 2.",
+          "technical": "Assigned to FVirtualCameraRequest.FieldOfViewBlendTime by MakeUniqueCameraRequest and also read directly by RestoreCameraMode, which builds a request with FOV 90 and this slot as its blend time before restoring the saved camera mode (only while still in mode 2). In ChangeCameraMode a blend time > 0 starts FovInterp; 0 would snap the FOV.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:417-425",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:35",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573-585"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "FOV interpolation uses Linear easing for camera preset 2.",
+          "technical": "MakeUniqueCameraRequest casts this float to int and switches: 0 -> Linear, 1 -> EaseIn, 2 -> EaseOut, 3 -> EaseInOut; any other value leaves the request's default easing unchanged. The stored 0 selects Linear, which is passed to FovInterp.Start together with the 0.3 s blend.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:939-968",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:36",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573-579"
+          ]
+        },
+        "8": {
+          "label": "Camera orbit yaw",
+          "simple": "Gaze orbit yaw is 0 for camera preset 2.",
+          "technical": "Assigned to FVirtualCameraRequest.OrbitYaw. The mode-2 camera builds an orbit rotator from OrbitPitch/OrbitYaw and only rotates the gaze about the camera when that rotator is non-zero, so 0 leaves the gaze unrotated on this axis.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:419-427"
+          ]
+        },
+        "9": {
+          "label": "Camera orbit pitch",
+          "simple": "Gaze orbit pitch is 0 for camera preset 2.",
+          "technical": "Assigned to FVirtualCameraRequest.OrbitPitch; it participates in the same optional orbit rotator as slot 8 and is zero here.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:419-427"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Camera roll is 0 for camera preset 2.",
+          "technical": "Assigned to FVirtualCameraRequest.Roll and passed to SetViewTarget87 (slot 87 roll) when the view is committed; 0 means no extra roll from this request.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:429-431"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The camera request is issued at both entry sites (ChangeChargeState 0 and TickChargeState case 2) and only when the camera is not already in mode 2; the level-to-row mapping is inlined in RestoreCameraMode. MakeUniqueCameraRequest reads only slots 0-10 and returns a default request for any camera mode other than 2, so no read of camera slots 11-13 was identified.",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:143-148",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:292-298",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:410-425",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941-975"
+          ]
+        }
+      ]
+    },
+    "CP_210_ATTACKH_CAMERA_3": {
+      "title": "Charged-attack camera preset 3",
+      "overview": "Mode-2 camera request used when the level-3 charged attack starts. It sets a gaze-space offset of (-600, 0, 150), gaze limits of 30 down / 20 up, a 100-degree FOV blended over 0.3 s with Linear easing, and no orbit or roll. Leaving the charge restores the saved camera mode with FOV 90 and the same 0.3 s blend. The three level presets currently hold identical values.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "Camera sits 600 units back along the gaze frame's forward axis (offset X = -600) for camera preset 3.",
+          "technical": "When the charge enters camera mode 2, MakeUniqueCameraRequest(2, cameraRow) reads this value and assigns it to FVirtualCameraRequest.CameraOffset.X. The mode-2 camera rotates CameraOffset by the gaze rotation and adds it to the eye base, so the value is an offset magnitude expressed in the gaze frame; a ThroughCamera trace can then pull the camera in.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941-948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:383-387",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:297",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:36-47"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "Sideways camera offset is 0 for camera preset 3.",
+          "technical": "Read as OffsetY and written to FVirtualCameraRequest.CameraOffset.Y by MakeUniqueCameraRequest(2, cameraRow); zero means no sideways component in the gaze-rotated offset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946-948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:297",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:36-47"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "Camera offset along the gaze frame's vertical axis is 150 for camera preset 3.",
+          "technical": "Read as OffsetZ and written to FVirtualCameraRequest.CameraOffset.Z by MakeUniqueCameraRequest(2, cameraRow); the whole FVector is then rotated into the gaze frame by the mode-2 camera update.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946-948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:383-387",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:297",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:36-47"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "Maximum downward gaze angle is 30 degrees for camera preset 3.",
+          "technical": "Assigned to FVirtualCameraRequest.LimitAngleDown. In UpdateRequestCamera, when the gaze point is below the eye base and the elevation angle is strictly greater than this limit, the gaze is rotated back to the limit; a gap equal to the limit is left unchanged.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:32",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370-381"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "Maximum upward gaze angle is 20 degrees for camera preset 3.",
+          "technical": "Assigned to FVirtualCameraRequest.LimitAngleUp and applied when the gaze point is above the eye base and the elevation is strictly greater than the limit. The downward and upward limits are independent; the data does not require them to match.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:33",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370-381"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "Charged-attack camera requests a 100-degree field of view for camera preset 3.",
+          "technical": "Assigned to FVirtualCameraRequest.FieldOfView. ChangeCameraMode only applies a new FOV when it is > 0; with 100 and a positive blend time of 0.3 the FOV is interpolated to 100 rather than snapped. On RestoreCameraMode Miwa instead sends 90 with this row's slot 6 as the blend time.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:34",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573-585",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:411-425"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "FOV change takes 0.3 seconds for camera preset 3.",
+          "technical": "Assigned to FVirtualCameraRequest.FieldOfViewBlendTime by MakeUniqueCameraRequest and also read directly by RestoreCameraMode, which builds a request with FOV 90 and this slot as its blend time before restoring the saved camera mode (only while still in mode 2). In ChangeCameraMode a blend time > 0 starts FovInterp; 0 would snap the FOV.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:417-425",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:35",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573-585"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "FOV interpolation uses Linear easing for camera preset 3.",
+          "technical": "MakeUniqueCameraRequest casts this float to int and switches: 0 -> Linear, 1 -> EaseIn, 2 -> EaseOut, 3 -> EaseInOut; any other value leaves the request's default easing unchanged. The stored 0 selects Linear, which is passed to FovInterp.Start together with the 0.3 s blend.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:939-968",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:36",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573-579"
+          ]
+        },
+        "8": {
+          "label": "Camera orbit yaw",
+          "simple": "Gaze orbit yaw is 0 for camera preset 3.",
+          "technical": "Assigned to FVirtualCameraRequest.OrbitYaw. The mode-2 camera builds an orbit rotator from OrbitPitch/OrbitYaw and only rotates the gaze about the camera when that rotator is non-zero, so 0 leaves the gaze unrotated on this axis.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:419-427"
+          ]
+        },
+        "9": {
+          "label": "Camera orbit pitch",
+          "simple": "Gaze orbit pitch is 0 for camera preset 3.",
+          "technical": "Assigned to FVirtualCameraRequest.OrbitPitch; it participates in the same optional orbit rotator as slot 8 and is zero here.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:419-427"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Camera roll is 0 for camera preset 3.",
+          "technical": "Assigned to FVirtualCameraRequest.Roll and passed to SetViewTarget87 (slot 87 roll) when the view is committed; 0 means no extra roll from this request.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:429-431"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The camera request is issued at both entry sites (ChangeChargeState 0 and TickChargeState case 2) and only when the camera is not already in mode 2; the level-to-row mapping is inlined in RestoreCameraMode. MakeUniqueCameraRequest reads only slots 0-10 and returns a default request for any camera mode other than 2, so no read of camera slots 11-13 was identified.",
+          "evidence": [
+            "Source/Abrams/Private/CP_210_ActionController.cpp:143-148",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:292-298",
+            "Source/Abrams/Private/CP_210_ActionController.cpp:410-425",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941-975"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Miwa's per-level unique rows are reached only through the type-74/78 charged-attack helpers: charge rows 1-3, camera rows 4-6. All row-selection switches return -1 for a cursed-energy level outside 1-3, and AGameCharacter::GetCharacterUniqueFloatValue is an unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference, so there is no safe fallback for such a level in this code.",
+      "evidence": [
+        "Source/Abrams/Private/CP_210_ActionController.cpp:36-60",
+        "Source/Abrams/Private/CP_210_ActionController.cpp:227-237",
+        "Source/Abrams/Private/CP_210_ActionController.cpp:562-572",
+        "Source/Abrams/Private/CP_210_ActionController.cpp:417-424",
+        "Source/Abrams/Private/GameCharacter.cpp:1759-1762",
+        "Tools/verify/CHAR/UniqueRowsInline.md:10-22"
+      ]
+    },
+    {
+      "text": "The weapon-drawn flag on UCP_210_ActionController (+0x178) changes attack-set/homing IDs and when the charge starts (start count 1 when drawn, 2 otherwise on the ground; one count later in the air), but it never selects a unique row. Row choice is cursed-energy level only.",
+      "evidence": [
+        "Source/Abrams/Private/CP_210_ActionController.cpp:431-452",
+        "Source/Abrams/Private/CP_210_ActionController.cpp:665-727",
+        "Source/Abrams/Private/CP_210_ActionController.cpp:897-929"
+      ]
+    },
+    {
+      "text": "The air charged attack (type 78) reuses the ground charge helpers and the same rows; it starts charging one start count later and replays the landing effect on restart. Ground and air therefore share these tunings, even though their animation rows differ.",
+      "evidence": [
+        "Source/Abrams/Private/CP_210_ActionController.cpp:697-727",
+        "Source/Abrams/Private/CP_210_ActionController.cpp:754-783",
+        "Source/Abrams/Private/CP_210_ActionController.cpp:867-888"
+      ]
+    },
+    {
+      "text": "CP_210's behavior controller only specialises AI indices 0x10 and 0x13 with NormalAttack3ToGoal and CursedEnergyAttack2Charge; neither reads unique rows. The row-0-reading CursedEnergyAttack1Hold/2Hold executors belong to CP_040/CP_050 behaviour factories, so their timing slots are not Miwa's.",
+      "evidence": [
+        "Source/Abrams/Private/CP_210_BehaviorController.cpp:6-13",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:112-130",
+        "Source/Abrams/Private/CP_040_BehaviorController.cpp:8-13"
+      ]
+    },
+    {
+      "text": "Generic trap actions forward GetUniqueFloat to the source character's unique rows, but CP_210's action/controller code does not spawn such traps, and the supplied trap tables have no CP_210 rows; those row 7/8 trap reads are not attributed here. Likewise, AGameShikigami has its own GetCharacterUniqueFloatValue over ShikigamiUniqueDataTable and is not the owner used by these readers.",
+      "evidence": [
+        "Source/Abrams/Private/GameTrapActionController.cpp:182-188",
+        "Source/Abrams/Private/CP_210_ActionController.cpp:1-35",
+        "Source/Abrams/Private/GameShikigami.cpp:1250-1254"
+      ]
+    },
+    {
+      "text": "Row names can be reused with different meanings: the verification record re-homes CP_210 slot 297 InitSheathedRows, which caches CP_210_2 from ActionMove/ActionDash tables. That row is not one of the character-unique rows described here.",
+      "evidence": [
+        "Tools/verify/CHAR/CP_190_ActionController.md:496-498",
+        "Source/Abrams/Private/CP_210_ActionController.cpp:452-480"
+      ]
+    },
+    {
+      "text": "CP_210 calls the out-of-line GetOwnerUniqueFloat helper (retail 0x141181440) rather than the hot-site inline variant used by CP_270; the verification note explains why the two-hop dereference is kept as calls in cold sites.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction.cpp:931-936",
+        "Tools/verify/CHAR/UniqueRowsInline.md:10-22",
+        "Source/Abrams/Public/GameCharacterAction.h:195-207"
+      ]
+    }
+  ]
+}

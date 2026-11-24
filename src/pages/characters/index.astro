@@ -1,0 +1,56 @@
+---
+import Reference from '../../layouts/Reference.astro';
+import { characterHref, characters } from '../../characters.js';
+
+const sections = [
+  { id: 'selectable', title: 'Character Select', roster: characters.filter((record) => record.selectable) },
+  { id: 'other', title: 'Other character records', roster: characters.filter((record) => !record.selectable) },
+];
+---
+<Reference title="Characters" section="characters" description="Find character-specific settings and the exported values for every fighter.">
+  <h1 class="table-title">Characters</h1>
+  <p class="lead">Find a fighter to see their character-specific settings, exported values, and the moves or mechanics that read them.</p>
+  <div class="field-tools roster-filter" hidden>
+    <input class="filter" type="search" id="roster-filter" placeholder="Filter by name or character code" aria-label="Filter characters" autocomplete="off" />
+    <p class="field-count" id="roster-count" role="status">{characters.length} characters</p>
+  </div>
+  {sections.map(({ id, title, roster }) => (
+    <section class="doc-section" id={id} data-roster-section>
+      <h2>{title}</h2>
+      <ul class="reference-index reference-list character-list">
+        {roster.map((record) => (
+          <li data-character={[record.name, record.id, record.storyName].filter(Boolean).join(' ').toLowerCase()}>
+            <h3><a href={characterHref(record.id)}>{record.name}</a></h3>
+            <code>{record.id}</code>
+            <span>{record.rows.length} {record.rows.length === 1 ? 'unique row' : 'unique rows'}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+  <script>
+    const field = document.querySelector('#roster-filter');
+    const tools = document.querySelector('.roster-filter');
+    const count = document.querySelector('#roster-count');
+    if (field instanceof HTMLInputElement && tools instanceof HTMLElement && count) {
+      tools.hidden = false;
+      const sections = [...document.querySelectorAll('[data-roster-section]')].map((section) => ({
+        section, rows: [...section.querySelectorAll('[data-character]')],
+      }));
+      field.addEventListener('input', () => {
+        const query = field.value.trim().toLowerCase();
+        let total = 0;
+        for (const { section, rows } of sections) {
+          let shown = 0;
+          for (const row of rows) {
+            row.hidden = !row.dataset.character.includes(query);
+            shown += Number(!row.hidden);
+          }
+          section.hidden = shown === 0;
+          total += shown;
+        }
+        count.textContent = total ? `${total} ${total === 1 ? 'character' : 'characters'}` : 'No matching characters';
+      });
+    }
+  </script>
+</Reference>

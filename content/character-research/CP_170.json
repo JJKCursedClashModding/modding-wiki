@@ -1,0 +1,558 @@
+{
+  "overview": "Mai’s settings tune rifle charge timing, aim tracking, and the aiming camera. Her controller also tracks a six-round stock.",
+  "technicalOverview": "Mai Zen'in (CP_170) is a selectable AGameCharacter built around a six-round stock, a charged rifle-like AttackH/Cursed Energy 2 hold, and a second Cursed Energy 1 start that enters an aim camera and tracks a secondary target. Four unique rows are populated: the base row is all zeros, ATTACKH sets charge timing, ATTACKG sets aim/tracking and phase-4 damage multipliers, and ATTACKG_SHOOT_CAMERA supplies the aim-camera request. The action controller also has a reload-like ExtraAttack_1, spends a round when a projectile effect plays, and is paired with CP_170 behavior/AI and HUD controllers. Statuses below describe confidence in the reconstructed source trace, not a claim that every containing function is byte-identical to retail.",
+  "rows": {
+    "CP_170": {
+      "title": "Base unique row (all zeros)",
+      "overview": "This is row 0, the character's general unique row. Every stored value is zero. No Mai-specific source path was found that reads these slots; one shared damage reaction can read slot 0 as a fallback, but a CP_170-specific route to it was not established.",
+      "values": {
+        "0": {
+          "label": "Shared projection-reaction fallback timer",
+          "simple": "This slot is zero; no Mai-specific use was found, but a shared damage reaction can use it as a last-resort timer.",
+          "technical": "Unresolved CP_170 relevance. The inherited base factory can create FGameCharacterAction_ProjectionSorceryReceive, whose Tick uses GetOwnerUniqueFloat(0,0) only when the incoming request has no DamageTableRow; the result is RestraintTime. If CP_170 ever reaches that exact path, the stored 0.0 makes the 'RestraintTime <= ActionElapsedTime' advance test able to pass immediately once Tick runs. No CP_170-specific request path to that action was found, so this is not assigned as a confirmed Mai mechanic. The zero itself is not evidence of disuse.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:875",
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "JJKCCDatatables/datatables/CharacterUniqueDataTable3.json:604"
+          ]
+        }
+      },
+      "untraced": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Generic AI Hold nodes read row 0 slots 1 and 2, but they are not assigned here: CP_170's behavior factory only specialises AI ordinal 0x16 and otherwise delegates to the base factory, whose 0x11/0x13 entries are the non-Hold node types. The Hold nodes are explicitly selected by CP_040's override.",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_BehaviorController.cpp:18",
+            "Source/Abrams/Private/GameCharacterBehaviorController.cpp:119",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:118"
+          ]
+        },
+        {
+          "text": "The other shared row-0[0] reader found, UGameCharacterActionController::SteerTowardSecondaryTarget, is called from CN_041 and CN_140 bodies in this tree, not from CP_170 code.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3492",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:391",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:97"
+          ]
+        }
+      ]
+    },
+    "CP_170_ATTACKH": {
+      "title": "AttackH / charged hold timing",
+      "overview": "Row 1 is the timing block for the charged AttackH path. Slots 0-2 are cursed-energy-level charge-stage times shared by the aimed CE1 charged shot and the CE2 hold; slot 3 is the strict idle-hold threshold before the CE2 setup animation can finish. The remaining slots are zero with no identified CP_170 read.",
+      "values": {
+        "0": {
+          "label": "Level 1 charge-stage time",
+          "simple": "At cursed-energy level 1, this sets how long each charge stage takes; a smaller value would advance the stages sooner.",
+          "technical": "Value 5.0. In CE1 phase 3 (CursedEnergyAttack_2 pressed during the aim-shot sequence) and in CE2 StartAttackHoming case 1, GetCursedEnergyLevel()==1 selects this slot and writes it to UCP_170_ActionController::ChargeStageTime, then sets bCharging. TickCharge only waits while elapsed < threshold: stages 1-3 use stage * ChargeStageTime * 0.2 s and stage 4 uses ChargeStageTime s, so equality advances. ChargeStage also drives the weapon FX and sound chain.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:317",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1437",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1029",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1038",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19"
+          ]
+        },
+        "1": {
+          "label": "Level 2 charge-stage time",
+          "simple": "At cursed-energy level 2, this replaces the level-1 charge timing with 4.0; lower than level 1, so stages advance sooner.",
+          "technical": "Selected by GetCursedEnergyLevel()==2 at the same CE1 phase-3 and CE2 first-start sites as slot 0. It becomes ChargeStageTime and bCharging is set; TickCharge then applies the same strict '<' tests for stages 1-4.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:320",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1440",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1014"
+          ]
+        },
+        "2": {
+          "label": "Level 3 charge-stage time",
+          "simple": "At cursed-energy level 3, this replaces the charge timing with 3.0, the fastest of the three levels.",
+          "technical": "Selected by GetCursedEnergyLevel()==3 at the CE1 phase-3 and CE2 first-start sites; written to ChargeStageTime with bCharging set, and consumed by TickCharge's stage thresholds. Unexpected levels leave a 5.0 fallback at those sites.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:323",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1443",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:313"
+          ]
+        },
+        "3": {
+          "label": "CE2 idle-hold threshold",
+          "simple": "The charged input must be held for more than 0.3 seconds while idle before the setup animation can complete; a larger value would require a longer hold.",
+          "technical": "Value 0.3. CE2 TickCharge phase 1 adds DeltaTime to ChargeTimer while CursedEnergyAttack_2 is held and the default-layer action is Idle. It advances to phase 2 only when GetOwnerUniqueFloat(3,1) < ChargeTimer, i.e. after a strict greater-than-0.3 s accumulation; the timer is then reset and the secondary target location refreshed. If the default action is not Idle, ChargeTimer is reset to 0 instead.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:627",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:644",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:655",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:660"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "This row is a shared timing source for two distinct attacks, not an ExtraAttack or reload control: the same 5/4/3 values are selected for the CE1 phase-3 charged shot and for the first CE2 hold start.",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:313",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1424",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:434"
+          ]
+        },
+        {
+          "text": "Charge stages are presentation/state changes, not the damage multipliers in row 2: each stage swaps the weapon effect FX_CP_170_08111/08121/08131/08141, pitches SE_CP_000_09001, maintains the stage-1 SE_CP_000_09002 loop, and stage advances flash FX_CP_170_08211 at the weapon bone.",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:955",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:963",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:983",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1044",
+            "Tools/verify/CHAR/SharedActionDependencies.md:616"
+          ]
+        }
+      ]
+    },
+    "CP_170_ATTACKG": {
+      "title": "AttackG aim-shot tracking and damage",
+      "overview": "Row 2 configures Mai's second Cursed Energy 1 start: manual aim speed, secondary-target acquisition and tracking, input cadence, and the phase-4 damage multipliers. It also seeds the AI aim-correction speed through a cached controller field. Slots 12 and 13 are zero with no identified read.",
+      "values": {
+        "0": {
+          "label": "Aim movement speed",
+          "simple": "How fast the aim point moves with the stick; while tracking it uses 30% of this speed. It also caps AI aim correction.",
+          "technical": "Value 70. UpdateAim multiplies this by DeltaTime to form a per-tick pitch/yaw step in degrees, then multiplies that step by row 2 slot 7 while bTrackingTarget is true. StartAttackHoming also caches the same value into UCP_170_ActionController::Unknown1F0 (+0x1F0); UCP_170_BehaviorController::UpdateAimStickInput uses that cached value as its maximum AI stick-correction step (DeltaTime * cached value). A higher value moves/snaps aim faster in both paths.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:163",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:166",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1394",
+            "Source/Abrams/Public/CP_170_ActionController.h:56",
+            "Source/Abrams/Private/CP_170_BehaviorController.cpp:181"
+          ]
+        },
+        "1": {
+          "label": "Secondary-target aim step",
+          "simple": "How quickly the aim is nudged toward a tracked secondary target; higher values turn faster.",
+          "technical": "Value 10. In TickTargetTracking, when the left stick is nonzero and tracking is active, this is multiplied by DeltaTime to make Step. The code only rotates the aim when the camera-forward-to-target angle is at least Step; the step then feeds pitch and yaw offsets computed from the camera-local target/aim direction.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:124",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:126",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:127",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:134"
+          ]
+        },
+        "2": {
+          "label": "Tracking-start angle",
+          "simple": "The camera must be within 2.5 degrees of the secondary target before tracking starts; a larger value would start tracking from wider angles.",
+          "technical": "Value 2.5 degrees. UpdateAim begins tracking only when AngleBetweenDegrees(camera forward, target direction from camera) is <= this value and the owner-location-to-target distance also passes slot 3. The boundary is inclusive because the source rejects only angles greater than the setting.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:148",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:152"
+          ]
+        },
+        "3": {
+          "label": "Secondary-target tracking range",
+          "simple": "Tracking is allowed only while the target is within 5000 world-space units; a larger value would allow tracking at longer range.",
+          "technical": "Value 5000. Used in two gates: CanFollowSecondaryTarget rejects a target when camera-location-to-target distance is > 5000, and UpdateAim starts tracking only when the owner's location-like point to the target is <= 5000. Both boundaries therefore accept exactly 5000. Other eligibility gates (status timer/action slot 66, jumping, default action type 7-18 inclusive) are separate from this range.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:52",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:70",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:76",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:153"
+          ]
+        },
+        "4": {
+          "label": "Tracking duration limit",
+          "simple": "After more than 0.25 seconds of tracking, the secondary target is dropped; a larger value would track longer.",
+          "technical": "Value 0.25 s. TickTargetTracking stops tracking when TrackingTimer > this slot. The timer starts at -1.0 on CE1 first start and resets to 0 when tracking begins, then accumulates DeltaTime. The boundary is strict: exactly 0.25 does not stop tracking.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:93",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:98",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1401"
+          ]
+        },
+        "5": {
+          "label": "Accepted aim-error angle",
+          "simple": "Aim error up to 90 degrees is treated as aligned; a larger value would tolerate more error.",
+          "technical": "Value 90 degrees. TickTargetTracking compares the angle between normalized camera-local target and aim directions to this slot. Angles <= 90 reset TrackingAngleTimer to 0; larger angles accumulate the timer that is checked against slot 6.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:109",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:111",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:117"
+          ]
+        },
+        "6": {
+          "label": "Aim-error grace time",
+          "simple": "Aim may be outside the accepted angle for 0.05 seconds before tracking is cancelled; a larger value gives more grace.",
+          "technical": "Value 0.05 s. When the angle from slot 5 is exceeded, TrackingAngleTimer accumulates DeltaTime; tracking is cancelled only when that timer > this slot. Exactly 0.05 s is still allowed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:117",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:118"
+          ]
+        },
+        "7": {
+          "label": "Tracking slow-down multiplier",
+          "simple": "While tracking, normal stick aim moves at 30% speed; raising this would make tracked aim faster.",
+          "technical": "Value 0.3. In UpdateAim, the per-tick Step derived from slot 0 is multiplied by this value only when bTrackingTarget is true. It does not affect the separate secondary-target nudge in slot 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:163",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:164",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:166"
+          ]
+        },
+        "8": {
+          "label": "Aim-attack input cooldown",
+          "simple": "Aim-shot inputs are accepted only after 0.25 seconds have accumulated; a larger value would slow the shot cadence.",
+          "technical": "Value 0.25 s. TickAimAttack phase 0 adds DeltaTime to AimInputCooldown and sets bReady only when cooldown >= this slot. The gate applies to CursedEnergyAttack_2, NormalAttack_2 and NormalAttack_1 aim attacks; on reset the cooldown starts at 100.0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:195",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:209",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:210",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1612"
+          ]
+        },
+        "9": {
+          "label": "Level 1 charged-shot damage rate",
+          "simple": "The level-1 phase-4 shot deals 1.02 times the layered damage rate; higher values would increase it.",
+          "technical": "Value 1.02. FCP_170_CursedEnergyAttack_1::GetActionDamageRate (slot 28) returns this only in Phase == 4 and GetCursedEnergyLevel()==1; outside that combination it returns 1.0. The controller multiplies slot-28 rates over all action layers, and that layered rate is passed into collision damage setup and effect initialization.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:434",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:441",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:2220",
+            "Source/Abrams/Private/GameAnimNS_AttackCollision.cpp:103"
+          ]
+        },
+        "10": {
+          "label": "Level 2 charged-shot damage rate",
+          "simple": "The level-2 phase-4 shot uses a 1.05 layered damage multiplier.",
+          "technical": "Value 1.05. Returned by the same slot-28 override only when the CE1 action is in Phase 4 and the cursed-energy level is 2; it replaces the baseline 1.0 in the layered action damage-rate product.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:443",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:2227",
+            "Source/Abrams/Private/GameEffect.cpp:1023"
+          ]
+        },
+        "11": {
+          "label": "Level 3 charged-shot damage rate",
+          "simple": "The level-3 phase-4 shot uses a 1.1 layered damage multiplier, the largest of the three levels.",
+          "technical": "Value 1.1. Returned by the CE1 slot-28 override only in Phase 4 at cursed-energy level 3; unexpected levels and non-phase-4 states fall back to 1.0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:445",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:448",
+            "Source/Abrams/Private/GameCharacter.cpp:1372"
+          ]
+        }
+      },
+      "untraced": [
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "This row belongs to the second CE1 start: the first start enters camera mode 3 and seeds the aim, the second shows the crosshair and runs TickAimAttack, and the third restores the camera. Phase 4 is the charged AttackG_04 follow-up entered after releasing CursedEnergyAttack_2.",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:511",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:387",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:401",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1408"
+          ]
+        },
+        {
+          "text": "Ammo gates the row's attacks: IsEnergyStockAction lists normals, CE1/CE2 and Supers, and CanAcceptActionType refuses them at BulletCount <= 0. Each played projectile effect decrements the stock; CE1/CE2 follow-up effects also spend a round only when the follow-up effect successfully plays.",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:704",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:840",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:940",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1568",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1597",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:621"
+          ]
+        },
+        {
+          "text": "The AI behavior controller mirrors this mechanic rather than reading the row directly: it drives the aim stick while CE1/CE1-air is active, using the cached row-2[0] speed, and latches CE2 input by target distance or ChargeStage >= 4.",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_BehaviorController.cpp:26",
+            "Source/Abrams/Private/CP_170_BehaviorController.cpp:47",
+            "Source/Abrams/Private/CP_170_BehaviorController.cpp:88",
+            "Source/Abrams/Private/CP_170_BehaviorController.cpp:92",
+            "Source/Abrams/Private/CP_170_BehaviorController.cpp:181"
+          ]
+        }
+      ]
+    },
+    "CP_170_ATTACKG_SHOOT_CAMERA": {
+      "title": "AttackG aim-shot camera request",
+      "overview": "Row 3 is read wholesale by MakeUniqueCameraRequest(2,3) when CE1 first enters the aim camera; slots 3 and 4 are also read directly to clamp the aim pitch. The helper's first argument is the request profile selector (2), while the character actually switches to camera mode 3. Slots 11-13 are not read.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "The aim camera sits 200 units back along the gaze-forward axis.",
+          "technical": "Value -200. MakeUniqueCameraRequest puts this in FVirtualCameraRequest::CameraOffset.X; UpdateRequestCamera rotates the whole offset into gaze-rotation space from the eye base. A larger positive X would move the camera forward along gaze, while more negative X moves it further back.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1404",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "A 40-unit sideways camera offset in gaze space.",
+          "technical": "Value 40; assigned to request CameraOffset.Y and rotated into gaze-rotation space. It changes lateral framing; the sign determines the side.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "A 10-unit vertical camera offset in gaze space.",
+          "technical": "Value 10; assigned to request CameraOffset.Z and rotated with the other offset components before collision adjustment. Raising it raises the camera relative to the eye base.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Upper aim/camera elevation limit",
+          "simple": "The aim may look up to 30 degrees above the eye; the same value is the aim pitch's upper bound.",
+          "technical": "Value 30. MakeUniqueCameraRequest assigns it to request LimitAngleUp. UpdateRequestCamera allows gaze elevation up to that value and only clamps when elevation is strictly greater than the selected limit. UpdateAim separately reads this slot as UpperLimit and uses FMath::Clamp(pitch, -row3[4], row3[3]), so the direct aim bound is inclusive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:175",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:177",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Lower aim/camera elevation limit",
+          "simple": "The aim may look down to 30 degrees below the eye; the same value is used as the negative pitch bound.",
+          "technical": "Value 30. Assigned to request LimitAngleDown and used when the gaze is below the eye; elevation > 30 is clamped back, while equality is allowed. UpdateAim reads it as LowerLimit and clamps aim pitch to -30 through +30 inclusive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:176",
+            "Source/Abrams/Private/CP_170_ActionController.cpp:177",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:376"
+          ]
+        },
+        "5": {
+          "label": "Aim-camera field of view",
+          "simple": "The aim camera requests a field of view of 70; a larger value would widen the view.",
+          "technical": "Value 70. MakeUniqueCameraRequest assigns it to FieldOfView. ChangeCameraMode only applies a new FOV when it is > 0, and this value is positive, so it starts the FOV interpolation using slot 6's duration and slot 7's easing.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "The field-of-view change takes 0.25 seconds; zero would snap instead.",
+          "technical": "Value 0.25. Assigned to FieldOfViewBlendTime. ChangeCameraMode starts FovInterp only when this is > 0; with 0 or less it writes the new FOV immediately and stops interpolation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:580"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "Selector 2 makes the FOV change use EaseOut.",
+          "technical": "Value 2. Cast to int32 in MakeUniqueCameraRequest and mapped 0=Linear, 1=EaseIn, 2=EaseOut, 3=EaseInOut; other values leave the request's default easing. The result is passed to FovInterp.Start when the blend time is positive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:939",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:961",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578"
+          ]
+        },
+        "8": {
+          "label": "Gaze orbit yaw",
+          "simple": "Zero means the camera does not orbit the gaze horizontally.",
+          "technical": "Value 0. Assigned to request OrbitYaw. UpdateRequestCamera builds an orbit rotator from OrbitPitch and OrbitYaw and applies it only when the rotator is nonzero, so 0/0 here leaves the gaze unorbited.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421"
+          ]
+        },
+        "9": {
+          "label": "Gaze orbit pitch",
+          "simple": "Zero means no vertical orbit is applied to the gaze.",
+          "technical": "Value 0; assigned to request OrbitPitch and combined with OrbitYaw in the orbit rotator that is skipped when both are zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Zero means no added roll on the aim-camera view.",
+          "technical": "Value 0; assigned to request Roll and passed to SetViewTarget87 after the camera position and gaze are solved. It is read even though it is zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:429",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Do not read the helper's CameraMode argument as the camera mode that is set: CP_170 calls MakeUniqueCameraRequest(2,3), then SetCameraMode(3,...). Argument 2 selects which unique row fields populate the request; mode 3 is the aim camera that consumes it.",
+          "evidence": [
+            "Source/Abrams/Private/CP_170_ActionController.cpp:1404",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacter.cpp:1946",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:345"
+          ]
+        },
+        {
+          "text": "The camera helper consumes only FloatValue[0..10]. No CP_170 source read was found for slots 11-13, and no other shared path assigns them a role for this character.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Tools/verify/CHAR/UniqueRowsInline.md:18"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Controller split: CP_170 uses UCP_170_ActionController for actions, charge state, ammo spending and passive toggling; UCP_170_BehaviorController drives AI-specific aim/CE2 input; FGameCharacterAIThinkNode_CP_170 is selected by AIType CP_170 and mirrors ammo plus the behavior controller's aim/CE2 flags into AI state.",
+      "evidence": [
+        "Source/Abrams/Public/CP_170_ActionController.h:7",
+        "Source/Abrams/Public/CP_170_BehaviorController.h:7",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:182",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:583",
+        "JJKCCDatatables/datatables/CharacterDataTable.json:2059"
+      ]
+    },
+    {
+      "text": "The ammo UI is a six-pip widget: the character HUD subclass colours the first N images bright and the rest grey from StatusController::BulletCount, so the same stock that gates CE/normal actions is visible in battle. BulletCount is clamped to 0..6.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_170.cpp:28",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_170.cpp:49",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_170.cpp:57",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:621",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:628"
+      ]
+    },
+    {
+      "text": "ExtraAttack_1 is the reload-like action, not one of the unique rows: UniqueAction parameter 1 sets BulletCount to zero, parameter 2 adds one, the first start announces whether ammo remains, and the action uses the ActionDataTable row Id_ExtraAttack_1 (CP_170_RELOAD).",
+      "evidence": [
+        "Source/Abrams/Private/CP_170_ActionController.cpp:1276",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:1282",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:1295",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:1332",
+        "JJKCCDatatables/datatables/ActionDataTable.json:1860"
+      ]
+    },
+    {
+      "text": "The passive buff is contextual: ActionTick adds BUFF_CP_170_PASSIVE only while the character is alive, input is enabled, and the relevant target (secondary during attacks, primary otherwise) targets Mai back; otherwise it removes the buff. Guard/ExtraAttack/CE2 key states latch the controller's cancel gates.",
+      "evidence": [
+        "Source/Abrams/Private/CP_170_ActionController.cpp:1058",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:1067",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:1083",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:1094",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:1102"
+      ]
+    },
+    {
+      "text": "Only AGameCharacter data is involved: CP_170's CharacterDataTable row has no trap and no shikigami IDs, so ShikigamiUniqueDataTable and trap/spawner forwarding are not part of this character's unique-row interpretation.",
+      "evidence": [
+        "JJKCCDatatables/datatables/CharacterDataTable.json:2035",
+        "JJKCCDatatables/datatables/CharacterDataTable.json:2040",
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:563"
+      ]
+    },
+    {
+      "text": "No CP_170-specific .inl file is included. The unusual shared header is CN_250_SharedHelpers.h, used only to start bone auto-aim during CE2 charge starts; verification notes describe that helper without any unique-row access.",
+      "evidence": [
+        "Source/Abrams/Private/CP_170_ActionController.cpp:27",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:618",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:1465",
+        "Tools/verify/CHAR/CN_250_ActionController.md:193"
+      ]
+    },
+    {
+      "text": "All CP_170 unique reads use literal row indices 1, 2 or 3; the only parameterized row is MakeUniqueCameraRequest's RowIndex, fixed at 3 by the caller. Dynamic selection happens inside a row: cursed-energy level chooses row 1 slots 0-2 and row 2 slots 9-11, while AI ordinal 0x16 selects the ExtraAttack think node. No dynamic slot-dispatch macro is used here.",
+      "evidence": [
+        "Source/Abrams/Private/CP_170_ActionController.cpp:317",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:441",
+        "Source/Abrams/Private/CP_170_ActionController.cpp:1404",
+        "Source/Abrams/Private/CP_170_BehaviorController.cpp:18",
+        "Source/Abrams/Private/GameCharacter.cpp:1759"
+      ]
+    },
+    {
+      "text": "Trace-confidence caveat: the verdicts above come from the reconstructed source and verification records, but several relevant CP_170 bodies are still recorded as accepted DIFF rather than exact byte matches, so 'verified' means the source path is explicit, not retail byte equivalence.",
+      "evidence": [
+        "Tools/verify/LANES/w24-char-g.md:19",
+        "Tools/verify/LANES/w24-char-g.md:21",
+        "Tools/verify/LANES/w24-char-g.md:43",
+        "Tools/verify/CHAR/UniqueRowsInline.md:18"
+      ]
+    }
+  ]
+}

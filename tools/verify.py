@@ -8,6 +8,8 @@ from pathlib import Path
 import re
 from urllib.parse import unquote, urljoin, urlsplit
 
+from character_catalog import create_catalog
+
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTENT = ROOT / "content"
@@ -42,6 +44,16 @@ def field_anchor(name):
     return "field-" + name.lower().replace("[]", "-array").replace(".", "--")
 
 
+def verify_evidence(label, evidence, project, line_counts, errors):
+    if not isinstance(evidence, list) or not evidence or not all(isinstance(ref, str) and ref.strip() for ref in evidence):
+        errors.append(f"{label}: missing evidence")
+        return
+    if project:
+        for ref in evidence:
+            if check_reference(ref, project, line_counts):
+                errors.append(f"{label}: reference outside local source {ref}")
+
+
 class Page(HTMLParser):
     def __init__(self, path):
         super().__init__()
@@ -64,14 +76,8 @@ class Page(HTMLParser):
 
 
 def reference_documents(groups, errors, project, line_counts, strict):
-    def verify_evidence(label, evidence):
-        if not isinstance(evidence, list) or not evidence or not all(isinstance(ref, str) and ref.strip() for ref in evidence):
-            errors.append(f"{label}: missing evidence")
-            return
-        if project:
-            for ref in evidence:
-                if check_reference(ref, project, line_counts):
-                    errors.append(f"{label}: reference outside local source {ref}")
+    def evidence_for(label, evidence):
+        verify_evidence(label, evidence, project, line_counts, errors)
 
     schemas = read(CONTENT / "enums.json") | read(CONTENT / "engine-enums.json")
     enum_files = {path.stem: path for path in (CONTENT / "enum-research").glob("*.json")}
@@ -90,7 +96,7 @@ def reference_documents(groups, errors, project, line_counts, strict):
         for name, note in values.items():
             if not annotation_complete(note) or note.get("status") not in STATUSES:
                 errors.append(f"{id}.{name}: incomplete enum explanation")
-            verify_evidence(f"{id}.{name}", note.get("evidence"))
+            evidence_for(f"{id}.{name}", note.get("evidence"))
 
     links = read(CONTENT / "table-links.json")
     for id, fields in links.items():
@@ -109,7 +115,7 @@ def reference_documents(groups, errors, project, line_counts, strict):
                 if table not in groups or table in seen:
                     errors.append(f"{id}.{name}: invalid target table {table}")
                 seen.add(table)
-                verify_evidence(f"{id}.{name} -> {table}", target.get("evidence"))
+                evidence_for(f"{id}.{name} -> {table}", target.get("evidence"))
 
     blueprint_catalog = read(CONTENT / "data-blueprints.json")
     blueprints = blueprint_catalog["entries"]
@@ -123,11 +129,11 @@ def reference_documents(groups, errors, project, line_counts, strict):
         seen.add(id)
         if entry.get("kind") not in {"settings", "actor"} or not annotation_complete(entry, ("title", "overview", "description", "baseClass")):
             errors.append(f"{id}: incomplete Blueprint family")
-        verify_evidence(id, entry.get("evidence"))
+        evidence_for(id, entry.get("evidence"))
         for field in entry["fields"]:
             if not annotation_complete(field, ("name", "type", "simple", "technical")):
                 errors.append(f"{id}.{field.get('name')}: incomplete Blueprint setting")
-            verify_evidence(f"{id}.{field.get('name')}", field.get("evidence"))
+            evidence_for(f"{id}.{field.get('name')}", field.get("evidence"))
         for asset in entry["examples"]:
             if not annotation_complete(asset, ("name", "path", "detail")):
                 errors.append(f"{id}: incomplete Blueprint example")
@@ -138,10 +144,64 @@ def reference_documents(groups, errors, project, line_counts, strict):
     return schemas, links, blueprints
 
 
+def character_documents(roster, errors, project, line_counts, strict):
+    def notes_for(label, notes):
+        if not isinstance(notes, list):
+            errors.append(f"{label}: notes must be a list")
+            return
+        for note in notes:
+            if not isinstance(note, dict) or not annotation_complete(note, ("text",)):
+                errors.append(f"{label}: invalid note")
+                continue
+            verify_evidence(label, note.get("evidence"), project, line_counts, errors)
+
+    files = {path.stem: path for path in (CONTENT / "character-research").glob("*.json")}
+    ids = {entry["id"] for entry in roster}
+    if len(ids) != len(roster):
+        errors.append("Duplicate character IDs")
+    for id in files.keys() - ids:
+        errors.append(f"Unexpected character research file {id}")
+    counts = Counter()
+    for entry in roster:
+        id = entry["id"]
+        if entry["transformation"] and entry["transformation"] not in ids:
+            errors.append(f"{id}: unknown linked form")
+        expected = {row["key"]: row for row in entry["rows"] if row}
+        if id not in files:
+            if strict:
+                errors.append(f"{id}: missing character research")
+            continue
+        document = read(files[id])
+        rows = document.get("rows", {})
+        if not annotation_complete(document, ("overview",)) or rows.keys() != expected.keys():
+            errors.append(f"{id}: missing overview or mismatch with exported unique rows")
+        notes_for(id, document.get("notes"))
+        for key in rows.keys() & expected:
+            label = f"{id}.{key}"
+            row = rows[key]
+            if not annotation_complete(row, ("title", "overview")):
+                errors.append(f"{label}: missing explanation")
+            notes_for(label, row.get("notes"))
+            written = row.get("values", {})
+            untraced = row.get("untraced", [])
+            slots = list(written) + [str(index) for index in untraced]
+            if Counter(slots) != Counter(str(index) for index in range(len(expected[key]["values"]))):
+                errors.append(f"{label}: every exported value must be accounted for once")
+            counts["untraced"] += len(untraced)
+            for slot, note in written.items():
+                if not annotation_complete(note, ("label", "simple", "technical")) or note.get("status") not in STATUSES:
+                    errors.append(f"{label}[{slot}]: incomplete value explanation")
+                verify_evidence(f"{label}[{slot}]", note.get("evidence"), project, line_counts, errors)
+                counts["indexed"] += 1
+                counts[note.get("status")] += 1
+    return counts
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--strict", action="store_true", help="Require every group and field to have a review")
     parser.add_argument("--project", type=Path, help="Also verify line references against the Unreal checkout")
+    parser.add_argument("--exports", type=Path, help="Also verify the character catalog against the DataTable JSON directory")
     args = parser.parse_args()
     catalog = read(CONTENT / "catalog.json")
     groups = {group["id"]: group for group in catalog}
@@ -180,6 +240,10 @@ def main():
             counts[status] += 1
 
     schemas, links, blueprints = reference_documents(groups, errors, args.project, line_counts, args.strict)
+    roster = read(CONTENT / "characters.json")
+    if args.exports and roster != create_catalog(args.exports):
+        errors.append("Character names, row order, or values differ from the exports")
+    character_counts = character_documents(roster, errors, args.project, line_counts, args.strict)
     pages = {}
 
     def verify_page(route, anchors=()):
@@ -196,7 +260,7 @@ def main():
             if anchor not in page.ids:
                 errors.append(f"/{route}: missing anchor {anchor}")
 
-    for route in ("", "tables", "enums", "data-blueprints"):
+    for route in ("", "tables", "enums", "data-blueprints", "characters"):
         verify_page(route)
     for group in catalog:
         slug = group["id"].lower()
@@ -210,6 +274,17 @@ def main():
         verify_page(f"enums/{id.lower()}", (f"value-{name.lower()}" for name, _ in schema["values"]))
     for entry in blueprints:
         verify_page(f"data-blueprints/{entry['id']}", (field_anchor(field["name"]) for field in entry["fields"]))
+    unique_rows = 0
+    character_values = 0
+    for entry in roster:
+        anchors = []
+        for index, row in enumerate(entry["rows"]):
+            if row:
+                unique_rows += 1
+                character_values += len(row["values"])
+                anchors.append(f"unique-{index}")
+                anchors.extend(f"unique-{index}-value-{slot}" for slot in range(len(row["values"])))
+        verify_page(f"characters/{entry['id'].lower()}", anchors)
 
     base = pages[""].base if "" in pages else "/"
 
@@ -236,7 +311,8 @@ def main():
     total_fields = sum(len(group["fields"]) for group in catalog)
     total_values = sum(len(schema["values"]) for schema in schemas.values())
     blueprint_fields = sum(len(entry["fields"]) for entry in blueprints)
-    if len(index) != len(catalog) + total_fields + len(schemas) + total_values + len(blueprints) + blueprint_fields:
+    reference_targets = len(catalog) + total_fields + len(schemas) + total_values + len(blueprints) + blueprint_fields
+    if len(index) != reference_targets + len(roster) + unique_rows + character_counts["indexed"]:
         errors.append("Search index count differs from the reference catalog")
 
     rendered = sum((page.statuses for route, page in pages.items() if route.startswith("tables/")), Counter())
@@ -244,6 +320,9 @@ def main():
     link_count = sum(len(targets) for fields in links.values() for targets in fields.values())
     print(f"{len(pages)} pages, {len(index)} search targets, {link_count} DataTable references")
     print(f"{len(schemas)} enums with {total_values} values, {len(blueprints)} Blueprint families with {blueprint_fields} settings")
+    print(f"{len(roster)} character pages, {unique_rows} row uses and {character_values} exported value slots "
+          f"({character_counts['verified']} traced, {character_counts['observed']} observed, "
+          f"{character_counts['unresolved']} unresolved, {character_counts['untraced']} no read traced)")
     print(f"{counts['groups reviewed']}/{len(catalog)} group descriptions, {reviewed}/{total_fields} reviewed fields "
           f"({rendered['verified']} traced, {rendered['observed']} observed, {rendered['unresolved']} unresolved)")
     if args.strict and (counts["groups reviewed"] < len(catalog) or reviewed < total_fields):

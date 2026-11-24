@@ -1,0 +1,56 @@
+{
+  "overview": "Ui Ui’s character record leaves all unique slots empty. Mei Mei’s controller handles Ui Ui’s battle voice cues.",
+  "technicalOverview": "Ui Ui (CN_210) is a non-selectable support/story character in the data, not a fighter with tunable numbers: the CharacterDataTable row has no action data, command list, base parameters, effects, shikigami or special attacks, and both ActionControllerType and AIType are None. AGameCharacter still reserves nine UniqueRows pointers from the nine Id_CharacterUnique entries, but every entry is None, and the optional-row helper returns nullptr for a None id without searching a table; the float accessors then dereference those pointers with no null or bounds check. The behavior that is actually traced for Ui Ui is delegated: UCP_240_ActionController (Mei Mei) queues the CN_210_* voice groups during battle and plays them as 3D voices attached to its owner. With no controller type the base action and bone controllers are created, and an AI brain built from AIType 0 uses the shared CP_010 think node and base behavior controller. Those are inherited fallbacks, not Ui Ui-specific logic.",
+  "rows": {},
+  "notes": [
+    {
+      "text": "Empty unique-data list in practice: all nine Id_CharacterUnique entries are None, so AGameCharacter's setup still reserves nine slots but GameCharacter_FindOptionalRow returns nullptr for each one without a table lookup. FGameCharacterAction::GetOwnerUniqueFloat and AGameCharacter::GetCharacterUniqueFloatValue both end in an unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference, so no row index or float index is safe to attribute to CN_210. Mei Mei's five unique rows (including the row-0 passive thresholds read by UCP_240_ActionController) belong to CP_240 and must not be copied onto Ui Ui just because her voice lines fire from that controller.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:449",
+        "Source/Abrams/Private/GameCharacter.cpp:560",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:379"
+      ]
+    },
+    {
+      "text": "Ui Ui's battle presence is a voice delegated to Mei Mei's controller. UCP_240_ActionController queues CN_210_START (2.0 s after a start voice), FIRSTATTACK / LEVELUP_02 / LEVELUP_03 / LEVELUP_MAX / KILL / TAGCOMBO_ATTACKER (2.0 s, tag-combo attacker 1.0 s), DEAD and GUARDBREAK (0.0 s), plus ALLY_DEAD, TAGCOMBO_RECEIVER (0.5 s), DOMAINEXPANSION_END, SPECIALATTACK_END and an IDLE line after more than 10 seconds spent in the Idle action. OnVoiceRequested is the slot-300 hook called first by PlayVoice; the queued group is resolved by PlayVoiceVariant to a voice row and played with PlayVoice3D on the owner's mesh and character index + 6, only when the owner is on the player's team. These are CP_240 controller behaviors triggered by combat events, not settings read from Ui Ui's own data.",
+      "evidence": [
+        "Source/Abrams/Private/CP_240_ActionController.cpp:296",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:364",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:405",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:499",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:506",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:701",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:765",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1723",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1942",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1949",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1978",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1984"
+      ]
+    },
+    {
+      "text": "No character-specific controller exists for CN_210. With ActionControllerType None, AGameCharacter::CreateActionController reaches its default arm and builds the base UGameCharacterActionController; CreateBoneController likewise builds the base UGameCharacterBoneController. The row's AIType 0 is passed into the brain when AI control is created, where BrainInit86's default builds FGameCharacterAIThinkNode_CP_010 and BrainCreate95's default builds the base UGameCharacterBehaviorController. The verification ledger records 'CN_210 AIType=0 ActCtl=0' and explicitly notes the CP_010 default node. That shared AI path is a fallback, not evidence that Ui Ui has Yuji's actions or behavior.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:632",
+        "Source/Abrams/Private/GameCharacter.cpp:764",
+        "Source/Abrams/Private/GameCharacter.cpp:791",
+        "Source/Abrams/Private/GameCharacter.cpp:826",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:210",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:1423",
+        "Source/Abrams/Private/GameCharacterBrain.cpp:12",
+        "Tools/verify/CHAR/GameCharacterAIThinkNode.md:104",
+        "Tools/verify/CHAR/GameCharacterAIThinkNode.md:150"
+      ]
+    },
+    {
+      "text": "Asset role fits a companion rather than a playable roster entry: the only dedicated cook rule for /Game/Characters/CN_210 is the SequencerNPC primary-asset type with AlwaysCook, while the supplied roster marks CN_210 non-selectable with one variation. Combined with the row's None action/effect/parameter IDs, there is no gameplay tuning surface for this character; her lines in the exported battle subtitle data are short reactions about Mei Mei ('Big Sis'), matching the CP_240 voice hooks traced above.",
+      "evidence": [
+        "Config/DefaultGame.ini:34",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1942"
+      ]
+    }
+  ]
+}

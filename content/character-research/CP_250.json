@@ -1,0 +1,242 @@
+{
+  "overview": "This form of Mahito counts hits on each target to trigger an extra attack. Its unique settings tune that counter and the third normal attack.",
+  "technicalOverview": "Instant Spirit Body of Distorted Killing (CP_250) is a cursed-spirit record without a Character Select entry whose character data selects UCP_250_ActionController and a CP_250-specific AI think node, not AGameShikigami or ShikigamiUniqueDataTable. Its CharacterDataTable.Id_CharacterUnique list contributes two populated CharacterUniqueDataTable2 rows. Row 0 (CP_250) is the passive hit-counter setup: a 7.0-second reset window and hit requirements of 5, 4, and 3 at cursed-energy levels 1, 2, and 3. Reaching the level's count clears that receiver's counter and queues a CP_250_PASSIVE multi-hit request. Row 1 (CP_250_ATTACKE) tunes the custom NormalAttack_3/AttackE chain: a 1.0-second first wait, a 5.0-second guard-sensitive final wait, and a 1.0 multiplier on cursed-energy exp from qualifying hyper-armor damage. CP_250's many custom attack subclasses also add surface-dependent impacts and inherited CN_090 super-attack slots, but those traced effects use hard-coded values, animation events, or data-table IDs rather than these unique floats. Indices 4-13 of row 0 and 3-13 of row 1 are zero and have no identified reader in the traced sources; zero alone is not proof that a slot is unused.",
+  "rows": {
+    "CP_250": {
+      "title": "Passive hit counter and reset timer",
+      "overview": "This row controls the CP_250 passive that counts landed hits on each receiver. A hit is ignored while cursed-energy disable time remains or when the receiver index is the 0xFF sentinel. Otherwise the per-receiver count increases, a level-specific threshold may convert it into a CP_250_PASSIVE request, and any counted hit at level 1-3 restarts the reset timer. The timer only counts down while input is enabled; when it expires, all receiver counts are cleared.",
+      "values": {
+        "0": {
+          "label": "Passive count reset time",
+          "simple": "How long landed hits stay counted toward the passive before the counter is forgotten.",
+          "technical": "The stored value is 7.0. In UCP_250_ActionController::AddPassiveHit, after the CursedEnergyDisabledTimeLeft <= 0.0f and PlayerIndex != 0xFF gates and after the switch has accepted CursedEnergyLevel 1, 2, or 3, HitCountResetTimer is assigned GetCharacterUniqueFloatValue(0, 0). This happens whether or not the hit reached the threshold. UCP_250_ActionController::ActionTick only decrements it while the timer is > 0.0f and the owner's input data reports input enabled; the decrement is DeltaTime / Dilation, where Dilation is CustomTimeDilation when that is > 0.0f and 1.0f otherwise. Once the timer is <= 0.0f, HitCounts.Reset() clears every receiver. Units are seconds because the code accumulates DeltaTime. Two generic, non-CP_250-specific readers also use (0, 0): SteerTowardSecondaryTarget requires it to be > 0.0f and divides an angle by it, and ProjectionSorceryReceive uses it as a fallback restraint time only when Request.DamageTableRow is null; no CP_250 source calls either path.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_250_ActionController.cpp:706",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:725",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:764",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3492",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:203",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212"
+          ]
+        },
+        "1": {
+          "label": "Level 1 passive hit threshold",
+          "simple": "At cursed energy level 1, five counted hits trigger the passive.",
+          "technical": "Read only in the case CursedEnergyLevel == 1 of UCP_250_ActionController::AddPassiveHit. After HitCounts[PlayerIndex] is incremented, the code tests HitCounts[PlayerIndex] >= static_cast<int32>(GetCharacterUniqueFloatValue(1, 0)). On success it removes that receiver entry, finds the character by EGameCharacterIndex(PlayerIndex), and, if found, queues one AddMultiHit request using damage row CP_250_PASSIVE. The switch default returns before the threshold or timer assignment, so levels outside 1-3 count the hit but do not trigger or restart anything. The stored value is 5.0; a higher value requires more counted hits, a lower value requires fewer.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_250_ActionController.cpp:725",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:731",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:734",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:746",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:760"
+          ]
+        },
+        "2": {
+          "label": "Level 2 passive hit threshold",
+          "simple": "At cursed energy level 2, four counted hits trigger the passive.",
+          "technical": "Read only in the case CursedEnergyLevel == 2 of UCP_250_ActionController::AddPassiveHit. It replaces the level-1 divisor in the same flow: compare the incremented per-receiver HitCounts value against static_cast<int32>(GetCharacterUniqueFloatValue(2, 0)), then clear that receiver's count and queue CP_250_PASSIVE if the target lookup succeeds. The stored value is 4.0; higher values need more hits and lower values need fewer. No other CP_250 reader for (2, 0) was identified.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_250_ActionController.cpp:737",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:746",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:760",
+            "Source/Abrams/Public/GameCharacterActionController.h:185"
+          ]
+        },
+        "3": {
+          "label": "Level 3 passive hit threshold",
+          "simple": "At cursed energy level 3, three counted hits trigger the passive.",
+          "technical": "Read only in the case CursedEnergyLevel == 3 of UCP_250_ActionController::AddPassiveHit. The incremented per-receiver HitCounts value is compared with static_cast<int32>(GetCharacterUniqueFloatValue(3, 0)); on reaching it, the count is removed and the same CP_250_PASSIVE AddMultiHit request path runs. The stored value is 3.0; higher values need more hits and lower values need fewer. The controller's cached CursedEnergyLevel is initialized to 1 and normally follows the clamped status level; values outside 1-3 use the switch default and skip this slot.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_250_ActionController.cpp:740",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:746",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:68",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:955",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:2063"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Guarded hits count too: slot 210 calls AddPassiveHit when a guarded hit's receiver is a character, that character's slot-179 flag is true, and the owner is the instigator; slot 212 applies the same count to dealt damage. CP_250's slot 160 identifies CP_250_PASSIVE as a passive damage row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_250_ActionController.cpp:697",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:768",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:779"
+          ]
+        },
+        {
+          "text": "The separate CP_250_Passive buff status uses its own BuffDebuff row floats: FloatValue[1] adds to the cursed-energy exp rate and FloatValue[0] adds to the attack rate. Those are not FloatValues from this CharacterUnique row, even though the names are similar.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3052",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3062",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3173",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3186"
+          ]
+        },
+        {
+          "text": "CP_250's slot 183 uses the shared full-gauge cursed-technique check at 0x141052E60 rather than the base max-level check, and slot 205 uses the shared CN_090/CP_020 homing-warp effect body. Neither body reads a unique float.",
+          "evidence": [
+            "Tools/verify/CHAR/batches/batch-action.md:286",
+            "Tools/verify/CHAR/batches/batch-action.md:298",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:294",
+            "Source/Abrams/Private/CN_090_ActionController.cpp:265"
+          ]
+        }
+      ]
+    },
+    "CP_250_ATTACKE": {
+      "title": "Normal Attack 3 / AttackE timing and reward",
+      "overview": "This row is reached by the CP_250-specific NormalAttack_3 and NormalAttackAir_3 action templates only. In a chained start (action start count 0), it gates two timed phases of the AttackE follow-up decision. It also scales the cursed-energy exp awarded to the owner when hyper armor absorbs ordinary damage. The row name matches the AttackE attack-set family, but the runtime finds it by its zero-based Id_CharacterUnique position, row 1.",
+      "values": {
+        "0": {
+          "label": "First AttackE follow-up wait",
+          "simple": "How long the chained normal attack waits before it can choose a follow-up.",
+          "technical": "TCP_250_NormalAttack_3<TBase>::TickAttack reads GetOwnerUniqueFloat(0, 1) only when the action's start count is 0 and Phase is 0. Each tick first adds DeltaTime to ActionElapsedTime, then returns while 1.0 > ActionElapsedTime; the stored value is 1.0 seconds. At exactly 1.0 or later the branch proceeds to normal-attack button and left-stick checks. Increasing this value delays the first decision point; decreasing it makes the decision earlier. At a start count of 1 the base TickAttack runs instead and this slot is not read.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_250_ActionController.cpp:98",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:105",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:114",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:164",
+            "Source/Abrams/Public/CP_250_Actions.h:79"
+          ]
+        },
+        "1": {
+          "label": "Guard-sensitive final AttackE wait",
+          "simple": "Without Guard held, the chain waits up to five seconds before parking; holding Guard skips that wait.",
+          "technical": "This is read later in the same start-count-0, Phase-0 branch, after the earlier button/stick alternatives have not returned. TCP_250_NormalAttack_3<TBase>::TickAttack returns while GetOwnerUniqueFloat(1, 1) = 5.0 > ActionElapsedTime and IsGameKeyHeld(EGameInputKey::Guard) is false. At exactly 5.0 or later, or immediately while Guard is held, it sets NextAttackType to the 0xFF sentinel, plays AttackE_01_02, and increments Phase. FilterRequests later requests the chosen follow-up (NormalAttack_1, NormalAttack_2, or NormalAttack_2_1) only when Byte16 is 1; a pending unrelated NormalAttack_3 request is removed when NextAttackType is not NormalAttack_3. Higher values lengthen this no-Guard wait; lower values shorten it. Units are seconds because ActionElapsedTime accumulates DeltaTime.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_250_ActionController.cpp:128",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:143",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:148",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:172",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:192"
+          ]
+        },
+        "2": {
+          "label": "Hyper-armor hit exp multiplier",
+          "simple": "Scales the cursed-energy exp gained when hyper armor lets certain hits land.",
+          "technical": "TCP_250_NormalAttack_3<TBase>::OnDamageReceived first returns unless bHyperArmorNotifyActive != 0 and DamageRow->AttackType is neither SuperCursedEnergyAttack nor SpecialTagCombo. It computes Ratio = Damage / HitPointMax; only when Ratio > 0.0f does Exp become GetLastLevelThreshold() * Ratio, where GetLastLevelThreshold returns CursedEnergyRow->LevelThreshold[3]. It then calls AddCursedEnergyExp(GetCharacterUniqueFloatValue(2, 1) * Exp). With the stored 1.0 the amount is unchanged; larger values increase the awarded exp and smaller values reduce it. If Ratio <= 0, Exp stays 0 and the multiplier has no effect. AddCursedEnergyExp itself returns for a defeated owner or zero exp. A non-hyper-armor-ignoring damage row also plays SE_CP_250_02001, which is independent of this multiplier.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_250_ActionController.cpp:199",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:211",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:217",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:2583",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3128",
+            "Source/Abrams/Public/GameCharacterStatusController.h:740"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The same template is instantiated for CreateAction cases NormalAttack_3 and NormalAttackAir_3, so row 1's three reads apply to both grounded and aerial third normal attacks. The air class only overrides the attack-set lookup.",
+          "evidence": [
+            "Source/Abrams/Private/CP_250_ActionController.cpp:676",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:678",
+            "Source/Abrams/Public/CP_250_Actions.h:98",
+            "Source/Abrams/Public/CP_250_Actions.h:102"
+          ]
+        },
+        {
+          "text": "CP_250's CursedEnergyAttack_1 chooses its impact by animation UniqueAction IntParameter 0-3 and by the map-ground row under the effect; it does not use row 1 values. The air variant returns false from ShouldSpawnGroundEffect, while the ground variant creates surface FX and a tracked decal for impact 1.",
+          "evidence": [
+            "Source/Abrams/Private/CP_250_ActionController.cpp:275",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:379",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:406",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:459",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:486",
+            "Source/Abrams/Public/CP_250_Actions.h:139"
+          ]
+        },
+        {
+          "text": "The SuperCursedEnergyAttack subclasses inherit CN_090's slots 70, 130, and 132 and add only a surface-effect UniqueAction; none of those inherited or overridden slots reads a unique float.",
+          "evidence": [
+            "Source/Abrams/Public/CN_090_Actions.h:33",
+            "Source/Abrams/Public/CP_250_Actions.h:145",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:632",
+            "Source/Abrams/Private/CP_250_ActionController.cpp:656"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Row indices are zero-based positions in CharacterDataTable.Id_CharacterUnique. AGameCharacter builds UniqueRows in that order and GetCharacterUniqueFloatValue is an unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference; FGameCharacterAction::GetOwnerUniqueFloat and its inline variant are only forwarding helpers. CP_250's readers use literal row 0 or 1, not a dynamic row-index helper.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:1758",
+        "Source/Abrams/Private/GameCharacterAction.cpp:931",
+        "Source/Abrams/Public/GameCharacterActionInline.h:7",
+        "Tools/verify/CHAR/UniqueRowsInline.md:12"
+      ]
+    },
+    {
+      "text": "Character setup switches to UCP_250_ActionController and FGameCharacterAIThinkNode_CP_250. The AI node's own setup and tick manage behavior weights, level bands, and a SuperCursedEnergyAttack state sentinel; those paths contain no unique-float access.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:613",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:190",
+        "Source/Abrams/Public/GameCharacterAIThinkNode.h:742",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:4608",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:770"
+      ]
+    },
+    {
+      "text": "No CP_250-specific .inl file exists in the traced source tree. The only relevant inline helper is the generic FGameCharacterAction::GetOwnerUniqueFloatInline; MakeUniqueCameraRequest is also generic but CP_250 action code never calls it, so none of the zero camera-style slots in either row can be assigned a camera use here.",
+      "evidence": [
+        "Source/Abrams/Public/GameCharacterActionInline.h:7",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941",
+        "Source/Abrams/Private/CP_250_ActionController.cpp:1"
+      ]
+    },
+    {
+      "text": "Do not import CN_250's dynamic GetLevelRowIndex/GetUniqueRow reads or its trap/spawner forwarding into CP_250. CP_250's controller is a direct UGameCharacterActionController subclass; its CreateAction override maps only its own normal, cursed-energy, and super attack action types, and its shared slots do not forward into trap unique-float access.",
+      "evidence": [
+        "Source/Abrams/Public/CP_250_ActionController.h:7",
+        "Source/Abrams/Private/CP_250_ActionController.cpp:663",
+        "Tools/verify/CHAR/batches/batch-action.md:286",
+        "Tools/verify/CHAR/batches/batch-action.md:302"
+      ]
+    },
+    {
+      "text": "UCP_250 post-processing is animation/sequencer state only (rotate alpha and tail/cloth rotators); it has no unique-row read. The sequencer module toggles the same SetSequencerRotateAlphaEnabled body shared with other post-process anim instances.",
+      "evidence": [
+        "Source/Abrams/Public/CP_250_PostProcessAnimInstance.h:12",
+        "Source/Abrams/Public/CP_250_PostProcessAnimInstance.h:50",
+        "Source/Abrams/Private/CP_250_PostProcessAnimInstance.cpp:3"
+      ]
+    }
+  ]
+}

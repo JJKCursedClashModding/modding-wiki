@@ -32,12 +32,13 @@ export const valueAnchor = (name) => `value-${name.toLowerCase()}`;
 export const blueprintHref = (id) => `${import.meta.env.BASE_URL}data-blueprints/${id}/`;
 
 export const referenceSections = [
+  { id: 'characters', label: 'Characters', description: 'Fighter mechanics, character-specific settings, and related table rows.' },
   { id: 'tables', label: 'DataTables', description: 'Settings that control combat, characters, missions, and more.' },
   { id: 'enums', label: 'Enums', description: 'What each named choice means and where the game uses it.' },
   { id: 'data-blueprints', label: 'Data Blueprints', description: 'Blueprint assets that supply settings and defaults to the game.' },
 ];
 
-function readResearch(files, path) {
+export function readResearch(files, path) {
   const raw = files[path];
   if (!raw) return {};
   try {

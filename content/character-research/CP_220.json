@@ -1,0 +1,1138 @@
+{
+  "overview": "Ultimate Mechamaru’s settings tune charged beams, release timing, and attack cameras. Different rows apply at different cursed-energy levels.",
+  "technicalOverview": "Ultimate Mechamaru (CP_220) is a playable, rifle-and-beam oriented character whose controller runs chargeable CursedEnergyAttack_1 and _2 sequences and a separate SuperCursedEnergyAttack. Its eight CharacterUniqueDataTable4 rows cover base Super-beam timings, shared normal-attack dimensions and thresholds, two sets of AttackG release-pose hold times, three AttackH beam tiers, and two dedicated mode-2 camera presets. Charge stage plus cursed-energy level selects FX and the AttackH row, while Weak/Strong passive stacks alter a separate set of normal-attack thresholds.",
+  "rows": {
+    "CP_220": {
+      "title": "Base SuperCursedEnergyAttack values",
+      "overview": "Base beam and charge values for the SuperCursedEnergyAttack (AttackI), the most expensive ranged special.",
+      "values": {
+        "0": {
+          "label": "Super beam base length",
+          "simple": "Base beam length = 3400 world-space units.",
+          "technical": "In SuperCursedEnergyAttack::UpdateBeamEndPoint, GetOwnerUniqueFloat(0,0) starts Length. A blocker trace shortens it to the first hit distance; a character trace can shorten it to the secondary target's scaled capsule radius times 0.25 plus hit distance. The final length is written to the charge effect's BeamEndPoint Niagara parameter. This is a world-vector length, not a projectile lifetime.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:889",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:893",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:898",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:903",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:915",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:920"
+          ]
+        },
+        "1": {
+          "label": "Super charge time",
+          "simple": "Charge time = 1 second at normal time dilation.",
+          "technical": "During first-start phase 1, elapsed increases by DeltaTime / Dilation, where Dilation is CustomTimeDilation when positive and 1 otherwise. When this value is <= elapsed, the action advances to phase 2, resets elapsed, refreshes the secondary target and clears aim-invalidation flags.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:792",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:798",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:799",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:801"
+          ]
+        },
+        "2": {
+          "label": "Super post-charge delay",
+          "simple": "Post-charge delay = 0.1 seconds.",
+          "technical": "During phase 2, elapsed increases by DeltaTime and flag159 is set when this value is <= elapsed. The comparison is inclusive: exactly 0.1 already satisfies it.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:806",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:808",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:810",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:812"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Row 0 is the character-level row used by SuperCursedEnergyAttack, not a passive-stat block. Only slots 0, 1 and 2 have traced CP220 readers; the remaining zeros are not treated as proof of no consumer.",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:792",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:889",
+            "Source/Abrams/Private/GameCharacter.cpp:1759"
+          ]
+        }
+      ]
+    },
+    "CP_220_NORMALATTACK": {
+      "title": "Shared normal-attack timings",
+      "overview": "Normal-attack beam dimensions, counter-stance timing, hit-slow response and character-specific flag thresholds used by several CP220 normal-attack chains.",
+      "values": {
+        "0": {
+          "label": "Normal beam length",
+          "simple": "Short normal-attack beam length = 1000 world-space units.",
+          "technical": "Every TickBeam of NormalAttack_2 sets both BeamLength and ClippedBeamLength from GetOwnerUniqueFloat(0,1) while the beam effect is alive and not finished. The beam is traced along its root's X axis for this length; the first contact hit shorter than the end clips ClippedBeamLength to Hit.Distance + 1.0 before Niagara and collision updates.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:632",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:638",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:646",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:660",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:665",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:670"
+          ]
+        },
+        "1": {
+          "label": "Minimum beam collision radius",
+          "simple": "Minimum capsule radius = 50.",
+          "technical": "UpdateBeamCollision halves the clipped beam length and uses FMath::Clamp(HalfLength, this value, slot 2) as each capsule's radius. The clamp is inclusive, so 50 is the lower bound; the capsule remains centered at HalfLength along the beam.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:684",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:685",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:691",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:692",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:693"
+          ]
+        },
+        "2": {
+          "label": "Maximum beam collision radius",
+          "simple": "Maximum capsule radius = 240.",
+          "technical": "Upper bound of the same FMath::Clamp on half the clipped beam length. A long beam therefore does not increase capsule radius beyond 240, although the capsule half-height still follows HalfLength.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:684",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:686",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:691",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:693"
+          ]
+        },
+        "3": {
+          "label": "Counter stance duration",
+          "simple": "Counter stance lasts 0.65 seconds.",
+          "technical": "On the first start of NormalAttack_2_1, phase 1 opens the stance with AttackD_01_Standby_01, accumulates ActionElapsedTime, and waits while this value is greater than elapsed. At or above 0.65 it plays the end animation and closes the stance; the comparison is strict greater-than on the wait, so the transition occurs at >= 0.65.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:478",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:483",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:490",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:492",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:494"
+          ]
+        },
+        "4": {
+          "label": "Unidentified normal-attack value",
+          "simple": "Contains 300; no CP220-specific reader was identified.",
+          "technical": "No traced CP220 action/controller call reads GetOwnerUniqueFloat(4,1) or GetCharacterUniqueFloatValue(4,1). Adjacent row-1 slots are read by the same normal-attack family (slot 3 for the counter timer, slots 5/6 for counter hit slow), and the lookup itself is an unchecked (ValueIndex, RowIndex) deref. This is marked unresolved rather than unused because lack of a call is not proof of no effect, and reconstruction may still have an unregistered or indirect consumer.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:431",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:492",
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Tools/verify/CHAR/UniqueRowsInline.md:20"
+          ]
+        },
+        "5": {
+          "label": "Counter hit-slow duration field",
+          "simple": "Counter-hit slow field = 0.01.",
+          "technical": "BuildHitResponse on NormalAttack_2_1 sets bAttackerHitSlow and writes this into FGameCharacterHitResponse.AttackerHitSlowRate. The damage pipeline later passes that field as RequestTimeDilation's Duration argument (its names are crossed in the reconstructed source): RequestTimeDilation(Instigator, Rate, Time, 0, false, false). Thus 0.01 is the request duration before the dilation value in slot 6.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:426",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:431",
+            "Source/Abrams/Public/GameCharacterAction.h:35",
+            "Source/Abrams/Private/GameBattleDamage.cpp:345",
+            "Source/Abrams/Private/GameTimeManager.cpp:62"
+          ]
+        },
+        "6": {
+          "label": "Counter hit-slow dilation field",
+          "simple": "Counter-hit slow field = 0.5.",
+          "technical": "Written to AttackerHitSlowTime by the same counter response and passed as RequestTimeDilation's Dilation argument. A dilation of 0.5 is half-rate for the 0.01-duration request, provided the request's Duration is positive and no higher-priority request blocks it.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:432",
+            "Source/Abrams/Private/GameBattleDamage.cpp:343",
+            "Source/Abrams/Private/GameBattleDamage.cpp:345",
+            "Source/Abrams/Private/GameTimeManager.cpp:66",
+            "Source/Abrams/Private/GameTimeManager.cpp:70"
+          ]
+        },
+        "7": {
+          "label": "NormalAttack_3 threshold, no passive",
+          "simple": "Timing flag threshold = 0.025 seconds.",
+          "technical": "CP_220_GetBuffUniqueVariant returns 0 when neither passive stack is present; GCP_220_BuffUniqueIndices[0] selects this value. On the second start of NormalAttack_3 / _Air_3, elapsed is accumulated and flag159 is set when this threshold is <= elapsed (inclusive).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:51",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:56",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:64",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:96",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:98"
+          ]
+        },
+        "8": {
+          "label": "NormalAttack_3 threshold, Weak passive",
+          "simple": "Timing flag threshold = 0.15 seconds.",
+          "technical": "A positive CP_220_Passive_Weak stack selects variant 1 and hence GCP_220_BuffUniqueIndices[1] = this value. Used by the same second-start NormalAttack_3 flag159 test with <= elapsed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:51",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:59",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:96",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:98"
+          ]
+        },
+        "9": {
+          "label": "NormalAttack_3 threshold, Strong passive",
+          "simple": "Timing flag threshold = 0.25 seconds.",
+          "technical": "A positive CP_220_Passive_Strong stack overrides a Weak stack and selects variant 2 / GCP_220_BuffUniqueIndices[2]. Used by the same second-start NormalAttack_3 flag159 test with <= elapsed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:51",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:61",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:96",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:98"
+          ]
+        },
+        "10": {
+          "label": "NormalAttack_3_1 threshold, no passive",
+          "simple": "Timing flag threshold = 0.15 seconds.",
+          "technical": "CP_220_GetBuffUniqueVariant returns 0 with no passive stacks; GCP_220_FallUniqueIndices[0] selects this value. On the second start of NormalAttack_3_1 / _Air_3_1, elapsed is accumulated and flag159 is set when this threshold is <= elapsed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:328",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:332",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:338",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:340"
+          ]
+        },
+        "11": {
+          "label": "NormalAttack_3_1 threshold, Weak passive",
+          "simple": "Timing flag threshold = 0.35 seconds.",
+          "technical": "A positive Weak stack selects variant 1 / GCP_220_FallUniqueIndices[1]. Used by the same second-start NormalAttack_3_1 flag159 test with <= elapsed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:328",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:338",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:340",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:56"
+          ]
+        },
+        "12": {
+          "label": "NormalAttack_3_1 threshold, Strong passive",
+          "simple": "Timing flag threshold = 0.55 seconds.",
+          "technical": "A positive Strong stack overrides Weak and selects variant 2 / GCP_220_FallUniqueIndices[2]. Used by the same second-start NormalAttack_3_1 flag159 test with <= elapsed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:328",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:338",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:340",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:61"
+          ]
+        },
+        "13": {
+          "label": "Fall phase timer",
+          "simple": "Fall phase lasts 0.15 seconds.",
+          "technical": "On the second start of NormalAttack_3_1, phase 1 adds DeltaTime to FallTimer while the owner has no ground hit. While this value is greater than FallTimer the action returns; once FallTimer reaches it, phase 2 plays AttackF_01_02. If a ground hit arrives first, the action skips to landing phase 3 instead.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:334",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:344",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:346",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:352",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:354",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:357"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "Slots 7-9 and 10-12 are two parallel passive-sensitive threshold sets: NormalAttack_3 uses 7/8/9 and NormalAttack_3_1 uses 10/11/12. Weak selects the middle value, Strong overrides to the last value; no passive uses the first.",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:49",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:56",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:59",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:61",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:328",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:338"
+          ]
+        },
+        {
+          "text": "The counter stance's Reset/ShouldInterceptHit/FilterRequests bodies are shared with CP_190/CP_200 families, but the traced CP220 unique-row reads are only in slot 50 (slots 5/6) and slot 131 (slot 3).",
+          "evidence": [
+            "Source/Abrams/Public/CP_220_Actions.h:174",
+            "Source/Abrams/Public/CP_220_Actions.h:195",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:431",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:492"
+          ]
+        }
+      ]
+    },
+    "CP_220_ATTACKG": {
+      "title": "AttackG charge and release holds",
+      "overview": "Charge duration and a two-dimensional hold-timer table for the released poses of CursedEnergyAttack_1.",
+      "values": {
+        "0": {
+          "label": "AttackG charge time",
+          "simple": "Charge time = 0.25 seconds.",
+          "technical": "While CursedEnergyAttack_1 is held on first start, elapsed increases by DeltaTime / positive CustomTimeDilation (else DeltaTime), and this value is the denominator for the over-cursed-energy gauge. Releasing the key immediately sets flag159; crossing the next cursed-energy threshold raises ChargeStage and plays a charge-level effect.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1826",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1830",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1833",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1847",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1862"
+          ]
+        },
+        "1": {
+          "label": "First AttackG hold duration",
+          "simple": "Hold duration = 0.35 seconds for the first pose group.",
+          "technical": "GCP_220_ReleaseHoldUniqueIndices[0][0] selects this value for AttackG_01_01_2 / AttackG_01_01_3 at HoldStage 0. During a release start, elapsed accumulates while either pose is playing; the action advances when this value is no longer >= elapsed (strictly after 0.35), then sets Byte16, resets elapsed and moves HoldStage to 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1673",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1685",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1802",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1809",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1811"
+          ]
+        },
+        "2": {
+          "label": "Second AttackG hold duration",
+          "simple": "Hold duration = 0.15 seconds for the first pose group's stage 1.",
+          "technical": "GCP_220_ReleaseHoldUniqueIndices[0][1] selects this value for AttackG_01_01_2 / _3 after HoldStage becomes 1, including immediately after a hit during one of those poses. The same strict greater-than-elapsed test applies.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1685",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1706",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1717",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1809"
+          ]
+        },
+        "3": {
+          "label": "First later-AttackG hold duration",
+          "simple": "Hold duration = 0.45 seconds for the second and Auto pose groups.",
+          "technical": "GCP_220_ReleaseHoldUniqueIndices[1][0] and [2][0] select this value for AttackG_02_01_1/_2/_3 and AttackG_02_01_Auto at HoldStage 0. It uses the same release-start elapsed test and advances to stage 1 on timeout.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1673",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1675",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1685",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1802",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1809"
+          ]
+        },
+        "4": {
+          "label": "Second later-AttackG hold duration",
+          "simple": "Hold duration = 0.2 seconds for the second and Auto pose groups.",
+          "technical": "GCP_220_ReleaseHoldUniqueIndices[1][1] and [2][1] select this value at HoldStage 1. A hit during any listed release pose resets elapsed and sets HoldStage to 1, so the shorter value is the one used after such a hit.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1685",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1709",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1717",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1809"
+          ]
+        }
+      },
+      "untraced": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The release table is indexed by pose group and HoldStage, not by cursed-energy variant. Hitting during any release pose restarts elapsed and forces stage 1, so the stage-1 durations (slots 2 and 4) are the ones used after such a hit.",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1673",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1685",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1706",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1717",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1809"
+          ]
+        },
+        {
+          "text": "The Auto variants override GetChargeVariant() to 0 and GetReleaseStartCount() to 1, but still read the same row-2 hold values when their single release pose is playing.",
+          "evidence": [
+            "Source/Abrams/Public/CP_220_Actions.h:269",
+            "Source/Abrams/Public/CP_220_Actions.h:273",
+            "Source/Abrams/Public/CP_220_Actions.h:281",
+            "Source/Abrams/Public/CP_220_Actions.h:285",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1802"
+          ]
+        }
+      ]
+    },
+    "CP_220_ATTACKG_SHOOT_CAMERA": {
+      "title": "AttackG camera preset",
+      "overview": "Mode-2 virtual-camera request used when the first CursedEnergyAttack_1 starts, then reused only for its FOV blend when the attack finishes.",
+      "values": {
+        "0": {
+          "label": "Camera X offset",
+          "simple": "X = -333.",
+          "technical": "In CameraMode 2 this becomes Request.CameraOffset.X. The final camera position is the eye base plus this offset rotated into the gaze frame, before the through-camera pull-in; negative X moves it backward along that local axis.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera Y offset",
+          "simple": "Y = -180.",
+          "technical": "In CameraMode 2 this becomes Request.CameraOffset.Y, applied in the gaze-rotation frame to the camera position before obstruction correction.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera Z offset",
+          "simple": "Z = 200.",
+          "technical": "In CameraMode 2 this becomes Request.CameraOffset.Z, raising the camera in the gaze-rotation frame before obstruction correction.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "Down limit = 80 degrees.",
+          "technical": "Request.LimitAngleDown. The virtual camera compares it with AngleBetweenDegrees when the gaze target is below the eye; if the gaze is lower than the limit, it is rotated back to this angle.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "Up limit = 80 degrees.",
+          "technical": "Request.LimitAngleUp. Applied by the same degree-based clamp when the gaze target is above the eye; a value at or under the limit is left unchanged.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "FOV = 130.",
+          "technical": "Request.FieldOfView. ChangeCameraMode only applies a positive FOV; this positive value replaces the current FOV, interpolated when slot 6 is positive and snapped otherwise.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:580"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "Blend time = 0.25 seconds.",
+          "technical": "Request.FieldOfViewBlendTime. Greater than zero starts FovInterp for the FOV change; zero or less snaps. The AttackG finish path also restores FOV 90 using this same row value as the blend time.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1917"
+          ]
+        },
+        "7": {
+          "label": "FOV easing curve",
+          "simple": "Easing = 3 (EaseInOut).",
+          "technical": "The float is cast to int32 and used as EEasingFunc: 0 Linear, 1 EaseIn, 2 EaseOut, 3 EaseInOut. The default branch leaves the request's zero (Linear) value; 3 explicitly selects EaseInOut.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578",
+            "Source/Abrams/Public/GameCharacterAction.h:28"
+          ]
+        },
+        "8": {
+          "label": "Gaze orbit yaw",
+          "simple": "Orbit yaw = 10 degrees.",
+          "technical": "Request.OrbitYaw is passed to FRotator(OrbitPitch, OrbitYaw, 0). The camera rotates the gaze about itself by that rotator after offset and obstruction handling.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:424"
+          ]
+        },
+        "9": {
+          "label": "Gaze orbit pitch",
+          "simple": "Orbit pitch = -10 degrees.",
+          "technical": "Request.OrbitPitch is the pitch component of the same FRotator used to orbit the gaze about the camera.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:424"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Roll = 3.",
+          "technical": "Request.Roll is forwarded to SetViewTarget87 along with camera and gaze locations; it is not part of the orbit rotator.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "MakeUniqueCameraRequest fills fields 0-10 only when CameraMode == 2; CP220 passes 2 explicitly. Slot 6 is additionally read by the finish path to blend back to a hard-coded FOV of 90.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:943",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1769",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1915",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1917"
+          ]
+        },
+        {
+          "text": "A generic JugonStun reaction reads an attacker's row-3 slots 5-8, but no CP220-specific action path to that reaction was traced. Those overlapping indices are documented here only as camera fields.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:279",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:282",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1769"
+          ]
+        }
+      ]
+    },
+    "CP_220_ATTACKH_1": {
+      "title": "Charged beam tier 1 (AttackH_1)",
+      "overview": "Timings and beam dimensions for AttackH_1, the first charged-beam tier selected by the current charge variant.",
+      "values": {
+        "0": {
+          "label": "Charge time",
+          "simple": "Charge time = 0.25.",
+          "technical": "While CursedEnergyAttack_2 is held in first-start phase 0, elapsed increases by DeltaTime / positive CustomTimeDilation (else DeltaTime). This value is the denominator for ((elapsed / charge time) * 100 + level base), clamped to 0..level max and stored as OverCursedEnergy; crossing the next threshold raises ChargeStage up to 3 - CursedEnergyLevel.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1500",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1509",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1511",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1523",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1525",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1529"
+          ]
+        },
+        "1": {
+          "label": "Maximum beam length",
+          "simple": "Maximum beam length = 3000.",
+          "technical": "Each TickBeam caps BeamLength to this value: grown length and this maximum are compared and the smaller wins before line tracing and Niagara BeamEndPoint updates.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1355",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1357",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1369"
+          ]
+        },
+        "2": {
+          "label": "Beam growth rate",
+          "simple": "Growth rate = 30000 per second.",
+          "technical": "BeamLength increases by this value multiplied by DeltaTime each tick (30000 units/second at normal time steps), then is capped by slot 1. DeltaTime is in seconds; the result is a world-space length.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1355",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1356",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1357"
+          ]
+        },
+        "3": {
+          "label": "Initial beam length",
+          "simple": "Initial length = 100.",
+          "technical": "When the beam starts, BeamLength is set from this value after the beam effect is attached and its root transform captured; TickBeam(0) then runs with that length.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1196",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1204",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1206"
+          ]
+        },
+        "4": {
+          "label": "Release delay",
+          "simple": "Release delay = 0.35 seconds.",
+          "technical": "After the charge key is released, first-start phase 1 adds DeltaTime to ReleaseTimer and waits while this value is greater than the timer. Flag159 is set once ReleaseTimer reaches the value (the test is strict greater-than).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1500",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1502",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1534",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1536",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1579"
+          ]
+        },
+        "5": {
+          "label": "Fired-beam delay",
+          "simple": "Fired-beam delay = 1 second.",
+          "technical": "In start count 2, once the beam effect is live and bBeamReady is set, ActionElapsedTime accumulates; the attack waits while this value is greater than elapsed and then reaches the timing flag.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1545",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1553",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1557",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1558",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1579"
+          ]
+        },
+        "6": {
+          "label": "Final beam delay",
+          "simple": "Final delay = 0.3 seconds.",
+          "technical": "In start count 3, when bBeamReady is set, ActionElapsedTime accumulates and the action waits while this value is greater than elapsed before setting flag159.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1564",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1570",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1579"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Rows 4, 5 and 6 are the three AttackH beam tiers. GetChargeVariant computes ChargeStage + GetCursedEnergyLevel() - 1 and caps only the upper end at 2; GetUniqueRowIndex maps 0/1/2 to rows 4/5/6 and uses -1 for anything else. The raw accessor has no bounds check.",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:972",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:981",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:985",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:987",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1002",
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Public/GameCharacterAction_CursedEnergyAttack.h:342"
+          ]
+        },
+        {
+          "text": "The same dynamic variant selects FX_CP_220_08112/08122/08132, 08115/08125/08135, 08113/08123/08133 and ground-effect scale 1.0/1.1/1.2; the unique values in this row control the corresponding tier's charge time and beam dimensions.",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1183",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1291",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1300",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1262",
+            "Tools/verify/CHAR/CreateActionBases.md:66"
+          ]
+        }
+      ]
+    },
+    "CP_220_ATTACKH_2": {
+      "title": "Charged beam tier 2 (AttackH_2)",
+      "overview": "Timings and beam dimensions for AttackH_2, the second charged-beam tier selected by the current charge variant.",
+      "values": {
+        "0": {
+          "label": "Charge time",
+          "simple": "Charge time = 0.25.",
+          "technical": "While CursedEnergyAttack_2 is held in first-start phase 0, elapsed increases by DeltaTime / positive CustomTimeDilation (else DeltaTime). This value is the denominator for ((elapsed / charge time) * 100 + level base), clamped to 0..level max and stored as OverCursedEnergy; crossing the next threshold raises ChargeStage up to 3 - CursedEnergyLevel.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1500",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1509",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1511",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1523",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1525",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1529"
+          ]
+        },
+        "1": {
+          "label": "Maximum beam length",
+          "simple": "Maximum beam length = 4000.",
+          "technical": "Each TickBeam caps BeamLength to this value: grown length and this maximum are compared and the smaller wins before line tracing and Niagara BeamEndPoint updates.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1355",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1357",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1369"
+          ]
+        },
+        "2": {
+          "label": "Beam growth rate",
+          "simple": "Growth rate = 30000 per second.",
+          "technical": "BeamLength increases by this value multiplied by DeltaTime each tick (30000 units/second at normal time steps), then is capped by slot 1. DeltaTime is in seconds; the result is a world-space length.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1355",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1356",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1357"
+          ]
+        },
+        "3": {
+          "label": "Initial beam length",
+          "simple": "Initial length = 100.",
+          "technical": "When the beam starts, BeamLength is set from this value after the beam effect is attached and its root transform captured; TickBeam(0) then runs with that length.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1196",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1204",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1206"
+          ]
+        },
+        "4": {
+          "label": "Release delay",
+          "simple": "Release delay = 0.35 seconds.",
+          "technical": "After the charge key is released, first-start phase 1 adds DeltaTime to ReleaseTimer and waits while this value is greater than the timer. Flag159 is set once ReleaseTimer reaches the value (the test is strict greater-than).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1500",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1502",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1534",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1536",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1579"
+          ]
+        },
+        "5": {
+          "label": "Fired-beam delay",
+          "simple": "Fired-beam delay = 1 second.",
+          "technical": "In start count 2, once the beam effect is live and bBeamReady is set, ActionElapsedTime accumulates; the attack waits while this value is greater than elapsed and then reaches the timing flag.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1545",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1553",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1557",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1558",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1579"
+          ]
+        },
+        "6": {
+          "label": "Final beam delay",
+          "simple": "Final delay = 0.3 seconds.",
+          "technical": "In start count 3, when bBeamReady is set, ActionElapsedTime accumulates and the action waits while this value is greater than elapsed before setting flag159.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1564",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1570",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1579"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Rows 4, 5 and 6 are the three AttackH beam tiers. GetChargeVariant computes ChargeStage + GetCursedEnergyLevel() - 1 and caps only the upper end at 2; GetUniqueRowIndex maps 0/1/2 to rows 4/5/6 and uses -1 for anything else. The raw accessor has no bounds check.",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:972",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:981",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:985",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:987",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1002",
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Public/GameCharacterAction_CursedEnergyAttack.h:342"
+          ]
+        },
+        {
+          "text": "The same dynamic variant selects FX_CP_220_08112/08122/08132, 08115/08125/08135, 08113/08123/08133 and ground-effect scale 1.0/1.1/1.2; the unique values in this row control the corresponding tier's charge time and beam dimensions.",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1183",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1291",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1300",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1262",
+            "Tools/verify/CHAR/CreateActionBases.md:66"
+          ]
+        }
+      ]
+    },
+    "CP_220_ATTACKH_3": {
+      "title": "Charged beam tier 3 (AttackH_3)",
+      "overview": "Timings and beam dimensions for AttackH_3, the third charged-beam tier selected by the current charge variant.",
+      "values": {
+        "0": {
+          "label": "Charge time",
+          "simple": "Charge time = 0.25.",
+          "technical": "While CursedEnergyAttack_2 is held in first-start phase 0, elapsed increases by DeltaTime / positive CustomTimeDilation (else DeltaTime). This value is the denominator for ((elapsed / charge time) * 100 + level base), clamped to 0..level max and stored as OverCursedEnergy; crossing the next threshold raises ChargeStage up to 3 - CursedEnergyLevel.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1500",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1509",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1511",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1523",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1525",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1529"
+          ]
+        },
+        "1": {
+          "label": "Maximum beam length",
+          "simple": "Maximum beam length = 5000.",
+          "technical": "Each TickBeam caps BeamLength to this value: grown length and this maximum are compared and the smaller wins before line tracing and Niagara BeamEndPoint updates.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1355",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1357",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1369"
+          ]
+        },
+        "2": {
+          "label": "Beam growth rate",
+          "simple": "Growth rate = 30000 per second.",
+          "technical": "BeamLength increases by this value multiplied by DeltaTime each tick (30000 units/second at normal time steps), then is capped by slot 1. DeltaTime is in seconds; the result is a world-space length.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1355",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1356",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1357"
+          ]
+        },
+        "3": {
+          "label": "Initial beam length",
+          "simple": "Initial length = 100.",
+          "technical": "When the beam starts, BeamLength is set from this value after the beam effect is attached and its root transform captured; TickBeam(0) then runs with that length.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1196",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1204",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1206"
+          ]
+        },
+        "4": {
+          "label": "Release delay",
+          "simple": "Release delay = 0.35 seconds.",
+          "technical": "After the charge key is released, first-start phase 1 adds DeltaTime to ReleaseTimer and waits while this value is greater than the timer. Flag159 is set once ReleaseTimer reaches the value (the test is strict greater-than).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1500",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1502",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1534",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1536",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1579"
+          ]
+        },
+        "5": {
+          "label": "Fired-beam delay",
+          "simple": "Fired-beam delay = 1 second.",
+          "technical": "In start count 2, once the beam effect is live and bBeamReady is set, ActionElapsedTime accumulates; the attack waits while this value is greater than elapsed and then reaches the timing flag.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1545",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1553",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1557",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1558",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1579"
+          ]
+        },
+        "6": {
+          "label": "Final beam delay",
+          "simple": "Final delay = 0.3 seconds.",
+          "technical": "In start count 3, when bBeamReady is set, ActionElapsedTime accumulates and the action waits while this value is greater than elapsed before setting flag159.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1564",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1570",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1579"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Rows 4, 5 and 6 are the three AttackH beam tiers. GetChargeVariant computes ChargeStage + GetCursedEnergyLevel() - 1 and caps only the upper end at 2; GetUniqueRowIndex maps 0/1/2 to rows 4/5/6 and uses -1 for anything else. The raw accessor has no bounds check.",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:972",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:981",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:985",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:987",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1002",
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Public/GameCharacterAction_CursedEnergyAttack.h:342"
+          ]
+        },
+        {
+          "text": "The same dynamic variant selects FX_CP_220_08112/08122/08132, 08115/08125/08135, 08113/08123/08133 and ground-effect scale 1.0/1.1/1.2; the unique values in this row control the corresponding tier's charge time and beam dimensions.",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1183",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1291",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1300",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1262",
+            "Tools/verify/CHAR/CreateActionBases.md:66"
+          ]
+        }
+      ]
+    },
+    "CP_220_ATTACKH_SHOOT_CAMERA": {
+      "title": "AttackH camera preset",
+      "overview": "Mode-2 virtual-camera request used when the first CursedEnergyAttack_2 starts, then reused for its FOV blend when the beam attack finishes.",
+      "values": {
+        "0": {
+          "label": "Camera X offset",
+          "simple": "X = -210.",
+          "technical": "In CameraMode 2 this becomes Request.CameraOffset.X. The final camera is the eye base plus this offset rotated into the gaze frame before obstruction correction; negative X moves it backward along that local axis.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera Y offset",
+          "simple": "Y = 155.",
+          "technical": "In CameraMode 2 this becomes Request.CameraOffset.Y, applied in the gaze-rotation frame before the through-camera pull-in.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera Z offset",
+          "simple": "Z = 2.",
+          "technical": "In CameraMode 2 this becomes Request.CameraOffset.Z, a small raise in the gaze-rotation frame before obstruction correction.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "Down limit = 30 degrees.",
+          "technical": "Request.LimitAngleDown. The virtual camera compares it with AngleBetweenDegrees when the gaze target is below the eye and rotates the gaze back to this angle if it is lower than the limit.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "Up limit = 30 degrees.",
+          "technical": "Request.LimitAngleUp. Applied by the same degree-based clamp when the gaze target is above the eye; values within the limit are unchanged.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "FOV = 120.",
+          "technical": "Request.FieldOfView. A positive value replaces the current FOV in ChangeCameraMode, using slot 6 as the interpolation duration.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:580"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "Blend time = 0.5 seconds.",
+          "technical": "Request.FieldOfViewBlendTime; greater than zero starts FovInterp. The CE2 finish path also restores FOV 90 with this same blend time.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1641"
+          ]
+        },
+        "7": {
+          "label": "FOV easing curve",
+          "simple": "Easing = 3 (EaseInOut).",
+          "technical": "Cast to int32 and used as EEasingFunc: 0 Linear, 1 EaseIn, 2 EaseOut, 3 EaseInOut. The default branch leaves the request's default zero (Linear).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578",
+            "Source/Abrams/Public/GameCharacterAction.h:28"
+          ]
+        },
+        "8": {
+          "label": "Gaze orbit yaw",
+          "simple": "Orbit yaw = -5 degrees.",
+          "technical": "Request.OrbitYaw is the Yaw component of FRotator(OrbitPitch, OrbitYaw, 0), used to orbit the gaze about the camera after offset and obstruction handling.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:424"
+          ]
+        },
+        "9": {
+          "label": "Gaze orbit pitch",
+          "simple": "Orbit pitch = 0.8 degrees.",
+          "technical": "Request.OrbitPitch is the Pitch component of the same orbit rotator.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:424"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Roll = -12.",
+          "technical": "Request.Roll is passed to SetViewTarget87 with the camera and gaze locations rather than into the orbit rotator.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "This is a separate preset from AttackG_SHOOT_CAMERA: the CE2 start takes row 7, while CE1 takes row 3. Both restore a saved camera mode with FOV 90 and their own row's slot-6 blend time.",
+          "evidence": [
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1124",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1128",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1640",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1641",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1769"
+          ]
+        },
+        {
+          "text": "No CP220-specific reader of slots 11-13 was found. The generic trap helper can forward row-7 values from a trap's source actor, but CP220's action code has no trap-spawn call in this source tree.",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:182",
+            "Source/Abrams/Private/GameTrapActionController.cpp:188",
+            "Source/Abrams/Private/CP_220_ActionController.cpp:1"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Unique rows are resolved by zero-based RowIndex into AGameCharacter::UniqueRows, which is filled in the character row's Id_CharacterUnique order; GetCharacterUniqueFloatValue(ValueIndex, RowIndex) is an unchecked raw deref. Shikigami actors populate a separate ShikigamiUniqueDataTable path, so none of these CP220 rows should be assigned to AGameShikigami.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameShikigami.cpp:874",
+        "Tools/verify/CHAR/UniqueRowsInline.md:20"
+      ]
+    },
+    {
+      "text": "CP220 installs UCP_220_ActionController through ActionControllerType CP_220. Its CreateAction factory supplies the normal, CE1, CE2 and Super action classes and delegates all unlisted action types to the base controller. The behavior controller is a zero-member shell whose only specialization is the executor factory for AI ordinals 0x11 and 0x13.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:610",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:2210",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:2257",
+        "Source/Abrams/Private/CP_220_BehaviorController.cpp:9",
+        "Source/Abrams/Public/CP_220_BehaviorController.h:11"
+      ]
+    },
+    {
+      "text": "The CP220-specific AI charge executors read the controller's ChargeStage. They keep holding only while the stage is below 3 minus clamped cursed-energy level and the target is within 500 units for CE1 or 800 units for CE2; those distances are hard-coded AI gates, not values from the unique rows.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAINode.cpp:2228",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:2256",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:2262",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:2295",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:2322",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:2328",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:4140"
+      ]
+    },
+    {
+      "text": "ChargeStage and cursed-energy level form the 0..2 variant that drives CE1 FX, CE2 AttackH rows and CE2 beam effects. The passive buffs form a separate 0..2 variant for row-1 threshold slots: Weak selects the middle slot, Strong overrides it, and a fired beam at stage 1/2 applies DEBUFF_CP_220_PASSIVE_1/_2.",
+      "evidence": [
+        "Source/Abrams/Private/CP_220_ActionController.cpp:49",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:56",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:61",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:956",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:959",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:961",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:972",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:987",
+        "Tools/verify/CHAR/CreateActionBases.md:66"
+      ]
+    },
+    {
+      "text": "Shared and delegated bodies matter here: CP220 NormalAttack_2_1 uses CP190/CP200-shared Reset, ShouldInterceptHit and FilterRequests bodies, while CE2 inherits the CE2 base slot set. No CP220-specific .inl include was found; the only .inl inclusion in this source tree is an unrelated rich-text parser.",
+      "evidence": [
+        "Source/Abrams/Public/CP_220_Actions.h:174",
+        "Source/Abrams/Public/CP_220_Actions.h:179",
+        "Source/Abrams/Public/CP_220_Actions.h:187",
+        "Source/Abrams/Public/CP_220_Actions.h:190",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:1",
+        "Source/Abrams/Private/GameWidgetAutoWrapRichTextBlock.cpp:36",
+        "Tools/verify/CHAR/CreateActionBases.md:108"
+      ]
+    },
+    {
+      "text": "CP220's row-0 and row-1 beam values feed Niagara effects plus line traces and capsule collision, not projectile actors: SuperCursedEnergyAttack clips a traced beam at blockers and the secondary target's capsule, while NormalAttack_2 traces its short beam and clips at contact effects.",
+      "evidence": [
+        "Source/Abrams/Private/CP_220_ActionController.cpp:638",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:647",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:660",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:889",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:893",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:903",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:915"
+      ]
+    },
+    {
+      "text": "Other source paths can read the same row numbers for different owners (trap GetUniqueFloat forwards from its source actor, and JugonStunReceive reads an attacker's row 3). No such CP220-specific forwarding path was traced, so they are not assigned here; zeros in untraced slots likewise are not treated as proof that a value is unused.",
+      "evidence": [
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188",
+        "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:279",
+        "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:282",
+        "Source/Abrams/Private/CP_220_ActionController.cpp:1"
+      ]
+    }
+  ]
+}

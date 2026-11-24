@@ -1,0 +1,1470 @@
+{
+  "overview": "This version of Geto has settings for summon-assisted attacks, ground waves, falling projectiles, and a whirlpool trap.",
+  "technicalOverview": "CN_122 is a curse-user fighting profile whose nine unique rows are one shared tuning block, not nine standalone moves. The action controller mixes them across shikigami-assisted normals, a ground-wave cursed-energy sequence, falling shot effects, and a spawned whirlpool trap; the super and auto variants deliberately switch between two shot rows. Most slots are world offsets, time limits, speeds, ranges, angles, scales or animation rates. Plain-language names below are descriptive: the read sites and expressions were traced in the reconstructed source, but helper and member names are ours.",
+  "rows": {
+    "CN_122": {
+      "title": "Base tuning shared by the character",
+      "overview": "The first row holds a few broad settings used by the long ground-wave sequence: where effects sit around the hand, how quickly the sequence ends, and how soft a material fade looks. The rest of this row was not found in a CN_122 reader.",
+      "values": {
+        "0": {
+          "label": "Water-effect lift",
+          "simple": "Raises the water-tagged effect pieces slightly above their ground point.",
+          "technical": "Added directly to the Z coordinate of each water Niagara component in FX_CN_122_07213 and FX_CN_122_07216. Both reads use GetCharacterUniqueFloatValue(0, 0).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2884",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3005"
+          ]
+        },
+        "1": {
+          "label": "Final sequence hold",
+          "simple": "Controls how long the closing fade stage lasts.",
+          "technical": "At sequence 240 phase 8 the controller waits while Sequence240Timer <= unique(1,0); the strict test advances only when the timer is greater. During the wait alpha is Clamp(timer*4,0,1) and drives Opacity_Timer and Mouth_Open.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2556",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2560"
+          ]
+        },
+        "2": {
+          "label": "Ground-sequence forward offset",
+          "simple": "Moves the summoned helper and opening effect forward from the left hand.",
+          "technical": "Forward-axis distance from the L_hand socket used both by the phase-1 FX_CN_122_07111 transform and by SummonSequence240Shikigami when placing shikigami 8.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2313",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2470"
+          ]
+        },
+        "3": {
+          "label": "Ground-sequence right offset",
+          "simple": "Moves the same helper and opening effect sideways from the left hand.",
+          "technical": "Right-axis distance from L_hand in the two placements described for slot 2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2314",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2472"
+          ]
+        },
+        "4": {
+          "label": "Ground-sequence up offset",
+          "simple": "Moves the same helper and opening effect vertically from the left hand.",
+          "technical": "Up-axis distance from L_hand in the two placements described for slot 2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2315",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2474"
+          ]
+        },
+        "5": {
+          "label": "Angle-fade softness source",
+          "simple": "Sets how sharply the wave decal fades at viewing angles.",
+          "technical": "AngleFadeSoften = Abs(unique(5,0)) / 90. The absolute value means a negative table value is treated as its magnitude; the result is pushed into the DCL_80601/DCL_80602 material parameter AngleFadeSoften.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2379",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2838",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2920"
+          ]
+        }
+      },
+      "untraced": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Slots 2-4 are reused for two different spawns in the same sequence, so editing them moves both the shikigami and the first effect together.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2313",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2470"
+          ]
+        },
+        {
+          "text": "The zero tail is not evidence of a fallback: the accessor is a raw unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Tools/verify/CHAR/UniqueRowsInline.md:17"
+          ]
+        }
+      ]
+    },
+    "CN_122_NORMALATTACK_1": {
+      "title": "First normal-attack homing setup",
+      "overview": "This row positions the first ranged normal attack marker, limits the pitch of the summoned follower, and gives two shikigami attacks their lifetimes. Two of its values are borrowed later by a different normal attack to size and place its effect.",
+      "values": {
+        "0": {
+          "label": "Follower Attack_8 lifetime",
+          "simple": "Sets how long the first summoned follower keeps attacking.",
+          "technical": "Passed as FShikigamiDamageActionParam.Value64 when shikigami 5 is ordered to Summon then Attack_8. Value64 is the elapsed-time release threshold in the CN_050 attack bodies, so this is a time in seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1124",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1166",
+            "Source/Abrams/Public/GameShikigamiActionController.h:47",
+            "Source/Abrams/Private/CN_050_ActionController.cpp:518"
+          ]
+        },
+        "1": {
+          "label": "Homing point forward distance",
+          "simple": "Pushes the attack marker in front of the owner.",
+          "technical": "Forward component of the far-target homing point: owner location + Forward*unique(1,1) + Right*unique(2,1) + Up*unique(3,1). Used when the target is at least 300 world units away in 2D.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:266",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:277"
+          ]
+        },
+        "2": {
+          "label": "Homing point right distance",
+          "simple": "Nudges the far attack marker sideways.",
+          "technical": "Right component of the same far-target homing expression. The stored value is zero, but it is read.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:267",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:277"
+          ]
+        },
+        "3": {
+          "label": "Homing height / close-target height",
+          "simple": "Raises the marker and also sets its height when the target is close.",
+          "technical": "Up component in the far-target expression, and the exact Z added to the owner location in the close branch (2D distance < 300). The same read is used in both branches.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:266",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:271"
+          ]
+        },
+        "4": {
+          "label": "Follower pitch limit",
+          "simple": "Restricts how far the follower can aim up or down.",
+          "technical": "After facing shikigami 5 at the secondary target, pitch is clamped to [-90 - limit, limit - 90] degrees, with limit = unique(4,1).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1161",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1162"
+          ]
+        },
+        "5": {
+          "label": "Follower Attack_9 lifetime",
+          "simple": "Sets the second summoned attack's active time.",
+          "technical": "Passed as Value64 for shikigami 0 Attack_9 in the second stage of NormalAttack_2_1; the shikigami action releases when Elapsed reaches Value64.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1277",
+            "Source/Abrams/Private/CN_050_ActionController.cpp:780"
+          ]
+        },
+        "6": {
+          "label": "Ankle effect forward offset",
+          "simple": "Places the homing effect ahead of the ankle socket.",
+          "technical": "Forward component added to the R_ankle socket location for the FX_CN_122_00111 spawn in NormalAttack_2_1 UniqueAction 0. The owner root rotation has its full-body roll subtracted first.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1197",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1205"
+          ]
+        },
+        "7": {
+          "label": "Ankle effect right offset",
+          "simple": "Places that effect sideways from the ankle.",
+          "technical": "Right component of the same R_ankle-based transform.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1196",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1205"
+          ]
+        },
+        "8": {
+          "label": "Ankle effect up offset",
+          "simple": "Places that effect below or above the ankle.",
+          "technical": "Up component of the same R_ankle-based transform. The stored -50 is used directly in the axis sum; no fallback converts it to zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1195",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1205"
+          ]
+        },
+        "9": {
+          "label": "Second-stage range gate",
+          "simple": "Decides when the attack may continue based on target distance.",
+          "technical": "At start count 1 the controller compares the 2D distance to the secondary target with strict < unique(9,1) before SetFlag159.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1284",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1285"
+          ]
+        },
+        "10": {
+          "label": "Five-point effect scale",
+          "simple": "Sets the size of the effect shown at each of the five homing points.",
+          "technical": "Used as the uniform FVector scale for FX_CN_122_00111 in NormalAttack_3 UniqueAction 0, not in this row's own NormalAttack_1_1 body.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1333",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1336"
+          ]
+        },
+        "11": {
+          "label": "Five-point effect forward offset",
+          "simple": "Moves each of those five effects slightly ahead of its homing point.",
+          "technical": "Forward-axis offset added to each of the five NormalAttack_3 homing locations before spawning FX_CN_122_00111.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1330",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1331"
+          ]
+        }
+      },
+      "untraced": [
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The Value64 forwarding is character-to-shikigami only; the shikigami's own GetCharacterUniqueFloatValue calls read ShikigamiUniqueDataTable, not these CN_122 rows.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1129",
+            "Source/Abrams/Private/GameShikigami.cpp:872"
+          ]
+        },
+        {
+          "text": "The 300-unit switch between close and far homing branches is a literal in the action, not data from this row.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:274"
+          ]
+        }
+      ]
+    },
+    "CN_122_NORMALATTACK_2": {
+      "title": "Second normal-attack fan setup",
+      "overview": "This row lays out five shikigami landing points in a fan, aims a later marker at the secondary target, and supplies two more shikigami attack durations. Its last three values size and offset the FX_CN_122_06101 marker.",
+      "values": {
+        "0": {
+          "label": "Five-way Attack_7 lifetime",
+          "simple": "Sets how long each of the five launched followers attacks.",
+          "technical": "Forwarded as Value64 when shikigami indices 0-4 are ordered to Summon then Attack_7. Each shikigami attack releases at Elapsed >= Value64.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1394",
+            "Source/Abrams/Public/GameShikigamiActionController.h:47"
+          ]
+        },
+        "1": {
+          "label": "Fan point forward distance",
+          "simple": "Pushes each of the five landing points away from the owner.",
+          "technical": "Forward axis of each homing point, rotated by the point index before use.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1326",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1327"
+          ]
+        },
+        "2": {
+          "label": "Fan point right distance",
+          "simple": "Offsets the landing points sideways about that rotation.",
+          "technical": "Right axis of each of the five rotated homing points.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1325",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1327"
+          ]
+        },
+        "3": {
+          "label": "Fan point up distance",
+          "simple": "Offsets the landing points vertically about that rotation.",
+          "technical": "Up axis of each of the five rotated homing points.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1324",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1327"
+          ]
+        },
+        "4": {
+          "label": "Fan yaw offset",
+          "simple": "Rotates the five-point layout.",
+          "technical": "Added to each point yaw as Index*72 degrees + unique(4,2); Index runs 0 through 4.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1322"
+          ]
+        },
+        "5": {
+          "label": "Follower Attack_10 lifetime",
+          "simple": "Sets how long the chosen shikigami 6/7 attack stays active.",
+          "technical": "Forwarded as Value64 when NormalAttack_3_1 picks a free shikigami (or falls back to 6) and orders Attack_10.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1615",
+            "Source/Abrams/Public/GameShikigamiActionController.h:47"
+          ]
+        },
+        "6": {
+          "label": "Aimed marker forward offset",
+          "simple": "Places the aimed marker ahead of the owner.",
+          "technical": "Forward component of NormalAttack_3_1 HomingLocation: owner location + Forward*unique(6,2) + Right*unique(7,2) + Up*unique(8,2).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1535",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1537"
+          ]
+        },
+        "7": {
+          "label": "Aimed marker right offset",
+          "simple": "Places the aimed marker sideways.",
+          "technical": "Right component of the same HomingLocation expression.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1534",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1537"
+          ]
+        },
+        "8": {
+          "label": "Aimed marker up and target lift",
+          "simple": "Places the marker above the owner and also lifts the aim point.",
+          "technical": "Up component of HomingLocation, and separately added to the secondary target Z with a literal +10 before aim rotation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1533",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1542"
+          ]
+        },
+        "9": {
+          "label": "Aim pitch limit",
+          "simple": "Clamps how steeply the marker can aim upward.",
+          "technical": "Passed as MaxPitch to CN122_AimRotation; the helper clamps elevation using this degree limit.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1543",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1545"
+          ]
+        },
+        "10": {
+          "label": "Aim yaw limit",
+          "simple": "Clamps how far sideways the marker can turn.",
+          "technical": "Passed as MaxYaw to CN122_AimRotation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1544",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1545"
+          ]
+        },
+        "11": {
+          "label": "Aimed effect scale",
+          "simple": "Sets the size of the FX_CN_122_06101 marker.",
+          "technical": "Uniform FVector scale for the effect spawned at the computed aim point.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1554",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1555"
+          ]
+        },
+        "12": {
+          "label": "Aimed effect forward offset",
+          "simple": "Moves that marker ahead of the homing point.",
+          "technical": "Forward-axis offset from HomingLocation before the effect transform is built.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1548",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1551"
+          ]
+        },
+        "13": {
+          "label": "Aimed effect up offset",
+          "simple": "Moves that marker vertically.",
+          "technical": "Up-axis offset from HomingLocation before the effect transform is built.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1547",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1551"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "The fan has exactly five points because the loop bound is five; the 72-degree step is a literal in the body.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1318",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1322"
+          ]
+        },
+        {
+          "text": "Shikigami 6 or 7 is selected only when inactive; if neither is free, both are deactivated and index 6 is used.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1568",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1578"
+          ]
+        }
+      ]
+    },
+    "CN_122_ATTACKG": {
+      "title": "Ground-wave sequence tuning",
+      "overview": "This row drives the first cursed-energy sequence: how far its wall probes reach, how high its decals sit, how fast its effect glides, and how long its damage phase waits at each cursed-energy level.",
+      "values": {
+        "0": {
+          "label": "Wall-probe depth / first decal length",
+          "simple": "Sets how far below the aim point the wave searches and part of the large ground decal length.",
+          "technical": "Depth is used as Step*3, as the starting height offset Depth-10-Step, and as the downward trace length in SpawnSequence240Actors. It is also the X size of DCL_80601 plus the half wall extents.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2683",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2686",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2922"
+          ]
+        },
+        "1": {
+          "label": "Even-side probe distance / first decal width",
+          "simple": "Sets the reach of alternating wall probes and the decal width.",
+          "technical": "Chosen for even probe/side indices in both wall passes and assigned to DCL_80601 Size.Y.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2682",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2735",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2923"
+          ]
+        },
+        "2": {
+          "label": "Odd-side probe distance / first decal depth",
+          "simple": "Sets the reach of the other alternating probes and the decal depth.",
+          "technical": "Chosen for odd probe/side indices in both wall passes and assigned to DCL_80601 Size.Z.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2681",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2735",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2924"
+          ]
+        },
+        "3": {
+          "label": "Ground acceptance height / second decal length",
+          "simple": "Limits which ground points are accepted and sets the second decal length.",
+          "technical": "Used as the allowed height difference for ring candidates, as the vertical target gate for pending damage, and as DCL_80602 Size.X plus wall half-extents.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2417",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2426",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2650",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2830"
+          ]
+        },
+        "4": {
+          "label": "Second decal width",
+          "simple": "Sets the DCL_80602 decal width.",
+          "technical": "Assigned to Size.Y of the DCL_80602 decal after its dynamic material is created.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2831"
+          ]
+        },
+        "5": {
+          "label": "Second decal depth",
+          "simple": "Sets the DCL_80602 decal depth.",
+          "technical": "Assigned to Size.Z of the same DCL_80602 decal.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2832"
+          ]
+        },
+        "6": {
+          "label": "Wave glide speed",
+          "simple": "Controls how quickly the travelling wave effect moves.",
+          "technical": "Speed multiplied by DeltaTime when gliding Effect188 toward the ground-snapped aim end.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2404",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2412"
+          ]
+        },
+        "7": {
+          "label": "Wave travel range",
+          "simple": "Limits how far the wave can travel in the normal version.",
+          "technical": "Used as the aim clamp for non-super attacks and as the maximum allowed distance from the sequence start while gliding. The super version replaces the aim clamp with row6 slot 0, but the glide check still uses this slot.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2362",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2394",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2406"
+          ]
+        },
+        "8": {
+          "label": "Pre-wave delay",
+          "simple": "Waits before the travelling effect appears.",
+          "technical": "Phase 3 advances only when Sequence240Timer > unique(8,3); the timer is accumulated from dilated DeltaTime.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2504",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2511"
+          ]
+        },
+        "9": {
+          "label": "Level 1 hold time",
+          "simple": "Sets the damage-phase duration at cursed-energy level 1.",
+          "technical": "GCN_122_UnknownIndices0 is {9,10,11}; phase 7 reads index[CursedEnergyLevel - 1] from row 3. Level 1 therefore selects slot 9.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:56",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2539",
+            "Source/Abrams/Public/GameCharacterActionController.h:604"
+          ]
+        },
+        "10": {
+          "label": "Level 2 hold time",
+          "simple": "Sets the damage-phase duration at cursed-energy level 2.",
+          "technical": "Same dynamic read; level 2 selects slot 10.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:56",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2539",
+            "Source/Abrams/Public/GameCharacterActionController.h:604"
+          ]
+        },
+        "11": {
+          "label": "Level 3 hold time",
+          "simple": "Sets the damage-phase duration at cursed-energy level 3.",
+          "technical": "Same dynamic read; level 3 selects slot 11. The base controller clamps the level to 3, and this expression does not add another bounds check.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:56",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2539",
+            "Source/Abrams/Public/GameCharacterActionController.h:604"
+          ]
+        },
+        "12": {
+          "label": "Damage ring radius",
+          "simple": "Sets how wide the delayed damage circle is.",
+          "technical": "Stored in Sequence240Radius and compared with the 2D distance from each candidate to the ring center; strict >= skips the target.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2378",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2649"
+          ]
+        },
+        "13": {
+          "label": "Damage height tolerance",
+          "simple": "Limits how far above or below the ring a target may be.",
+          "technical": "Targets are skipped when this value <= Abs(center.Z - target.Z).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2650",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2657"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "The wave damage row also switches by cursed-energy level: CN_122_ATTACKG_01_01_1/2/3 for normal and CN_122_ATTACKI_01_01 for the super variant.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2597",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2637"
+          ]
+        },
+        {
+          "text": "The three dynamic index tables are part of the retail translation unit; their names are unproven but their contents are recorded in source.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:54",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:58",
+            "Tools/verify/CHAR/CN_122_ActionController.md:131"
+          ]
+        }
+      ]
+    },
+    "CN_122_ATTACKH_1": {
+      "title": "Shot-sequence origin and projectile tuning",
+      "overview": "This row controls where the shot sequence begins and where the Super version sends shikigami 5. It also tunes falling projectiles, their ground rings, and the Auto version's overrides.",
+      "values": {
+        "0": {
+          "label": "Charge / shot origin forward offset",
+          "simple": "Moves the charge effect and shot starting point in front of the owner.",
+          "technical": "Forward distance for FX_CN_122_08111 in PlayChargeEffect and for Location290 in sequence 2D8 phase 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:855",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3093"
+          ]
+        },
+        "1": {
+          "label": "Charge / shot origin right offset",
+          "simple": "Moves those origins sideways.",
+          "technical": "Right distance in the same two expressions.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:856",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3095"
+          ]
+        },
+        "2": {
+          "label": "Charge / shot origin up offset",
+          "simple": "Moves those origins vertically.",
+          "technical": "Up distance in the same two expressions.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:857",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3097"
+          ]
+        },
+        "3": {
+          "label": "Homing / shot spawn forward offset",
+          "simple": "Places the late shikigami and each falling shot ahead of the owner.",
+          "technical": "Forward distance both in StartShikigamiHoming and in the shot spawn offset added to each group aim point.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3547",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3255"
+          ]
+        },
+        "4": {
+          "label": "Homing / shot spawn right offset",
+          "simple": "Places those spawns sideways.",
+          "technical": "Right distance in the same two expressions.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3548",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3257"
+          ]
+        },
+        "5": {
+          "label": "Homing / shot spawn up offset",
+          "simple": "Places those spawns above the owner.",
+          "technical": "Up distance in StartShikigamiHoming and the default up distance for shot spawns. The Auto variant swaps this read for slot 13.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3549",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3253"
+          ]
+        },
+        "6": {
+          "label": "Shot landing floor offset",
+          "simple": "Sets the height at which a falling shot becomes a ground effect.",
+          "technical": "Floor = unique(6,4) + ShotGroups[Group].Location.Z. When the falling effect reaches that height, the shot effect finishes and eight ground trails spawn.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3389",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3393"
+          ]
+        },
+        "7": {
+          "label": "Charge-particle speed and range",
+          "simple": "Controls how fast the rising sub-effects move and how far they may rise.",
+          "technical": "Default speed for sub-effects rising along their up vector and also the default distance from the origin at which they are finished; both checks use this same slot.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3327",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3338",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3352"
+          ]
+        },
+        "8": {
+          "label": "Shot-ring decal size",
+          "simple": "Sets the width and depth of the ring under each shot group.",
+          "technical": "Assigned to both Size.Y and Size.Z of the DCL_80611 decal; Size.X is left unchanged.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3532",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3533"
+          ]
+        },
+        "9": {
+          "label": "Shot aim range",
+          "simple": "Clamps how far the normal shot sequence will aim.",
+          "technical": "When 3D distance from Location290 to a target exceeds unique(9,4), the aim point is shortened to that range. The Super variant uses row6 slot 3 instead.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3188",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3192"
+          ]
+        },
+        "10": {
+          "label": "Unresolved tuning value",
+          "simple": "A large value with no CN_122 read identified.",
+          "technical": "No traced CN_122 action, controller, trap, or helper read uses row 4 slot 10. The stored 7600 is preserved but no effect is claimed.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3327",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3382"
+          ]
+        },
+        "11": {
+          "label": "Auto charge-particle range",
+          "simple": "Sets the Auto variant's sub-effect finish distance.",
+          "technical": "Substitutes for slot 7 only when IsCursedEnergyAttack2AutoActive is true.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3345",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3352"
+          ]
+        },
+        "12": {
+          "label": "Auto shot fall speed",
+          "simple": "Sets how fast falling shots descend in the Auto variant.",
+          "technical": "Substitutes for default/Super descent speed when IsCursedEnergyAttack2AutoActive is true.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3382",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3386"
+          ]
+        },
+        "13": {
+          "label": "Auto shot spawn up offset",
+          "simple": "Raises Auto-variant shot spawns differently from the normal shot row.",
+          "technical": "Selected in place of slot 5 for the up component when IsCursedEnergyAttack2AutoActive is true.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3253",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3259"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "The three shot modes are distinguished by live Attack-layer action type, not by a field in this row.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:824",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:831"
+          ]
+        },
+        {
+          "text": "Super mode does not simply replace every value: it overrides particle speed, particle range, descent speed and aim range from other slots, while still using several row 4 positions.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3330",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3341",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3378"
+          ]
+        }
+      ]
+    },
+    "CN_122_ATTACKH_2": {
+      "title": "Normal shot timing and trails",
+      "overview": "This row is used when neither Super nor Auto is active. It staggers three charge pairs, waits between aiming and firing, and controls the falling shots and their ground trails.",
+      "values": {
+        "0": {
+          "label": "First charge-pair interval",
+          "simple": "Sets when the first charge effect pair appears.",
+          "technical": "GetShotInterval maps index 0 to this slot when Super is inactive; phase 1 spawns the first pair once ShotTimer is greater than the interval.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:57",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:819",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3071"
+          ]
+        },
+        "1": {
+          "label": "Second charge-pair interval",
+          "simple": "Sets when the second pair appears.",
+          "technical": "Same mapping for index 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:57",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:819",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3071"
+          ]
+        },
+        "2": {
+          "label": "Third charge-pair interval",
+          "simple": "Sets when the third pair appears.",
+          "technical": "Same mapping for index 2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:57",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:819",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3071"
+          ]
+        },
+        "3": {
+          "label": "Pre-aim wait",
+          "simple": "Pauses before shot groups are assigned to targets.",
+          "technical": "In sequence 2D8 phase 3 the non-Super wait is unique(3,5); the timer accumulates until it is greater than the wait.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3151",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3155"
+          ]
+        },
+        "4": {
+          "label": "Post-aim wait",
+          "simple": "Pauses after targets are marked and before shots fire.",
+          "technical": "Phase 4 non-Super wait compares Sequence2D8Timer with unique(4,5).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3246",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3250"
+          ]
+        },
+        "5": {
+          "label": "Shot fire interval",
+          "simple": "Sets the gap between falling-shot volleys.",
+          "technical": "Phase 5 non-Super interval; the code waits while Sequence2D8Timer < unique(5,5), so a volley fires at or after the interval.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3246",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3251"
+          ]
+        },
+        "6": {
+          "label": "Shot descent speed",
+          "simple": "Controls how fast falling shots move downward.",
+          "technical": "Default speed multiplied by DeltaTime along the negative up vector; Super and Auto substitute row6/row4 values.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3375",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3386"
+          ]
+        },
+        "7": {
+          "label": "Charge-particle rise speed",
+          "simple": "Controls how fast the charging sub-effects rise.",
+          "technical": "Default speed used by TickEffectPairs; Super and Auto have their own overrides.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3327",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3334"
+          ]
+        },
+        "8": {
+          "label": "Ground-trail speed",
+          "simple": "Controls how fast the eight ground trails slide forward.",
+          "technical": "Each trail moves along its own forward vector by unique(8,5)*DeltaTime before ground snapping.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3471",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3479"
+          ]
+        },
+        "9": {
+          "label": "Ground-trail lifetime",
+          "simple": "Controls how long ground trails remain.",
+          "technical": "Trails are finished and cleared when this lifetime is less than the shot's TrailTimer.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3447",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3453"
+          ]
+        },
+        "10": {
+          "label": "Trail height-step limit",
+          "simple": "Clamps how far a trail may jump vertically in one update.",
+          "technical": "When a trail is farther than this from its shot origin, an excessive Z difference is clamped to +/- this value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3472",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3491"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The stagger values are compared with strict < in phase 1 but with >= in phase 5; the inequalities were preserved from the traced source.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3071",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3251"
+          ]
+        },
+        {
+          "text": "A zero interval is still read. With this row's zeros, the wait stages pass after one positive timer increment rather than being skipped as null data.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3151",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3246"
+          ]
+        }
+      ]
+    },
+    "CN_122_ATTACKI_1": {
+      "title": "Super shot-sequence overrides",
+      "overview": "This row is selected while the Super Cursed Energy attack is active on the Attack layer. It supplies longer ranges, different timing, and faster shot motion for the same visual sequence.",
+      "values": {
+        "0": {
+          "label": "Super wave aim range",
+          "simple": "Extends the ground-wave aim distance in Super mode.",
+          "technical": "AimSequence240 chooses this instead of row3 slot 7 when IsSuperCursedEnergyAttackActive is true.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2362",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2363"
+          ]
+        },
+        "1": {
+          "label": "Super damage hold",
+          "simple": "Sets the long phase-7 duration in Super mode.",
+          "technical": "Used directly as the phase-7 Duration instead of the cursed-energy-level array from row3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2535",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2541"
+          ]
+        },
+        "2": {
+          "label": "Super particle finish distance",
+          "simple": "Lets Super charge particles rise farther before being finished.",
+          "technical": "Overrides the sub-effect distance check only in Super mode.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3341",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3352"
+          ]
+        },
+        "3": {
+          "label": "Super shot aim range",
+          "simple": "Sets how far Super shot groups may aim at targets.",
+          "technical": "Overrides row4 slot 9 in the per-group 3D distance clamp.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3188",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3192"
+          ]
+        },
+        "4": {
+          "label": "Super first pair interval",
+          "simple": "Sets the first Super charge-pair delay.",
+          "technical": "GCN_122_UnknownIndices2 is {4,5,6}; GetShotInterval selects this slot for index 0 while Super is active.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:58",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:817",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3071"
+          ]
+        },
+        "5": {
+          "label": "Super second pair interval",
+          "simple": "Sets the second Super charge-pair delay.",
+          "technical": "Same dynamic mapping for index 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:58",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:817",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3071"
+          ]
+        },
+        "6": {
+          "label": "Super third pair interval",
+          "simple": "Sets the third Super charge-pair delay.",
+          "technical": "Same dynamic mapping for index 2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:58",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:817",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3071"
+          ]
+        },
+        "7": {
+          "label": "Super pre-aim wait",
+          "simple": "Pauses before Super shot groups are aimed.",
+          "technical": "Overrides row5 slot 3 as phase-3 wait in Super mode.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3151",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3155"
+          ]
+        },
+        "8": {
+          "label": "Unresolved tuning value",
+          "simple": "A zero with no CN_122 read identified.",
+          "technical": "No traced reader uses row 6 slot 8. It is left unresolved rather than treated as a confirmed disable.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3246",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3327"
+          ]
+        },
+        "9": {
+          "label": "Super shot fire interval",
+          "simple": "Sets the gap between Super falling-shot volleys.",
+          "technical": "Overrides row5 slot 5 in the phase-5 timer gate.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3246",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3251"
+          ]
+        },
+        "10": {
+          "label": "Super shot descent speed",
+          "simple": "Controls how fast Super shots fall.",
+          "technical": "Overrides both the normal and Auto descent speeds in TickShots.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3378",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3386"
+          ]
+        },
+        "11": {
+          "label": "Super particle rise speed",
+          "simple": "Controls how fast Super charge sub-effects rise.",
+          "technical": "Overrides TickEffectPairs speed in Super mode.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3330",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3334"
+          ]
+        },
+        "12": {
+          "label": "Shikigami-5 pitch range",
+          "simple": "Limits the pitch of the final Super shikigami dive.",
+          "technical": "TickShikigamiHoming clamps pitch to [-90 - value, value - 90] degrees.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2217",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2218"
+          ]
+        },
+        "13": {
+          "label": "Unresolved tuning value",
+          "simple": "A zero with no CN_122 read identified.",
+          "technical": "No traced reader uses row 6 slot 13; no fallback behaviour is claimed.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2217",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3378"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "Switching between rows 5 and 6 happens through the live Attack-layer action type, checked separately for Super and Auto.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:824",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:831"
+          ]
+        },
+        {
+          "text": "The last Super volley also starts the shikigami-5 homing state, which is why slot 12 is read by the controller tick rather than the shot sequence itself.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3308",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:2217"
+          ]
+        }
+      ]
+    },
+    "CN_122_ATTACKI_2": {
+      "title": "Trap placement and lunge control",
+      "overview": "The first three values place TR_050_00 in front of the owner. The trap's delegated Uzumaki action then reads most of the remaining values through the spawner interface to control its aim, lunge and turn limits.",
+      "values": {
+        "0": {
+          "label": "Trap spawn forward offset (and shared plant override)",
+          "simple": "Moves the trap backward or forward when it is created.",
+          "technical": "Forward component added to the owner location when SpawnTrap050 places TR_050_00, before the root rotation is applied. Separately, the shared PlantRootMove trap action uses this slot as its Rise duration only when SpawnFlag == 1; CN_122 passes 0, so that override is not selected by its own spawn call.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3614",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3619",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3625",
+            "Source/Abrams/Private/GameTrapActionController.cpp:670",
+            "Source/Abrams/Private/GameTrapActionController.cpp:672"
+          ]
+        },
+        "1": {
+          "label": "Shared plant speed selector input",
+          "simple": "A zero slot with no direct CN_122 read.",
+          "technical": "No traced CN_122 or Uzumaki reader uses row 7 slot 1. The PlantRootMove code derives SpeedIndex 1 from cursed-energy level and then reads row0 slot1 instead, so that is not a read of this value.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:583",
+            "Source/Abrams/Private/GameTrapActionController.cpp:670"
+          ]
+        },
+        "2": {
+          "label": "Trap spawn right offset (and shared plant timer override)",
+          "simple": "Moves the trap sideways when it is created.",
+          "technical": "Right component of the TR_050_00 spawn location. Shared PlantRootMove also uses this slot as its initial countdown when SpawnFlag == 1, which CN_122 does not pass.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3615",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3619",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3625",
+            "Source/Abrams/Private/GameTrapActionController.cpp:583",
+            "Source/Abrams/Private/GameTrapActionController.cpp:584"
+          ]
+        },
+        "3": {
+          "label": "Uzumaki maximum lunge speed",
+          "simple": "Caps how fast the trap head travels.",
+          "technical": "Read as MaxSpeed and used as the upper bound of a speed lerp/clamp driven by DistanceAlpha; also used in the ease formula after the head passes the target.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1430",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1873",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1882"
+          ]
+        },
+        "4": {
+          "label": "Uzumaki post-target speed",
+          "simple": "Sets the head speed once it has passed the aim point.",
+          "technical": "Read as StartSpeed and assigned when Traveled exceeds Distance; a speed ease may then interpolate from this value toward MaxSpeed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1431",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1878",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1882"
+          ]
+        },
+        "5": {
+          "label": "Uzumaki minimum lunge speed",
+          "simple": "Sets the lower bound of the head speed.",
+          "technical": "Read as MinSpeed and used as both lerp input and clamp lower bound.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1433",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1873"
+          ]
+        },
+        "6": {
+          "label": "Uzumaki maximum distance",
+          "simple": "Sets the furthest valid head travel distance.",
+          "technical": "Read as MaxDistance and used as the upper clamp for Distance, as the denominator for DistanceAlpha and progress, and in the fade trigger.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1434",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1740",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1888"
+          ]
+        },
+        "7": {
+          "label": "Uzumaki overshoot distance",
+          "simple": "Lets the head travel a little beyond the aim point.",
+          "technical": "Added to Distance to form the hard cap on NewDistance; reaching it ends the lunge stage.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1436",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1892",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1894"
+          ]
+        },
+        "8": {
+          "label": "Uzumaki scale distance",
+          "simple": "Sets the distance over which the head reaches full size.",
+          "technical": "Denominator for Clamp(NewDistance / ScaleDistance, 0, 1), which scales the head mesh, attack offset and beam width.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1437",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1898",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1923"
+          ]
+        },
+        "9": {
+          "label": "Uzumaki aim delay",
+          "simple": "Controls when the trap finishes aiming and begins its lunge.",
+          "technical": "The aim branch waits while Timer <= AimDelay; once it fires, the turn ease duration is AimDelay - Timer.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1438",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1737",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1848"
+          ]
+        },
+        "10": {
+          "label": "Base animation delay",
+          "simple": "Holds the base animation before the head appears.",
+          "technical": "State 1 waits while Timer <= Unique10Row7 before playing AttackA_01_01.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1439",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1712",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1717"
+          ]
+        },
+        "11": {
+          "label": "Aim pitch-up limit",
+          "simple": "Allows the trap head to turn above its starting pitch.",
+          "technical": "Upper bound is StartRotation.Pitch + unique(11,7) degrees.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1855",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1858"
+          ]
+        },
+        "12": {
+          "label": "Aim pitch-down limit",
+          "simple": "Allows the trap head to turn below its starting pitch.",
+          "technical": "Lower bound is StartRotation.Pitch - unique(12,7) degrees.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1856",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1858"
+          ]
+        },
+        "13": {
+          "label": "Aim yaw range",
+          "simple": "Limits left/right aiming from the starting yaw.",
+          "technical": "Yaw is clamped to StartRotation.Yaw +/- unique(13,7) degrees and roll is forced to zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1857",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1859"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "The trap forwards its spawner as the source interface, so these reads are CN_122 character rows even though the code lives in the shared trap action.",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapManager.cpp:99",
+            "Source/Abrams/Private/GameTrap.cpp:130",
+            "Source/Abrams/Private/GameTrapActionController.cpp:182"
+          ]
+        },
+        {
+          "text": "CN_122 initializes the trap with SpawnFlag 0; the PlantRootMove overrides at slots 0 and 2 are therefore documented as shared logic, not as part of this trap's normal path.",
+          "evidence": [
+            "Source/Abrams/Private/CN_122_ActionController.cpp:3625",
+            "Source/Abrams/Private/GameTrapActionController.cpp:583",
+            "Source/Abrams/Private/GameTrapActionController.cpp:670"
+          ]
+        }
+      ]
+    },
+    "CN_122_ATTACKI_3": {
+      "title": "Uzumaki trap appearance and motion",
+      "overview": "This entire row is read by the delegated Uzumaki trap action: fade timing, collision size, decal growth, animation blending and its distance-based speed/animation mapping.",
+      "values": {
+        "0": {
+          "label": "Fade start ratio",
+          "simple": "Chooses when the trap begins fading during the lunge.",
+          "technical": "Phase 1 starts when NewDistance > Distance / MaxDistance * FadeStartRatio.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1441",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1888",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1998"
+          ]
+        },
+        "1": {
+          "label": "Fade duration",
+          "simple": "Sets how long the dither and Niagara fade take.",
+          "technical": "Passed to FadeDitherAlpha and used as the linear FadeEase duration.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1442",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1998",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1999"
+          ]
+        },
+        "2": {
+          "label": "Beam endpoint extension",
+          "simple": "Controls how far the beam reaches beyond the head position.",
+          "technical": "BeamEndPoint.X = Scale * unique(2,8) * Clamp(Distance/MaxDistance,0,1) + NewDistance; the same value drives beam collision extent.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1440",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1920",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1935"
+          ]
+        },
+        "3": {
+          "label": "Minimum collision radius",
+          "simple": "Sets the reset capsule size and the lower clamp for attacking capsules.",
+          "technical": "Used as both radius and half-height when resetting Attack_body/NullifiesDamage capsules, and as MinRadius in Clamp(HalfLength, MinRadius, MaxRadius).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1538",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1964",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1966"
+          ]
+        },
+        "4": {
+          "label": "Maximum collision radius",
+          "simple": "Caps the attacking capsule radius.",
+          "technical": "Used as MaxRadius in the same clamp.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1965",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1966"
+          ]
+        },
+        "5": {
+          "label": "Near-target animation rate",
+          "simple": "Sets one end of the head animation playback-rate interpolation.",
+          "technical": "Unique5Row8 is the first Lerp endpoint and the clamp lower bound; because the second endpoint is slot 13, the minimum rate is this value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1444",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1745"
+          ]
+        },
+        "6": {
+          "label": "Trap animation blend time",
+          "simple": "Sets how quickly the base and head animations blend.",
+          "technical": "Passed as BlendInTime to AttackA_01_01 and AttackA_01_02.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1446",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1717",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1732"
+          ]
+        },
+        "7": {
+          "label": "Turn start delay",
+          "simple": "Waits before the trap head starts turning toward the target.",
+          "technical": "TurnEase.Start is called only when Timer >= TurnDelay.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1447",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1838"
+          ]
+        },
+        "8": {
+          "label": "Aim height offset",
+          "simple": "Raises the target point used to aim the trap head.",
+          "technical": "Added to the secondary target's Z before computing the aim rotation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1842",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1843"
+          ]
+        },
+        "9": {
+          "label": "Decal length scale",
+          "simple": "Controls how long the beam decal grows.",
+          "technical": "DecalLength = Scale * DecalScale + NewDistance; half of it is assigned to the decal Z size.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1448",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1918",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1942"
+          ]
+        },
+        "10": {
+          "label": "Niagara fade delay",
+          "simple": "Delays the beam fade after the trap starts disappearing.",
+          "technical": "FadeEase.Update is only called once FadeTimer >= FadeDelay.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1443",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2010",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2012"
+          ]
+        },
+        "11": {
+          "label": "Minimum aim distance",
+          "simple": "Sets the near clamp for the trap-to-target distance.",
+          "technical": "Used as the lower bound for Distance and DistanceAlpha, which in turn drive animation rate and lunge speed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1435",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1740",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1741"
+          ]
+        },
+        "12": {
+          "label": "Minimum lunge speed",
+          "simple": "Lower-bounds the interpolated head speed.",
+          "technical": "Read as MinSpeed and used with row7 slot3 MaxSpeed in the speed lerp/clamp.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1432",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1873"
+          ]
+        },
+        "13": {
+          "label": "Far-target animation rate",
+          "simple": "Sets the other end of the head animation playback-rate interpolation.",
+          "technical": "Unique13Row8 is the second Lerp endpoint and the clamp upper bound.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1445",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1745"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "All fourteen slots in this row have a traced read in FGameTrapAction_Uzumaki; none is merely reserved by a zero value.",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1430",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1448"
+          ]
+        },
+        {
+          "text": "DistanceAlpha ties several values together: row8 slot11 and row7 slot6 define the distance range, which feeds both head animation rate and lunge speed.",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1741",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1745",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1873"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "The nine row IDs are loaded in this exact order from CharacterDataTable.Id_CharacterUnique; the accessor then indexes that array without checks, so a wrong dynamic row index reads a different row rather than returning null.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:561",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Tools/verify/CHAR/UniqueRowsInline.md:17"
+      ]
+    },
+    {
+      "text": "Cursed-energy level is a base-controller value initialized to 1 and kept clamped to 3; CN_122 uses Level-1 to index three-entry arrays for ground-wave damage rows, shot effects and the level-specific phase-7 hold.",
+      "evidence": [
+        "Source/Abrams/Public/GameCharacterActionController.h:184",
+        "Source/Abrams/Public/GameCharacterActionController.h:604",
+        "Source/Abrams/Private/CN_122_ActionController.cpp:2539",
+        "Source/Abrams/Private/CN_122_ActionController.cpp:2639",
+        "Source/Abrams/Private/CN_122_ActionController.cpp:3261"
+      ]
+    },
+    {
+      "text": "The shikigami forwarding helper always requests Summon (Value68 = 1) before the attack, and fills Value64 from a character unique row. Do not read the shikigami's own unique-float calls as CN_122 rows: summons load their own ShikigamiUnique rows.",
+      "evidence": [
+        "Source/Abrams/Private/CN_122_ActionController.cpp:1124",
+        "Source/Abrams/Private/CN_122_ActionController.cpp:1130",
+        "Source/Abrams/Public/GameShikigamiActionController.h:47",
+        "Source/Abrams/Private/GameShikigami.cpp:872"
+      ]
+    },
+    {
+      "text": "TR_050_00 is spawned with SpawnFlag 0 and its spawner as source interface; the Uzumaki action therefore reads CN_122 rows 7 and 8 through GetUniqueFloat forwarding.",
+      "evidence": [
+        "Source/Abrams/Private/CN_122_ActionController.cpp:3621",
+        "Source/Abrams/Private/CN_122_ActionController.cpp:3625",
+        "Source/Abrams/Private/GameTrapManager.cpp:103",
+        "Source/Abrams/Private/GameTrap.cpp:130",
+        "Source/Abrams/Private/GameTrapActionController.cpp:182"
+      ]
+    },
+    {
+      "text": "The controller refuses a second special while its relevant sequence is active; Super additionally waits for the trap. This gates when the row-driven sequences can restart.",
+      "evidence": [
+        "Source/Abrams/Private/CN_122_ActionController.cpp:874",
+        "Source/Abrams/Private/CN_122_ActionController.cpp:889"
+      ]
+    },
+    {
+      "text": "AI uses the same controller state: below 40 percent HP it can advance a think phase only after the secondary target has been assigned, which happens on the CN_122_ATTACKI_02_02 damage row.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:973",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:984",
+        "Source/Abrams/Private/CN_122_ActionController.cpp:913"
+      ]
+    },
+    {
+      "text": "The behavior controller holds CursedEnergyAttack_2 input only while that attack is active and no opponent is within 2000 world units, using a stricter target rule at brain level 6 or below.",
+      "evidence": [
+        "Source/Abrams/Private/CN_122_BehaviorController.cpp:23",
+        "Source/Abrams/Private/CN_122_BehaviorController.cpp:43",
+        "Source/Abrams/Private/CN_122_BehaviorController.cpp:61"
+      ]
+    },
+    {
+      "text": "Verification records show several of these exact bodies still have byte-match differences; the JSON therefore records traced control flow, not a claim that every reconstructed body is byte-identical to retail.",
+      "evidence": [
+        "Tools/verify/CHAR/CN_122_ActionController.md:1",
+        "Tools/verify/CHAR/UniqueRowsInline.md:1"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,402 @@
+{
+  "overview": "Kechizu’s unique settings control how many hits an attack can land, how far his beams reach, and how high and far he leaps.",
+  "technicalOverview": "Kechizu (CN_081) is a non-selectable, non-playable character with his own action controller, bone controller and AI think node. His character row points Id_CharacterUnique at five rows named CN_080*, all from CharacterUniqueDataTable5; those names are inherited from related CN_080 data and do not mean the CN_080 shikigami controller reads them. Four rows carry all of the character-specific numbers: a normal-attack hit quota, a cursed-energy beam length, a ballistic leap (height/gravity/distance), and the super attack's charge time and beam length. After setup, each float is read as UniqueRows[RowIndex]->FloatValue[ValueIndex] through FGameCharacterAction::GetOwnerUniqueFloat(ValueIndex, RowIndex), with no bounds check; only the five non-None rows of the list are valid.",
+  "rows": {
+    "CN_080": {
+      "title": "General row (all zeros)",
+      "overview": "Row 0 of CN_081's unique list, named CN_080. All fourteen floats are zero. No CN_081-specific reader of this row was found; the only reconstructed readers of row 0 are generic helpers whose wiring belongs to other characters.",
+      "values": {
+        "0": {
+          "label": "Generic row-0 turn/charge base",
+          "simple": "A zero placeholder here; none of Kechizu's own attacks or AI is known to use it.",
+          "technical": "Generic reads of UniqueRows[0]->FloatValue[0] exist but are not wired to CN_081 in the reconstructed source: UGameCharacterActionController::SteerTowardSecondaryTarget uses it as the divisor for a turn angle and forces a zero turn time when it is not greater than 0, and its only reconstructed callers are the CN_041 and CN_140 controllers; FGameCharacterAIAction_CursedEnergyAttack1Hold/2Hold Reset uses it as a base hold duration, but those AI actions are created by CP_040's behavior controller; FGameCharacterAction_ProjectionSorceryReceive::Tick uses it as a restraint-time fallback only when the damage row is null. UCN_081_ActionController's CreateAction falls through to the base factory for all of these action types, so no CN_081 path is established. The stored value is 0.0.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/CN_041_ActionController.cpp:391",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:97",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:118",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:129",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:11",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:484"
+          ]
+        },
+        "1": {
+          "label": "Generic level-scaled CE1 hold base",
+          "simple": "Zero in the data; only another character's AI hold action is known to read this slot.",
+          "technical": "FGameCharacterAIAction_CursedEnergyAttack1Hold::Reset sets Duration = UniqueRows[0]->FloatValue[0] + UniqueRows[0]->FloatValue[1] * CursedEnergyLevel. That AI action is instantiated by CP_040's behavior controller (case 0x11); no CN_081 behavior/AI wiring to it was found, so the read is not established for Kechizu.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:119",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+            "Source/Abrams/Private/CNControllerRegistrationHelpers.cpp:37"
+          ]
+        },
+        "2": {
+          "label": "Generic level-scaled CE2 hold base",
+          "simple": "Zero in the data; only another character's AI hold action is known to read this slot.",
+          "technical": "FGameCharacterAIAction_CursedEnergyAttack2Hold::Reset sets Duration = UniqueRows[0]->FloatValue[0] + UniqueRows[0]->FloatValue[2] * CursedEnergyLevel. That AI action is instantiated by CP_040's behavior controller (case 0x13); CP_050 uses a separate fixed 2-second variant instead, and no CN_081 wiring was found.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:123",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:130",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:11",
+            "Source/Abrams/Private/CP_050_BehaviorController.cpp:11"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The row name CN_080 is inherited data naming, not a shared runtime table with the shikigami: AGameCharacter builds UniqueRows from Id_CharacterUnique, while AGameShikigami builds its own UniqueRows from Id_ShikigamiUnique / ShikigamiUniqueDataTables. Chasing CN_080's shikigami readers (rows 0/3/4 there) would misattribute values to Kechizu.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:559",
+            "Source/Abrams/Private/GameShikigami.cpp:870",
+            "Source/Abrams/Private/GameShikigami.cpp:1251",
+            "Source/Abrams/Public/CN_080_ActionController.h:7"
+          ]
+        }
+      ]
+    },
+    "CN_080_ATTACKF": {
+      "title": "Normal attack 2 (AttackF) settings",
+      "overview": "Row 1, used by Kechizu's second normal attack (action type NormalAttack_2); only its first float is read.",
+      "values": {
+        "0": {
+          "label": "Hits needed on the secondary target",
+          "simple": "How many hits on the second target are needed before the dash-inertia and the AttackF follow-up trigger; set to 4 here.",
+          "technical": "FCN_081_NormalAttack_2::OnAttackHit first calls the base handler; then, only when the owner's secondary target is valid, Receiver is that target's game-actor interface, Phase is nonzero and ActionHomingRow is non-null, it increments HitCount1FC and tests (float)HitCount1FC >= UniqueRows[1]->FloatValue[0] (inclusive, >= not >). At or above 4.0 it sets bHitQuotaReached, applies the homing row's inertia (Inertia_Rate, Inertia_Time, EaseOut, bFollowGroundEnabled, false), calls ResetState4B8, disables all clashing collisions, clears flag 159, calls ActivateAttack(true) and sets Phase to 0. HitCount1FC and bHitQuotaReached are cleared below the first start (start count <= 0). A zero or negative value would be met by the first qualifying hit; the comparison is float-versus-counter, not a time.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_081_ActionController.cpp:41",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:49",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:50",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:52",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:58",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:29",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:207"
+          ]
+        }
+      },
+      "untraced": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The follow-up animation is played from a different slot: on start count 1 with bHitQuotaReached still 0, slot 145 plays AttackF_01_02; reaching the quota suppresses it because the threshold branch sets bHitQuotaReached first.",
+          "evidence": [
+            "Source/Abrams/Private/CN_081_ActionController.cpp:204",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:207",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:50"
+          ]
+        }
+      ]
+    },
+    "CN_080_ATTACKJ": {
+      "title": "Cursed energy attack 1 (AttackJ) beam settings",
+      "overview": "Row 2, used by the ground and air CursedEnergyAttack_1 beam; only its first float is read.",
+      "values": {
+        "0": {
+          "label": "Beam reach",
+          "simple": "Starting length of the curse beam: 1000 world units before a hit shortens it; the same value is reused on every tick.",
+          "technical": "When slot 43 sees the timed effect whose effect row Id is FX_CN_081_07101 and no beam is stored yet, the action stores it and calls UCN_081_ActionController::UpdateBeamEffect(BeamEffect, UniqueRows[2]->FloatValue[0]). Slot 131 repeats that call each tick while the beam is valid and unfinished; slot 132 finishes with the trailing beam instead. UpdateBeamEffect returns -1.0 for an invalid beam, otherwise traces from the beam's location along its facing for this length, shortens it to Hit.Distance + 1.0 at the first hit that fails EffectPassesContact, writes BeamEndPoint to the Niagara components, sets each collision capsule's half-length to length * 0.5 and its radius from the capsule scale, hits destructible meshes in a box around the end, and returns the final length into BeamRate200. The 1000.0 is therefore an initial/max trace distance, not a guaranteed final beam length; no unit conversion is applied, so it is in the game's world-distance units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_081_ActionController.cpp:283",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:290",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:297",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:310",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:222",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:229",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:244",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:262"
+          ]
+        }
+      },
+      "untraced": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "When the beam effect finishes (bFinished3D5 == 1) or the attack ends, Kechizu spawns FX_CN_080_07102 at the old beam's transform and attaches it to the owner's Head socket, carrying the last traced length in BeamEndPoint. This is a CN_080-named effect reused by the CN_081 character, not the shikigami's attack.",
+          "evidence": [
+            "Source/Abrams/Private/CN_081_ActionController.cpp:302",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:329",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:332",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:337",
+            "Tools/verify/CHAR/CN_081_ActionController.md:75"
+          ]
+        }
+      ]
+    },
+    "CN_080_ATTACKK": {
+      "title": "Cursed energy attack 2 (AttackK) leap settings",
+      "overview": "Row 3: the first three floats solve Kechizu's leaping attack; another four are read only by a generic attacker-side stun rule that Kechizu's own data does not invoke.",
+      "values": {
+        "0": {
+          "label": "Leap height",
+          "simple": "Base height of the jumping cursed-energy attack, used as 2000 before the target's height is folded in.",
+          "technical": "FCN_081_CursedEnergyAttack_2::GetLaunchHeight returns UniqueRows[3]->FloatValue[0] (slot 146). On the second start of the attack (start count == 1), StartAttackHoming reads the target vector, computes HeightDelta = owner Z - target Z, and sets Height = this value + HeightDelta only when HeightDelta > 0 or Height + HeightDelta >= 0 (inclusive lower bound); otherwise HeightDelta is reset to 0 and the base height stands. The resulting Height, target distance and gravity feed GameAnimNotify_LaunchSpeed and GameAnimNotify_LaunchAngle; their results are split into vertical and horizontal velocity for the per-tick movement. Start count other than 1 leaves the leap flags/velocities at their defaults.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Public/CN_081_Actions.h:114",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:96",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:100",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:105",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:106",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:116",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:62"
+          ]
+        },
+        "1": {
+          "label": "Leap gravity",
+          "simple": "How strongly the leap is pulled back down; used as 12000 in the launch solve and each tick.",
+          "technical": "FCN_081_CursedEnergyAttack_2::GetLaunchGravity returns UniqueRows[3]->FloatValue[1] (slot 147). It is passed as the Gravity argument to GameAnimNotify_LaunchSpeed and GameAnimNotify_LaunchAngle on the leap's second start (those helpers use 2*Gravity to solve the arc), and on every later tick while start count == 1 the vertical velocity HomingFloat200 is reduced by this value * DeltaTime. The animation AttackK_01_02 plays on the tick where vertical velocity crosses from >= 0 to < 0; flag 159 is raised once vertical velocity is <= 0 and the ground trace hit is set.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Public/CN_081_Actions.h:115",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:116",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:117",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:137",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:138",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:142",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:64"
+          ]
+        },
+        "2": {
+          "label": "Leap distance cap",
+          "simple": "The farthest horizontal distance the leap solve will use: 4000 world units.",
+          "technical": "FCN_081_CursedEnergyAttack_2::GetLaunchMaxDistance returns UniqueRows[3]->FloatValue[2] (slot 148). On the leap's second start the 2-D distance from the owner to the target is clamped with FMath::Clamp(Distance, 0.0, this value), so 4000 is an inclusive upper bound; the clamped distance, not the raw distance, is passed to GameAnimNotify_LaunchSpeed/Angle. This affects both the launch speed and the launch angle, hence the split horizontal/vertical velocity; it does not by itself gate whether the leap starts.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Public/CN_081_Actions.h:116",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:114",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:115",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:67",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:78"
+          ]
+        },
+        "5": {
+          "label": "Generic close-range stun time",
+          "simple": "Zero here; only read when some other character stuns someone with this character as the attacker.",
+          "technical": "FGameCharacterAction_JugonStunReceive::Start reads the ATTACKER's UniqueRows[3]->FloatValue[5] as TimeNear and interpolates it with values 6/7/8 by attacker-to-victim distance. None of CN_081's own damage rows uses EGameDamageType::JugonStun in the public export, and no CN_081 attack requests that action, so this reader is not established for Kechizu even though the generic code exists. The stored value is 0.0.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:269",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:279",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:283",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:869",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:468"
+          ]
+        },
+        "6": {
+          "label": "Generic long-range stun time",
+          "simple": "Zero here; only used by the generic Jugon stun receiver for the attacker.",
+          "technical": "FGameCharacterAction_JugonStunReceive::Start reads the attacker's UniqueRows[3]->FloatValue[6] as TimeFar, used when distance > value 7, or in the linear blend between value 8 and value 7. No CN_081 attack data or action path requesting Jugon stun was identified; stored value is 0.0.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:280",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:288",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:295"
+          ]
+        },
+        "7": {
+          "label": "Generic stun far-distance boundary",
+          "simple": "Zero here; only used by the generic Jugon stun receiver for the attacker.",
+          "technical": "FGameCharacterAction_JugonStunReceive::Start reads the attacker's UniqueRows[3]->FloatValue[7] as DistanceFar; a victim farther than this gets TimeFar, and equal-to value 8 short-circuits to TimeNear. No CN_081 attacker path for this action was identified; stored value is 0.0.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:281",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:283",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:288"
+          ]
+        },
+        "8": {
+          "label": "Generic stun near-distance boundary",
+          "simple": "Zero here; only used by the generic Jugon stun receiver for the attacker.",
+          "technical": "FGameCharacterAction_JugonStunReceive::Start reads the attacker's UniqueRows[3]->FloatValue[8] as DistanceNear; a victim nearer than this gets TimeNear and the in-between band interpolates toward value 7. No CN_081 attacker path for this action was identified; stored value is 0.0.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:282",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:290",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:293"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The leap is a two-start move: slot 130 solves it only on start count 1 and sets bLaunched1F8, which slot 22 (IsGrounded) returns; slot 131 then flies the solved vector, plays AttackK_01_02 at the apex and raises flag 159 once descending while grounded.",
+          "evidence": [
+            "Source/Abrams/Public/CN_081_Actions.h:100",
+            "Source/Abrams/Public/CN_081_Actions.h:119",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:99",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:126",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:133",
+            "Tools/verify/CHAR/CN_081_ActionController.md:22"
+          ]
+        }
+      ]
+    },
+    "CN_080_ATTACKL": {
+      "title": "Super cursed energy attack (AttackL) settings",
+      "overview": "Row 4: the first float times the charge, the second sizes the super beam; the rest are zero and unread by CN_081.",
+      "values": {
+        "0": {
+          "label": "Super charge duration",
+          "simple": "How long the charged super attack waits before raising its finish flag: 3.1 seconds here.",
+          "technical": "TCN_081_SuperCursedEnergyAttack::TickAttack (slot 131) takes the base tick for every start count except 1. On start count 1 it adds DeltaTime to ActionElapsedTime and raises flag 159 as soon as UniqueRows[4]->FloatValue[0] <= ActionElapsedTime (inclusive, <=). Since the timer accumulates DeltaTime, the value is in seconds. The first start also zeroes cursed energy and adds the owner as a focus candidate when the super-event count is <= 0; slot 132 requests the event state on the same count. The charge value does not itself set those event states and is not clamped.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_081_ActionController.cpp:395",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:397",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:403",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:404",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:406",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:378",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:386"
+          ]
+        },
+        "1": {
+          "label": "Super beam reach",
+          "simple": "Starting length of the super beam, 3500 world units, reused on every tick of the beam.",
+          "technical": "When slot 43 sees FX_CN_081_09101 and no super beam is stored, TCN_081_SuperCursedEnergyAttack stores it and calls UCN_081_ActionController::UpdateBeamEffect(BeamEffect, UniqueRows[4]->FloatValue[1]); slot 131 and slot 132 make the same call while the beam is alive. As for row 2, UpdateBeamEffect traces that far from the effect's location along its facing, shortens to Hit.Distance + 1.0 at the first non-passing effect hit, pushes the result into BeamEndPoint, capsule half-length and the destructible box, and stores it in BeamRate200 for the trailing FX_CN_081_09102 spawned at the Head. 3500 is a starting/trace ceiling rather than the guaranteed final length.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_081_ActionController.cpp:353",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:355",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:360",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:409",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:419",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:222",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:443",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:452"
+          ]
+        }
+      },
+      "untraced": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The super action is one of CN_090's shared bodies for camera gating, first-start focus setup and event-state stepping, but the charge and beam values are CN_081's own slot overrides; do not attribute CN_090's unique rows here.",
+          "evidence": [
+            "Source/Abrams/Private/CN_081_ActionController.cpp:365",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:376",
+            "Source/Abrams/Private/CN_081_ActionController.cpp:424",
+            "Tools/verify/CHAR/CN_081_ActionController.md:24"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Controller and AI are dedicated to CN_081: the character row selects EGameCharacterActionControllerType::CN_081 and AI type CN_081, and the game creates UCN_081_ActionController, UCN_081_BoneController and FGameCharacterAIThinkNode_CN_081. The bone controller only overrides ankle/head bone lookup and leaves the lean, aim-offset and foot-bend hooks empty; no unique-float reads were found in it.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:619",
+        "Source/Abrams/Private/GameCharacter.cpp:759",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:195",
+        "Source/Abrams/Private/CN_081_BoneController.cpp:5"
+      ]
+    },
+    {
+      "text": "Control quirks: the controller refuses Guard, GuardAir and NormalAttackAir_2, refuses tag combos and revival buffs, allows a cursed technique only at a full gauge unless the gauge check is ignored, and permits only situation voice index 1. Its CreateAction override supplies six action types and delegates every other type to the base factory. Its classes override slots 8/22/32/36/130/131/145 (normal 2), 43/131/132 (beam), 130/131 and 146-148 (leap) and 43/70/130/131/132 (super).",
+      "evidence": [
+        "Source/Abrams/Private/CN_081_ActionController.cpp:468",
+        "Source/Abrams/Private/CN_081_ActionController.cpp:492",
+        "Source/Abrams/Private/CN_081_ActionController.cpp:506",
+        "Source/Abrams/Private/CN_081_ActionController.cpp:516",
+        "Source/Abrams/Private/CN_081_ActionController.cpp:527",
+        "Tools/verify/CHAR/CN_081_ActionController.md:20"
+      ]
+    },
+    {
+      "text": "Both beams share the general beam trace object list with CN_080/CP_190 and hook AGameEffect's private finished flag; the verification record lists the friend grant and the beam helpers as still needing transcription in that lane, so runtime descriptions of the short circuits come from the reconstructed readers and their decoded RVAs, not from a claim that every helper is byte-matched.",
+      "evidence": [
+        "Source/Abrams/Private/CN_081_ActionController.cpp:216",
+        "Source/Abrams/Private/CN_081_ActionController.cpp:221",
+        "Source/Abrams/Public/GameEffect.h:31",
+        "Tools/verify/CHAR/CN_081_ActionController.md:68",
+        "Tools/verify/CHAR/CN_081_ActionController.md:81"
+      ]
+    },
+    {
+      "text": "Reconstruction caveat: the CN_081 verification note (2026-10-26) records 0 registered action types and two obj-exact bodies that are absent from the Shipping link because /OPT:REF drops them; the current reconstructed source does have a CreateAction override with six cases. The row/value readings above follow the traced retail slots and source readers, but linkage/registration status in our build should not be read as a gameplay fact.",
+      "evidence": [
+        "Tools/verify/CHAR/CN_081_ActionController.md:16",
+        "Tools/verify/CHAR/CN_081_ActionController.md:38",
+        "Tools/verify/CHAR/CN_081_ActionController.md:117",
+        "Source/Abrams/Private/CN_081_ActionController.cpp:468"
+      ]
+    },
+    {
+      "text": "Accessor mechanics: MakeUniqueCameraRequest (mode 2) would read value indices 0 through 10 of its RowIndex, value 7 selecting FOV easing, but no CN_081 action or controller call site was found. Trap forwarding similarly reads a trap source's entire unique row, yet CN_081's character row has all trap slots set to None. Neither path is counted as a read of Kechizu's values.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction.cpp:941",
+        "Source/Abrams/Private/GameCharacterAction.cpp:953",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Tools/verify/CHAR/UniqueRowsInline.md:19"
+      ]
+    }
+  ]
+}

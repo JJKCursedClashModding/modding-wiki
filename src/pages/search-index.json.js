@@ -1,4 +1,5 @@
 import { blueprintHref, blueprints, categoryNames, enumHref, enums, fieldAnchor, groups, hrefFor, valueAnchor } from '../data.js';
+import { characterHref, characters, uniqueRowAnchor, uniqueValueAnchor } from '../characters.js';
 
 export function GET() {
   const tables = groups.flatMap((group) => {
@@ -28,5 +29,18 @@ export function GET() {
         [field.simple, field.technical].join(' ')]),
     ];
   });
-  return new Response(JSON.stringify([...tables, ...enumEntries, ...blueprintEntries]), { headers: { 'Content-Type': 'application/json' } });
+  const characterEntries = characters.flatMap((record) => {
+    const href = characterHref(record.id);
+    return [
+      [record.name, `Character · ${record.id}`, href, [record.storyName, record.overview, record.technicalOverview, record.controller].join(' ')],
+      ...record.rows.flatMap((row) => [
+        [row.key, `${record.name} · ${row.title}`, `${href}#${uniqueRowAnchor(row.index)}`, row.overview ?? ''],
+        ...row.slots.filter((slot) => slot.label).map((slot) => [
+          slot.label, `${record.name} · ${row.key} [${slot.index}]`, `${href}#${uniqueValueAnchor(row.index, slot.index)}`,
+          [slot.simple, slot.technical].join(' '),
+        ]),
+      ]),
+    ];
+  });
+  return new Response(JSON.stringify([...tables, ...enumEntries, ...blueprintEntries, ...characterEntries]), { headers: { 'Content-Type': 'application/json' } });
 }

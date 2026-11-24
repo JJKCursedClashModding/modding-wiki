@@ -1,0 +1,1060 @@
+{
+  "overview": "Eso & Kechizu’s settings tune summon orders, the decay beam, and its cameras. Solo Eso shares these rows.",
+  "technicalOverview": "Eso & Kechizu (CP_160) is a playable death-painting character whose kit is built around one summoned shikigami (CN_080) and a rot/decay branch. The character row points at nine unique-table slots; seven are populated here (main tuning, shikigami-command tuning, decay-beam tuning, decay range/upkeep, and three decay-shot camera rows) and the last two are empty. All traced reads go through AGameCharacter::GetCharacterUniqueFloatValue / FGameCharacterAction::GetOwnerUniqueFloat, which dereference UniqueRows[RowIndex]->FloatValue[ValueIndex] without bounds checks; UniqueRows is built in the order of CharacterDataTable.Id_CharacterUnique. The traced readers include the CP_160 controller, its action classes, and the shared helpers they call. A zero is not itself evidence that a slot is unused: indices under \"untraced\" simply had no CP_160 read identified after searching the source, and the nonzero slot 6 of CP_160_ATTACKG is called out explicitly as unresolved.",
+  "rows": {
+    "CP_160": {
+      "title": "Eso & Kechizu - main tuning row",
+      "overview": "General settings for the summon: how close CN_080 must stay, how fast automatic and manual shikigami orders fire, their reach and lifetimes, and the energy cost of the manual order.",
+      "values": {
+        "0": {
+          "label": "Beam growth speed multiplier",
+          "simple": "When the shikigami is missing or still alive, the decay beam grows about 1.65 times faster; once the shikigami is defeated, growth is normal.",
+          "technical": "AddBeam starts Factor at 1.0 and replaces it with UniqueRows[0]->FloatValue[0] only when GetShikigami(0) is null OR that shikigami's IsDefeated() returns false (alive). A defeated shikigami leaves Factor at 1.0. The stored Entry.Rate is Factor * Rate; TickBeams advances Progress by the time-scaled tick times that Rate.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:704",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:706",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:707",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:708",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:710",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:717",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1340"
+          ]
+        },
+        "1": {
+          "label": "Summon leash / auto-order distance",
+          "simple": "The summon will not attack on its own if it drifts more than 1200 units from Eso; the same distance limits which enemies can be chosen.",
+          "technical": "TickAutoAttack reads UniqueRows[0]->FloatValue[1] as Range. It requires the owner-to-shikigami Delta.Size() <= Range (skips when > Range), and filters opponent characters by Distance > Range from the owner. Equality passes both checks; there is no negative/unlimited special case on this value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1415",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1418",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1436",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1437"
+          ]
+        },
+        "2": {
+          "label": "Auto-order wind-up time",
+          "simple": "After a target is found, the automatic shikigami order waits about 1.25 seconds before it is issued.",
+          "technical": "TickAutoAttack adds the time-scaled tick to AutoAttackTime once a valid target exists and returns while UniqueRows[0]->FloatValue[2] > AutoAttackTime. The order fires on the first tick with AutoAttackTime >= 1.25; the timer is then zeroed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1386",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1457",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1458",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1462"
+          ]
+        },
+        "3": {
+          "label": "Auto-order cooldown",
+          "simple": "Once the shikigami has been ordered automatically, about 4 seconds pass before the next automatic order.",
+          "technical": "AutoAttackCooldown is assigned UniqueRows[0]->FloatValue[3] when the order is placed; each tick subtracts the scaled DeltaTime while it is > 0, and the start gate `!(AutoAttackCooldown <= 0)` blocks until it is zero or negative. On shikigami summon-cooldown restart it is instead set to -1.0f, bypassing the wait.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1387",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1389",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1419",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1475",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1080"
+          ]
+        },
+        "4": {
+          "label": "Auto-order trigger radius",
+          "simple": "A normal auto-order tells CN_080 to commit to its queued attack once it is within 500 units of the target.",
+          "technical": "TickAutoAttack reads UniqueRows[0]->FloatValue[4] into Value194 and passes it as the third argument of UCN_080_ActionController::SetTargetMode(2, Action, Value194, Value198, -1.0f). Traced into SetTargetMode: Value194 becomes QueuedActionRadius; CN_080::ActionTick compares squared shikigami-to-target distance against radius*radius (a negative radius disables the trigger).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1464",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1474",
+            "Source/Abrams/Private/CN_080_ActionController.cpp:588",
+            "Source/Abrams/Private/CN_080_ActionController.cpp:643"
+          ]
+        },
+        "5": {
+          "label": "Auto-order mode time limit",
+          "simple": "A normal auto-order keeps its follow/target mode for about 3 seconds.",
+          "technical": "TickAutoAttack reads UniqueRows[0]->FloatValue[5] into Value198 (fourth SetTargetMode argument). SetTargetMode stores it as TargetModeTimeLimit; CN_080::ActionTick counts it down while >= 0 and calls ResetTargetMode when it drops below zero and no attack is active.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1465",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1474",
+            "Source/Abrams/Private/CN_080_ActionController.cpp:589",
+            "Source/Abrams/Private/CN_080_ActionController.cpp:627"
+          ]
+        },
+        "6": {
+          "label": "Manual-order distance (neutral stick)",
+          "simple": "Holding the manual-order key with no stick direction works only while the summon is within 1200 units of Eso.",
+          "technical": "TickOrderAttack reads UniqueRows[0]->FloatValue[6] as Range and returns when `Range >= 0 && Delta.Size() > Range`, with Delta measured from the shikigami to the owner. Negative values would skip the distance gate entirely; with 1200, equality passes and larger distances refuse the order.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1516",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1522",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1523"
+          ]
+        },
+        "7": {
+          "label": "Manual-order trigger radius (stick up)",
+          "simple": "With the stick held up, the manual order commits CN_080 to its heavy attack within 750 units rather than 500.",
+          "technical": "TickOrderAttack switches Action from Attack_3 to Attack_4 on stick up and replaces Value194 with UniqueRows[0]->FloatValue[7]; SetTargetMode then stores it as QueuedActionRadius (same squared-distance trigger, negative disables).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1554",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1557",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1560",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1563",
+            "Source/Abrams/Private/CN_080_ActionController.cpp:643"
+          ]
+        },
+        "8": {
+          "label": "Manual-order mode time limit (stick up)",
+          "simple": "With the stick held up, the issued order keeps its target mode for about 2 seconds.",
+          "technical": "In the stick-up branch TickOrderAttack replaces Value198 with UniqueRows[0]->FloatValue[8]; SetTargetMode stores it as TargetModeTimeLimit, counted down while >= 0 before ResetTargetMode.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1557",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1561",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1563",
+            "Source/Abrams/Private/CN_080_ActionController.cpp:589",
+            "Source/Abrams/Private/CN_080_ActionController.cpp:627"
+          ]
+        },
+        "9": {
+          "label": "Manual-order distance (stick up)",
+          "simple": "The up-stick manual order is allowed from a slightly farther summon distance (1200 units).",
+          "technical": "TickOrderAttack replaces AttackSetId with CP_160_ATTACKG_2 on stick up and Range with UniqueRows[0]->FloatValue[9]; the same `Range >= 0 && Delta.Size() > Range` refusal applies before the attack-set row is looked up.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1517",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1520",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1523"
+          ]
+        },
+        "10": {
+          "label": "Manual-order energy cost multiplier",
+          "simple": "The manual order multiplies the chosen attack's cursed-energy cost by 2, then adds it to the current energy before the affordability check.",
+          "technical": "TickOrderAttack computes CursedEnergy = UniqueRows[0]->FloatValue[10] * AttackRow->CursedEnergy_Add + StatusController->CursedEnergy (from the CP_160_ATTACKG/_2 row's first attack). If bNotForce and the result is < 0 the order is refused; otherwise the computed value is written back with SetCursedEnergy, so a positive CursedEnergy_Add is spent and a negative one restored.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1534",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1542",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1543",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1564"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The energy multiplier is applied to the attack row reached through the unique-table range check, and the resulting energy value is written back only after the order succeeds; the affordability check itself uses the same multiplied expression.",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1527",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1542",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1547",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1564"
+          ]
+        }
+      ]
+    },
+    "CP_160_ATTACKG": {
+      "title": "Cursed-energy shikigami command (ATTACKG) tuning",
+      "overview": "Distances and command timings used when Eso spends cursed energy to order the shikigami; the stick direction selects which sub-values are used.",
+      "values": {
+        "0": {
+          "label": "CE-1 command trigger radius",
+          "simple": "The normal cursed-energy shikigami command commits the attack within 500 units.",
+          "technical": "TCP_160_CursedEnergyAttack_1::StartAttackHoming reads UniqueRows[1]->FloatValue[0] into Value194 by default and passes it to CN_080 SetTargetMode(Mode=2 or 1, Decay byte, Value194, Value198, 1.0f). Value194 is the shikigami's QueuedActionRadius; the queued action triggers only while the shikigami-to-target distance is strictly less than the radius.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1163",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1165",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1184",
+            "Source/Abrams/Private/CN_080_ActionController.cpp:588",
+            "Source/Abrams/Private/CN_080_ActionController.cpp:643"
+          ]
+        },
+        "1": {
+          "label": "CE-1 command time limit",
+          "simple": "The normal cursed-energy command keeps its target mode for about 3 seconds.",
+          "technical": "UniqueRows[1]->FloatValue[1] becomes Value198, stored as CN_080 TargetModeTimeLimit; it counts down from >= 0 and resets the mode when it goes negative while no attack is active.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1166",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1184",
+            "Source/Abrams/Private/CN_080_ActionController.cpp:589",
+            "Source/Abrams/Private/CN_080_ActionController.cpp:627"
+          ]
+        },
+        "2": {
+          "label": "CE-1 normal attack-set range",
+          "simple": "The neutral-stick cursed-energy order uses the standard attack set only when the summon is within 2000 units; otherwise the fallback set is used.",
+          "technical": "GetAttackSetRow first requires shikigami 0 alive, CanOrderAttack and a valid owner target. It then reads UniqueRows[1]->FloatValue[2] as Range and sets bFallback when `Range >= 0 && shikigami-to-owner Distance > Range`; on fallback it looks up CP_160_ATTACKG_5. Equality passes.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1212",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1217",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1228",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1229",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1233"
+          ]
+        },
+        "3": {
+          "label": "CE-1 up-stick trigger radius",
+          "simple": "With the stick up the cursed-energy command uses a 750-unit trigger radius.",
+          "technical": "UniqueRows[1]->FloatValue[3] replaces Value194 when IsLeftStickInDirection(0, 45.0001, 0.5) is true; it is passed to SetTargetMode as QueuedActionRadius and the shikigami's queued Attack_4 fires inside that radius.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1167",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1170",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1184",
+            "Source/Abrams/Private/CN_080_ActionController.cpp:643"
+          ]
+        },
+        "4": {
+          "label": "CE-1 up-stick time limit",
+          "simple": "With the stick up the cursed-energy command keeps its target mode for about 3 seconds.",
+          "technical": "UniqueRows[1]->FloatValue[4] replaces Value198 in the stick-up branch of StartAttackHoming; SetTargetMode stores it as TargetModeTimeLimit.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1167",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1171",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1184",
+            "Source/Abrams/Private/CN_080_ActionController.cpp:589"
+          ]
+        },
+        "5": {
+          "label": "CE-1 up-stick attack-set range",
+          "simple": "The up-stick cursed-energy order allows the standard attack set out to 2000 units.",
+          "technical": "GetAttackSetRow reads UniqueRows[1]->FloatValue[5] as Range in the stick-up branch (attack set CP_160_ATTACKG_2) and applies the same `Range >= 0 && Distance > Range` fallback rule to CP_160_ATTACKG_5.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1218",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1221",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1229",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1233"
+          ]
+        },
+        "6": {
+          "label": "Unresolved sixth command value",
+          "simple": "This nonzero slot (500) has no identified CP_160 read in the reconstructed source.",
+          "technical": "The CE-1 command path reads only value indices 0, 1, 3 and 4 (StartAttackHoming) and 2, 5 and 7 (GetAttackSetRow); the manual/auto order helpers read row 1 values 0, 1, 3 and 4 as well. No shared CP_160-reachable caller was found for UniqueRows[1]->FloatValue[6]. The nearest similarly-sized value, row 1 value 0, is a 500-unit command radius, but that is not evidence that slot 6 is another radius.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1165",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1171",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1217",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1226",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1464",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1470"
+          ]
+        },
+        "7": {
+          "label": "CE-1 down-stick attack-set range",
+          "simple": "With the stick down the cursed-energy order never falls back for distance: the stored -1 means unlimited range.",
+          "technical": "GetAttackSetRow reads UniqueRows[1]->FloatValue[7] as Range in the stick-down branch (attack set CP_160_ATTACKG_4). The fallback test is guarded by `Range >= 0`, so -1 removes the distance restriction; the separate stick-down command sets Value194/Value198 to a literal -1.0f and Mode=1, not from this slot.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1173",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1178",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1223",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1226",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1229"
+          ]
+        }
+      },
+      "untraced": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "CP_160_ATTACKG in this unique table is not the AttackSet row of the same name: the former supplies the ranges that decide whether the latter (or its _2, _4, _5 variants) is looked up.",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1209",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1229",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1236"
+          ]
+        }
+      ]
+    },
+    "CP_160_ATTACKH": {
+      "title": "Decay shot beams (ATTACKH) tuning",
+      "overview": "Three level-based sets for the decay projectiles: aim limit, growth speed and maximum length, plus the repeat interval used while holding the level-3 charge.",
+      "values": {
+        "0": {
+          "label": "Beam aim angle, level 1",
+          "simple": "At cursed-energy level 1 the shot can bend about 40 degrees toward the secondary target.",
+          "technical": "OnEffectPlayed handles FX_CP_160_08111/21/31. For level 1 (also the default branch) UniqueRows[2]->FloatValue[0] is MaxAngle; it clamps the planar aim yaw to [-MaxAngle, MaxAngle] with a NaN-to--MaxAngle quirk, and is passed as both limits of GameAnimNotify_ClampedElevation for pitch. The auto action types 75/79 overwrite MaxAngle with 90 degrees, ignoring this slot there.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:736",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:748",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:752",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:770",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:779",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:785"
+          ]
+        },
+        "1": {
+          "label": "Beam aim angle, level 2",
+          "simple": "At level 2 the beam uses its own 40-degree aim limit.",
+          "technical": "Level 2 of the same switch reads UniqueRows[2]->FloatValue[1] as MaxAngle and feeds the same yaw/elevation clamps; auto variants still force 90 degrees.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:757",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:758",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:770",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:779"
+          ]
+        },
+        "2": {
+          "label": "Beam aim angle, level 3",
+          "simple": "At level 3 the beam uses its own 40-degree aim limit.",
+          "technical": "Level 3 reads UniqueRows[2]->FloatValue[2] as MaxAngle for the yaw clamp and both elevation limits before the auto-variant 90-degree override.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:763",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:764",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:770",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:785"
+          ]
+        },
+        "3": {
+          "label": "Beam growth rate, level 1",
+          "simple": "Level 1 beams grow roughly 2800 units of progress per second before the summon-status multiplier.",
+          "technical": "UniqueRows[2]->FloatValue[3] is Rate for level 1; AddBeam stores Factor * Rate in Entry.Rate, and TickBeams advances Progress by the scaled DeltaTime times Rate, clamped at MaxProgress.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:753",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:717",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1340"
+          ]
+        },
+        "4": {
+          "label": "Beam growth rate, level 2",
+          "simple": "Level 2 beams use their own 2800-unit growth rate.",
+          "technical": "UniqueRows[2]->FloatValue[4] is the level 2 Rate passed to AddBeam and multiplied by the beam Factor; growth uses the same time-scaled tick.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:759",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:717",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1340"
+          ]
+        },
+        "5": {
+          "label": "Beam growth rate, level 3",
+          "simple": "Level 3 beams use their own 2800-unit growth rate.",
+          "technical": "UniqueRows[2]->FloatValue[5] is the level 3 Rate; it follows the same AddBeam/TickBeams path as the lower levels.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:765",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:717",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1340"
+          ]
+        },
+        "6": {
+          "label": "Beam maximum length, level 1",
+          "simple": "Level 1 beams stop extending at about 2000 units.",
+          "technical": "UniqueRows[2]->FloatValue[6] is MaxProgress for level 1. TickBeams clamps Progress with FMath::Min(MaxProgress, Grown) and floors negative growth at 0; Progress is sent to Niagara as BeamEndPoint and to the capsule/destructible-mesh trace.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:754",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1341",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1348"
+          ]
+        },
+        "7": {
+          "label": "Beam maximum length, level 2",
+          "simple": "Level 2 beams stop extending at about 2500 units.",
+          "technical": "UniqueRows[2]->FloatValue[7] is the level 2 MaxProgress passed to AddBeam; the same inclusive clamp caps beam growth and the Niagara/trace end point.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:760",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1341",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1348"
+          ]
+        },
+        "8": {
+          "label": "Beam maximum length, level 3",
+          "simple": "Level 3 beams stop extending at about 3000 units.",
+          "technical": "UniqueRows[2]->FloatValue[8] is the level 3 MaxProgress; on beam finish the recorded Progress is also used when spawning the follow-up effect at the beam transform.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:766",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1341",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1346",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:1348"
+          ]
+        },
+        "9": {
+          "label": "Level-3 charge repeat interval",
+          "simple": "While the level-3 charge is held, it re-pays the attack cost and replays the animation every 0.3 seconds.",
+          "technical": "In the level-3 / start-count-1 charge branch, TickAttack requires flag158, an affordable cost and key 9 held, then accumulates DeltaTime and returns while ActionElapsedTime <= UniqueRows[2]->FloatValue[9]. Only when elapsed is strictly greater than 0.3 does it call SetCursedEnergy, zero the timer, clear flag158 and replay Animation; otherwise flag159 is set on release/failure.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:632",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:652",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:657",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:660",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:666",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:668"
+          ]
+        }
+      },
+      "untraced": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Level 1 is also the default branch of the OnEffectPlayed switch, so a level outside 1..3 reads slot 0/3/6 rather than treating the shot as disabled.",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:748",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:750",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:752"
+          ]
+        },
+        {
+          "text": "The auto variants of the cursed-energy attack (types 75/79) discard the row's aim angle and use a literal 90 degrees, so the 40-degree values only shape the manually aimed shots.",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:770",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:773"
+          ]
+        }
+      ]
+    },
+    "CP_160_ATTACKH_2": {
+      "title": "Decay state range and upkeep (ATTACKH_2)",
+      "overview": "Two settings for the rot/decay branch: how far away a decayed opponent still counts, and how much cursed energy the branch drains each second.",
+      "values": {
+        "0": {
+          "label": "Decay target search range",
+          "simple": "Decayed opponents farther than this from Eso are ignored; the stored -1 means no distance limit.",
+          "technical": "GetDecayingOpponents filters opponents carrying Decay_1..3 (or RotTechnique when decay mode is off) and reads UniqueRows[3]->FloatValue[0] as Range. It skips a character when `Range >= 0 && Delta.Size() > Range`; a negative value disables the check. This list gates both the decay detonation and the ATTACKH_2/_3 attack sets.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:59",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:68",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:77",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:83",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:84",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:592"
+          ]
+        },
+        "1": {
+          "label": "Decay-mode cursed energy drain",
+          "simple": "While rot decay is active, Eso loses about 12 cursed energy per second before the normal recovery step.",
+          "technical": "GetCursedEnergyDrainRate returns 0.0f when bDecayMode == 0 and UniqueRows[3]->FloatValue[1] otherwise. AGameCharacter::GetActionValue113 forwards it to the status tick, which calls SetCursedEnergy(CursedEnergy - Drain * DeltaTime) when Drain >= 0; regular recovery is applied afterwards in the same tick.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:978",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:981",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:985",
+            "Source/Abrams/Private/GameCharacter.cpp:3031",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3434",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3437"
+          ]
+        }
+      },
+      "untraced": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Switching decay mode off strips Decay_1/2/3 from every opponent, so the drain returns to zero and the decay-specific attack sets stop being selected.",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:911",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:918",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:927",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:985"
+          ]
+        }
+      ]
+    },
+    "CP_160_ATTACKH_SHOOT_CAMERA_1": {
+      "title": "Decay shot camera, level 1",
+      "overview": "Framing for the level-1 cursed-energy decay shot: offset, look limits, field of view and orbit.",
+      "values": {
+        "0": {
+          "label": "Camera offset - sideways",
+          "simple": "The camera sits 220 units to the side of the usual eye position.",
+          "technical": "MakeUniqueCameraRequest(2, RowIndex) reads UniqueRows[RowIndex]->FloatValue[0] as CameraOffset.X. The camera applies this FVector after rotating it into the gaze rotation's space, so it is a gaze-relative camera offset, not a world-X teleport.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera offset - depth",
+          "simple": "The camera is pulled 180 units back along the gaze axis.",
+          "technical": "Value index 1 becomes CameraOffset.Y in the same FVector; its sign and effect follow the gaze-relative basis described above.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera offset - height",
+          "simple": "The camera is raised 100 units above the gaze-based eye position.",
+          "technical": "Value index 2 is read first into OffsetZ and becomes CameraOffset.Z of the request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "The camera will not look more than about 60 degrees below the eye line for this shot.",
+          "technical": "Value index 3 becomes LimitAngleDown. UpdateRequestCamera computes the gaze elevation in degrees and, when the target is below the base, rotates the gaze back within this limit; equality with the measured angle passes.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "The camera will not look more than about 30 degrees above the eye line for this shot.",
+          "technical": "Value index 4 becomes LimitAngleUp and is used by the same degree-based elevation clamp when the target is above the base.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "The row asks for a 110-degree field of view when the shot camera is entered; the restore paths replace it with a literal 90 degrees.",
+          "technical": "Value index 5 becomes Request.FieldOfView. CP_160's OnEffectPlayed(IntParameter 10) and the level-3 second-start restore overwrite that field with 90.0f after building the request, and the final exit to AttackDefault uses a separate zeroed request with only FOV 90. The initial SetCameraMode(2, true, ...) calls use the row value unmodified.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:448",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:449",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:617",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:695"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "Changing to this field of view is blended over about 0.25 seconds.",
+          "technical": "Value index 6 becomes FieldOfViewBlendTime; the request is passed to SetCameraMode with bBlendView true on entry and on the level-3/restore transitions. The final AttackDefault exit instead passes false and a request whose blend time is zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:618",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:695",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:696"
+          ]
+        },
+        "7": {
+          "label": "Field-of-view easing kind",
+          "simple": "The stored 3 selects the EaseInOut curve for the field-of-view change.",
+          "technical": "Value index 7 is cast to int32 in a switch: 0 -> Linear, 1 -> EaseIn, 2 -> EaseOut, 3 -> EaseInOut (EEasingFunc), and any other value leaves the request default. Here the value is exactly 3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/GameCharacterAction.cpp:939",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:964",
+            "Source/Abrams/Private/GameCharacterAction.cpp:965"
+          ]
+        },
+        "8": {
+          "label": "Gaze orbit yaw",
+          "simple": "The camera orbits the gaze about the camera by 15 degrees of yaw.",
+          "technical": "Value index 8 becomes Request.OrbitYaw; the virtual camera constructs FRotator(OrbitPitch, OrbitYaw, 0) and rotates the gaze around the camera through that transform.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        },
+        "9": {
+          "label": "Gaze orbit pitch",
+          "simple": "The same orbit tilts the gaze by -7 degrees of pitch.",
+          "technical": "Value index 9 becomes Request.OrbitPitch, the Pitch component of the FRotator used in the orbit step.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "The view is rolled by 2.5 units (the roll passed to the camera's view-target setter).",
+          "technical": "Value index 10 becomes Request.Roll and is handed to SetViewTarget87 together with the computed camera position and gaze. No other CP_160 caller overrides it.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Level 1 switches the owner to camera mode 2 with this row on the first start of the charged cursed-energy shot; the same row is reused by the level-1 restore path (or the third start at level 3).",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:435",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:445",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:448",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600"
+          ]
+        }
+      ]
+    },
+    "CP_160_ATTACKH_SHOOT_CAMERA_2": {
+      "title": "Decay shot camera, level 2",
+      "overview": "Framing for the level-2 cursed-energy decay shot: offset, look limits, field of view and orbit.",
+      "values": {
+        "0": {
+          "label": "Camera offset - sideways",
+          "simple": "The camera sits 220 units to the side of the usual eye position.",
+          "technical": "MakeUniqueCameraRequest(2, RowIndex) reads UniqueRows[RowIndex]->FloatValue[0] as CameraOffset.X. The camera applies this FVector after rotating it into the gaze rotation's space, so it is a gaze-relative camera offset, not a world-X teleport.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:604",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera offset - depth",
+          "simple": "The camera is pulled 180 units back along the gaze axis.",
+          "technical": "Value index 1 becomes CameraOffset.Y in the same FVector; its sign and effect follow the gaze-relative basis described above.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:604",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera offset - height",
+          "simple": "The camera is raised 100 units above the gaze-based eye position.",
+          "technical": "Value index 2 is read first into OffsetZ and becomes CameraOffset.Z of the request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:604",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "The camera will not look more than about 60 degrees below the eye line for this shot.",
+          "technical": "Value index 3 becomes LimitAngleDown. UpdateRequestCamera computes the gaze elevation in degrees and, when the target is below the base, rotates the gaze back within this limit; equality with the measured angle passes.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:604",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "The camera will not look more than about 30 degrees above the eye line for this shot.",
+          "technical": "Value index 4 becomes LimitAngleUp and is used by the same degree-based elevation clamp when the target is above the base.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:604",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "The row asks for a 110-degree field of view when the shot camera is entered; the restore paths replace it with a literal 90 degrees.",
+          "technical": "Value index 5 becomes Request.FieldOfView. CP_160's OnEffectPlayed(IntParameter 10) and the level-3 second-start restore overwrite that field with 90.0f after building the request, and the final exit to AttackDefault uses a separate zeroed request with only FOV 90. The initial SetCameraMode(2, true, ...) calls use the row value unmodified.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:604",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:448",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:449",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:617",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:695"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "Changing to this field of view is blended over about 0.25 seconds.",
+          "technical": "Value index 6 becomes FieldOfViewBlendTime; the request is passed to SetCameraMode with bBlendView true on entry and on the level-3/restore transitions. The final AttackDefault exit instead passes false and a request whose blend time is zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:604",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:618",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:695",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:696"
+          ]
+        },
+        "7": {
+          "label": "Field-of-view easing kind",
+          "simple": "The stored 3 selects the EaseInOut curve for the field-of-view change.",
+          "technical": "Value index 7 is cast to int32 in a switch: 0 -> Linear, 1 -> EaseIn, 2 -> EaseOut, 3 -> EaseInOut (EEasingFunc), and any other value leaves the request default. Here the value is exactly 3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:604",
+            "Source/Abrams/Private/GameCharacterAction.cpp:939",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:964",
+            "Source/Abrams/Private/GameCharacterAction.cpp:965"
+          ]
+        },
+        "8": {
+          "label": "Gaze orbit yaw",
+          "simple": "The camera orbits the gaze about the camera by 15 degrees of yaw.",
+          "technical": "Value index 8 becomes Request.OrbitYaw; the virtual camera constructs FRotator(OrbitPitch, OrbitYaw, 0) and rotates the gaze around the camera through that transform.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:604",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        },
+        "9": {
+          "label": "Gaze orbit pitch",
+          "simple": "The same orbit tilts the gaze by -7 degrees of pitch.",
+          "technical": "Value index 9 becomes Request.OrbitPitch, the Pitch component of the FRotator used in the orbit step.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:604",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "The view is rolled by 2.5 units (the roll passed to the camera's view-target setter).",
+          "technical": "Value index 10 becomes Request.Roll and is handed to SetViewTarget87 together with the computed camera position and gaze. No other CP_160 caller overrides it.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:604",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Level 2 switches the owner to camera mode 2 with this row on the first start of the charged cursed-energy shot; the same row is reused by the level-2 restore path (or the third start at level 3).",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:435",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:445",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:448",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:604"
+          ]
+        }
+      ]
+    },
+    "CP_160_ATTACKH_SHOOT_CAMERA_3": {
+      "title": "Decay shot camera, level 3",
+      "overview": "Framing for the level-3 cursed-energy decay shot: offset, look limits, field of view and orbit.",
+      "values": {
+        "0": {
+          "label": "Camera offset - sideways",
+          "simple": "The camera sits 220 units to the side of the usual eye position.",
+          "technical": "MakeUniqueCameraRequest(2, RowIndex) reads UniqueRows[RowIndex]->FloatValue[0] as CameraOffset.X. The camera applies this FVector after rotating it into the gaze rotation's space, so it is a gaze-relative camera offset, not a world-X teleport.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:609",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:611",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera offset - depth",
+          "simple": "The camera is pulled 180 units back along the gaze axis.",
+          "technical": "Value index 1 becomes CameraOffset.Y in the same FVector; its sign and effect follow the gaze-relative basis described above.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:609",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:611",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera offset - height",
+          "simple": "The camera is raised 100 units above the gaze-based eye position.",
+          "technical": "Value index 2 is read first into OffsetZ and becomes CameraOffset.Z of the request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:609",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:611",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "The camera will not look more than about 60 degrees below the eye line for this shot.",
+          "technical": "Value index 3 becomes LimitAngleDown. UpdateRequestCamera computes the gaze elevation in degrees and, when the target is below the base, rotates the gaze back within this limit; equality with the measured angle passes.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:609",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:611",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "The camera will not look more than about 30 degrees above the eye line for this shot.",
+          "technical": "Value index 4 becomes LimitAngleUp and is used by the same degree-based elevation clamp when the target is above the base.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:609",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:611",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "The row asks for a 110-degree field of view when the shot camera is entered; the restore paths replace it with a literal 90 degrees.",
+          "technical": "Value index 5 becomes Request.FieldOfView. CP_160's OnEffectPlayed(IntParameter 10) and the level-3 second-start restore overwrite that field with 90.0f after building the request, and the final exit to AttackDefault uses a separate zeroed request with only FOV 90. The initial SetCameraMode(2, true, ...) calls use the row value unmodified.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:609",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:611",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:448",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:449",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:617",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:695"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "Changing to this field of view is blended over about 0.25 seconds.",
+          "technical": "Value index 6 becomes FieldOfViewBlendTime; the request is passed to SetCameraMode with bBlendView true on entry and on the level-3/restore transitions. The final AttackDefault exit instead passes false and a request whose blend time is zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:609",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:611",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:600",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:618",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:695",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:696"
+          ]
+        },
+        "7": {
+          "label": "Field-of-view easing kind",
+          "simple": "The stored 3 selects the EaseInOut curve for the field-of-view change.",
+          "technical": "Value index 7 is cast to int32 in a switch: 0 -> Linear, 1 -> EaseIn, 2 -> EaseOut, 3 -> EaseInOut (EEasingFunc), and any other value leaves the request default. Here the value is exactly 3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:609",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:611",
+            "Source/Abrams/Private/GameCharacterAction.cpp:939",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:964",
+            "Source/Abrams/Private/GameCharacterAction.cpp:965"
+          ]
+        },
+        "8": {
+          "label": "Gaze orbit yaw",
+          "simple": "The camera orbits the gaze about the camera by 15 degrees of yaw.",
+          "technical": "Value index 8 becomes Request.OrbitYaw; the virtual camera constructs FRotator(OrbitPitch, OrbitYaw, 0) and rotates the gaze around the camera through that transform.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:609",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:611",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        },
+        "9": {
+          "label": "Gaze orbit pitch",
+          "simple": "The same orbit tilts the gaze by -7 degrees of pitch.",
+          "technical": "Value index 9 becomes Request.OrbitPitch, the Pitch component of the FRotator used in the orbit step.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:609",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:611",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "The view is rolled by 2.5 units (the roll passed to the camera's view-target setter).",
+          "technical": "Value index 10 becomes Request.Roll and is handed to SetViewTarget87 together with the computed camera position and gaze. No other CP_160 caller overrides it.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:609",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:611",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Level 3 enters mode 2 with this row only at action start count 0; at count 2 it rebuilds the request to restore the saved mode and forces FOV 90, and leaving for AttackDefault uses a fixed 90-degree request with no blend.",
+          "evidence": [
+            "Source/Abrams/Private/CP_160_ActionController.cpp:606",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:611",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:613",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:616",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:617",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:693",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:695",
+            "Source/Abrams/Private/CP_160_ActionController.cpp:696"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Both accessors take the float index first and the row index second, despite the controller often naming the pair by effect first. The checked-free dereference means a read of one of CP_160's two null table slots (7 or 8) would be invalid; the traced CP_160 code stays within rows 0..6.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:561",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Source/Abrams/Private/GameCharacterAction.cpp:935",
+        "Tools/verify/CHAR/UniqueRowsInline.md:23"
+      ]
+    },
+    {
+      "text": "The decay branch has two modes. RotTechnique mode converts enemies to DEBUFF_DECAY_n and lets the charge detonate waist-level damage rows; after that the controller reads Decay_1..3 stacks, enables the cursed-energy drain from row 3 value 1, and selects CP_160_ATTACKH_2/_3 attack sets. Clearing decay mode strips the Decay buffs from opponents and disables the drain.",
+      "evidence": [
+        "Source/Abrams/Private/CP_160_ActionController.cpp:454",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:525",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:538",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:911",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:927",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:985"
+      ]
+    },
+    {
+      "text": "The summoned CN_080 has its own ShikigamiUniqueDataTable. Calls such as UCN_080_ActionController::GetMovementSpeedRate, its AttackH animation count and its beam length read AGameShikigami::GetCharacterUniqueFloatValue on the shikigami, not the seven character rows documented here.",
+      "evidence": [
+        "Source/Abrams/Private/GameShikigami.cpp:1251",
+        "Source/Abrams/Private/GameShikigami.cpp:1253",
+        "Source/Abrams/Private/CN_080_ActionController.cpp:310",
+        "Source/Abrams/Private/CN_080_ActionController.cpp:469",
+        "Source/Abrams/Private/CN_080_ActionController.cpp:655"
+      ]
+    },
+    {
+      "text": "Same-looking unique indices in other controllers are not reused here. The AI hold durations at GameCharacterAINode.cpp:112-130 are instantiated by CP_040's behavior controller, and the row-2/row-7/row-8 reads in GameTrapActionController sit inside CP_150 trap bodies; neither is attributable to CP_160. CP_160 itself has no dedicated behavior-controller class: AI type 17 uses the base behavior controller and the playable FGameCharacterAIThinkNode_CP_160.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+        "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+        "Source/Abrams/Private/GameTrapActionController.cpp:1306",
+        "Source/Abrams/Private/GameTrapActionController.cpp:1321",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:181",
+        "Source/Abrams/Private/GameCharacterBehaviorController.cpp:119"
+      ]
+    },
+    {
+      "text": "The controller delegates part of its behavior: CP_030_ActionHelpers decides whether an order can start, CP_110_FindLayerAction checks the active attack layer, and CN_080 SetTargetMode receives the tuned radius/time values. It also defines the shared ParallelAttack finder that CP_140 calls; these are shared helpers, not CP_160-only mechanics.",
+      "evidence": [
+        "Source/Abrams/Private/CP_160_ActionController.cpp:901",
+        "Source/Abrams/Private/CP_160_ActionController.cpp:1019",
+        "Source/Abrams/Private/CN_080_ActionController.cpp:588",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:752"
+      ]
+    }
+  ]
+}

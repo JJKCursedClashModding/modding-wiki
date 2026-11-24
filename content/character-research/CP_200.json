@@ -1,0 +1,362 @@
+{
+  "overview": "Toji’s settings tune air jumps, dash costs, lunge angles, and the hold time and targeting of his second cursed-energy attack.",
+  "technicalOverview": "Toji Fushiguro (CP_200) uses his own action controller with two unique rows in CharacterUniqueDataTable1. Row 0 is his general combat row: two air jumps, a 200-point knockout reward, separate 200 base dash-gauge costs for the NormalAttack_3 and ExtraAttack follow-ups, a 20-degree pitch clamp for stickless lunges, and a 30-degree diagonal step turn. Row 1 tunes Cursed Energy Attack 2: a 0.2 second guaranteed hold, a 0.7 second held-button cap, and an 800-unit range test that decides whether the second start aims behind the secondary target. The remaining slots are empty; generic camera or AI helpers can read some of them only when called, and no CP_200 path in the reconstructed source calls those helpers with these row indices.",
+  "rows": {
+    "CP_200": {
+      "title": "Toji baseline combat values",
+      "overview": "This is the always-on row for Toji's movement and follow-up attacks. The traced readers cover floats 0 through 6; floats 7 through 10 would be camera settings if the shared camera builder were called, but no such call is traced for CP_200.",
+      "values": {
+        "0": {
+          "label": "Air-jump limit (minimum 1)",
+          "simple": "Toji can air-jump twice; a value of 1 or less would still allow one.",
+          "technical": "UCP_200_ActionController::GetAirJumpLimit reads row 0 float 0, raises any value less than or equal to 1.0 to exactly 1.0, then truncates it to an integer. Both air-jump Begin actions use it as a strict upper bound on their own start count and on the other air-jump Begin's start count; the AI brain's CanAirJump also compares the JumpAirBegin start count with it. Shared code has other readers of row 0 float 0: SteerTowardSecondaryTarget divides the facing angle by it (with a zero/non-positive guard), ProjectionSorceryReceive uses it as a restraint-time fallback when the damage row is absent, and CursedEnergyAttack1/2Hold AI executors use it as a hold-duration base. No CP_200 caller of those shared paths was found in reconstructed Source.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_200_ActionController.cpp:1216",
+            "Source/Abrams/Private/GameCharacterAction_Jump.cpp:111",
+            "Source/Abrams/Private/GameCharacterAction_Jump.cpp:137",
+            "Source/Abrams/Private/GameCharacterBrain_AI.cpp:107",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:118",
+            "Tools/verify/CHAR/CP_200_ActionController.md:335"
+          ]
+        },
+        "1": {
+          "label": "Knockout cursed-energy reward",
+          "simple": "A knockout gives Toji 200 cursed-energy progress: experience early on, raw energy once his gauge is at its level threshold.",
+          "technical": "When AGameCharacter grants knockout credit, controller slot 274 runs UCP_200_ActionController::OnKillCredit. It reads row 0 float 1. If IsCursedEnergyGaugeAtThreshold is false, the value goes to AddCursedEnergyExp (which ignores a defeated owner and an exactly zero amount); if true, the same value goes to AddCursedEnergy. The override then applies BUFF_CP_200_PASSIVE with the owner as the source. The threshold test compares the gauge with the highest currently indexed level threshold.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_200_ActionController.cpp:1266",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:1271",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:1276",
+            "Source/Abrams/Private/GameCharacter.cpp:4004",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:215",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:2585",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:4143",
+            "Tools/verify/CHAR/CP_200_ActionController.md:338"
+          ]
+        },
+        "2": {
+          "label": "Unused baseline slot (generic readers only)",
+          "simple": "Stored as 0; no Toji-specific effect was traced.",
+          "technical": "No CP_200-specific reader of row 0 float 2 was found. Generic code would use it as the camera offset Z if MakeUniqueCameraRequest were called with RowIndex 0, and the CursedEnergyAttack2Hold AI executor would use it as a per-level hold-duration add. CP_200's behavior controller does not create that hold executor, however: its special AI index 0x16 maps to a normal-attack executor, and no CP_200 call to that camera helper was found.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:129",
+            "Source/Abrams/Private/CP_200_BehaviorController.cpp:9",
+            "Source/Abrams/Private/GameCharacterBehaviorController.cpp:119"
+          ]
+        },
+        "3": {
+          "label": "NormalAttack_3 dash-gauge base cost",
+          "simple": "Starting the ground or air NormalAttack_3 follow-up spends 200 base dash gauge.",
+          "technical": "On the first start (start count 0) of NormalAttack_3 / NormalAttackAir_3, CP_200 passes row 0 float 3 to GetNormalDashGaugeCost regardless of the stick direction. That helper multiplies the base cost by the owner's normal dash-gauge consume rate, or by zero when dash gauge is unlimited. CP_200 subtracts the result from DashGauge, clamps to zero and to GetDashGaugeMax(), and turns dash-gauge recovery off. The stickless pitch clamp on the same start uses float 5, not this value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_200_ActionController.cpp:825",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:827",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:2723",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:1021"
+          ]
+        },
+        "4": {
+          "label": "ExtraAttack dash-gauge base cost",
+          "simple": "Starting ExtraAttack_1 or ExtraAttack_2 spends 200 base dash gauge.",
+          "technical": "On the first start (start count 0) of ExtraAttack_1 / ExtraAttack_2 (types 82 and 83), after the AttackE step row and homing step are set up, CP_200 passes row 0 float 4 to the same GetNormalDashGaugeCost helper. The result is subtracted from DashGauge with zero and maximum clamps, and dash-gauge recovery is disabled. This is a separate charge from the NormalAttack_3 cost at float 3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_200_ActionController.cpp:1029",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:1031",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:2723"
+          ]
+        },
+        "5": {
+          "label": "Stickless lunge pitch limit (degrees)",
+          "simple": "With no stick direction, a lunge is flattened to a 20 degree incline instead of aiming steeply up or down.",
+          "technical": "On the first start of NormalAttack_3 or ExtraAttack, only when the input move direction is exactly zero, the direction falls back to the secondary target's location or to the owner's position plus its facing vector. CP_200 tests AngleBetweenDegrees(direction, its flat XY projection) > row 0 float 5 (strictly greater, degrees). When it exceeds the limit, the flat direction is rotated by that many degrees about a cross-product axis whose sign follows the direction's Z component, then re-normalized. With no secondary target the facing fallback is used; nonzero stick input never enters this clamp.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_200_ActionController.cpp:812",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:817",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:821",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:1006",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:1010"
+          ]
+        },
+        "6": {
+          "label": "Diagonal AttackE turn amount (degrees)",
+          "simple": "The diagonal AttackE step turns by up to 30 degrees toward the input side.",
+          "technical": "In FindAttackEStepRow, a zero input direction selects the neutral step row with no read of this float. For a nonzero input, if the angle with the flattened camera forward is at least 45 degrees (inclusive; the secondary target's direction replaces camera forward when valid), CP_200 selects the diagonal step row and rotates the direction by minus row 0 float 6 multiplied by Side, in degrees about world up. Side is the normalized Z component of cross(input, camera forward), with unit, small and zero cross-product cases handled separately. Below 45 degrees the forward row is chosen and this float is not read.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_200_ActionController.cpp:724",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:751",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:754"
+          ]
+        },
+        "7": {
+          "label": "Camera FOV easing selector (generic helper only)",
+          "simple": "0 in Toji's row; would mean linear field-of-view easing only if the shared camera builder were used.",
+          "technical": "MakeUniqueCameraRequest(CameraMode 2, RowIndex) casts row float 7 to an integer and maps 0, 1, 2 and 3 to Linear, EaseIn, EaseOut and EaseInOut FOV easing; other values leave the request's default. No CP_200 call to this helper with RowIndex 0 was found, so the value has no traced effect for Toji.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Public/GameCharacterAction.h:205"
+          ]
+        },
+        "8": {
+          "label": "Camera orbit yaw (generic helper only)",
+          "simple": "0 in Toji's row; no CP_200 camera use traced.",
+          "technical": "The shared mode-2 camera builder assigns row float 8 to Request.OrbitYaw. No CP_200 call to that builder with RowIndex 0 was found in reconstructed Source.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970"
+          ]
+        },
+        "9": {
+          "label": "Camera orbit pitch (generic helper only)",
+          "simple": "0 in Toji's row; no CP_200 camera use traced.",
+          "technical": "The shared mode-2 camera builder assigns row float 9 to Request.OrbitPitch. No CP_200 call to that builder with RowIndex 0 was found in reconstructed Source.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971"
+          ]
+        },
+        "10": {
+          "label": "Camera roll (generic helper only)",
+          "simple": "0 in Toji's row; no CP_200 camera use traced.",
+          "technical": "The shared mode-2 camera builder assigns row float 10 to Request.Roll. No CP_200 call to that builder with RowIndex 0 was found in reconstructed Source.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Floats 3 and 4 are always read independently by different actions; changing one does not change the other follow-up's gauge spend.",
+          "evidence": [
+            "Source/Abrams/Private/CP_200_ActionController.cpp:825",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:1029"
+          ]
+        },
+        {
+          "text": "The 200 at float 1 is used in two different resource paths by the same kill override: experience below the current threshold, raw cursed energy at or above it, followed by the passive buff.",
+          "evidence": [
+            "Source/Abrams/Private/CP_200_ActionController.cpp:1268",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:1279"
+          ]
+        }
+      ]
+    },
+    "CP_200_ATTACKH": {
+      "title": "Cursed Energy Attack 2 hold and range tuning",
+      "overview": "This row only serves Cursed Energy Attack 2. Two floats define the non-Auto held-button window, and one float is the range test used on the second start to choose the behind-target warp. All four CE2 variants share the range test; only the non-Auto ground and air versions read the hold times.",
+      "values": {
+        "0": {
+          "label": "Minimum held-charge time (seconds)",
+          "simple": "The first 0.2 seconds of Cursed Energy Attack 2 always count as held.",
+          "technical": "In IsChargeHeld (slot 146 of the non-Auto CE2 ground and air types), row 1 float 0 is the lower bound: if Lower > ActionElapsedTime, strictly, the function returns true without checking input. Once elapsed time reaches it, the check falls through to the button test. The CE2 tick sets Flag159 when the function is false. Auto variants fold this slot to a constant false and do not read the value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_200_ActionController.cpp:288",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:291",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:116",
+            "Source/Abrams/Public/CP_200_Actions.h:40",
+            "Tools/verify/CHAR/CP_200_ActionController.md:220"
+          ]
+        },
+        "1": {
+          "label": "Maximum held-charge time (seconds)",
+          "simple": "Keeping the attack button held extends the charge window to 0.7 seconds.",
+          "technical": "IsChargeHeld reads row 1 float 1 as its upper bound after the lower-bound check fails: it returns true only while CursedEnergyAttack_2 is held and Upper > ActionElapsedTime, strictly. At 0.7 seconds or later the function is false even with the button down. This applies to the non-Auto CE2 types; Auto variants fold the slot to false.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_200_ActionController.cpp:290",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:296",
+            "Source/Abrams/Public/CP_200_Actions.h:40",
+            "Tools/verify/CHAR/CP_200_ActionController.md:220"
+          ]
+        },
+        "2": {
+          "label": "Behind-target range threshold (world distance)",
+          "simple": "At 800 units, the second CE2 start decides whether it aims behind the secondary target.",
+          "technical": "On the second start, only when a secondary target is valid, CP_200 computes Distance as the length from the owner to the cached target vector minus both capsule radii, then sets bTargetInRange from row 1 float 2 > Distance (strictly greater). That flag chooses the warp yaw of 180 degrees when true and 0 degrees when false, both at start and while the step is ticked. With a valid target the step row is still the Forward (or Forward Auto) row; the stored flag selects the Behind (or Behind Auto) row only in the no-target branch, where no fresh comparison is made. The four CE2 variants share this start override, so the Auto versions read it too.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_200_ActionController.cpp:144",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:205",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:209",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:212",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:219",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:227",
+            "Tools/verify/CHAR/CP_200_ActionController.md:90"
+          ]
+        },
+        "3": {
+          "label": "Camera look-down limit (generic helper only)",
+          "simple": "0 in this row; no CP_200 camera use traced.",
+          "technical": "The shared mode-2 camera builder assigns row float 3 to Request.LimitAngleDown. No CP_200 call to that builder with RowIndex 1 was found in reconstructed Source.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949"
+          ]
+        },
+        "4": {
+          "label": "Camera look-up limit (generic helper only)",
+          "simple": "0 in this row; no CP_200 camera use traced.",
+          "technical": "The shared mode-2 camera builder assigns row float 4 to Request.LimitAngleUp. No CP_200 call to that builder with RowIndex 1 was found in reconstructed Source.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950"
+          ]
+        },
+        "5": {
+          "label": "Camera field of view (generic helper only)",
+          "simple": "0 in this row; no CP_200 camera use traced.",
+          "technical": "The shared mode-2 camera builder assigns row float 5 to Request.FieldOfView. CP_200's own attack pitch clamp instead reads float 5 of row 0, not this row.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:817"
+          ]
+        },
+        "6": {
+          "label": "Camera FOV blend time (generic helper only)",
+          "simple": "0 in this row; no CP_200 camera use traced.",
+          "technical": "The shared mode-2 camera builder assigns row float 6 to Request.FieldOfViewBlendTime. No CP_200 call to that builder with RowIndex 1 was found in reconstructed Source.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952"
+          ]
+        },
+        "7": {
+          "label": "Camera FOV easing selector (generic helper only)",
+          "simple": "0 in this row; would mean linear easing if the shared camera builder were used.",
+          "technical": "The shared mode-2 camera builder casts row float 7 to an integer to select FOV easing: 0 Linear, 1 EaseIn, 2 EaseOut, 3 EaseInOut. No CP_200 call to that builder with RowIndex 1 was found.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:953"
+          ]
+        },
+        "8": {
+          "label": "Camera orbit yaw (generic helper only)",
+          "simple": "0 in this row; no CP_200 camera use traced.",
+          "technical": "The shared mode-2 camera builder assigns row float 8 to Request.OrbitYaw. No CP_200 call to that builder with RowIndex 1 was found.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970"
+          ]
+        },
+        "9": {
+          "label": "Camera orbit pitch (generic helper only)",
+          "simple": "0 in this row; no CP_200 camera use traced.",
+          "technical": "The shared mode-2 camera builder assigns row float 9 to Request.OrbitPitch. No CP_200 call to that builder with RowIndex 1 was found.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971"
+          ]
+        },
+        "10": {
+          "label": "Camera roll (generic helper only)",
+          "simple": "0 in this row; no CP_200 camera use traced.",
+          "technical": "The shared mode-2 camera builder assigns row float 10 to Request.Roll. No CP_200 call to that builder with RowIndex 1 was found.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The Auto ground and air CE2 variants reuse the 800-unit range decision because they inherit the same start override, but their vtable folds the hold check to false; the 0.2 and 0.7 values belong only to the manually held versions.",
+          "evidence": [
+            "Source/Abrams/Public/CP_200_Actions.h:36",
+            "Source/Abrams/Public/CP_200_Actions.h:41",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:212",
+            "Tools/verify/CHAR/CP_200_ActionController.md:220"
+          ]
+        },
+        {
+          "text": "Step rows are picked from CP_200_AttackH_Forward, _Behind and their _Auto versions through the shared CP_210 ActionStep finder; the data values here only decide direction and yaw, not the row names.",
+          "evidence": [
+            "Source/Abrams/Private/CP_200_ActionController.cpp:219",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:231",
+            "Source/Abrams/Private/CP_200_ActionController.cpp:237"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Row order is data-driven: AGameCharacter copies each Id_CharacterUnique entry into UniqueRows in order and the accessor indexes that array without bounds checks. The supplied authoritative input maps index 0 to CP_200 and index 1 to CP_200_ATTACKH; all traced CP_200 reads use literal row 0 or 1.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Source/Abrams/Public/GameCharacterAction.h:194",
+        "Tools/verify/CHAR/UniqueRowsInline.md:19"
+      ]
+    },
+    {
+      "text": "The two 200 dash-gauge values are deliberately separate: NormalAttack_3 spends the float-3 amount, ExtraAttack_1/2 spend the float-4 amount, both scaled by the same consume-rate helper and clamped against the dash-gauge maximum.",
+      "evidence": [
+        "Source/Abrams/Private/CP_200_ActionController.cpp:825",
+        "Source/Abrams/Private/CP_200_ActionController.cpp:1029",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2723"
+      ]
+    },
+    {
+      "text": "Cursed Energy Attack 2's Auto variants use _Auto ActionStep rows through IsChargeAuto, while the manually held variants use the plain rows; the verification record shows the hold-check slot is constant-folded for Auto types.",
+      "evidence": [
+        "Source/Abrams/Public/CP_200_Actions.h:36",
+        "Source/Abrams/Private/CP_200_ActionController.cpp:219",
+        "Source/Abrams/Private/CP_200_ActionController.cpp:231",
+        "Tools/verify/CHAR/CP_200_ActionController.md:220"
+      ]
+    },
+    {
+      "text": "The 800.0 close and mid-range values in CP_200's AI think-node setup are hard-coded literals, not reads of the CP_200_ATTACKH row, so they must not be treated as another use of that unique float.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:3327"
+      ]
+    },
+    {
+      "text": "No shikigami or trap unique rows are involved here. AGameShikigami has a separate ShikigamiUniqueDataTable and its own accessor, and trap actions forward unique-float reads through the source actor interface; neither is a CP_200 controller read.",
+      "evidence": [
+        "Source/Abrams/Private/GameShikigami.cpp:870",
+        "Source/Abrams/Private/GameShikigami.cpp:1251",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188"
+      ]
+    },
+    {
+      "text": "The reconstructed CP_200 translation unit includes no .inl file; its unique reads go through the out-of-line GetOwnerUniqueFloat hop, unlike the hot sites whose inline dereference is documented in the unique-row verification note.",
+      "evidence": [
+        "Source/Abrams/Private/CP_200_ActionController.cpp:1",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Tools/verify/CHAR/UniqueRowsInline.md:19"
+      ]
+    },
+    {
+      "text": "Verification notes record byte matches for the two controller overrides that read row 0 floats 0 and 1, so those reads are treated as retail-faithful rather than reconstruction guesses; the other row slots rely on source traces only.",
+      "evidence": [
+        "Tools/verify/CHAR/CP_200_ActionController.md:335",
+        "Tools/verify/CHAR/CP_200_ActionController.md:338"
+      ]
+    }
+  ]
+}

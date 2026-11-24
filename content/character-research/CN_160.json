@@ -1,0 +1,196 @@
+{
+  "overview": "The Hairy Cursed Spirit’s third normal attack can warp behind a target. Its unique settings include the warp distance and wait before the follow-up.",
+  "technicalOverview": "Hairy Cursed Spirit (CN_160) is a non-playable enemy with a deliberately narrow action set. Its character row selects UCN_160_ActionController and the CN_160 AI think node; the controller only supplies a custom NormalAttack_3 action, refuses guards, steps, air dashes and cursed-energy attacks, allows two air jumps, and edits the shared cancel table. The leading 0 and 1 in the supplied unique-row tuples are zero-based positions in CharacterDataTable.Id_CharacterUnique; the 14 following numbers are FloatValue[0..13]. Only two unique rows are populated. Row 0 ('CN_160') stores 180.0 in FloatValue[0] and zeros elsewhere, but no reachable CN_160 reader was identified for it. Row 1 ('CN_160_ATTACKC') is used only by the custom third normal attack: FloatValue[1]=50.0 chooses a warp position behind the secondary target after the first attack animation stops, and FloatValue[0]=1.0 is the wait before flag 159 permits the next request. All remaining slots are zero and were left untraced rather than assumed unused.",
+  "rows": {
+    "CN_160": {
+      "title": "Base unique row (row index 0)",
+      "overview": "FloatValue[0] is 180.0 and the other 13 values are zero. In the reconstructed CN_160 path this row is not read; the character's unique-float behaviour uses row 1 instead. The 180.0 is therefore reported as an unresolved stored value, not as an active setting.",
+      "values": {
+        "0": {
+          "label": "Unresolved base float (180.0)",
+          "simple": "The character's own unique row stores 180.0 in its first float, but this character's observed actions do not change because of it.",
+          "technical": "AGameCharacter resolves CharacterDataTable.Id_CharacterUnique in order: position 0 is 'CN_160', and GetCharacterUniqueFloatValue(ValueIndex, RowIndex) dereferences UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds checks. Generic row-0 readers do exist: the cursed-energy hold AI nodes read (0,0)/(1,0)/(2,0), SteerTowardSecondaryTarget divides an angle by (0,0), and MakeUniqueCameraRequest reads (0..10, RowIndex) when called with row 0. None is reachable for CN_160 in the traced source: its factory creates FGameCharacterAIThinkNode_CN_160 (not the CP_040/CP_050 hold behaviour), its controller rejects CursedEnergyAttack_1/2, its custom action only calls GetOwnerUniqueFloat with row 1, and no MakeUniqueCameraRequest call exists in the CN_160 TU. Retail intent for the 180.0 is not established.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:560",
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Private/GameCharacter.cpp:1761",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:118",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterBrain_AI.cpp:204",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:219",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:121",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:128"
+          ]
+        }
+      },
+      "untraced": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The exported leading 0 is the unique-row position, not FloatValue[0]. The 14-value array starts at FloatValue[0]; that is why the stored 180.0 here is an indexed value and the row itself is still row 0.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:560",
+            "Source/Abrams/Private/GameCharacter.cpp:1759"
+          ]
+        },
+        {
+          "text": "The zero-valued slots are listed as untraced, not proven unused. Shared row-0 consumers were checked (AI hold duration, secondary-target steering, camera request, projection sorcery, trap/spawner forwarding and shikigami code), but none is part of this character's traced action/AI path.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:118",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:121",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214",
+            "Source/Abrams/Private/GameTrapActionController.cpp:182",
+            "Source/Abrams/Private/GameShikigami.cpp:1251"
+          ]
+        }
+      ]
+    },
+    "CN_160_ATTACKC": {
+      "title": "Third-normal-attack timing and warp row (row index 1)",
+      "overview": "FloatValue[0]=1.0 and FloatValue[1]=50.0 are both read in the first start of NormalAttack_3. Value 1 supplies the extra distance for a ground warp behind the secondary target after the current animation ends; value 0 is the one-second delay before flag 159 is raised. No other FloatValue in this row has an identified CN_160 reader.",
+      "values": {
+        "0": {
+          "label": "Post-animation wait before next attack request",
+          "simple": "After the first hit's animation finishes, the spirit stays hidden for 1 second before it can queue the next NormalAttack_3 hit.",
+          "technical": "In FCN_160_NormalAttack_3::TickAttack this is read as GetOwnerUniqueFloat(0, 1), i.e. UniqueRows[1]->FloatValue[0]. It is used only when GetActionStartCount(NormalAttack_3)==0 and Phase==1. ActionElapsedTime accumulates DeltaTime; while the configured 1.0 is greater than ActionElapsedTime the function returns; when ActionElapsedTime reaches or exceeds 1.0 (inclusive boundary) SetFlag159(true) runs. Phase 1 is entered only after IsCurrentAnimationPlaying() becomes false in Phase 0, so the wait starts after that animation stops. FilterRequests then uses GetFlag159 to re-add NormalAttack_3 and run the base filter. Units are seconds of accumulated action time.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_160_ActionController.cpp:104",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:106",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:112",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:126",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:128",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:132",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:177",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:179",
+            "Source/Abrams/Private/GameCharacterAction.cpp:933",
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Public/GameCharacterAction.h:137"
+          ]
+        },
+        "1": {
+          "label": "Warp distance behind the secondary target",
+          "simple": "After the first hit's animation finishes, the spirit moves to a ground spot behind its secondary target, using 50.0 world-distance units as the extra stand-off.",
+          "technical": "In the same first-start Phase 0 branch, after GAISlot022_FlagSetter(false), RefreshSlotEffects(false) and SetOwnedEffect1D8And1E0Active(false), the code calls GameWarp_FindPlacementAroundSecondaryTarget(Owner, GetOwnerUniqueFloat(1, 1), 180.0f) and passes the result to RequestLocation(Location, 2). GetOwnerUniqueFloat(1,1) is UniqueRows[1]->FloatValue[1]=50.0. The helper rotates the target's forward 180 degrees about the target's up (hard-coded, not a unique value), then tests four directions 0/90/180/270 degrees about world Z; reach is owner scaled capsule radius + Distance + 1.0, and each candidate is ground-snapped with wall checks, choosing the spot whose ground Z is closest to the target's. If the secondary target is invalid, the helper returns the owner's current location, so the 50.0 has no positional effect on that fallback. The value is a distance in the warp's world-distance units, not a fixed teleport duration or a simple exact offset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_160_ActionController.cpp:104",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:116",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:121",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:122",
+            "Source/Abrams/Private/GameCharacterAction.cpp:933",
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Private/GameWarpLocation.cpp:616",
+            "Source/Abrams/Private/GameWarpLocation.cpp:618",
+            "Source/Abrams/Private/GameWarpLocation.cpp:627",
+            "Source/Abrams/Private/GameWarpLocation.cpp:637",
+            "Source/Abrams/Private/GameWarpLocation.cpp:670",
+            "Source/Abrams/Private/GameWarpLocation.cpp:679",
+            "Source/Abrams/Public/GameWarpLocation.h:39"
+          ]
+        }
+      },
+      "untraced": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Only the first start of NormalAttack_3 reads this row. On start count 1 the tick instead checks IsFallAction and then Unknown1F9 plus the owner's ground-trace flag; on start count 2 it delegates to the base AttackBase tick. Later start counts do nothing in this override.",
+          "evidence": [
+            "Source/Abrams/Private/CN_160_ActionController.cpp:106",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:138",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:139",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:144",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:149",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:2588"
+          ]
+        },
+        {
+          "text": "The two nonzero values belong to the hide/wait/reveal lifecycle, not to damage or cursed-energy cost. The first-start branch hides owner effects before the warp; FinishAttackEffects restores them only when the next action is a different type, while UniqueAction cases -1/0/5/10 and StartAttackHoming manage collision locks and the provisional action flags without reading unique floats.",
+          "evidence": [
+            "Source/Abrams/Private/CN_160_ActionController.cpp:50",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:58",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:79",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:116",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:160",
+            "Source/Abrams/Private/CN_160_ActionController.cpp:163",
+            "Source/Abrams/Private/GameCharacterEffectController.cpp:56",
+            "Source/Abrams/Private/GameCharacterEffectController.cpp:277"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "The controller is intentionally restrictive: CreateAction overrides only NormalAttack_3 with FCN_160_NormalAttack_3 and delegates every other action to the base factory. CanAcceptActionType outright refuses 20 types, including Guard/GuardAir, Step/StepAir, both air-dash begins, DashJumpBegin, several normal/air attack suffixes, all four cursed-energy attacks and both super attacks. GetAirJumpLimit is 2; tag combo, revival buff and situation voice are false; InitCharacterSpecificState copies the shared cancel table and swaps DashJumpBegin for RunJumpBegin on NormalDash while adding JumpAirBegin/RunJumpAirBegin to JumpAir and RunJumpAir.",
+      "evidence": [
+        "Source/Abrams/Private/CN_160_ActionController.cpp:188",
+        "Source/Abrams/Private/CN_160_ActionController.cpp:201",
+        "Source/Abrams/Private/CN_160_ActionController.cpp:205",
+        "Source/Abrams/Private/CN_160_ActionController.cpp:219",
+        "Source/Abrams/Private/CN_160_ActionController.cpp:234",
+        "Source/Abrams/Public/CN_160_ActionController.h:31",
+        "Source/Abrams/Public/CN_160_ActionController.h:34"
+      ]
+    },
+    {
+      "text": "The engine binds this character to UCN_160_ActionController and to FGameCharacterAIThinkNode_CN_160. The AI setup/tick traced in source uses brain keys, random rolls and hard-coded distances such as 1200.0 rather than unique rows: SetupThinkParameters, SetupSlot34 and SetupRandomParameters have verification MATCH entries, but the Tick body is still marked DIFF, so fine-grained AI details are reconstruction-level evidence rather than a linked-exe byte match.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:627",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:204",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:347",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:394",
+        "Tools/verify/CHAR/ai-family-verified.md:123",
+        "Tools/verify/CHAR/ai-wave4-T.md:39",
+        "Tools/verify/CHAR/ai-source-audit.md:63"
+      ]
+    },
+    {
+      "text": "No per-character .inl file is included by the CN_160 controller TU; it includes only its own headers plus GameCharacter.h and GameActorInterface.h. The two row-1 reads go through the out-of-line FGameCharacterAction::GetOwnerUniqueFloat helper, which forwards to AGameCharacter::GetCharacterUniqueFloatValue. MakeUniqueCameraRequest, trap GetUniqueFloat forwarding and AGameShikigami's separate GetCharacterUniqueFloatValue were checked as shared readers but are not in this character's traced path.",
+      "evidence": [
+        "Source/Abrams/Private/CN_160_ActionController.cpp:1",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941",
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/GameShikigami.cpp:1251",
+        "Tools/verify/CHAR/UniqueRowsInline.md:16"
+      ]
+    },
+    {
+      "text": "Verification caution: the CN_160 action record says this class was parked/unregistered, its four converted bodies were withdrawn from MATCH because the linked Shipping exe discarded them, and slot 131 still needed a full raw decode at that time. The descriptions here follow the current reconstructed source and the decoded slot comments, not a claim that this exact source is byte-identical in the retail executable.",
+      "evidence": [
+        "Tools/verify/CHAR/CN_160_ActionController.md:51",
+        "Tools/verify/CHAR/CN_160_ActionController.md:80"
+      ]
+    }
+  ]
+}

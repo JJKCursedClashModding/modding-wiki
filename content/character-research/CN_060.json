@@ -1,0 +1,156 @@
+{
+  "overview": "Two settings control the timing of this cursed spirit’s rushing attack and how soon it gets up if the attack fails.",
+  "technicalOverview": "Childish Cursed Spirit (CN_060) is a non-playable cursed spirit with its own action, behavior and bone controllers. Its only populated unique row, CharacterUniqueDataTable4/CN_060 at CharacterDataTable.Id_CharacterUnique row 0, has just two traced tuning numbers: a dash-transition delay and a getup delay. They belong to a custom NormalAttack_1 / NormalAttackAir_1 state machine that rushes forward, can fail into a downed sequence, and then recovers. The accessor is an unchecked two-hop lookup, UniqueRows[RowIndex]->FloatValue[ValueIndex]; this character's code uses only the constant row index 0. All other row slots are zero in the supplied data, and shared helpers were checked for row-0 reads before leaving them untraced; no CN_060-specific read of those slots was found. Descriptions below are traced from the reconstructed consumer source, not from a gameplay capture.",
+  "rows": {
+    "CN_060": {
+      "title": "Dash follow-up and getup timing",
+      "overview": "This single row times the special normal-attack rush before its second attack animation, and the later getup after a failed rush. The remaining zero slots are not read by CN_060's own action, behavior, AI, effect or bone code; shared row-0 readers belong to other characters' paths.",
+      "values": {
+        "0": {
+          "label": "Forward-rush duration",
+          "simple": "How long the special normal attack keeps checking the route ahead before it switches to the follow-up attack animation. With the supplied value 3, that wait is about three seconds once the rush phase starts.",
+          "technical": "TCN_060_NormalAttack_1<TBase>::TickAttack, instantiated for both ground NormalAttack_1 and NormalAttackAir_1, reads GetOwnerUniqueFloat(0, 0) in Phase 1. Phase 0 first requires a ground trace hit and no currently playing animation, then plays attack row 1, sets Phase 1 and ActionElapsedTime = 0, sets move mode 6, enables lean, and starts dash effects/sounds. In Phase 1, ActionElapsedTime accumulates DeltaTime. If the ground trace is lost, the action applies NormalDashAir inertia and aborts; if the forward capsule trace hits a world object, it plays FX_CP_000_04611 / SE_CP_000_07011 and calls StartFailure01 instead of consulting this value. Otherwise the comparison value > ActionElapsedTime returns while the timer is below the value; when elapsed reaches or exceeds it (inclusive equality), the code stops float interpolation, disables lean, plays attack row 2, applies dash-air inertia, and advances to Phase 2. Seconds are established by DeltaTime accumulation. GetOwnerUniqueFloat forwards to AGameCharacter::GetCharacterUniqueFloatValue(ValueIndex, RowIndex), which is UniqueRows[0]->FloatValue[0] with no bounds check. A separate shared use applies to this character as a receiver: FGameCharacterAction_ProjectionSorceryReceive::Tick uses GetOwnerUniqueFloat(0, 0) as RestraintTime only when Request.DamageTableRow is null; when a damage row exists, that row's RestraintTime wins. It releases when RestraintTime <= ActionElapsedTime. The shared SteerTowardSecondaryTarget helper also reads (0,0) as an angle divisor, but its traced callers are CN_041 and CN_140 actions, not CN_060.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_060_ActionController.cpp:84",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:94",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:103",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:132",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:154",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:167",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:171",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:173",
+            "Source/Abrams/Private/GameCharacterAction.cpp:933",
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3492"
+          ]
+        },
+        "1": {
+          "label": "Getup delay",
+          "simple": "How long the character stays in the late recovery state before playing the getup animation. With the supplied value 5, that wait is about five seconds after the struggle animation finishes.",
+          "technical": "The same CN_060 normal-attack template reads GetOwnerUniqueFloat(1, 0) in Phase 5, after Phase 3 played AttackD_01_Failure_02 and set bFailureFlag and Phase 4 played AttackD_01_Struggling_01. Phase 5 requires an active ground trace; otherwise it breaks to the common tail, sets Phase to MAX_int32 and Byte16 to 1, ending the action without getup. While grounded it adds DeltaTime to ActionElapsedTime and returns as long as value > ActionElapsedTime. At elapsed >= value the boundary is inclusive: it plays AttackD_01_Getup_01, advances to Phase 6, and clears bFailureFlag. Seconds are established by DeltaTime accumulation. bFailureFlag is the reconstructed +0x1F9 byte exposed by AllowsGroundAlignment, and the failure path can be entered from a blocked attack in Phase 1 or a real (non-None, non-Invalid) damage type received in Phase 1. The read is UniqueRows[0]->FloatValue[1] with no bounds check. Shared trap code also reads (1,0) for the CP_140 one-shot volcano trap, but CN_060 has no trap-spawn or source-forwarding path in its reconstructed source, so that is not assigned to this character.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_060_ActionController.cpp:57",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:191",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:212",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:217",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:218",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:222",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:224",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:253",
+            "Source/Abrams/Public/CN_060_Actions.h:19",
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Private/GameTrapActionController.cpp:182",
+            "Source/Abrams/Private/GameTrapActionController.cpp:227"
+          ]
+        }
+      },
+      "untraced": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Indices 2-13 were checked rather than assumed unused from their zero values. No CN_060 reader was found: its action TU only reads (0,0) and (1,0); its behavior/bone TUs contain no unique-float reads; MakeUniqueCameraRequest's row-parameterized reads (values 0-10) are called only from other characters' TUs; shared AI hold-node resets read (0,0), (1,0) and (2,0) only for CP_040/CP_050-style controllers, which CN_060 does not use; trap forwarding targets rows 2/7/8 and has no CN_060 source path.",
+          "evidence": [
+            "Source/Abrams/Private/CN_060_ActionController.cpp:167",
+            "Source/Abrams/Private/CN_060_ActionController.cpp:218",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+            "Source/Abrams/Private/GameTrapActionController.cpp:182"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Row resolution is positional and unchecked: CharacterDataTable.Id_CharacterUnique supplies one pointer per row name, and GetCharacterUniqueFloatValue indexes UniqueRows[RowIndex] then FloatValue[ValueIndex] without bounds or null checks. CN_060 uses constant row 0 only; no dynamic row index, GUF-style indirection, or separate row selection was found in its consumers.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Tools/verify/CHAR/UniqueRowsInline.md:19"
+      ]
+    },
+    {
+      "text": "Only two action types are custom: CreateAction returns TCN_060_NormalAttack_1 for NormalAttack_1 and TCN_060_NormalAttackAir_1 for NormalAttackAir_1, and delegates every other type to the base factory. The air type overrides GetAttackSetRow to use Id_AttackSet_Normal_1, so it reuses the ground Normal_1 attack set before the shared template state machine runs.",
+      "evidence": [
+        "Source/Abrams/Private/CN_060_ActionController.cpp:25",
+        "Source/Abrams/Private/CN_060_ActionController.cpp:29",
+        "Source/Abrams/Private/CN_060_ActionController.cpp:34",
+        "Source/Abrams/Private/CN_060_ActionController.cpp:278",
+        "Source/Abrams/Public/CN_060_Actions.h:40",
+        "Source/Abrams/Public/CN_060_Actions.h:45"
+      ]
+    },
+    {
+      "text": "The controller's own per-character state is a copied and edited action-cancel table, not unique floats: NormalDash loses DashJumpBegin and gains RunJumpBegin, while JumpAir and RunJumpAir each gain JumpAirBegin and RunJumpAirBegin. It also overrides air-jump limit to 2 and forces tag-combo, revival-buff and situation-voice helpers to false.",
+      "evidence": [
+        "Source/Abrams/Private/CN_060_ActionController.cpp:288",
+        "Source/Abrams/Private/CN_060_ActionController.cpp:291",
+        "Source/Abrams/Private/CN_060_ActionController.cpp:294",
+        "Source/Abrams/Private/CN_060_ActionController.cpp:297",
+        "Source/Abrams/Private/CN_060_ActionController.cpp:300",
+        "Source/Abrams/Public/CN_060_ActionController.h:42"
+      ]
+    },
+    {
+      "text": "AI is deliberately narrow: UCN_060_BehaviorController specializes only AI ordinal 0x0B with NormalAttack1Aim, all other ordinals go to the parent factory, and FGameCharacterAIThinkNode_CN_060's long-range group also picks behavior index 0x0B. No cursed-energy hold behavior is installed for CN_060, so generic AI hold timings are not part of this row.",
+      "evidence": [
+        "Source/Abrams/Private/CN_060_BehaviorController.cpp:8",
+        "Source/Abrams/Private/CN_060_BehaviorController.cpp:9",
+        "Source/Abrams/Private/CN_060_BehaviorController.cpp:12",
+        "Source/Abrams/Private/GameCharacterAIThinkNode.cpp:3278",
+        "Source/Abrams/Private/GameCharacterAIThinkNode.cpp:3300",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:194",
+        "Source/Abrams/Public/GameCharacterAINode.h:308"
+      ]
+    },
+    {
+      "text": "A distinctive bone-controller quirk is that retail slot 101 uses the left/right elbow and hand bones as the IK knee/toe keys written into the anim instance's ankle effect targets; no ankle height is measured, AnkleHeight is forced to 1.0, and UpdateLeanAlpha, TickAimOffset and TickFootBend are empty overrides. This is separate from the unique-row values.",
+      "evidence": [
+        "Source/Abrams/Private/CN_060_BoneController.cpp:7",
+        "Source/Abrams/Private/CN_060_BoneController.cpp:14",
+        "Source/Abrams/Private/CN_060_BoneController.cpp:23",
+        "Source/Abrams/Private/CN_060_BoneController.cpp:31",
+        "Source/Abrams/Private/CN_060_BoneController.cpp:40",
+        "Source/Abrams/Private/CN_060_BoneController.cpp:44"
+      ]
+    },
+    {
+      "text": "Camera and trap paths were checked but are not CN_060 unique-row consumers here. MakeUniqueCameraRequest reads camera values from a caller-supplied row, yet no CN_060 action calls it; the custom attack instead plays dash/map-ground effects and sounds directly. FGameTrapAction::GetUniqueFloat forwards to the trap's source character, but no CN_060 trap spawn is present in its controller, and the projectile code has no corresponding unique-float read. Do not assign CP_140/CP_150 trap rows or other characters' camera rows to this character.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction.cpp:941",
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/CN_060_ActionController.cpp:118",
+        "Source/Abrams/Private/CN_060_ActionController.cpp:124",
+        "Source/Abrams/Private/CN_060_ActionController.cpp:128"
+      ]
+    },
+    {
+      "text": "Reconstruction caveat: the CN_060 action record describes the two action vtables and decoded slots but still labels the work blocked/lane-record rather than a live gameplay measurement; the two custom bytes bStartedFlag and bFailureFlag are explicitly named by the reconstructor. The value explanations above are traced from those reconstructed bodies; where a generic path exists but is not called by CN_060, it is called out rather than treated as this character's tuning. No per-character CN_060 .inl is included: its headers include only generated/base/action headers, while GameCharacterActionInline.h defines the generic unique-float hop and is not CN_060-specific.",
+      "evidence": [
+        "Tools/verify/CHAR/CN_060_ActionController.md:1",
+        "Tools/verify/CHAR/CN_060_ActionController.md:19",
+        "Tools/verify/CHAR/CN_060_ActionController.md:22",
+        "Source/Abrams/Public/CN_060_Actions.h:19",
+        "Source/Abrams/Public/CN_060_ActionController.h:1",
+        "Source/Abrams/Public/GameCharacterActionInline.h:7"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,740 @@
+{
+  "overview": "Inumaki’s settings tune his throat gauge, cursed-speech moves, and attack bonuses that depend on cursed-energy levels.",
+  "technicalOverview": "Toge Inumaki (CP_070) uses a shared AGameCharacter with a dedicated UCP_070_ActionController. Seven populated CharacterUniqueDataTable2 rows drive throat-gauge/cursed-energy recovery, cursed-level matchup scaling, ExtraAttack and NormalAttack_3_1 hold times, CursedEnergyAttack_1 level bonuses, and the two AttackH (CursedEnergyAttack_2) openings. His JugonStun hits also make the receiver read Toge's row 3 as attacker data. Row indices are the zero-based positions in CharacterDataTable.Id_CharacterUnique; FloatValue indices are also zero-based. Values below distinguish traced reads from anything not identified.",
+  "rows": {
+    "CP_070": {
+      "title": "Core recovery and cursed-level matchup scaling",
+      "overview": "The main row sets how quickly Toge recovers cursed energy at different throat-gauge levels, and how strongly hits are boosted when his cursed-energy level is above or below the target's.",
+      "values": {
+        "0": {
+          "label": "Partial-gauge cursed-energy recovery",
+          "simple": "With some throat gauge left, cursed energy regenerates more slowly than the normal controller rate.",
+          "technical": "UCP_070_ActionController::GetCursedEnergyRecoverRate reads the status bonus ratio. If ratio > 0.5 it returns the inherited product; if 0 < ratio <= 0.5 it returns this value (0.8); if ratio <= 0 it uses index 1 instead. The result is a multiplier: AGameCharacter multiplies it into the final cursed-energy recovery rate. When the free-battle throat-gauge option is on, GetBonusValueRatio is always 1.0, so this branch is skipped.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1270-1282",
+            "Source/Abrams/Private/GameCharacter.cpp:3037-3041",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:2178-2188",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:186-199"
+          ]
+        },
+        "1": {
+          "label": "Empty-gauge cursed-energy recovery",
+          "simple": "With no throat gauge left, cursed energy regenerates at 0.6 of the normal controller rate.",
+          "technical": "The final else branch of GetCursedEnergyRecoverRate, used only when GetBonusValueRatio() <= 0.0. Lower/equal to zero selects this value; any positive ratio selects index 0 or the inherited rate.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1270-1282",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:186-199"
+          ]
+        },
+        "2": {
+          "label": "One-level advantage, first bonus pool",
+          "simple": "When Toge is exactly one cursed-energy level above a character target, hits feed 0.6 times the base amount into the first bonus pool.",
+          "technical": "In AccumulateBonus168, if the receiver is non-null, yields a game character, and clamped-owner minus clamped-target level is exactly +1, the addend becomes Value * this row value before PendingBonus168 is increased. Other level differences use their own keys; a difference of 0 or a non-character receiver leaves Value unscaled.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:116-142",
+            "Source/Abrams/Public/GameCharacterStatusController.h:266-270"
+          ]
+        },
+        "3": {
+          "label": "Two-level advantage, first bonus pool",
+          "simple": "A +2 cursed-energy level advantage scales first-pool hit bonuses by 0.6.",
+          "technical": "Same AccumulateBonus168 gate as index 2, but selected only by level difference exactly +2. The level is clamped to 1..3 before subtraction, so +2 is the largest positive difference.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:116-142",
+            "Source/Abrams/Public/GameCharacterStatusController.h:266-270"
+          ]
+        },
+        "4": {
+          "label": "One-level disadvantage, first bonus pool",
+          "simple": "When Toge is exactly one level below the target, first-pool hit bonuses are multiplied by 1.5.",
+          "technical": "AccumulateBonus168 selects this key for clamped level difference exactly -1. The multiplier is applied only when the receiver resolves to a game character; otherwise the incoming Value is added unchanged.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:116-142"
+          ]
+        },
+        "5": {
+          "label": "Two-level disadvantage, first bonus pool",
+          "simple": "At two levels below the target, first-pool hit bonuses are multiplied by 1.5.",
+          "technical": "AccumulateBonus168 selects this key only for clamped level difference exactly -2. Differences of 0, -1, +1 and +2 have separate or unscaled handling; there is no broader 'lower level' rule.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:116-142"
+          ]
+        },
+        "6": {
+          "label": "One-level advantage, second bonus pool",
+          "simple": "A +1 level advantage scales second-pool hit bonuses by 0.5.",
+          "technical": "AccumulateBonus16C mirrors AccumulateBonus168: with a character receiver and clamped level difference exactly +1, Value * 0.5 is added to PendingBonus16C; otherwise Value is unchanged.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:149-175"
+          ]
+        },
+        "7": {
+          "label": "Two-level advantage, second bonus pool",
+          "simple": "A +2 level advantage scales second-pool hit bonuses by 0.5.",
+          "technical": "Selected only by clamped level difference exactly +2 in AccumulateBonus16C. The second pool is later spent as hit-point reduction when the bonus ratio is empty (see FlushBonusPool).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:149-175",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:183-205"
+          ]
+        },
+        "8": {
+          "label": "One-level disadvantage, second bonus pool",
+          "simple": "At -1 level difference, second-pool hit bonuses are multiplied by 1.5.",
+          "technical": "AccumulateBonus16C selects this key for clamped owner-minus-target level exactly -1 and multiplies the incoming bonus before adding it to PendingBonus16C.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:149-175"
+          ]
+        },
+        "9": {
+          "label": "Two-level disadvantage, second bonus pool",
+          "simple": "At -2 level difference, second-pool hit bonuses are multiplied by 1.5.",
+          "technical": "AccumulateBonus16C selects this key for clamped level difference exactly -2. No fallback to this key is used for larger or smaller differences; those either use another exact case or leave Value unscaled.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:149-175"
+          ]
+        }
+      },
+      "untraced": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "A level difference of zero deliberately does not scale either pool; the switch has no case 0. The generic camera helper also reads slots 0-10 but only when a controller calls MakeUniqueCameraRequest, and no CP_070 call site does.",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:116-175",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941-973"
+          ]
+        }
+      ]
+    },
+    "CP_070_2": {
+      "title": "Bonus charge refill and revival top-up",
+      "overview": "This row is used when a special normal attack spends one bonus charge and when Toge is revived. Both populated values are 100.",
+      "values": {
+        "0": {
+          "label": "NormalAttack_2_1 charge top-up",
+          "simple": "The special normal attack tops the throat gauge back up and spends one of the two stored charges.",
+          "technical": "TCP_070_NormalAttack_2_1::UniqueAction requires the action controller to be UCP_070_ActionController. It calls SetBonusValue((Setup.ThroatGauge == 1 ? BonusValueMax : BonusValue) + 100), then SetBonusCount(BonusCount - 1). SetBonusValue clamps to [0, BonusValueMax] with BonusValueMax initialized to 100, and SetBonusCount clamps to [0, BonusCountMax] with BonusCountMax initialized to 2. With the normal gauge already full, the displayed pool does not exceed 100.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:283-296",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:565-587",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:113-117"
+          ]
+        },
+        "1": {
+          "label": "Revival bonus top-up",
+          "simple": "On revival Toge gets both charges back and the bonus pool is topped up by 100.",
+          "technical": "UCP_070_ActionController::ApplyRevivalBuff calls Super first, then ResetBonusCount (BonusCountMax = BonusCount = 2), then the same clamped SetBonusValue formula with this value added to the current or cap value depending on Setup.ThroatGauge. The 100 is a pool amount, not a percentage because SetBonusValue clamps against a 100-point cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1194-1203",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3122-3127",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:565-571"
+          ]
+        }
+      },
+      "untraced": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The HUD for this character displays the bonus pool as a throated gauge with three color bands and lights two treat icons for the two charges; it reads status values, not these floats directly.",
+          "evidence": [
+            "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_070.cpp:27-50",
+            "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_070.cpp:56-85"
+          ]
+        }
+      ]
+    },
+    "CP_070_ATTACKE": {
+      "title": "ExtraAttack_1 bonus and first-start hold",
+      "overview": "Values for the ExtraAttack_1 action: base hit bonuses and three wait times chosen by how full the throat gauge is.",
+      "values": {
+        "0": {
+          "label": "ExtraAttack first bonus-pool add",
+          "simple": "Successful extra attacks feed 8 points into the first bonus pool before level-difference scaling.",
+          "technical": "FCP_070_ExtraAttack_1 adds this value to PendingBonus168 on collision end when no target was hit, on FinishAttackEffects only when the pool has not already been flushed, bByte1E6 == 1 and bHitTarget == 0, and passes it through AccumulateBonus168 on a receiver hit. Every path then calls FlushBonusPool.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1010-1023",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1026-1034",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1101-1113"
+          ]
+        },
+        "1": {
+          "label": "ExtraAttack second bonus-pool add",
+          "simple": "Successful extra attacks feed 24 points into the second bonus pool before level-difference scaling.",
+          "technical": "The parallel PendingBonus16C add uses this value in the same three ExtraAttack_1 paths. On a receiver hit, AccumulateBonus16C may multiply it by the main row's level-difference key before adding; the other two paths add it directly.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1010-1023",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1026-1034",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:149-175"
+          ]
+        },
+        "2": {
+          "label": "Full-gauge extra hold",
+          "simple": "With a high bonus ratio the first extra attack waits 0.6 seconds before allowing the next action.",
+          "technical": "Only on ExtraAttack_1 start count exactly 1. If GetBonusValueRatio() > 0.5, ActionElapsedTime is set to 0.6 seconds; FGameActionState::Tick adds DeltaTime to Elapsed, and ExtraAttack_1::Tick sets Flag159 once Elapsed >= ActionElapsedTime. Higher ratios (>0.5) take this shortest 0.6-second branch.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1051-1075",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1079-1095",
+            "Source/Abrams/Private/GameCharacterAction.cpp:43-49"
+          ]
+        },
+        "3": {
+          "label": "Mid-gauge extra hold",
+          "simple": "With a partly filled bonus ratio the hold is 0.8 seconds.",
+          "technical": "Selected when start count is 1 and 0.0 < GetBonusValueRatio() <= 0.5. The boundary at exactly 0.5 belongs to this branch because the higher branch uses strict > 0.5. This is longer than the 0.6-second high-gauge branch and shorter than the empty-gauge branch.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1051-1075",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:186-199"
+          ]
+        },
+        "4": {
+          "label": "Empty-gauge extra hold",
+          "simple": "With no bonus gauge left the first extra attack holds for 1 second.",
+          "technical": "The final else branch when start count is 1 and GetBonusValueRatio() <= 0.0. Elapsed is compared against this stored time in seconds before Flag159 is set.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1051-1075",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1079-1095"
+          ]
+        }
+      },
+      "untraced": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "ExtraAttack_1 is queued by NormalAttack_3 while Flag158 is set and the NormalAttack_3 key is pressed; the row name here is CP_070_ATTACKE, while the action set it uses is CP_070_ATTACKE_2.",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:51-59",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:1116-1120"
+          ]
+        }
+      ]
+    },
+    "CP_070_ATTACKF": {
+      "title": "NormalAttack_3_1 bonus, hold, and cursed-speech stun",
+      "overview": "This row serves two traced roles: NormalAttack_3_1 bonus/hold timing, and the attacker-side stun timing for JugonStun hits from AttackF and AttackH.",
+      "values": {
+        "0": {
+          "label": "NormalAttack_3_1 first bonus-pool add",
+          "simple": "The third normal attack feeds 28 points into the first bonus pool before level scaling.",
+          "technical": "TCP_070_NormalAttack_3_1 uses this as PendingBonus168 add on collision end with no hit, on FinishAttackEffects under the not-flushed / bByte1E6 / not-hit gate, and as the base passed to AccumulateBonus168 on a receiver hit.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:903-915",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:920-930",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:992-1004"
+          ]
+        },
+        "1": {
+          "label": "NormalAttack_3_1 second bonus-pool add",
+          "simple": "The third normal attack feeds 50 points into the second bonus pool before level scaling.",
+          "technical": "Parallel PendingBonus16C add in the same NormalAttack_3_1 paths. On hits it may be multiplied using the main row's level-difference key; on no-hit/dealt paths it is added directly before FlushBonusPool.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:903-915",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:920-930",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:992-1004"
+          ]
+        },
+        "2": {
+          "label": "Full-gauge third-attack hold",
+          "simple": "A high bonus ratio makes the first third-attack start hold for 0.35 seconds.",
+          "technical": "On start count exactly 1, ratio > 0.5 stores this value as ActionElapsedTime; TickAttack waits until Elapsed reaches it before setting Flag159. This is the shortest of the three third-attack hold branches.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:945-963",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:969-990"
+          ]
+        },
+        "3": {
+          "label": "Mid-gauge third-attack hold",
+          "simple": "A partly filled bonus ratio makes the hold 0.7 seconds.",
+          "technical": "Chosen when start count is 1 and 0.0 < ratio <= 0.5. The 0.5 boundary is inclusive here because the higher branch requires strict > 0.5.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:945-963",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:186-199"
+          ]
+        },
+        "4": {
+          "label": "Empty-gauge third-attack hold",
+          "simple": "With no bonus gauge left, the hold is 1 second.",
+          "technical": "The final ratio <= 0.0 branch on the first start; stored in ActionElapsedTime and compared in seconds against Elapsed before Flag159 is set.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:945-963",
+            "Source/Abrams/Private/GameCharacterAction.cpp:43-49"
+          ]
+        },
+        "5": {
+          "label": "Jugon stun time, close range",
+          "simple": "A cursed-speech hit at close range stuns for 2 seconds.",
+          "technical": "When the receiver starts JugonStunReceive, the shared action reads the ATTACKER's row 3 value 5 as TimeNear. If DistanceFar == DistanceNear it always uses this value; otherwise any distance < 150 also uses it, and exactly 150 lands on the interpolation start, which evaluates to this value. This row is read from Toge when his JugonStun damage rows hit, not from the victim.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271-300",
+            "Source/Abrams/Private/GameBattleManager.cpp:2348-2354",
+            "Source/Abrams/Private/GameBattleDamage.cpp:403-408",
+            "JJKCCDatatables/datatables/DamageDataTable2.json:4140",
+            "JJKCCDatatables/datatables/DamageDataTable2.json:4805"
+          ]
+        },
+        "6": {
+          "label": "Jugon stun time, far range",
+          "simple": "A cursed-speech hit at long range stuns for 1.5 seconds.",
+          "technical": "The ATTACKER's row 3 value 6 is TimeFar. If the 3D attacker-to-receiver distance is > 800, this value is used directly; at exactly 800 the interpolation endpoint also evaluates to it. Between the thresholds the stun decreases linearly from 2 to 1.5 seconds as distance rises.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271-300",
+            "JJKCCDatatables/datatables/DamageDataTable2.json:4140",
+            "JJKCCDatatables/datatables/DamageDataTable2.json:4995"
+          ]
+        },
+        "7": {
+          "label": "Jugon far-distance threshold",
+          "simple": "At 800 world-space units or farther, the shorter 1.5-second stun applies.",
+          "technical": "Read as DistanceFar from the attacker's row 3 value 7. Distances strictly greater than this select TimeFar; distances inside it use the linear blend with value 8 as the near endpoint. The code uses FVector::Dist, so the unit is raw world-space distance, not a normalized ratio.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271-300"
+          ]
+        },
+        "8": {
+          "label": "Jugon near-distance threshold",
+          "simple": "At 150 world-space units or closer, the longer 2-second stun applies.",
+          "technical": "Read as DistanceNear from the attacker's row 3 value 8. Distances strictly below it select TimeNear; exactly at it the interpolation returns TimeNear. Higher distances progressively reduce the stun until the 800 threshold.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271-300"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "JugonStun damage mapping is conditional: the battle manager selects JugonStunReceive only for a non-downed receiver on a JugonStun damage row; a downed receiver is routed to Down instead and these unique values are not read by that action.",
+          "evidence": [
+            "Source/Abrams/Private/GameBattleManager.cpp:2320-2354",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271-300"
+          ]
+        }
+      ]
+    },
+    "CP_070_ATTACKG": {
+      "title": "CursedEnergyAttack_1 level-based hit bonuses",
+      "overview": "AttackG's first six values are the per-cursed-energy-level bonus amounts for CursedEnergyAttack_1.",
+      "values": {
+        "0": {
+          "label": "Level 1 first bonus-pool add",
+          "simple": "At cursed-energy level 1, CursedEnergyAttack_1 feeds 20 points into the first pool.",
+          "technical": "GetBonus168Unique returns row 4 value 0 for GetCursedEnergyLevel() == 1 and also as the default fallback when the level is neither 1, 2 nor 3. The returned amount is added directly on no-hit collision end / finish paths and passed through AccumulateBonus168 on a receiver hit.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:347-360",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:384-414",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:451-464"
+          ]
+        },
+        "1": {
+          "label": "Level 2 first bonus-pool add",
+          "simple": "At level 2 the first-pool add is 30.",
+          "technical": "GetBonus168Unique selects this key only for exact cursed-energy level 2. Unlike the level-1 key it is not the default fallback.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:347-360"
+          ]
+        },
+        "2": {
+          "label": "Level 3 first bonus-pool add",
+          "simple": "At level 3 the first-pool add is 40.",
+          "technical": "GetBonus168Unique selects this key for exact cursed-energy level 3. No interpolation or comparison against thresholds is performed; the switch is exact.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:347-360"
+          ]
+        },
+        "3": {
+          "label": "Level 1 second bonus-pool add",
+          "simple": "At level 1 the second-pool add is 70.",
+          "technical": "GetBonus16CUnique returns row 4 value 3 for exact level 1 and as the default fallback. It feeds PendingBonus16C through the same collision/hit/finish paths as the first pool.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:365-378",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:401-414"
+          ]
+        },
+        "4": {
+          "label": "Level 2 second bonus-pool add",
+          "simple": "At level 2 the second-pool add is 70.",
+          "technical": "Exact-level-2 selection in GetBonus16CUnique. The equal values at levels 1-3 mean this row does not change the second-pool add by level, even though the code still switches on level.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:365-378"
+          ]
+        },
+        "5": {
+          "label": "Level 3 second bonus-pool add",
+          "simple": "At level 3 the second-pool add is 70.",
+          "technical": "Exact-level-3 selection in GetBonus16CUnique. On a receiver hit the add can still be multiplied later by the main row's level-difference key in AccumulateBonus16C.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:365-378",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:149-175"
+          ]
+        }
+      },
+      "untraced": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The exact level switch is on the action's cursed-energy level; the controller's separate level-difference scaling comes from row 0 and is applied only when a receiver resolves to a game character.",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:347-378",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:116-175"
+          ]
+        }
+      ]
+    },
+    "CP_070_ATTACKH_1": {
+      "title": "CursedEnergyAttack_2 opening stance and bonuses",
+      "overview": "The first opening of AttackH uses these values for level-based bonuses and for the stance length; the three stance values are zero and are genuinely read.",
+      "values": {
+        "0": {
+          "label": "Opening first bonus-pool add, level 1",
+          "simple": "The first AttackH hit adds 5 to the first pool at level 1.",
+          "technical": "OnAttackHit chooses row 5 unless GetActionStartCount(attack type) == 2. With exact cursed-energy level 1, or any other level, it reads row 5 value 0 and passes it to AccumulateBonus168 for a newly seen receiver. The value can be multiplied by row 0's level-difference key before PendingBonus168 is increased.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:523-577",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:116-142"
+          ]
+        },
+        "1": {
+          "label": "Opening first bonus-pool add, level 2",
+          "simple": "The first AttackH hit adds 5 to the first pool at level 2.",
+          "technical": "Exact level 2 selects row 5 value 1 in the OnAttackHit switch; the receiver dedup list means the same receiver is only counted once per action reset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:523-577",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:605-612"
+          ]
+        },
+        "2": {
+          "label": "Opening first bonus-pool add, level 3",
+          "simple": "The first AttackH hit adds 5 to the first pool at level 3.",
+          "technical": "Exact level 3 selects row 5 value 2; other levels fall back to value 0. This is a hit bonus, not a damage multiplier.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:523-577"
+          ]
+        },
+        "3": {
+          "label": "Opening second bonus-pool add, level 1",
+          "simple": "The first AttackH hit adds 5 to the second pool at level 1.",
+          "technical": "The second switch in OnAttackHit uses row 5 value 3 for exact level 1 and as default, then passes it to AccumulateBonus16C, where row 0's level-difference key can scale it.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:523-577",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:149-175"
+          ]
+        },
+        "4": {
+          "label": "Opening second bonus-pool add, level 2",
+          "simple": "The first AttackH hit adds 5 to the second pool at level 2.",
+          "technical": "Exact level 2 selects row 5 value 4. The value is read only for a receiver not already in HitReceivers.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:523-577"
+          ]
+        },
+        "5": {
+          "label": "Opening second bonus-pool add, level 3",
+          "simple": "The first AttackH hit adds 5 to the second pool at level 3.",
+          "technical": "Exact level 3 selects row 5 value 5; any other level uses value 3 as the default.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:523-577"
+          ]
+        },
+        "6": {
+          "label": "Opening stance time, level 1",
+          "simple": "The open stance is configured for 0 seconds at level 1.",
+          "technical": "TickStance phase 0 plays AttackH_01_Standby_01 and sets bStanceOpen. Phase 1 adds DeltaTime to ActionElapsedTime and returns only while row 5 value 6 is greater than that elapsed time. With 0, the comparison is false on the first phase-1 tick, immediately playing AttackH_01_End_01 and clearing bStanceOpen. The zero is therefore traced and meaningful, not evidence of an unused slot.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:684-730",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:636-646"
+          ]
+        },
+        "7": {
+          "label": "Opening stance time, level 2",
+          "simple": "The level-2 stance time is also 0 seconds.",
+          "technical": "Exact cursed-energy level 2 selects value index 7 in the TickStance switch. The same strict 'value > elapsed' comparison applies; a zero value closes the stance on the first timing tick.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:684-730"
+          ]
+        },
+        "8": {
+          "label": "Opening stance time, level 3",
+          "simple": "The level-3 stance time is also 0 seconds.",
+          "technical": "Exact level 3 selects value index 8; levels outside 1-3 default to index 6. There is no 'longer at higher level' rule here: all three configured values are zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:684-730"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "While bStanceOpen is 1, ShouldInterceptHit refuses non-hyper-armor-ignoring hits; the counter response then reads row 6 slots 9 and 10, not this row's zero slots 9 and 10.",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:636-646",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:618-628"
+          ]
+        }
+      ]
+    },
+    "CP_070_ATTACKH_2": {
+      "title": "CursedEnergyAttack_2 second-start bonuses and counter slowdown",
+      "overview": "On the second start of AttackH, hits use these level-based bonus amounts. Slots 9 and 10 are read by the counter response even though both are zero here.",
+      "values": {
+        "0": {
+          "label": "Second-start first bonus-pool add, level 1",
+          "simple": "Second-start AttackH hits add 20 to the first pool at level 1.",
+          "technical": "OnAttackHit sets Row = 6 only when GetActionStartCount(attack type) == 2. With exact level 1, or an unexpected level, it reads row 6 value 0 and passes it to AccumulateBonus168. Other start counts use row 5 instead.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:523-577",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:270-273"
+          ]
+        },
+        "1": {
+          "label": "Second-start first bonus-pool add, level 2",
+          "simple": "Second-start AttackH hits add 25 to the first pool at level 2.",
+          "technical": "Exact level 2 selects row 6 value 1. The add is applied once per newly recorded receiver before FlushBonusPool can spend the pending amount.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:523-577"
+          ]
+        },
+        "2": {
+          "label": "Second-start first bonus-pool add, level 3",
+          "simple": "Second-start AttackH hits add 30 to the first pool at level 3.",
+          "technical": "Exact level 3 selects row 6 value 2; no interpolated or threshold-based selection is used.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:523-577"
+          ]
+        },
+        "3": {
+          "label": "Second-start second bonus-pool add, level 1",
+          "simple": "Second-start AttackH hits add 50 to the second pool at level 1.",
+          "technical": "The parallel row-6 switch reads value 3 for exact level 1 and as default, then calls AccumulateBonus16C with the newly seen receiver.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:523-577",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:149-175"
+          ]
+        },
+        "4": {
+          "label": "Second-start second bonus-pool add, level 2",
+          "simple": "Second-start AttackH hits add 50 to the second pool at level 2.",
+          "technical": "Exact level 2 selects row 6 value 4. The equal level-1/2/3 values mean this row does not vary the second-pool add by level, though the switch still distinguishes them.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:523-577"
+          ]
+        },
+        "5": {
+          "label": "Second-start second bonus-pool add, level 3",
+          "simple": "Second-start AttackH hits add 50 to the second pool at level 3.",
+          "technical": "Exact level 3 selects row 6 value 5; on a character receiver it may still be scaled by row 0's level-difference key before being added.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:523-577",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:149-175"
+          ]
+        },
+        "6": {
+          "label": "Level 1 open stance time",
+          "simple": "Sets how long Inumaki holds the open stance at cursed-energy level 1 before starting the closing animation.",
+          "technical": "In phase 1 of the second CursedEnergyAttack_2 start, the action accumulates DeltaTime and selects FloatValue[6] at CursedEnergyLevel 1. Other levels also use this slot. The phase holds while elapsed time is below the value in seconds. At or above it, the action starts AttackH_01_End_01, advances phase, and clears bStanceOpen.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:695-723"
+          ]
+        },
+        "7": {
+          "label": "Level 2 open stance time",
+          "simple": "Sets how long Inumaki holds the open stance at cursed-energy level 2 before starting the closing animation.",
+          "technical": "In phase 1 of the second CursedEnergyAttack_2 start, the action accumulates DeltaTime and selects FloatValue[7] at CursedEnergyLevel 2. The phase holds while elapsed time is below the value in seconds. At or above it, the action starts AttackH_01_End_01, advances phase, and clears bStanceOpen.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:695-723"
+          ]
+        },
+        "8": {
+          "label": "Level 3 open stance time",
+          "simple": "Sets how long Inumaki holds the open stance at cursed-energy level 3 before starting the closing animation.",
+          "technical": "In phase 1 of the second CursedEnergyAttack_2 start, the action accumulates DeltaTime and selects FloatValue[8] at CursedEnergyLevel 3. The phase holds while elapsed time is below the value in seconds. At or above it, the action starts AttackH_01_End_01, advances phase, and clears bStanceOpen.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:695-723"
+          ]
+        },
+        "9": {
+          "label": "Counter attacker-hit-slow duration",
+          "simple": "On a counter, the attacker is scheduled for a 0.01-second slowdown.",
+          "technical": "BuildHitResponse always sets bAttackerHitSlow true and writes this row-6 value into Response.AttackerHitSlowRate. GameBattleDamage then calls RequestTimeDilation(instigator, Response.AttackerHitSlowRate, Response.AttackerHitSlowTime, ...), and RequestTimeDilation's second argument is Duration, not rate. With 0.01 > 0, the request is accepted for 0.01 seconds using the next value as the dilation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:618-628",
+            "Source/Abrams/Private/GameBattleDamage.cpp:333-346",
+            "Source/Abrams/Private/GameTimeManager.cpp:62-66"
+          ]
+        },
+        "10": {
+          "label": "Counter attacker dilation",
+          "simple": "During that brief counter window the attacker runs at 0.3 times normal speed.",
+          "technical": "This row-6 value is written to Response.AttackerHitSlowTime, but it is passed as RequestTimeDilation's Dilation argument. Dilation 0.3 means 30 percent speed. Because duration comes from slot 9, a zero duration would suppress the effect regardless of this value; here slot 9 is 0.01, so the 0.3 dilation is requested for 0.01 seconds. The response itself runs only when the receiver's ShouldInterceptHit accepted the hit and the damage row does not have bIgnoreHyperArmor.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:618-646",
+            "Source/Abrams/Private/GameBattleDamage.cpp:333-346",
+            "Source/Abrams/Private/GameTimeManager.cpp:62-66"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Slots 6-8 are 0.6 here, but the traced stance-timing read uses row 5 for those slots; no CP_070 path was found that reads row 6 slots 6-8. They are untraced rather than treated as unused by proof.",
+          "evidence": [
+            "Source/Abrams/Private/CP_070_ActionController.cpp:523-545",
+            "Source/Abrams/Private/CP_070_ActionController.cpp:700-716"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Unique row resolution is generic: AGameCharacter builds UniqueRows from CharacterDataTable.Id_CharacterUnique, and the accessor is an unchecked array dereference. CP_070's nine-slot list has seven named rows followed by None entries, matching the seven rows documented here.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:560-565",
+        "Source/Abrams/Private/GameCharacter.cpp:1759-1762",
+        "JJKCCDatatables/datatables/CharacterDataTable.json:658-668"
+      ]
+    },
+    {
+      "text": "The two pending pools are spent together. FlushBonusPool prefers the first pool when the bonus ratio is above zero; when the ratio is empty and hit-point reduction is pending, it clamps HP after damage to a floor of 1. It then clears both pools and marks the action as flushed. This is the consumer that gives rows 2-6 their gameplay meaning.",
+      "evidence": [
+        "Source/Abrams/Private/CP_070_ActionController.cpp:183-205",
+        "Tools/verify/CHAR/CP_070_ActionController.md:138-142"
+      ]
+    },
+    {
+      "text": "Cursed speech is an attacker-data quirk: CP_070's AttackF and three AttackH opening damage rows are JugonStun. The shared JugonStunReceive action reads the attacker's row 3 values (2 s near, 1.5 s far, 150/800 world-unit thresholds), so changing CP_070_ATTACKF changes how long opponents are stunned by both AttackF and AttackH.",
+      "evidence": [
+        "JJKCCDatatables/datatables/DamageDataTable2.json:4140",
+        "JJKCCDatatables/datatables/DamageDataTable2.json:4805",
+        "JJKCCDatatables/datatables/DamageDataTable2.json:4900",
+        "JJKCCDatatables/datatables/DamageDataTable2.json:4995",
+        "Source/Abrams/Private/GameBattleManager.cpp:2348-2354",
+        "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271-300"
+      ]
+    },
+    {
+      "text": "AttackG's blow hits have a scripted follow-up: OnBlowHit recognizes CP_070_ATTACKG_01_01_{1,2,3}, spawns FX_CP_070_07211/07221/07231 at the receiver's root, and queues the matching CP_070_ATTACKG_02_01_n follow-up multi-hit. This is effect/damage-row logic, not a read of the unique float row itself.",
+      "evidence": [
+        "Source/Abrams/Private/CP_070_ActionController.cpp:226-275",
+        "Tools/verify/BEHAV/records/Z01.json:245"
+      ]
+    },
+    {
+      "text": "AI, trap, Shikigami and camera consumers were checked and excluded for these rows. CP_070 has a dedicated AI think node but no CP_070 behavior controller that instantiates the generic CursedEnergyAttack hold actions; CharacterDataTable gives it no traps or Shikigami; and no CP_070 controller/action calls MakeUniqueCameraRequest. The generic hold, trap/spawner, ShikigamiUniqueDataTable and camera helpers therefore do not add reads here.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:170",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:112-131",
+        "Source/Abrams/Private/CP_040_BehaviorController.cpp:10-11",
+        "Source/Abrams/Private/CP_050_BehaviorController.cpp:11",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941-973",
+        "JJKCCDatatables/datatables/CharacterDataTable.json:648-656"
+      ]
+    },
+    {
+      "text": "There is no CP_070-specific .inl file. The only .inl related to these reads is the shared GameCharacterActionInline.h helper, and the CP_070 bodies call the out-of-line GetOwnerUniqueFloat path; UniqueRowsInline.md records that the underlying slot is the raw unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference.",
+      "evidence": [
+        "Source/Abrams/Public/GameCharacterActionInline.h:7-12",
+        "Tools/verify/CHAR/UniqueRowsInline.md:19-21",
+        "Source/Abrams/Private/CP_070_ActionController.cpp:341-378"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,731 @@
+{
+  "overview": "Momo’s settings tune broom movement, ranged attacks, and the camera used when aiming.",
+  "technicalOverview": "Momo Nishimiya (CP_180) is a selectable Jujutsu Sorcerer built around a flying broom: a boosted, Jump-held dash, a held second normal attack, an aimed ranged beam, and a broom follow-up attack. Her AGameCharacter unique data lives in six populated rows of CharacterUniqueDataTable4, reached by zero-based row index through CharacterDataTable.Id_CharacterUnique; they are not AGameShikigami / ShikigamiUniqueDataTable data, and CP_180 has no trap or shikigami unique row. The numbers tune movement and camera behaviour rather than base stats. CP_180 has its own UCP_180_ActionController and UCP_180_BehaviorController over the shared base controllers, and reads these rows through the shared FGameCharacterAction::GetOwnerUniqueFloat / AGameCharacter::GetCharacterUniqueFloatValue helpers, which are unchecked float-array dereferences. No character-specific .inl file is included by the CP_180 sources; the only inline helper is the shared GameCharacterActionInline.h, which these code paths do not call. Descriptions below separate reads traced in CP_180's code from generic readers that merely exist in shared code.",
+  "rows": {
+    "CP_180": {
+      "title": "Momo's core movement and dash-gauge tuning",
+      "overview": "The main block for Momo Nishimiya's jump-hover, boosted dash and dash-gauge recovery. It is read often while she is airborne; while she is on the ground, two of its values are deliberately replaced by a fixed 1.0. A few generic systems also read the first three values.",
+      "values": {
+        "0": {
+          "label": "Airborne dash-gauge refill speed",
+          "simple": "How quickly the dash gauge fills again while Momo is in the air; on the ground this number is ignored.",
+          "technical": "UCP_180_ActionController::GetDashGaugeRecoverInterpSpeed returns 1.0 when GetGroundTraceHit()==1 (grounded), otherwise UniqueRows[0]->FloatValue[0]. AGameCharacter::GetActionValue99 forwards it to the status controller, which calls Interp1B0.Update(Value * DeltaTime) to advance the gauge-refill interpolation. The read is an unchecked array dereference. Generic readers of (0,0) also exist (secondary-target steering divisor, projection-sorcery receive restraint-time fallback, AI hold-node durations), but no CP_180 action was traced to those nodes, so they are noted rather than treated as Momo-specific effects.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1681",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1683",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1687",
+            "Source/Abrams/Private/GameCharacter.cpp:3034",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3510",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214"
+          ]
+        },
+        "1": {
+          "label": "Airborne dash-gauge wait rate",
+          "simple": "How fast the short pause before the air gauge starts refilling counts down; grounded characters use a fixed rate instead.",
+          "technical": "UCP_180_ActionController::GetDashGaugeRecoverWaitRate returns 1.0 when GetGroundTraceHit()==1, otherwise FloatValue[1] of row 0. AGameCharacter::GetActionValue100 passes it to UGameCharacterStatusController::Tick: DashGaugeRecoverWait = max(wait - Rate*DeltaTime, 0). When the wait reaches <= 0 the refill interpolation starts (unless the DashGaugeNotRecoverItem buff is active).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1691",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1693",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1697",
+            "Source/Abrams/Private/GameCharacter.cpp:3033",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3489",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3493",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3497"
+          ]
+        },
+        "2": {
+          "label": "Jump-hold hover gauge drain",
+          "simple": "Dash gauge spent per second by holding Jump to hover: with the stick still in a jump, or with the stick moving in a running jump.",
+          "technical": "FCP_180_Jump::Tick and FCP_180_RunJump::Tick pass FloatValue[2] of row 0 to GetNormalDashGaugeCost while Jump is held and the respective stick test passes (stick exactly zero for Jump, stick size > 0 for RunJump). The helper multiplies by the owner's normal dash gauge consume rate (0 while unlimited gauge); that cost is multiplied by DeltaTime, subtracted from DashGauge, clamped to [0, max], and the hold ends when the gauge reaches 0. 360 is the base cost before that multiplier; no other conversion is done in the traced code.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:470",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:472",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:474",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:494",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:496",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:2723",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:2725"
+          ]
+        },
+        "3": {
+          "label": "Boosted dash start-up gauge cost",
+          "simple": "One-time dash-gauge fee for starting a dash with Jump held (Momo's boosted dash).",
+          "technical": "FCP_180_NormalDash::GetBoostGaugeCost passes FloatValue[3] of row 0 to GetNormalDashGaugeCost. It is applied on a fresh Jump press when no JumpCount / RunJumpLimitWithoutHitPointMax / DashStepJumpLimit vow is active; otherwise the dash becomes a penalty dash and this cost is not charged. The result is subtracted from DashGauge with a floor of 0. The value 0 therefore means no upfront fee at the default rate, not that the entry is unused.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:512",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:610",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:612",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:620",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:2723"
+          ]
+        },
+        "4": {
+          "label": "Boosted dash gauge drain per second",
+          "simple": "Dash gauge drained each second while the Jump-boosted dash keeps going.",
+          "technical": "FCP_180_NormalDash::GetBoostDrainRate passes FloatValue[4] of row 0 to GetNormalDashGaugeCost; 330 is the base before the dash-gauge consume-rate multiplier (which is 0 with unlimited gauge). While bBoostActive is set, Tick subtracts DrainRate*DeltaTime from DashGauge, clamped to [0, max]. This is a recurring cost, separate from the start-up cost in value 3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:518",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:520",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:599",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:602",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:2723"
+          ]
+        },
+        "5": {
+          "label": "Boosted dash extra continuation window",
+          "simple": "A short grace period, in seconds, that keeps a boosted dash going after the ordinary dash would stop.",
+          "technical": "FCP_180_NormalDash::IsDashContinuing first asks the base dash; if that says stop, but bBoostActive==1 and FloatValue[5] of row 0 > BoostTime, it still returns true. BoostTime accumulates DeltaTime only while the boost is active and resets to 0 whenever the held-Jump state changes. The comparison is strict (>), so a 0.4-second window lapses once BoostTime reaches 0.4.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:227",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:230",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:603",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:606",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:609"
+          ]
+        }
+      },
+      "untraced": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The two recovery values in this row matter in the air: the controller returns a literal 1.0 on the ground, so editing them changes airborne gauge recovery only. Both overrides were verified byte-identical to retail in the reconstruction record.",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1681",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1691",
+            "Source/Abrams/Public/CP_180_ActionController.h:62",
+            "Source/Abrams/Public/CP_180_ActionController.h:66"
+          ]
+        }
+      ]
+    },
+    "CP_180_ATTACKC": {
+      "title": "AttackC combo-step hold timing",
+      "overview": "Two short timers that govern how long Momo holds her broom in her second normal attack and how long she may stay grounded before the follow-up animation takes over.",
+      "values": {
+        "0": {
+          "label": "AttackC hold duration",
+          "simple": "How long the AttackC step can be held before it moves into the next animation.",
+          "technical": "In TCP_180_NormalAttack_2::TickAttack (used by the ground and air NormalAttack_2 actions), when the action's start count is zero the phase-1/2 branch advances to phase 4 if a hit, guard or flag is set OR FloatValue[0] of row 1 <= ActionElapsedTime. Phase 3 continues to wait only while FloatValue[0] > ActionElapsedTime. Thus 0.3 s is an inclusive finishing boundary for the hold; these timers are only accumulated in this custom branch, not when the start count is nonzero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1525",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1544",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1546",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1566"
+          ]
+        },
+        "1": {
+          "label": "Grounded wait limit",
+          "simple": "Extra time on the ground before the held AttackC step is cut short.",
+          "technical": "Phase 3 keeps holding only while all of: no hit, no guard, no flag, FloatValue[0] > ActionElapsedTime and FloatValue[1] > GroundedWaitElapsed. GroundedWaitElapsed is zeroed on entering phase 3 and grows by DeltaTime there; the `>` comparisons mean 0.1 s is exclusive for the wait. Reaching the limit plays AttackC_01_02 on body and weapon and moves to phase 4.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1552",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1559",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1564",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1567",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1571"
+          ]
+        }
+      },
+      "untraced": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": []
+    },
+    "CP_180_ATTACKF": {
+      "title": "AttackF finisher row (no float reader found)",
+      "overview": "Momo's third normal attack finisher has a unique row with two nonzero numbers, but no code path in the reconstructed CP_180 sources or shared base actions reads them. The AttackF attack-set changeover uses a different table entirely.",
+      "values": {
+        "0": {
+          "label": "AttackF first value (unresolved)",
+          "simple": "A 0.5 stored on the AttackF finisher row; no on-screen effect could be traced to it.",
+          "technical": "No GetOwnerUniqueFloat or GetCharacterUniqueFloatValue call with ValueIndex 0 and RowIndex 2 appears in any CP_180 source or in the shared base action/controller code reachable from its action factory. The nearby (0,2) read found in FGameTrapAction reads the trap's source character, and CP_180's controller creates no trap. The AttackF name here only matches an AttackSet row swapped in by the passive stack; that is a different data table. Status is unresolved, not proof that retail never reads this value.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1143",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1183",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1188",
+            "Source/Abrams/Private/GameTrapActionController.cpp:182",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1306"
+          ]
+        },
+        "1": {
+          "label": "AttackF second value (unresolved)",
+          "simple": "A 2 stored on the same AttackF finisher row; no consumer was identified.",
+          "technical": "No call reading ValueIndex 1 of row 2 was found in the CP_180 action or behaviour controllers, nor in the shared base actions they instantiate. A shared (1,2) read exists only inside trap code, and CP_180 has no trap forwarding. The 2 must not be interpreted as a shot count or level merely from its size; its meaning is unresolved.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_BehaviorController.cpp:8",
+            "Source/Abrams/Public/CP_180_Actions.h:263",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1335",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1188"
+          ]
+        }
+      },
+      "untraced": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "This is the only populated Momo unique row without a traced float reader. Reused row names can have different consumers on other characters, so no behaviour was borrowed from another character's ATTACKF row.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1183",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1188"
+          ]
+        }
+      ]
+    },
+    "CP_180_ATTACKG": {
+      "title": "Cursed Energy 1 (AttackG) beam-aim steering",
+      "overview": "The aiming rules for Momo's first cursed-energy attack, the ranged broom beam: how long it can be held, its left/right and up/down limits, and how quickly the stick moves the aim. Later uses turn faster and drop the first-use yaw clamp.",
+      "values": {
+        "0": {
+          "label": "First beam hold time",
+          "simple": "Maximum time she can hold the beam on its first use.",
+          "technical": "FCP_180_CursedEnergyAttack_1::TickAttack, only in the Count==1 case, adds DeltaTime to ActionElapsedTime while the CursedEnergyAttack_1 key is held and ActionElapsedTime < FloatValue[0] of row 3. If the key is released or elapsed time reaches 0.5, the finish flags are set. This value is not consulted in the Count>=2 branch of this function.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:963",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:984",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:986",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:987",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:989"
+          ]
+        },
+        "1": {
+          "label": "First-use yaw range",
+          "simple": "How far left and right the beam can be pointed on its first use; the value is halved for each side.",
+          "technical": "HalfYawLimit = FloatValue[1] of row 3 * 0.5 (60 -> 30 degrees per side). For Count < 2 the accumulated YawOffset is clamped with FMath::Clamp(..., -HalfYawLimit, +HalfYawLimit), so both endpoints are allowed. For Count >= 2 the clamp is skipped and yaw keeps accumulating.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:968",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:970",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:971",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:972"
+          ]
+        },
+        "2": {
+          "label": "Beam downward pitch limit",
+          "simple": "Maximum downward angle of the beam aim.",
+          "technical": "Lower = FloatValue[2] of row 3. AimPitch = FMath::Clamp(AimPitch - Speed*Stick.Y, -Lower, Upper), so value 15 allows down to -15 degrees; clamp endpoints are inclusive. The resulting pitch drives AnimInstance FullBodyRotation.Roll and AimDirection.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:976",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:978",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:979",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:980"
+          ]
+        },
+        "3": {
+          "label": "Beam upward pitch limit",
+          "simple": "Maximum upward angle of the beam aim.",
+          "technical": "Upper = FloatValue[3] of row 3; the same inclusive clamp caps AimPitch at +40 degrees with this data. Both pitch limits are read every tick while aiming is active.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:977",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:978"
+          ]
+        },
+        "4": {
+          "label": "Beam steering speed",
+          "simple": "How fast the stick swings the beam, measured as degrees per second at full stick deflection.",
+          "technical": "Speed = FloatValue[4] of row 3 * DeltaTime (80 -> 80 degrees per second per full stick). It is multiplied by Stick.X for YawOffset and subtracted times Stick.Y for AimPitch on every aiming tick.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:967",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:968",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:978"
+          ]
+        },
+        "5": {
+          "label": "Later-use steering multiplier",
+          "simple": "Aim turns twice as fast on the second and later beam uses.",
+          "technical": "When the action's start count is >= 2, Speed *= FloatValue[5] of row 3 (2 doubles the per-frame yaw and pitch step). The same start-count test also removes the first-use yaw clamp, so these two effects combine on later activations.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:963",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:969",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:971"
+          ]
+        }
+      },
+      "untraced": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The beam follow-up dash is picked by cursed-energy level: CP_180_ATTACKG_1 / _2 / _3 in ActionDashDataTables, falling back to the current dash row if not found. This is a different table from the unique row; the beam camera itself always uses the fixed unique row 4.",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:913",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:921",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:923",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:925",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:926"
+          ]
+        }
+      ]
+    },
+    "CP_180_ATTACKG_SHOOT_CAMERA": {
+      "title": "Cursed Energy 1 beam-aim camera",
+      "overview": "The camera used during Momo's aimed broom beam (Cursed Energy 1 / AttackG): a high, far-back view with wide FOV, symmetric gaze limits, and a small orbit. The shared request builder reads the first eleven values of this row whenever the attack starts aiming.",
+      "values": {
+        "0": {
+          "label": "Camera offset along gaze-forward",
+          "simple": "Moves the camera -180 units along its gaze-forward axis in this shot.",
+          "technical": "MakeUniqueCameraRequest(2, 4) reads FloatValue[0] of row 4 into FVirtualCameraRequest.CameraOffset.X. UpdateRequestCamera rotates that offset by the gaze rotation and adds it to the eye base, then traces toward the gaze for collision. This helper's CameraMode argument 2 means 'build the request from a unique-float row', not virtual-camera mode 2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:716",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera sideways offset",
+          "simple": "Moves the camera -150 units along its gaze-local sideways axis.",
+          "technical": "FloatValue[1] of row 4 becomes CameraOffset.Y in the same MakeUniqueCameraRequest(2, 4) call; it is part of the offset vector rotated into world space by the gaze rotation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:716",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera height offset",
+          "simple": "Raises or lowers the camera 100 units relative to the eye base in this shot.",
+          "technical": "FloatValue[2] of row 4 becomes CameraOffset.Z. Positive values place the camera above the eye base, negative below it, before the gaze-space rotation is applied. This value is read even when it is zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:716",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Largest downward gaze angle",
+          "simple": "Limits how far below the eye the camera may look (80 degrees here).",
+          "technical": "FloatValue[3] of row 4 becomes Request.LimitAngleDown. In UpdateRequestCamera, if the gaze lies below the eye base and its elevation exceeds this limit (strict >), the gaze is rotated back by LimitAngleDown. The comparison uses angle-in-degrees.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:716",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:376",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Largest upward gaze angle",
+          "simple": "Limits how far above the eye the camera may look (80 degrees here).",
+          "technical": "FloatValue[4] of row 4 becomes Request.LimitAngleUp, applied symmetrically when the gaze is above the eye base and elevation is strictly greater than the limit.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:716",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "5": {
+          "label": "Field of view during the shot",
+          "simple": "Sets a field of view of 110 while this attack's camera is active.",
+          "technical": "FloatValue[5] of row 4 becomes Request.FieldOfView (110). SetCameraMode only starts an FOV interpolation when this number is > 0; the restore requests in CP_180's action code use a literal 90.0 instead, so this value governs the aiming view, not the return view.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:716",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:574",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:34"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "How many seconds the view takes to zoom into and out of this shot (0.25 s).",
+          "technical": "FloatValue[6] of row 4 becomes Request.FieldOfViewBlendTime. Positive values start FovInterp from the current FOV to the requested FOV with the easing selected by value 7; zero or negative makes the FOV snap. Momo's action code also reads this same value directly when restoring to a 90.0 FOV, so it affects both entering and leaving the shot.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:779",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1013",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:35"
+          ]
+        },
+        "7": {
+          "label": "Field-of-view easing choice",
+          "simple": "Selects smooth-in-out easing (3) for the zoom.",
+          "technical": "FloatValue[7] of row 4 is cast to int in MakeUniqueCameraRequest: 0 = Linear, 1 = EaseIn, 2 = EaseOut, 3 = EaseInOut; any other value leaves the freshly built request's default Linear. The current 3 selects EaseInOut for FovInterp.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:716",
+            "Source/Abrams/Private/GameCharacterAction.cpp:939",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:956",
+            "Source/Abrams/Private/GameCharacterAction.cpp:959",
+            "Source/Abrams/Private/GameCharacterAction.cpp:962",
+            "Source/Abrams/Private/GameCharacterAction.cpp:965"
+          ]
+        },
+        "8": {
+          "label": "Gaze orbit yaw",
+          "simple": "Turns the gaze 10 degrees around the camera after the camera is placed.",
+          "technical": "FloatValue[8] of row 4 becomes Request.OrbitYaw. UpdateRequestCamera builds FRotator(OrbitPitch, OrbitYaw, 0) and applies it to the gaze only when the rotator is nonzero; zero in the attack-H row means no horizontal orbit.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:716",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29"
+          ]
+        },
+        "9": {
+          "label": "Gaze orbit pitch",
+          "simple": "Tilts the gaze -10 degrees around the camera.",
+          "technical": "FloatValue[9] of row 4 becomes Request.OrbitPitch, the Pitch member of the orbit rotator used in UpdateRequestCamera when the orbit is nonzero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:716",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Rolls the final view 5 degrees.",
+          "technical": "FloatValue[10] of row 4 becomes Request.Roll and is passed to SetViewTarget87 as the roll argument. It is not part of the orbit rotator and does not affect the collision trace or gaze clamp.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:716",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The camera is switched to virtual-camera mode 3 at the beam notify (IntParameter 10), where Mode3GazeLocation is fed from the beam aim direction each tick; leaving the attack restores the saved mode with a literal 90.0 FOV and this row's blend time.",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:714",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:716",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1026",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:775",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:779"
+          ]
+        }
+      ]
+    },
+    "CP_180_ATTACKH_SHOOT_CAMERA": {
+      "title": "Cursed Energy 2 broom-attack camera",
+      "overview": "The camera used by Momo's second cursed-energy attack (AttackH): a much lower, closer view with tighter gaze limits than the beam camera. Its first eleven values feed the same shared request builder on the first homing start, and value 6 is reused when the view is restored.",
+      "values": {
+        "0": {
+          "label": "Camera offset along gaze-forward",
+          "simple": "Moves the camera -130 units along its gaze-forward axis in this shot.",
+          "technical": "MakeUniqueCameraRequest(2, 5) reads FloatValue[0] of row 5 into FVirtualCameraRequest.CameraOffset.X. UpdateRequestCamera rotates that offset by the gaze rotation and adds it to the eye base, then traces toward the gaze for collision. This helper's CameraMode argument 2 means 'build the request from a unique-float row', not virtual-camera mode 2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1318",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera sideways offset",
+          "simple": "Moves the camera 67 units along its gaze-local sideways axis.",
+          "technical": "FloatValue[1] of row 5 becomes CameraOffset.Y in the same MakeUniqueCameraRequest(2, 5) call; it is part of the offset vector rotated into world space by the gaze rotation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1318",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera height offset",
+          "simple": "Raises or lowers the camera -10 units relative to the eye base in this shot.",
+          "technical": "FloatValue[2] of row 5 becomes CameraOffset.Z. Positive values place the camera above the eye base, negative below it, before the gaze-space rotation is applied. This value is read even when it is zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1318",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Largest downward gaze angle",
+          "simple": "Limits how far below the eye the camera may look (30 degrees here).",
+          "technical": "FloatValue[3] of row 5 becomes Request.LimitAngleDown. In UpdateRequestCamera, if the gaze lies below the eye base and its elevation exceeds this limit (strict >), the gaze is rotated back by LimitAngleDown. The comparison uses angle-in-degrees.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1318",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:376",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Largest upward gaze angle",
+          "simple": "Limits how far above the eye the camera may look (30 degrees here).",
+          "technical": "FloatValue[4] of row 5 becomes Request.LimitAngleUp, applied symmetrically when the gaze is above the eye base and elevation is strictly greater than the limit.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1318",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "5": {
+          "label": "Field of view during the shot",
+          "simple": "Sets a field of view of 110 while this attack's camera is active.",
+          "technical": "FloatValue[5] of row 5 becomes Request.FieldOfView (110). SetCameraMode only starts an FOV interpolation when this number is > 0; the restore requests in CP_180's action code use a literal 90.0 instead, so this value governs the aiming view, not the return view.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1318",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:574",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:34"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "How many seconds the view takes to zoom into and out of this shot (0.35 s).",
+          "technical": "FloatValue[6] of row 5 becomes Request.FieldOfViewBlendTime. Positive values start FovInterp from the current FOV to the requested FOV with the easing selected by value 7; zero or negative makes the FOV snap. Momo's action code also reads this same value directly when restoring to a 90.0 FOV, so it affects both entering and leaving the shot.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1289",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1340",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:35"
+          ]
+        },
+        "7": {
+          "label": "Field-of-view easing choice",
+          "simple": "Selects smooth-in-out easing (3) for the zoom.",
+          "technical": "FloatValue[7] of row 5 is cast to int in MakeUniqueCameraRequest: 0 = Linear, 1 = EaseIn, 2 = EaseOut, 3 = EaseInOut; any other value leaves the freshly built request's default Linear. The current 3 selects EaseInOut for FovInterp.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1318",
+            "Source/Abrams/Private/GameCharacterAction.cpp:939",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:956",
+            "Source/Abrams/Private/GameCharacterAction.cpp:959",
+            "Source/Abrams/Private/GameCharacterAction.cpp:962",
+            "Source/Abrams/Private/GameCharacterAction.cpp:965"
+          ]
+        },
+        "8": {
+          "label": "Gaze orbit yaw",
+          "simple": "Turns the gaze 0 degrees around the camera after the camera is placed.",
+          "technical": "FloatValue[8] of row 5 becomes Request.OrbitYaw. UpdateRequestCamera builds FRotator(OrbitPitch, OrbitYaw, 0) and applies it to the gaze only when the rotator is nonzero; zero in the attack-H row means no horizontal orbit.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1318",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29"
+          ]
+        },
+        "9": {
+          "label": "Gaze orbit pitch",
+          "simple": "Tilts the gaze -3 degrees around the camera.",
+          "technical": "FloatValue[9] of row 5 becomes Request.OrbitPitch, the Pitch member of the orbit rotator used in UpdateRequestCamera when the orbit is nonzero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1318",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Rolls the final view -15 degrees.",
+          "technical": "FloatValue[10] of row 5 becomes Request.Roll and is passed to SetViewTarget87 as the roll argument. It is not part of the orbit rotator and does not affect the collision trace or gaze clamp.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1318",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Unlike the beam camera, this request is applied through SetCameraMode(2, ...) on the first homing start, and it is restored only while the camera is still in mode 2 when the attack finishes; the restore again uses 90.0 FOV plus this row's blend time.",
+          "evidence": [
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1314",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1318",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1336",
+            "Source/Abrams/Private/CP_180_ActionController.cpp:1340"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Holding Jump turns Momo's dash into a boosted dash: a one-time gauge fee, a per-second drain, a surface splash, and a 0.4 s grace window keyed to the last Jump-state change. Jump-limit binding vows replace it with a penalty dash instead, so the fee and boost effects are skipped.",
+      "evidence": [
+        "Source/Abrams/Private/CP_180_ActionController.cpp:596",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:603",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:610",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:612",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:620",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:227",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:230"
+      ]
+    },
+    {
+      "text": "Airborne dash-gauge recovery is unusual for her: the controller overrides two base getters so air recovery uses row 0 values 0 and 1, while grounded characters get a hard 1.0. Those overrides are the only ones of their slots in the reconstructed binary.",
+      "evidence": [
+        "Source/Abrams/Private/CP_180_ActionController.cpp:1681",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:1691",
+        "Source/Abrams/Public/CP_180_ActionController.h:66",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3493",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:3510"
+      ]
+    },
+    {
+      "text": "The aimed beam's second and third activations use a cursed-energy-level-specific ActionDash row, add the CP_180 passive buff, and steer twice as fast without the first-use yaw clamp. The passive itself also swaps several normal-attack sets (B_2, E_2, F_2).",
+      "evidence": [
+        "Source/Abrams/Private/CP_180_ActionController.cpp:921",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:1002",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:1008",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:969",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:1066",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:1132",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:1185"
+      ]
+    },
+    {
+      "text": "Two camera rows use the same shared builder with different row indices: row 4 for the beam's mode-3 gaze camera and row 5 for the broom attack's mode-2 camera. The builder's '2' argument selects 'make request from unique floats'; the SetCameraMode call then uses mode 3 or 2. Both restore with a hard-coded 90.0 field of view but keep the row's blend time.",
+      "evidence": [
+        "Source/Abrams/Private/CP_180_ActionController.cpp:716",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:1318",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941",
+        "Source/Abrams/Private/GameCharacterAction.cpp:944",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:779",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:1340",
+        "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:574"
+      ]
+    },
+    {
+      "text": "Momo's behaviour controller only specialises AI ordinals 0x03, 0x04, 0x05, 0x0e and 0x11 (jump/air-jump/dash-jump mobility plus two attacks); all other ordinals forward to the parent factory. The generic timed CursedEnergyAttack hold nodes that read unique row 0 values are built by CP_040's controller, not hers.",
+      "evidence": [
+        "Source/Abrams/Private/CP_180_BehaviorController.cpp:8",
+        "Source/Abrams/Private/CP_180_BehaviorController.cpp:10",
+        "Source/Abrams/Private/CP_180_BehaviorController.cpp:11",
+        "Source/Abrams/Private/CP_180_BehaviorController.cpp:12",
+        "Source/Abrams/Private/CP_180_BehaviorController.cpp:13",
+        "Tools/verify/CHAR/BehaviorController_shells.md:66",
+        "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:118"
+      ]
+    },
+    {
+      "text": "Surface tracing gives Momo water-specific jump, dash and landing effects, and the CP_180 passive attaches/removes waist effects; none of this reads unique floats, but it explains why the same jump/dash code has extra sound and effect branches around the gauge-tuning reads.",
+      "evidence": [
+        "Source/Abrams/Private/CP_180_ActionController.cpp:250",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:576",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:584",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:642",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:1766",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:1793",
+        "Source/Abrams/Private/CP_180_ActionController.cpp:1802"
+      ]
+    },
+    {
+      "text": "Both unique-float hops are plain unchecked dereferences, so an out-of-range row or value index would be invalid memory access rather than a safe fallback. Verification notes document that retail keeps these as calls at cold sites while some hot sites inline them; that is an emission detail, not a different data lookup.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Public/GameCharacterActionInline.h:10",
+        "Source/Abrams/Public/GameCharacterActionInline.h:12",
+        "Tools/verify/CHAR/UniqueRowsInline.md:19",
+        "Tools/verify/CHAR/UniqueRowsInline.md:21",
+        "Tools/verify/CHAR/UniqueRowsInline.md:25",
+        "Tools/verify/CHAR/UniqueRowsInline.md:26",
+        "Tools/verify/CHAR/UniqueRowsInline.md:27"
+      ]
+    }
+  ]
+}

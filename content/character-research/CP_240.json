@@ -1,0 +1,646 @@
+{
+  "overview": "Mei Mei’s settings tune her hover attack, the formation and movement of her summoned birds, and the camera while hovering.",
+  "technicalOverview": "Mei Mei (CP_240) is a selectable sorcerer built around groups of summoned shikigami. Her five populated unique rows set combo-passive thresholds and a falling-attack timer, the hover duration and input timing of the AttackG cursed-energy attack, the three shikigami formation anchors, how those birds chase and lean toward the anchors, and the special camera used while hovering. The controller reads these by zero-based row and value index through the owner's CharacterDataTable.Id_CharacterUnique list; the reads are direct and unchecked.",
+  "rows": {
+    "CP_240": {
+      "title": "Base row: combo passives and falling attack",
+      "overview": "Four values are traced here: the three link-combo counts needed for her passive buffs and the delay before a falling normal attack changes pose. The trailing zeros have no CP_240-specific reader in the source.",
+      "values": {
+        "0": {
+          "label": "Passive level 1 combo count",
+          "simple": "Two successful link combos qualify for the first passive buff.",
+          "technical": "OnLinkComboSucceeded increments PassiveCount and scans the passive thresholds from highest index to lowest (indices 2, 1, 0 map to candidate passive levels 3, 2, 1). The count is cast to int32 and tested with >= the row float, so 2.0 means at least 2 link combos for level 1. If the resulting level is above PassiveLevel and the owner is not defeated, BUFF_CP_240_PASSIVE_1 is added. This is a threshold, not a duration.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:151",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:377",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:379",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:390"
+          ]
+        },
+        "1": {
+          "label": "Passive level 2 combo count",
+          "simple": "Five link combos qualify for the second passive buff.",
+          "technical": "Same descending threshold scan as indices 0 and 2. Because index 2 (8) is checked first, this value is the level-2 qualification only after fewer than 8 combos; at 5 or more combos the candidate level is at least 2 and BUFF_CP_240_PASSIVE_2 is added on a level rise while the owner is alive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:151",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:377",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:379",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:390"
+          ]
+        },
+        "2": {
+          "label": "Passive level 3 combo count",
+          "simple": "Eight link combos qualify for the highest passive buff.",
+          "technical": "First threshold checked by the descending loop; with PassiveCount >= static_cast<int32>(8.0) the candidate level is 3, so level 3 and BUFF_CP_240_PASSIVE_3 take priority over the lower values.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:151",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:377",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:379",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:390"
+          ]
+        },
+        "3": {
+          "label": "Falling attack animation delay",
+          "simple": "During the falling normal attack, the second fall pose appears after about 0.25 seconds in the air.",
+          "technical": "TCP_240_NormalAttack_3_1::TickAttack only runs this logic at action start count 0 and FallPhase 1. While the owner's ground trace is not 1, FallTimer adds DeltaTime; the code returns while unique(3,0) > FallTimer. At equality or above (FallTimer >= 0.25) it sets FallPhase 2 and plays AttackF_01_02. Ground contact before that also leaves phase 1 and takes the landing path.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1218",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1220",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1223",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1227"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The passive buff is re-applied on revival from the stored PassiveLevel, not by re-reading these thresholds.",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1715",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1766"
+          ]
+        }
+      ]
+    },
+    "CP_240_ATTACKG": {
+      "title": "AttackG: hover timing",
+      "overview": "This row belongs to CursedEnergyAttack_1 / Air_1, Mei Mei's hover-and-dive move. The first three slots are hover time limits by cursed-energy level; the fourth delays which inputs can end the hover.",
+      "values": {
+        "0": {
+          "label": "Hover duration, level 1",
+          "simple": "At charge level 1 the hover lasts 5 seconds before it ends on its own.",
+          "technical": "StartAttackHoming reads HoverTimeLimit = GetOwnerUniqueFloat(GCP_240_HoverLimitUniqueIndices[CursedEnergyLevel - 1], 1); the index table is {0,1,2}, so level 1 selects row value 0. This happens at attack start count 0 while the chosen AttackSet is the hover set. In TickAttack, only at start count 1, ActionElapsedTime accumulates DeltaTime and the code ends the hover when ActionElapsedTime > HoverTimeLimit (strictly greater; equality continues).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1421",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1468",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1487",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1581",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1584"
+          ]
+        },
+        "1": {
+          "label": "Hover duration, level 2",
+          "simple": "At charge level 2 the hover also lasts 5 seconds.",
+          "technical": "Same read as index 0 with CursedEnergyLevel - 1 == 1. The value is captured when the hover starts; expiry uses the same strict ActionElapsedTime > HoverTimeLimit comparison. This is a separate slot from the passive threshold at row 0 index 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1421",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1487",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1584"
+          ]
+        },
+        "2": {
+          "label": "Hover duration, level 3",
+          "simple": "At charge level 3 the hover also lasts 5 seconds.",
+          "technical": "Same hover-limit read with CursedEnergyLevel - 1 == 2. Levels outside 1..3 are not selected by this table in the traced body; the source uses the level directly as an array index after subtracting one.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1421",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1487",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1476"
+          ]
+        },
+        "3": {
+          "label": "Guard or dive input unlock delay",
+          "simple": "After 0.4 seconds of hovering, guarding can cancel the hover and the cursed-energy-attack input can become a dive.",
+          "technical": "During a hover at attack start count 1, TickAttack checks GetOwnerUniqueFloat(3, 1) <= ActionElapsedTime; at exactly 0.4 the branch is active. Guard press then sets flag 159 and bHoverEnded. CursedEnergyAttack_1 press sets flag 159 and selects the dive branch; if MoveDown is held or the left stick points in direction 1 within 45.0001 degrees at 0.5, bDiveDown is set. Before this delay those inputs are not handled by this block.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1576",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1612",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1614",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1618",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1620"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The hover limit is chosen by cursed-energy level; the dive and down-dive attack sets are also chosen by level but from separate AttackSet rows, not from these floats.",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1417",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1672",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1686"
+          ]
+        }
+      ]
+    },
+    "CP_240_SHIKIGAMI_OFFSET": {
+      "title": "Shikigami formation offsets",
+      "overview": "Nine values give each of the three summoned bird groups an X (forward), Y (side) and Z (height) offset from Mei Mei. They build the group anchors that summoning, following and guard placement use.",
+      "values": {
+        "0": {
+          "label": "Group 1 forward offset",
+          "simple": "The first group's anchor starts 40 world units behind Mei Mei.",
+          "technical": "Group 0 of GCP_240_GroupOffsetIndices reads values 0, 1, 2 as X, Y, Z. X = -40 is read after Y and Z in InitCharacterSpecificState, then used as Forward * X in the initial anchor and stored in ShikigamiGroupOffsets. Anchors are recalculated each ActionTick from the controller's root rotation and can be pulled toward a wall hit.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:154",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:441",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:443",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:444",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:445",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:449",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:981"
+          ]
+        },
+        "1": {
+          "label": "Group 1 side offset",
+          "simple": "The first group is offset 20 world units to the left.",
+          "technical": "Group 0 Y value. It multiplies the owner's right vector in the initial anchor (Right * -20), so it is a side offset in the owner's frame; the same stored vector is later rotated by the current root rotation when anchors are refreshed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:154",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:441",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:443",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:444",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:445",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:449",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:981"
+          ]
+        },
+        "2": {
+          "label": "Group 1 height offset",
+          "simple": "The first group's anchor is raised 60 world units above the common group height.",
+          "technical": "Group 0 Z value. The initial anchor uses Up * (ShikigamiGroupHeights[0] + Z), where the height list starts at 100.0; summoning can replace that group height with the shikigami's FollowHeightOffset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:154",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:441",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:443",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:444",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:445",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:449",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:981"
+          ]
+        },
+        "3": {
+          "label": "Group 2 forward offset",
+          "simple": "The second group also starts 40 world units behind Mei Mei.",
+          "technical": "Group 1 X = -40, read through the {3,4,5} entry of GCP_240_GroupOffsetIndices and applied as Forward * X to anchor 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:154",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:441",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:443",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:444",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:445",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:449",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:981"
+          ]
+        },
+        "4": {
+          "label": "Group 2 side offset",
+          "simple": "The second group is offset 80 world units to the right.",
+          "technical": "Group 1 Y = 80; Right * 80 in the initial anchor and the Y component of the stored formation offset for group 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:154",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:441",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:443",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:444",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:445",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:449",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:981"
+          ]
+        },
+        "5": {
+          "label": "Group 2 height offset",
+          "simple": "The second group has no extra height on top of the common group height.",
+          "technical": "Group 1 Z = 0.0 is still read (Z, Y, X are all fetched for each group); it adds nothing to Up * (height + Z) at initialization.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:154",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:441",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:443",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:444",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:445",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:449",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:981"
+          ]
+        },
+        "6": {
+          "label": "Group 3 forward offset",
+          "simple": "The third group starts 10 world units behind Mei Mei.",
+          "technical": "Group 2 X = -10, read through the {6,7,8} entry and used as Forward * X for anchor 2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:154",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:441",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:443",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:444",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:445",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:449",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:981"
+          ]
+        },
+        "7": {
+          "label": "Group 3 side offset",
+          "simple": "The third group is offset 80 world units to the left.",
+          "technical": "Group 2 Y = -80, used as Right * Y in the initial anchor and kept in the stored offset vector.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:154",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:441",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:443",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:444",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:445",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:449",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:981"
+          ]
+        },
+        "8": {
+          "label": "Group 3 height offset",
+          "simple": "The third group has no extra height on top of the common group height.",
+          "technical": "Group 2 Z = 0.0 is read even though it adds nothing to the initial Up component; later refreshes use the stored offset and current group height.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:154",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:441",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:443",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:444",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:445",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:449",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:981"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "A wall between the raised owner and the computed anchor pulls that group's anchor to the hit point, 10 units along the impact normal and 40 units back along the owner's facing. This happens every tick outside CursedEnergyAttack_2, so the row values are formation inputs rather than fixed final positions.",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:470",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:555"
+          ]
+        }
+      ]
+    },
+    "CP_240_SHIKIGAMI_CHASE": {
+      "title": "Shikigami chase and lean",
+      "overview": "Six values shape how a following bird closes on its anchor, turns toward Mei Mei's facing, and tilts its animation. Five are traced directly; the second value has no traced consumer.",
+      "values": {
+        "0": {
+          "label": "Chase speed",
+          "simple": "Following birds fly toward their anchor at 2000 world units per second, slowed to 75% while starting or ending a dash.",
+          "technical": "In UpdateShikigamiFollow, for each of the first three non-attacking group members with bFollowAnchor set, Speed = owner row 3 value 0. If the shikigami Default action type is DashBegin or DashEnd, Speed is multiplied by 0.75. NewLocation += Direction * Speed * Rate * DeltaTime and is sent to RequestLocation with move flag 0 when ShouldTestCameraInsideActor is true, otherwise 2. GetSafeNormal handles a zero direction; the code does not clamp Speed itself.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:566",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:591",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:592",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:595",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:608",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:610"
+          ]
+        },
+        "1": {
+          "label": "Untraced chase value",
+          "simple": "This value is set to 3500, but no effect on Mei Mei or her birds was traced.",
+          "technical": "The supplied row has 3500.0 here. The CP_240 follow code reads row 3 values 0, 2, 3, 4 and 5; no dynamic index table selects value 1, and no other CP_240-specific reader was found. Other files that read a row-3 value 1 belong to other characters or generic reactions and are not assigned to CP_240. Treat the purpose as unresolved; do not infer that 3500 is a larger speed or range.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:592",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:648",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:689",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:690",
+            "Source/Abrams/Private/GameCharacter.cpp:1759"
+          ]
+        },
+        "2": {
+          "label": "Turn rate",
+          "simple": "Following birds rotate toward Mei Mei's facing at up to 720 degrees per second.",
+          "technical": "The controller flattens the owner's facing vector to Z=0, computes the wrapped yaw gap to the desired facing, then sets Turn = FMath::Min(Gap, row 3 value 2 * DeltaTime). The sign is chosen from the 2-D cross product of the bird's forward and the desired facing; the result is added to the current yaw and wrapped to 0..360. Gap is an absolute angle, so the limit is in degrees per second.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:616",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:629",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:648",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:650",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:654"
+          ]
+        },
+        "3": {
+          "label": "Full-speed distance",
+          "simple": "A bird reaches full chase speed once it is 180 world units from its anchor.",
+          "technical": "Rate = FMath::Min(static_cast<float>(Distance) / row 3 value 3, 1.0f), where Distance is FVector::Dist from the current anchor to the bird. At 180 or more the rate caps at 1.0; below 180 it scales linearly with distance. This multiplier is applied only to the chase movement, not to the turn or lean.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:603",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:606",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:607",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:608"
+          ]
+        },
+        "4": {
+          "label": "Side-lean pitch scale",
+          "simple": "The bird's side-to-side lean is multiplied by 20 and applied as full-body pitch.",
+          "technical": "LeanLR comes from the angle between the owner's facing and the bird's forward, times 0.2, clamped against MoveRow->Run_Lean_Max and signed by the 2-D side test. It is blended using MoveRow->Run_Lean_Rate * 60 * DeltaTime when that rate is nonzero, then written as FRotator(PitchScale * LeanLR, 0, RollScale * LeanUD), where PitchScale is this row value (20).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:661",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:668",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:678",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:687",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:690",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:691"
+          ]
+        },
+        "5": {
+          "label": "Climb-lean roll scale",
+          "simple": "The bird's climb/drop lean is multiplied by 30 and applied as full-body roll.",
+          "technical": "LeanUD is abs(anchor.Z - bird.Z) * 0.01, clamped to MoveRow->Run_Lean_Max, signed so upward movement leans one way, and blended by the same MoveRow->Run_Lean_Rate path. It is written into FRotator(PitchScale * LeanLR, 0, RollScale * LeanUD), where RollScale is this row value (30). The roll is only recomputed inside the bFollowAnchor branch.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:605",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:672",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:678",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:689",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:691"
+          ]
+        }
+      },
+      "untraced": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "These values come from the owner character's row, not the shikigami's own ShikigamiUniqueDataTable. The CN_220 shikigami actions call GetCharacterUniqueFloatValue on AGameShikigami and read that separate table.",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:592",
+            "Source/Abrams/Private/GameShikigami.cpp:1251",
+            "Source/Abrams/Private/CN_220_ActionController.cpp:398"
+          ]
+        }
+      ]
+    },
+    "CP_240_ATTACKG_SHOOT_CAMERA": {
+      "title": "AttackG hover camera",
+      "overview": "A custom camera request is built from this row when the hovering AttackG attack begins, at attack start count 0. The helper reads values 0 through 10 only; value 6 is also read directly when the camera is handed back.",
+      "values": {
+        "0": {
+          "label": "Camera offset, forward/back",
+          "simple": "The hover camera sits 320 world units behind the gaze direction.",
+          "technical": "MakeUniqueCameraRequest(2, 4) puts row value 0 into Request.CameraOffset.X. The virtual camera rotates this offset by the gaze rotation and adds it to the eye base; collision traces can pull the resulting camera closer. CP_240 calls this helper only from StartAttackHoming on start count 0 while hovering.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1489",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:383",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera offset, right",
+          "simple": "The hover camera is offset 90 world units along the gaze-space right axis.",
+          "technical": "Row value 1 becomes Request.CameraOffset.Y and is part of the same rotated FVector as value 0. It is not a world-space Y offset; the virtual camera applies it in the gaze rotation's frame.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera offset, up",
+          "simple": "The hover camera is raised 50 world units in gaze space.",
+          "technical": "Row value 2 is read into OffsetZ and stored in Request.CameraOffset.Z, then rotated with the other two offset components around the eye base.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "The camera will not look more than 45 degrees below the eye line.",
+          "technical": "Row value 3 becomes Request.LimitAngleDown. When the target is below the base and the elevation angle is strictly greater than 45, the gaze is rotated back to that limit; equality is allowed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:380"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "The camera will not look more than 45 degrees above the eye line.",
+          "technical": "Row value 4 becomes Request.LimitAngleUp with the mirror condition: when the target is above the base and elevation is strictly greater than 45, the gaze is clamped to the limit.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:380"
+          ]
+        },
+        "5": {
+          "label": "Hover field of view",
+          "simple": "The hover camera uses a 90-degree field of view.",
+          "technical": "Row value 5 becomes Request.FieldOfView. The virtual camera starts an FOV interpolation only when the new FOV is > 0 and the blend time (value 6) is > 0; otherwise it snaps. FinishAttackEffects also restores with a hard-coded 90-degree FOV rather than re-reading this slot.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:570",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:572",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1643",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1644"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "The field-of-view change eases over 2.5 seconds.",
+          "technical": "MakeUniqueCameraRequest reads row value 6 into FieldOfViewBlendTime. When leaving the hover for a different action type, FinishAttackEffects builds a fresh request and sets its blend time from this same value again before restoring SavedCameraMode. With a positive time the camera interpolates FOV; with zero it would snap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1641",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1645",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1646",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578"
+          ]
+        },
+        "7": {
+          "label": "FOV easing curve",
+          "simple": "A value of 0 means the field of view blends linearly.",
+          "technical": "The helper casts the row value to int32 and switches 0 -> EEasingFunc::Linear, 1 -> EaseIn, 2 -> EaseOut, 3 -> EaseInOut; other values leave the request default. The restore request in FinishAttackEffects does not copy this slot, so it uses the request's default easing (0/Linear).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:939",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:955",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:36",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1643"
+          ]
+        },
+        "8": {
+          "label": "Camera orbit yaw",
+          "simple": "Zero means the gaze is not orbited left or right around the camera.",
+          "technical": "Row value 8 is Request.OrbitYaw. The virtual camera builds an FRotator(OrbitPitch, OrbitYaw, 0); only when that rotator is non-zero does it orbit the gaze point about the camera. Here the value is 0, so this orbit branch is skipped unless another request field is non-zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:419",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:426"
+          ]
+        },
+        "9": {
+          "label": "Camera orbit pitch",
+          "simple": "Zero means no vertical orbit of the gaze point.",
+          "technical": "Row value 9 is Request.OrbitPitch, the first component of the orbit rotator described in value 8. With both orbit values at zero, the virtual camera leaves the gaze point unchanged after the collision pull-in.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:419",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Zero means the camera is not rolled.",
+          "technical": "Row value 10 is Request.Roll and is passed to SetViewTarget87 as the roll argument. A larger value would blend into the view rotation; zero leaves the normal no-roll view.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:600"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The custom request is installed at hover start and handed back only when the next action is a different type and the current camera mode is 2; staying in the same action type returns early and leaves the camera alone.",
+          "evidence": [
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1483",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1489",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1634",
+            "Source/Abrams/Private/CP_240_ActionController.cpp:1641"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Row and value numbering are both zero-based positions: AGameCharacter fills UniqueRows from CharacterDataTable.Id_CharacterUnique in order, and GetCharacterUniqueFloatValue dereferences UniqueRows[RowIndex]->FloatValue[ValueIndex] without bounds checks. The supplied five rows therefore occupy row indices 0 through 4.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Tools/verify/CHAR/UniqueRowsInline.md:19"
+      ]
+    },
+    {
+      "text": "Mei Mei's birds are nine CN_220 shikigami acting under UCN_220_ActionController, which the CP_240 controller casts to directly for ready checks, anchors, orders and release. Their own action timers and dither values come from the shikigami's ShikigamiUniqueDataTable, not from these five character rows; do not mix the two readers.",
+      "evidence": [
+        "Source/Abrams/Private/CP_240_ActionController.cpp:47",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:566",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:872",
+        "Source/Abrams/Private/GameShikigami.cpp:870",
+        "Source/Abrams/Private/GameShikigami.cpp:1251",
+        "Source/Abrams/Private/CN_220_ActionController.cpp:443"
+      ]
+    },
+    {
+      "text": "AttackH is the other cursed-energy attack: with a ready bird it orders an attack, otherwise it summons up to three birds from the group anchors and holds a CheckOnly energy cost for a later refund. That logic uses the controller helpers rather than new unique-row values.",
+      "evidence": [
+        "Source/Abrams/Private/CP_240_ActionController.cpp:894",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:944",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1298",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1350"
+      ]
+    },
+    {
+      "text": "CP_240's behavior controller only steers the hover attack's second start; it does not read unique floats. The generic AI timed-hold actions that read row 0 values 0-2 are created by CP_040 and CP_050 behavior controllers, so those AI uses are not assigned to Mei Mei.",
+      "evidence": [
+        "Source/Abrams/Private/CP_240_BehaviorController.cpp:31",
+        "Source/Abrams/Private/CP_240_BehaviorController.cpp:55",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:123",
+        "Source/Abrams/Private/CP_040_BehaviorController.cpp:10"
+      ]
+    },
+    {
+      "text": "Trap actions also have a GetUniqueFloat forwarder to the spawner's source, including a row-2 value 0 timer, but CP_240's traced interception and movement route goes through its own shikigami groups and CN_220 controllers; no CP_240 trap forwarding call was traced and those trap reads are not assigned here.",
+      "evidence": [
+        "Source/Abrams/Private/GameTrapActionController.cpp:183",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188",
+        "Source/Abrams/Private/GameTrapActionController.cpp:1306",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:809",
+        "Source/Abrams/Private/CP_240_ActionController.cpp:872"
+      ]
+    },
+    {
+      "text": "CP_240_ActionController.cpp includes no per-character .inl file; the unique reads go through GetCharacterUniqueFloatValue / GetOwnerUniqueFloat and the shared MakeUniqueCameraRequest helper. GetOwnerUniqueFloatInline is declared for hot sites of other characters but is not used in this controller.",
+      "evidence": [
+        "Source/Abrams/Private/CP_240_ActionController.cpp:1",
+        "Source/Abrams/Public/GameCharacterAction.h:203",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941"
+      ]
+    }
+  ]
+}

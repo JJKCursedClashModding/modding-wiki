@@ -1,0 +1,1060 @@
+{
+  "overview": "Gojo’s settings control how he builds Limitless stacks, charges and fires attacks, and frames those attacks on camera.",
+  "technicalOverview": "Satoru Gojo (CP_050) uses eight populated unique rows. Row 0 drives his Limitless guard gauge and stacks plus a few movement/combo limits. Rows 1 and 2 set the two charge attacks, row 3 sets the long-range shockwave shots, row 4 sets the combined ExtraAttack_2 charge and shot, and rows 5-7 are camera presets attached to those three attacks. The reconstructed code reaches these values by zero-based row and float index; the row names themselves are not looked up by string in the action code.",
+  "rows": {
+    "CP_050": {
+      "title": "Core CP_050 tuning row",
+      "overview": "This row sets the Limitless stack cap, gauge fill rate and stack cost, plus independent limits on floating, normal-attack repeats and a third-hit descent.",
+      "values": {
+        "0": {
+          "label": "Cursed-energy cost per Limitless stack",
+          "simple": "Each new stack takes 100 cursed energy from Gojo.",
+          "technical": "When the gauge reaches 100 and a stack is awarded, TickLimitless subtracts this float from the current cursed-energy gauge with SetCursedEnergyGauge(current - value, true, true); no clamp is applied in this call. Shared ProjectionSorceryReceive also reads row 0 value 0 as the restraint-time fallback only when the incoming request has no DamageTableRow; that is a generic receiver path, not a CP_050-only action.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2248",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:210",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214"
+          ]
+        },
+        "1": {
+          "label": "Maximum Limitless stacks",
+          "simple": "Gojo can hold up to 5 Limitless stacks by default.",
+          "technical": "Cast to int32 before comparison. If LimitlessCount >= value, TickLimitless forces the gauge to 100 and resets GuardHoldTime; the guarded branch repeats the same cap check and returns. At exactly the cap the character is already full. Current value 5.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2200",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2211",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2220"
+          ]
+        },
+        "2": {
+          "label": "Limitless gauge fill divisor",
+          "simple": "The guarded gauge fills according to 100 divided by 1.25 per second before other modifiers.",
+          "technical": "Rate = DeltaTime * 100.0f / this float, passed to AddUnknown270. It runs only after the stack cap check, cursed-energy level is at least 2, cursed-energy disabled time is <= 0, the owner is guarding, and GuardHoldTime has reached row 0 value 3. There is no zero-divisor guard in this call. Current value 1.25.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2203",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2210",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2221",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2226"
+          ]
+        },
+        "3": {
+          "label": "Guard hold before gauge fill",
+          "simple": "Gojo must hold guard for 0.25 seconds before the Limitless gauge starts charging.",
+          "technical": "GuardHoldTime accumulates DeltaTime; while GuardHoldTime < this float TickLimitless returns without adding gauge progress. At equality or above it proceeds to the row 0 value 2 rate calculation. The hold is reset when the stack cap is reached, when not guarding or on the qualifying guard-durability change. Current value 0.25 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2216",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2221",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2237",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:220"
+          ]
+        },
+        "4": {
+          "label": "Floating horizontal inertia scale",
+          "simple": "Floating movement uses 0.1 of the normal horizontal inertia response.",
+          "technical": "FCP_050_Floating::Start calls ScaleInertia(GetFloatingInertiaRate(), GetFloatingInertiaRateZ()); the first getter tail-returns row 0 value 4. No condition changes this value at the call site. Current value 0.1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:351",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:383",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:385"
+          ]
+        },
+        "5": {
+          "label": "Floating vertical inertia scale",
+          "simple": "Floating movement uses 0.1 of the normal vertical inertia response.",
+          "technical": "The second argument of ScaleInertia is GetFloatingInertiaRateZ(), which tail-returns row 0 value 5. No condition changes this value at the call site. Current value 0.1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:351",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:389",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:391"
+          ]
+        },
+        "6": {
+          "label": "Repeat-normal-attack maximum",
+          "simple": "The first normal attack can chain up to three extra repeats.",
+          "technical": "On the first start of a repeat-normal attack, RepeatMax is set to int32(row 0 value 6). TickAttack queues another animation only while RepeatCount < RepeatMax - 1. With the default 4, RepeatCount 0, 1 and 2 qualify, so three extra repeats follow the initial attack.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:416",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:419",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:450"
+          ]
+        },
+        "7": {
+          "label": "Third-hit descent speed",
+          "simple": "The third hit of NormalAttack_2_1 pulls Gojo downward at 3500 per second.",
+          "technical": "Used only when the action start count is exactly 3, Phase is 2 and bFlag14 is false: RequestLocation(current location + DownVector * this float * DeltaTime, 0). If bFlag14 is true instead, the branch sets Byte16 and flag 159. The source calls this a speed but does not name a distance unit; do not reinterpret the magnitude as an acceleration.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:505",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:516",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:518",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:522"
+          ]
+        },
+        "8": {
+          "label": "Maximum Floating starts",
+          "simple": "The Floating action can start once by default.",
+          "technical": "Cast to int32. FCP_050_Floating::CanCancelCurrent refuses the action when ActionController->GetActionStartCount(Floating) >= this value; it also refuses when the owner ground trace hit is 1. At the default 1, the second and later starts are blocked. Current value 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:357",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:359",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:360",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:363"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The common helper FGameCharacterAction::GetOwnerUniqueFloat is a thin call to the owner AGameCharacter::GetCharacterUniqueFloatValue; both hops preserve the supplied row and value index without remapping.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:933",
+            "Source/Abrams/Private/GameCharacterAction.cpp:935",
+            "Source/Abrams/Private/GameCharacter.cpp:1759"
+          ]
+        },
+        {
+          "text": "The generic AI timed-hold classes also read row 0 values 0-2, but CP_050 behavior controller replaces AI indices 0x11 and 0x13 with Gojo-specific executors that do not read those floats. Those generic reads were therefore not treated as CP_050 uses.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+            "Source/Abrams/Private/CP_050_BehaviorController.cpp:10",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:1726"
+          ]
+        }
+      ]
+    },
+    "CP_050_ATTACKG": {
+      "title": "Cursed Energy Attack 1 charge and steering",
+      "overview": "This row controls the three-level charge time, how long the held orb can be steered, and the initial placement and steering speeds of that orb.",
+      "values": {
+        "0": {
+          "label": "Charge duration at cursed-energy level 1",
+          "simple": "At level 1 the orb stage charges for 0.7 seconds.",
+          "technical": "In TCP_050_CursedEnergyAttack_1::StartAttackHoming, the action second start sets Duration from row 1 value 0 when GetCursedEnergyLevel() == 1, then calls UCP_050_ActionController::StartChargeEffect(effect location, Duration). Current value 0.7 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1110",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1128",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1137"
+          ]
+        },
+        "1": {
+          "label": "Charge duration at cursed-energy level 2",
+          "simple": "At level 2 the orb stage charges for 0.7 seconds.",
+          "technical": "Same StartAttackHoming switch, cursed-energy level 2 case; the value is passed unchanged as StartChargeEffect duration. Current value 0.7 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1130",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1131",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1137"
+          ]
+        },
+        "2": {
+          "label": "Charge duration at cursed-energy level 3",
+          "simple": "At level 3 the orb stage charges for 0.7 seconds.",
+          "technical": "Same StartAttackHoming switch, cursed-energy level 3 case. Level 0 leaves the reset duration of 1.0 in place because no switch case selects a row value. Current value 0.7 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1124",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1133",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1134",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1137"
+          ]
+        },
+        "3": {
+          "label": "Steering hold window",
+          "simple": "The held orb can be steered for up to 1.2 seconds.",
+          "technical": "During the action second start, TickAttack accumulates ActionElapsedTime. It calls SteerEffect only while CursedEnergyAttack_1 is held AND ActionElapsedTime < this float. At equality or above, or when the key is not held, it sets Byte16, Phase = MAX_int32 and flag 159 to finish. Current value 1.2 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1155",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1158",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1162",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1167"
+          ]
+        },
+        "4": {
+          "label": "Steer-effect initial trace distance",
+          "simple": "The steering orb starts 450 units in front of the placement offset.",
+          "technical": "At the orb spawn, Start = owner location + root-rotation transform of FVector(50, 0, 150); End = Start + this float * owner facing. A radius-50 capsule trace against CN_050_CeilingObjectTypes moves End to ImpactPoint + ImpactNormal * 60 when it hits. The source names a distance but not a world unit. Current value 450.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1102",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1104",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1105",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1117"
+          ]
+        },
+        "5": {
+          "label": "Steering forward speed",
+          "simple": "The orb moves forward at 7 per second while being steered.",
+          "technical": "SteerEffect adds DeltaTime * (this float * owner facing). If the vertical collision pass set bBlocked, Forward is negated before it is added. The source names this a speed but does not name a distance unit. Current value 7.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1272",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1274",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1275"
+          ]
+        },
+        "6": {
+          "label": "Steering side and up speed",
+          "simple": "Left-stick side/up steering moves the orb at 2 per second and also controls the collision push-off.",
+          "technical": "This same float multiplies Up * Stick.Y in the first collision pass, Right * Stick.X in the second pass, and -PlaneNormal * value * DeltaTime when bBlocked is true. It is read three times in SteerEffect, not just once. Current value 2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1229",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1235",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1278",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1287"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The same attack switches the owner to camera mode 2 with MakeUniqueCameraRequest(2, 5); that request reads CP_050_ATTACKG_SHOOT_CAMERA, not this row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1079",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941"
+          ]
+        },
+        {
+          "text": "When CE_1 and CE_2 are held together before start count 2, this action requests ExtraAttack_2; that shared control path does not add a row 1 float read.",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1201",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1209"
+          ]
+        }
+      ]
+    },
+    "CP_050_ATTACKG_2": {
+      "title": "Cursed Energy Attack 2 charge durations",
+      "overview": "This row only selects how long the CE_2 charge lasts at each cursed-energy level.",
+      "values": {
+        "0": {
+          "label": "Charge duration at cursed-energy level 1",
+          "simple": "At level 1 the CE_2 charge lasts 3 seconds.",
+          "technical": "TCP_050_CursedEnergyAttack_2::StartAttackHoming, action start count 1, assigns ChargeDuration from row 2 value 0 when GetCursedEnergyLevel() == 1. The tick keeps the effect in its growing phase while ChargeElapsed <= ChargeDuration; after that it spawns the full-charge effect. Current value 3 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1461",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1467",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1572",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1578"
+          ]
+        },
+        "1": {
+          "label": "Charge duration at cursed-energy level 2",
+          "simple": "At level 2 the CE_2 charge lasts 2 seconds.",
+          "technical": "Same start-count-1 switch, level 2 case. No interpolation between levels is performed. Current value 2 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1469",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1470",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1572"
+          ]
+        },
+        "2": {
+          "label": "Charge duration at cursed-energy level 3",
+          "simple": "At level 3 the CE_2 charge lasts 1.25 seconds.",
+          "technical": "Same start-count-1 switch, level 3 case. Level 0 leaves the reset duration of 1.0 in place. Current value 1.25 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1461",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1472",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1473",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1572"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The full-charge threshold is strict in the upward direction: the tick continues while ChargeElapsed <= ChargeDuration and advances to the full effect only when ChargeElapsed > ChargeDuration.",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1570",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1572",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1578"
+          ]
+        }
+      ]
+    },
+    "CP_050_SHOCKWAVE": {
+      "title": "Shockwave shot count, spacing and aim",
+      "overview": "This row decides how many long-range effects are queued from charge progress, how far apart they spawn, when each one fires, and how the shot is aimed at a secondary target.",
+      "values": {
+        "0": {
+          "label": "Minimum charge ratio for middle count",
+          "simple": "A charge of at least 10 percent starts using the middle shot count.",
+          "technical": "AddShot receives Level as the truncated integer charge percentage Ratio = int32(ChargeElapsed / ChargeDuration * 100). If Ratio >= 100 it takes the full-count branch; else if Ratio >= 50 the high-count branch; else if float(Ratio) >= this float the middle-count branch; otherwise Count stays at its initialized 1. Current value 10, with no system that changes it between calls.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1395",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1406",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:871",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:881"
+          ]
+        },
+        "1": {
+          "label": "Middle shot count",
+          "simple": "A charge from 10 percent up to 50 percent fires 4 shots.",
+          "technical": "Used as Count = int32(row 3 value 1) in the Ratio >= row 3 value 0 and Ratio < 50 branch. The 50 comparison happens first, so exactly 50 uses the high count, not this one. Current value 4.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:877",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:879",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:881",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:883"
+          ]
+        },
+        "2": {
+          "label": "High shot count",
+          "simple": "A charge from 50 percent up to 100 percent fires 7 shots.",
+          "technical": "Used in the else-if Level >= 50 branch, before the full-charge branch. At exactly 50 this value is selected. Current value 7.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:877",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:879"
+          ]
+        },
+        "3": {
+          "label": "Full shot count",
+          "simple": "A charge of 100 percent or more fires 10 shots.",
+          "technical": "Tested first with Level >= 100; Level is the integer charge ratio, not the cursed-energy level. Because the ratio is computed from ChargeElapsed / ChargeDuration * 100, holding beyond full can still produce a value >= 100. Current value 10.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:873",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:875",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1395"
+          ]
+        },
+        "4": {
+          "label": "Shot interval",
+          "simple": "A shot waits until 0.16 seconds of dilated time have passed before it advances.",
+          "technical": "TickShots computes Delta = DeltaTime / Dilation, where Dilation is owner CustomTimeDilation when > 0 and 1.0 otherwise. After a shot fires its Timer is 0; every tick adds Delta, and if row 3 value 4 >= Shot.Timer it continues, suppressing all further processing while Timer is less than or equal to this value. At exactly 0.16 it still continues; firing starts only above it. The newly queued shot initially has Timer = 10000, so its first tick fires immediately. Current value 0.16 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:907",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:908",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:883",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:933",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:958"
+          ]
+        },
+        "5": {
+          "label": "Maximum upward aim angle / near-stun time",
+          "simple": "Aim can rise by at most 7 degrees when a secondary target exists; shared restraint code also reads 7 as a near-distance stun time.",
+          "technical": "In the CE_2 shot fire it is passed as MaxUp to GameAnimNotify_ClampedElevation(owner location, secondary-target location, value, row 3 value 6 as MaxDown); if no valid secondary target exists, Elevation is forced to 0 and the helper is not called. The helper clamps above-target pitch to [-MaxDown, MaxUp]. Separately, shared JugonStunReceive reads the attacker row 3 value 5 as TimeNear when a victim is inside value 8. No CP_050-specific JugonStun trigger was found. Current value 7.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1397",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1400",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:13",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:14",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:44",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:279"
+          ]
+        },
+        "6": {
+          "label": "Maximum downward aim bound / far-stun time",
+          "simple": "The aim clamp allows up to 30 degrees in the opposite direction; shared restraint code also reads 30 as a far-distance stun time.",
+          "technical": "Passed as MaxDown to GameAnimNotify_ClampedElevation. For a below-target direction the helper clamps to [-MaxUp, MaxDown], so this is not a symmetric limit with value 5. Shared JugonStunReceive reads the attacker row 3 value 6 as TimeFar for distances beyond row 3 value 7. Current value 30.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1398",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1400",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:14",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:47",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:280"
+          ]
+        },
+        "7": {
+          "label": "Shot origin forward offset / far-distance bound",
+          "simple": "Shots start 260 units along their horizontal direction; shared restraint code also reads 260 as a far-distance boundary.",
+          "technical": "AddShot sets Shot.Origin = Origin + Direction.GetSafeNormal2D() * this float, then stores the original Direction. The source names this a distance but not a world unit. Shared JugonStunReceive reads the attacker row 3 value 7 as DistanceFar and uses strict Distance > DistanceFar to select TimeFar. Current value 260.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:886",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:892",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:281",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:287"
+          ]
+        },
+        "8": {
+          "label": "Shared restraint near-distance bound",
+          "simple": "The only traced use of this zero is as a distance boundary in a generic restraint reaction; Gojo-specific reachability is unresolved.",
+          "technical": "FGameCharacterAction_JugonStunReceive reads the attacker row 3 value 8 as DistanceNear. It returns TimeNear when Distance < DistanceNear, interpolates between the near and far bounds within the interval, and returns TimeNear when the two bounds are equal. No CP_050 action or damage path that starts this generic receiver was identified, so this is not claimed as a Gojo-specific mechanic. Current value 0.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:282",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:284",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:287",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:298"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The Level argument name in AddShot is misleading if read as cursed-energy level: the sole caller passes the integer charge Ratio. The 100/50 branches are therefore charge-percentage branches.",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:870",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1395",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1406"
+          ]
+        },
+        {
+          "text": "Shots are advanced from the end of the array backward, are removed when their homing target or recorded hits carry collision lock 10, and use FX_CP_050_08113_* with a variant-specific last-shot name. These effects are downstream of the row values but are not themselves tunable by this row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:910",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:920",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:960",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:970"
+          ]
+        }
+      ]
+    },
+    "CP_050_ATTACKH": {
+      "title": "Combined ExtraAttack_2 charge and shot",
+      "overview": "This row sets the charge time and effect scale range for ExtraAttack_2, plus the aim clamp used when its beam is fired.",
+      "values": {
+        "0": {
+          "label": "Charge duration",
+          "simple": "The combined attack charges for 1.1 seconds.",
+          "technical": "Read both in FCP_050_ExtraAttack_2::StartAttackHoming (start count 1) and in UniqueAction case 0, then assigned to ChargeDuration. UpdateChargeEffect computes Alpha = Clamp(ActionElapsedTime / ChargeDuration, 0, 1); TickAttack advances to the full effect only when ActionElapsedTime > ChargeDuration. Current value 1.1 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1947",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2063",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1899",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2103"
+          ]
+        },
+        "1": {
+          "label": "Starting effect scale percent",
+          "simple": "The charge effect starts at 500 percent, which the code converts to 5.0 scale.",
+          "technical": "The source multiplies this float by 0.01 before storing StartScale. UpdateChargeEffect starts its lerp from StartScale, uses the same scale for the forward growth offset and the downward ground trace length, and raises the effect by Clamp(ActionElapsedTime / ChargeDuration, 0, 1) * 75. Current value 500 -> 5.0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1948",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2064",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1900",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1904",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1908",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1914"
+          ]
+        },
+        "2": {
+          "label": "Ending effect scale percent",
+          "simple": "The charge effect grows to 1100 percent, which the code converts to 11.0 scale.",
+          "technical": "The source multiplies this float by 0.01 before storing EndScale. UpdateChargeEffect interpolates from StartScale to EndScale over Alpha; the resulting Scale is also applied to the ground effect FX_CP_050_09117 when the downward trace hits a blocker. Current value 1100 -> 11.0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1949",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2065",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1900",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1929"
+          ]
+        },
+        "3": {
+          "label": "Maximum upward aim angle",
+          "simple": "The fired beam can be raised by at most 30 degrees toward a secondary target.",
+          "technical": "UniqueAction case 2 reads this as Elevation and passes it as MaxUp to GameAnimNotify_ClampedElevation from Gojo location to the secondary-target location. When GetSecondaryTargetActor().IsValid() is false, Elevation is forced to 0 and the helper is skipped. The returned angle rotates the effect facing around its right vector. Current value 30 degrees.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1974",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1977",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1981",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:13",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:44"
+          ]
+        },
+        "4": {
+          "label": "Maximum downward aim bound",
+          "simple": "The same aim clamp allows up to 35 degrees in the opposite direction.",
+          "technical": "Read as MaxDown alongside row 4 value 3. For a below-target direction the helper clamps to [-MaxUp, MaxDown], so the two limits are intentionally different. Current value 35 degrees.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1975",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1977",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:14",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:47"
+          ]
+        }
+      },
+      "untraced": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "ExtraAttack_2 only starts from cursed-energy level 3: CanCancelCurrent first checks GetCursedEnergyLevelClamped() < 3 and only then calls the shared cursed-energy gate.",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2140",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2041",
+            "Source/Abrams/Public/CP_050_Actions.h:274"
+          ]
+        },
+        {
+          "text": "The 0.01 multiplier is a literal source conversion from the table percent-style values to the effect scale; the verification record also calls out that constant and the row 4 indices in the matched UniqueAction body.",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1948",
+            "Tools/verify/BEHAV/records/Y01.json:800",
+            "Tools/verify/BEHAV/records/Y01.json:802"
+          ]
+        }
+      ]
+    },
+    "CP_050_ATTACKG_SHOOT_CAMERA": {
+      "title": "Cursed Energy Attack 1 camera preset",
+      "overview": "This is the mode-2 camera request used while Gojo first cursed-energy attack is active. It supplies a close offset, a 105 field-of-view value and a short FOV blend.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "Camera offset X is -200.",
+          "technical": "MakeUniqueCameraRequest(2, row) reads this as Owner.GetCharacterUniqueFloatValue(0, row) and assigns it to FVirtualCameraRequest.CameraOffset.X.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "Camera offset Y is 80.",
+          "technical": "The helper reads value 1 into a local OffsetY and places it in CameraOffset.Y.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "Camera offset Z is 30.",
+          "technical": "The helper reads value 2 into a local OffsetZ and places it in CameraOffset.Z.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "The camera request downward angle limit is 60.",
+          "technical": "Assigned to FVirtualCameraRequest.LimitAngleDown. The camera-request header describes it as the maximum gaze elevation below the eye; the mode-2 camera code consumes this request field to constrain the gaze.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:32"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "The camera request upward angle limit is 30.",
+          "technical": "Assigned to FVirtualCameraRequest.LimitAngleUp. The camera-request header describes it as the maximum gaze elevation above the eye.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:33"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "The camera requests a field of view of 105.",
+          "technical": "Assigned to FVirtualCameraRequest.FieldOfView. The request header states that a value > 0 is a new FOV, so 0 means no new FOV is requested; a positive value is applied by the camera FOV interpolator.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:34"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "The FOV changes over 0.3 seconds.",
+          "technical": "Assigned to FieldOfViewBlendTime. The request header states that a positive value is the FovInterp duration and 0 snaps when a new FOV is applied. With FieldOfView 0 in this row, there is no new FOV to blend.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:35"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "FOV easing selector 0 means Linear.",
+          "technical": "The helper casts this float to int32 and maps 0 to EEasingFunc::Linear, 1 to EaseIn, 2 to EaseOut and 3 to EaseInOut; every other value leaves the zero-initialized request field at Linear. Value 7 is 0 here, so this row explicitly selects Linear.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:955",
+            "Source/Abrams/Private/GameCharacterAction.cpp:958",
+            "Source/Abrams/Private/GameCharacterAction.cpp:961",
+            "Source/Abrams/Private/GameCharacterAction.cpp:964",
+            "Source/Abrams/Private/GameCharacterAction.cpp:967",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:36"
+          ]
+        },
+        "8": {
+          "label": "Orbit yaw",
+          "simple": "Orbit yaw is 0, so no yaw orbit is requested.",
+          "technical": "Assigned to FVirtualCameraRequest.OrbitYaw, described in the request header as gaze orbit about the camera on rotator Yaw.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29"
+          ]
+        },
+        "9": {
+          "label": "Orbit pitch",
+          "simple": "Orbit pitch is 0, so no pitch orbit is requested.",
+          "technical": "Assigned to FVirtualCameraRequest.OrbitPitch, described as gaze orbit about the camera on rotator Pitch.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30"
+          ]
+        },
+        "10": {
+          "label": "Roll",
+          "simple": "Camera roll is 0.",
+          "technical": "Assigned to FVirtualCameraRequest.Roll; the header records this as the value used by camera slot 87.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The request is built by MakeUniqueCameraRequest(2, 5) when CE_1 starts, and the same row value 6 is read again when CE_1 finishes to set the FOV blend time while restoring the saved camera mode.",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1079",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1193",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941"
+          ]
+        },
+        {
+          "text": "The helper copies only floats 0-10 into the request. Indices 11-13 are zero in this row but have no identified reader in this code path.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterAction.h:205"
+          ]
+        }
+      ]
+    },
+    "CP_050_ATTACKG_2_SHOOT_CAMERA": {
+      "title": "Cursed Energy Attack 2 camera preset",
+      "overview": "This is the mode-2 camera request used by the charged CE_2 attack and by its homing-warp camera update.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "Camera offset X is -180.",
+          "technical": "MakeUniqueCameraRequest(2, row) reads this as Owner.GetCharacterUniqueFloatValue(0, row) and assigns it to FVirtualCameraRequest.CameraOffset.X.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "Camera offset Y is 60.",
+          "technical": "The helper reads value 1 into a local OffsetY and places it in CameraOffset.Y.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "Camera offset Z is 40.",
+          "technical": "The helper reads value 2 into a local OffsetZ and places it in CameraOffset.Z.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "The camera request downward angle limit is 60.",
+          "technical": "Assigned to FVirtualCameraRequest.LimitAngleDown. The camera-request header describes it as the maximum gaze elevation below the eye; the mode-2 camera code consumes this request field to constrain the gaze.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:32"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "The camera request upward angle limit is 30.",
+          "technical": "Assigned to FVirtualCameraRequest.LimitAngleUp. The camera-request header describes it as the maximum gaze elevation above the eye.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:33"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "The camera requests no new field of view.",
+          "technical": "Assigned to FVirtualCameraRequest.FieldOfView. The request header states that a value > 0 is a new FOV, so 0 means no new FOV is requested; a positive value is applied by the camera FOV interpolator.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:34"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "The camera uses no blend time.",
+          "technical": "Assigned to FieldOfViewBlendTime. The request header states that a positive value is the FovInterp duration and 0 snaps when a new FOV is applied. With FieldOfView 0 in this row, there is no new FOV to blend.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:35"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "FOV easing selector 0 means Linear.",
+          "technical": "The helper casts this float to int32 and maps 0 to EEasingFunc::Linear, 1 to EaseIn, 2 to EaseOut and 3 to EaseInOut; every other value leaves the zero-initialized request field at Linear. Value 7 is 0 here, so this row explicitly selects Linear.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:955",
+            "Source/Abrams/Private/GameCharacterAction.cpp:958",
+            "Source/Abrams/Private/GameCharacterAction.cpp:961",
+            "Source/Abrams/Private/GameCharacterAction.cpp:964",
+            "Source/Abrams/Private/GameCharacterAction.cpp:967",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:36"
+          ]
+        },
+        "8": {
+          "label": "Orbit yaw",
+          "simple": "Orbit yaw is 0, so no yaw orbit is requested.",
+          "technical": "Assigned to FVirtualCameraRequest.OrbitYaw, described in the request header as gaze orbit about the camera on rotator Yaw.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29"
+          ]
+        },
+        "9": {
+          "label": "Orbit pitch",
+          "simple": "Orbit pitch is 0, so no pitch orbit is requested.",
+          "technical": "Assigned to FVirtualCameraRequest.OrbitPitch, described as gaze orbit about the camera on rotator Pitch.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30"
+          ]
+        },
+        "10": {
+          "label": "Roll",
+          "simple": "Camera roll is 0.",
+          "technical": "Assigned to FVirtualCameraRequest.Roll; the header records this as the value used by camera slot 87.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "This row is requested twice: on CE_2 first start with bBlendView true, and in OnHomingWarpEnd with bBlendView false. The second call uses the same camera request rather than a different row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1439",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1455"
+          ]
+        },
+        {
+          "text": "Values 5 and 6 are both 0: the helper still writes them into the request, but the camera header only treats a positive FOV as a new FOV and only uses a positive blend time when one is applied.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:34",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:35"
+          ]
+        }
+      ]
+    },
+    "CP_050_ATTACKH_SHOOT_CAMERA": {
+      "title": "ExtraAttack_2 camera preset",
+      "overview": "This is the mode-2 camera request for the combined CE_1+CE_2 attack. It is the only Gojo camera row here that requests orbit and roll.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "Camera offset X is -260.",
+          "technical": "MakeUniqueCameraRequest(2, row) reads this as Owner.GetCharacterUniqueFloatValue(0, row) and assigns it to FVirtualCameraRequest.CameraOffset.X.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "Camera offset Y is -170.",
+          "technical": "The helper reads value 1 into a local OffsetY and places it in CameraOffset.Y.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "Camera offset Z is -100.",
+          "technical": "The helper reads value 2 into a local OffsetZ and places it in CameraOffset.Z.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "The camera request downward angle limit is 60.",
+          "technical": "Assigned to FVirtualCameraRequest.LimitAngleDown. The camera-request header describes it as the maximum gaze elevation below the eye; the mode-2 camera code consumes this request field to constrain the gaze.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:32"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "The camera request upward angle limit is 30.",
+          "technical": "Assigned to FVirtualCameraRequest.LimitAngleUp. The camera-request header describes it as the maximum gaze elevation above the eye.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:33"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "The camera requests no new field of view.",
+          "technical": "Assigned to FVirtualCameraRequest.FieldOfView. The request header states that a value > 0 is a new FOV, so 0 means no new FOV is requested; a positive value is applied by the camera FOV interpolator.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:34"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "The camera uses no blend time.",
+          "technical": "Assigned to FieldOfViewBlendTime. The request header states that a positive value is the FovInterp duration and 0 snaps when a new FOV is applied. With FieldOfView 0 in this row, there is no new FOV to blend.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:35"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "FOV easing selector 0 means Linear.",
+          "technical": "The helper casts this float to int32 and maps 0 to EEasingFunc::Linear, 1 to EaseIn, 2 to EaseOut and 3 to EaseInOut; every other value leaves the zero-initialized request field at Linear. Value 7 is 0 here, so this row explicitly selects Linear.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:955",
+            "Source/Abrams/Private/GameCharacterAction.cpp:958",
+            "Source/Abrams/Private/GameCharacterAction.cpp:961",
+            "Source/Abrams/Private/GameCharacterAction.cpp:964",
+            "Source/Abrams/Private/GameCharacterAction.cpp:967",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:36"
+          ]
+        },
+        "8": {
+          "label": "Orbit yaw",
+          "simple": "Orbit yaw is 12.",
+          "technical": "Assigned to FVirtualCameraRequest.OrbitYaw, described in the request header as gaze orbit about the camera on rotator Yaw.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29"
+          ]
+        },
+        "9": {
+          "label": "Orbit pitch",
+          "simple": "Orbit pitch is 10.",
+          "technical": "Assigned to FVirtualCameraRequest.OrbitPitch, described as gaze orbit about the camera on rotator Pitch.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30"
+          ]
+        },
+        "10": {
+          "label": "Roll",
+          "simple": "Camera roll is -7.",
+          "technical": "Assigned to FVirtualCameraRequest.Roll; the header records this as the value used by camera slot 87.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The row is requested in FCP_050_ExtraAttack_2::UniqueAction case 1, immediately after saving the current camera mode. Finishing the action restores that saved mode with a default-constructed request.",
+          "evidence": [
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1966",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:1967",
+            "Source/Abrams/Private/CP_050_ActionController.cpp:2161"
+          ]
+        },
+        {
+          "text": "Unlike the other two camera rows, values 8-10 are nonzero: they request 12 yaw orbit, 10 pitch orbit and -7 roll.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "The character's CharacterDataTable entry puts these eight names into Id_CharacterUnique slots 0-7. AGameCharacter copies that list into UniqueRows, and GetCharacterUniqueFloatValue is a raw unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference. Thus a code literal such as row 3 means CP_050_SHOCKWAVE for this character, but the same numeric row can mean something else for another character.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1758",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Source/Abrams/Public/GameCharacter.h:245"
+      ]
+    },
+    {
+      "text": "Limitless is the defining CP_050 loop: guarding at cursed-energy level 2 or higher fills a gauge, each full gauge adds one stack and spends cursed energy, and stacks suppress passive-hit effects while they last. Specific hits nullify the stacks and play FX_CP_050_11201. This is controller behavior layered on the character's shared status controller, not a unique-datatable shader effect.",
+      "evidence": [
+        "Source/Abrams/Private/CP_050_ActionController.cpp:108",
+        "Source/Abrams/Private/CP_050_ActionController.cpp:153",
+        "Source/Abrams/Private/CP_050_ActionController.cpp:2324",
+        "Source/Abrams/Private/CP_050_ActionController.cpp:2198",
+        "Source/Abrams/Private/CP_050_ActionController.cpp:2248"
+      ]
+    },
+    {
+      "text": "The controller owns the CE_1, CE_2, SuperCursedEnergy and ExtraAttack action classes for this character, but its factory falls through to the shared UGameCharacterActionController for every unlisted action type. Its behavior controller likewise overrides only AI indices 0x11, 0x13 and 0x16 and delegates every other index to the parent. No CP_050-specific .inl is included by these translation units.",
+      "evidence": [
+        "Source/Abrams/Private/CP_050_ActionController.cpp:634",
+        "Source/Abrams/Private/CP_050_ActionController.cpp:695",
+        "Source/Abrams/Private/CP_050_BehaviorController.cpp:8",
+        "Source/Abrams/Private/CP_050_BehaviorController.cpp:13",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941"
+      ]
+    },
+    {
+      "text": "Do not mix this character with CN_050: that is a separate action controller and source file. The row names here are CP_050-prefixed and are consumed through UCP_050_ActionController and its CP_050 action classes.",
+      "evidence": [
+        "Source/Abrams/Private/CN_050_ActionController.cpp:1",
+        "Source/Abrams/Private/CP_050_ActionController.cpp:1",
+        "Source/Abrams/Public/CP_050_Actions.h:11"
+      ]
+    },
+    {
+      "text": "Trap and shikigami forwarding were checked but are not part of these eight row reads. FGameTrapAction::GetUniqueFloat forwards to a spawner only when a trap has a source interface and returns 0 without one; CP_050's character data names no trap or shikigami. No AGameShikigami or ShikigamiUniqueDataTable reader is involved in these values.",
+      "evidence": [
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/GameTrapActionController.cpp:184",
+        "Source/Abrams/Public/GameShikigami.h:350"
+      ]
+    },
+    {
+      "text": "Verification notes identify the CP_050 unique-float call in FinishAttackEffects as a matched waypoint, and note that blanket inlining of the two-hop accessor was rejected because it would regress that cold site. Y01's behavior record independently lists the ExtraAttack_2 UniqueAction reads of row 4 indices 0-4 and the camera request (2,7). These are matching notes for reconstructed consumer code, not a claim that every function is byte-identical.",
+      "evidence": [
+        "Tools/verify/CHAR/UniqueRowsInline.md:55",
+        "Tools/verify/CHAR/UniqueRowsInline.md:115",
+        "Tools/verify/BEHAV/records/Y01.json:798",
+        "Tools/verify/BEHAV/records/Y01.json:800",
+        "Tools/verify/BEHAV/records/Y01.json:802"
+      ]
+    }
+  ]
+}

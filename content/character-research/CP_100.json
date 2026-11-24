@@ -1,0 +1,363 @@
+{
+  "overview": "Todo’s settings tune his partner-pairing range, the charge and steering of his thrown-stone move, and its attack camera.",
+  "technicalOverview": "Aoi Todo (CP_100) has three populated CharacterUniqueDataTable3 rows. The plain CP_100 row supplies one long range for his cursed-energy partner pairing. CP_100_THROWSTONEWARP times the thrown-stone warp charge and eases the beam length while the player steers with the stick. CP_100_ATTACKF_SHOOT_CAMERA builds the camera request used when the shooting follow-up starts, and its FOV-blend slot is read again when the warp ends. CharacterDataTable.Id_CharacterUnique is a zero-based list of row names; GetCharacterUniqueFloatValue then reads FloatValue[value index] with no bounds check. CP_100's own action controller overrides eight attack actions and delegates everything else to the shared base; its behavior controller replaces only AI ordinal 0x10, so the other AI executors are the shared ones.",
+  "rows": {
+    "CP_100": {
+      "title": "Base partner range",
+      "overview": "One setting: how far away another fighter can be and still be picked for Todo's cursed-energy partner move.",
+      "values": {
+        "0": {
+          "label": "Partner selection range",
+          "simple": "Maximum distance for the two fighters chosen by the cursed-energy partner attack. Larger means partners can be farther apart; exactly at the limit still counts.",
+          "technical": "Read as GetOwnerUniqueFloat(0, 0) in TCP_100_CursedEnergyAttack_1::UniqueAction. Candidates are assembled from the owner, the farthest ally, and the nearest/farthest opponents according to TargetMode (stick direction). RemoveAll then discards invalid targets, targets with FVector::Dist(owner location, target location) > Range, and targets whose AcceptsUnknownSlot74(Owner) is false. Only if exactly two targets survive does the level's BUFF_CP_100_PASSIVE_n get applied and AddTriple140(Owner, Targets[0], Targets[1]) run. Equality with the range is allowed (strict > removal). Distance is 3-D world-space (FVector::Dist); the source does not state a display unit. The same (0,0) slot is also a shared fallback in the inherited ProjectionSorceryReceive action: when Request.DamageTableRow is null it becomes RestraintTime, and that action advances once RestraintTime <= ActionElapsedTime. No other CP_100 code reads this slot.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_100_ActionController.cpp:679",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:686",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:692",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:876",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:215"
+          ]
+        }
+      },
+      "untraced": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": []
+    },
+    "CP_100_THROWSTONEWARP": {
+      "title": "Stone-warp charge and beam steering",
+      "overview": "Settings for how long the stone-warp attack is charged, how long the beam grows, and how far the left stick can turn or tilt it.",
+      "values": {
+        "0": {
+          "label": "Charge time / beam growth time",
+          "simple": "How long the wind-up lasts before the stone is fired, and the time over which the beam reaches its full length.",
+          "technical": "Read twice as row (1, value 0). In NormalAttack_3_1 Tick phase 1 it is ChargeTime: while NormalAttack_3 is held, ActionElapsedTime += DeltaTime only while ActionElapsedTime < ChargeTime; on reaching or passing it the code fires AttackRow2, clears the aim beam and advances the phase. UpdateBeam calls it Duration and computes Length = ActionElapsedTime / Duration * (EndLength - StartLength) + StartLength. There is no guard against zero or negative values at either site. Seconds, because the numerator is DeltaTime accumulation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_100_ActionController.cpp:288",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:291",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:347",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:351",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:357"
+          ]
+        },
+        "1": {
+          "label": "Beam starting length",
+          "simple": "How far ahead the beam/marker starts when charging begins.",
+          "technical": "Row (1, value 1) is StartLength in the same linear interpolation as value 0. UpdateBeam uses the resulting Length to put the camera mode-3 gaze point at effect location + effect forward * Length and to trace from the effect root to root-forward * Length; the first hit shortens Length to Hits[0].Distance, and BeamEndPoint is set to (Length, 0, 0) on every Niagara component. Tick phase 1 re-reads StartLength to compute Unknown224, which phases 2 and 3 compare against the played effect's MovedDistance (>=) before applying collisions / advancing. World distance along the effect's forward axis; no clamping of the interpolated value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_100_ActionController.cpp:289",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:291",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:293",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:301",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:309",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:356",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:370"
+          ]
+        },
+        "2": {
+          "label": "Beam ending length",
+          "simple": "The length the beam/marker grows toward by the end of the charge.",
+          "technical": "Row (1, value 2) is EndLength in the (StartLength -> EndLength) lerp driven by ActionElapsedTime / Duration. It is re-read in Tick phase 1 as the upper term of Unknown224 = elapsed / ChargeTime * (EndLength - StartLength) + StartLength; that threshold is compared with the projectile effect's MovedDistance in phases 2/3. With the shipped values the lerp runs 2000 -> 2500 over 2 seconds, but the source applies no clamp, so editing value 0 or 1 can make the interpolated length decrease or overshoot.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_100_ActionController.cpp:290",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:291",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:357",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:387",
+            "Tools/verify/CHAR/SharedActionDependencies.md:147"
+          ]
+        },
+        "3": {
+          "label": "Yaw steering limit divisor",
+          "simple": "Sets how far left and right the aim can swing; the stored number is halved before use.",
+          "technical": "Row (1, value 3) is multiplied by 0.5f to make YawLimit. Phase 1 accumulates Turn * Stick.X into the action's Unknown22C and clamps it inclusively to [-YawLimit, +YawLimit]; owner root rotation Yaw = StartYaw + Unknown22C. With the shipped 120 the actual bound is +/-60 degrees, because FRotator Yaw is in degrees. Changing this value changes the bound to half the value, not one-to-one.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_100_ActionController.cpp:339",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:340",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:342"
+          ]
+        },
+        "4": {
+          "label": "Maximum downward aim tilt",
+          "simple": "Limits how far the aim can tilt downward while charging.",
+          "technical": "Row (1, value 4) is PitchDown. Phase 1 sets BodyRollTarget = Clamp(BodyRollTarget - Turn * Stick.Y, -PitchDown, PitchUp), so the lower inclusive bound is the negative of this number. UpdateBeam assigns effect root Rotation.Pitch = -BodyRollTarget, and UniqueActionBegin passes BodyRollTarget to StartFullBodyRollEase. With the shipped 20 the lower bound is -20 degrees; increasing the value permits more negative pitch.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_100_ActionController.cpp:344",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:346",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:295",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:451"
+          ]
+        },
+        "5": {
+          "label": "Maximum upward aim tilt",
+          "simple": "Limits how far the aim can tilt upward while charging.",
+          "technical": "Row (1, value 5) is the upper inclusive bound PitchUp of the same BodyRollTarget clamp as value 4. It is not negated: with the shipped 40 the clamp is [-20, +40] degrees before the sign flip used for the effect's root Pitch and before the roll ease on the owner's movement controller.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_100_ActionController.cpp:345",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:346",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:295"
+          ]
+        },
+        "6": {
+          "label": "Stick steering speed",
+          "simple": "How quickly holding a stick direction swings and tilts the aim.",
+          "technical": "Row (1, value 6) is multiplied by DeltaTime to form Turn; Turn * Stick.X feeds the clamped yaw accumulator and Turn * Stick.Y is subtracted from the clamped pitch accumulator every phase-1 tick. With the shipped 200 the rate is 200 degrees per second per unit of stick input; no separate input normalization or max is applied at these reads.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_100_ActionController.cpp:338",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:340",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:346"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "This row is only used while the NormalAttack_3_1 / NormalAttackAir_3_1 action family is active. The kept projectile is selected in slot 42 by EffectType == Projectile; contact with a character body sets the secondary target and channel-5 contact sets bBeamHitGameTraceChannelFive, which gates the phase-4 follow-up.",
+          "evidence": [
+            "Source/Abrams/Private/CP_100_ActionController.cpp:830",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:891",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:400"
+          ]
+        }
+      ]
+    },
+    "CP_100_ATTACKF_SHOOT_CAMERA": {
+      "title": "Shooting-attack camera request",
+      "overview": "Camera placement, gaze limits, FOV, and orbit settings applied when the shooting follow-up begins; the blend-time slot is reused when the stone-warp teleport restores the old camera mode.",
+      "values": {
+        "0": {
+          "label": "Camera forward offset",
+          "simple": "Moves the camera along the aim direction; the shipped negative value pulls it back.",
+          "technical": "Row (2, value 0) becomes FVirtualCameraRequest.CameraOffset.X via MakeUniqueCameraRequest(2, 2), called from TCP_100_NormalAttack_3_1::UniqueAction when IntParameter == 10 before SetCameraMode(3, true, &request). UpdateRequestCamera builds the camera from Base + GazeRotation.Quaternion().RotateVector(CameraOffset), where GazeRotation's +X points from the eye base toward the gaze; -150 therefore offsets along -X in that gaze space. A later geometry trace can pull the resulting camera position in. World-space offset, not clamped.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_100_ActionController.cpp:219",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:386",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera side offset",
+          "simple": "Shifts the camera sideways relative to the aim.",
+          "technical": "Row (2, value 1) is CameraOffset.Y in the same gaze-rotated offset vector as value 0. The request is copied into the camera even though the caller asks for camera mode 3; mode 3 uses Mode3GazeLocation, then the shared request camera code applies this offset. No sign is flipped and no clamp is applied in the helper.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera height offset",
+          "simple": "Shifts the camera vertically relative to the aim; the shipped value lowers it slightly.",
+          "technical": "Row (2, value 2) is CameraOffset.Z, read before X/Y are assembled into the request. It is rotated with the rest of CameraOffset into gaze-rotation space by UpdateRequestCamera; the shipped -10 is a downward local-Z offset in that space, not a fixed world-height override.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Gaze downward limit",
+          "simple": "Stops the camera from looking too far below the fighter.",
+          "technical": "Row (2, value 3) is Request.LimitAngleDown. UpdateRequestCamera measures the unsigned angle between the gaze direction and its 2-D heading with AngleBetweenDegrees; when the gaze is below the eye and that angle exceeds this limit, the gaze is rotated back to the limit around the cross-product axis. Degrees; with 60 it allows up to 60 degrees below. The comparison is strict >, so exactly at the limit no correction is made.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:374",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Gaze upward limit",
+          "simple": "Stops the camera from looking too far above the fighter.",
+          "technical": "Row (2, value 4) is Request.LimitAngleUp, applied by the same AngleBetweenDegrees check only when the gaze is above the eye. With the shipped 30 the gaze is corrected above 30 degrees; the down limit (value 3) is a separate setting, so the two do not have to match.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "5": {
+          "label": "Requested field of view",
+          "simple": "Nominally the camera's zoom setting, but the shipped 0 tells the camera to leave FOV alone.",
+          "technical": "Row (2, value 5) is Request.FieldOfView. ChangeCameraMode only acts when NewFieldOfView > 0.0f; with the shipped 0 the FOV is neither blended nor snapped by MakeUniqueCameraRequest's request. The two stone-warp restore paths instead hard-code FieldOfView = 90.0f in their own request and use value 6 for the blend time. Zero is therefore a do-not-change value here, not a zero-degree view.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:267",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:527"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "How long an FOV change takes; 0 means it switches instantly.",
+          "technical": "Row (2, value 6) has two paths. MakeUniqueCameraRequest copies it to Request.FieldOfViewBlendTime; with a positive FOV, ChangeCameraMode starts FovInterp only when this is > 0.0f, otherwise it snaps. Separately, both teleport restores read GetOwnerUniqueFloat(6, 2) into a request with FOV 90 and call SetCameraMode(SavedCameraMode, false / true, &request), so shipped 0 makes that FOV restore instantaneous. The boolean only controls the separate view blend. Seconds; no default substitution when the value is 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:268",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:269",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:528",
+            "Source/Abrams/Private/CP_100_ActionController.cpp:529",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:582"
+          ]
+        },
+        "7": {
+          "label": "FOV easing choice",
+          "simple": "Selects the curve used when the FOV blend runs.",
+          "technical": "Row (2, value 7) is cast to int32 by MakeUniqueCameraRequest. 0 -> EEasingFunc::Linear, 1 -> EaseIn, 2 -> EaseOut, 3 -> EaseInOut; any other value falls through the switch and leaves the request's default FieldOfViewEasing (0). FovInterp receives that enum only when FieldOfView > 0 and blend time > 0, which is not the case for the shipped request from this row itself.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:956",
+            "Source/Abrams/Private/GameCharacterAction.cpp:968",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:36",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578"
+          ]
+        },
+        "8": {
+          "label": "Orbit yaw",
+          "simple": "Rotates the view horizontally around the camera after the camera position is chosen.",
+          "technical": "Row (2, value 8) becomes Request.OrbitYaw. UpdateRequestCamera builds FRotator(OrbitPitch, OrbitYaw, 0) and, when the rotator is non-zero, transforms the gaze point through the camera's inverse/forward view space before aiming the camera at it. Degrees; 0 leaves this step inactive for the shipped data.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421"
+          ]
+        },
+        "9": {
+          "label": "Orbit pitch",
+          "simple": "Rotates the view vertically around the camera after the camera position is chosen.",
+          "technical": "Row (2, value 9) becomes Request.OrbitPitch, the Pitch member of the same orbit FRotator as value 8. It shares the IsZero gate, so the shipped 0 contributes no orbit; no separate clamp is applied to orbit values in this code.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Tilts the camera image; the shipped value leaves it level.",
+          "technical": "Row (2, value 10) becomes Request.Roll, passed as the Roll argument of SetViewTarget87(CameraLocation, Gaze, Request.Roll, bSkipViewInterp == 0) at the end of UpdateRequestCamera. It is camera roll, distinct from the action's own BodyRollTarget from the THROWSTONEWARP row. Zero means no camera roll from this request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The helper is called with CameraMode 2 but the caller sets camera mode 3. That is intentional in the traced code: only CameraMode == 2 makes MakeUniqueCameraRequest fill the fields, while SetCameraMode copies the request wholesale and mode 3 supplies Mode3GazeLocation. Values 0-4 and 8-10 still affect the resulting camera in mode 3.",
+          "evidence": [
+            "Source/Abrams/Private/CP_100_ActionController.cpp:219",
+            "Source/Abrams/Private/GameCharacterAction.cpp:943",
+            "Source/Abrams/Private/GameCharacter.cpp:1946",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:584"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Todo's action controller creates eight special action types (NormalAttack_3, _3_Auto, Air_3, Air_3_Auto, NormalAttack_3_1, Air_3_1, CursedEnergyAttack_1 and Air_1); all other action requests go through Super::CreateAction. That is why the shared ProjectionSorceryReceive fallback can still read CP_100's row 0 when Todo is the receiver.",
+      "evidence": [
+        "Source/Abrams/Private/CP_100_ActionController.cpp:930",
+        "Source/Abrams/Private/CP_100_ActionController.cpp:951",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:876"
+      ]
+    },
+    {
+      "text": "Teleport is part of the attack action, not a generic warp: slot 42 keeps only a projectile effect, and UniqueAction teleports the owner to that effect using RequestLocation when PlayedEffect is valid (mode 2 for NormalAttack_3, mode 0 for the _3_1 parameter-0 branch). This is the effect whose movement distance is compared with the beam length from row 1.",
+      "evidence": [
+        "Source/Abrams/Private/CP_100_ActionController.cpp:745",
+        "Source/Abrams/Private/CP_100_ActionController.cpp:55",
+        "Source/Abrams/Private/CP_100_ActionController.cpp:247",
+        "Source/Abrams/Private/CP_100_ActionController.cpp:370"
+      ]
+    },
+    {
+      "text": "Behavior side: UCP_100_BehaviorController only replaces AI ordinal 0x10 with FGameCharacterAIAction_NormalAttack3DownOrbit; ordinals 0x00-0x18 otherwise come from the base factory. FGameCharacterAIThinkNode_CP_100 sets weights/ranges for NormalAttack_3_1 and CursedEnergyAttack_1, but its setup code does not read the unique table.",
+      "evidence": [
+        "Source/Abrams/Private/CP_100_BehaviorController.cpp:9",
+        "Source/Abrams/Private/GameCharacterBehaviorController.cpp:45",
+        "Source/Abrams/Private/GameCharacterBehaviorController.cpp:99",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1116",
+        "Source/Abrams/Public/GameCharacterAIThinkNode.h:435"
+      ]
+    },
+    {
+      "text": "Other generic readers were checked and not attributed to CP_100: SteerTowardSecondaryTarget divides by row 0 value 0 but its transcribed callers are CN_041/CN_140; the CursedEnergyAttack1/2Hold executors that read row 0 values 0-2 are created by CP_040's behavior controller, not CP_100's; trap controllers forward their source's unique values from rows 7/8, whereas CP_100 has no trap actions in its CreateAction override.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+        "Source/Abrams/Private/CN_041_ActionController.cpp:391",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:97",
+        "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188",
+        "Source/Abrams/Private/CP_100_ActionController.cpp:930"
+      ]
+    },
+    {
+      "text": "These are traced reads in reconstructed consumer code, not a byte-match claim: CP_100's own record still marks several slot bodies NEED-PROBE, and the verification notes identify the beam-steering helper as reading unique floats 0-2 of row 1 and the CE target-select body as using GUF(0,0). The descriptions above follow the code's observable behavior; unresolved byte-level details are not presented as settings.",
+      "evidence": [
+        "Source/Abrams/Public/CP_100_Actions.h:8",
+        "Tools/verify/CHAR/SharedActionDependencies.md:147",
+        "Tools/verify/CHAR/SharedActionDependencies.md:174",
+        "Tools/verify/CHAR/CameraDependencies.md:55"
+      ]
+    },
+    {
+      "text": "Row lookup is unchecked and positional: AGameCharacter builds UniqueRows by iterating Id_CharacterUnique in order, and GetCharacterUniqueFloatValue indexes UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds tests. Changing the CharacterDataTable row list would silently change which table row each of these hard-coded indices reaches.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:561",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacter.cpp:1761"
+      ]
+    }
+  ]
+}

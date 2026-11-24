@@ -1,0 +1,228 @@
+{
+  "overview": "Maki’s unique settings include a brief collision lock and the timing and speed of her tension drain.",
+  "technicalOverview": "Maki Zen'in (CP_060) uses the CP_060 action controller, a CP_060-specific AI think node, and a small CP_060 behavior controller. Her first CharacterUnique row contains three traced character-specific settings: a short collision lock when the first cursed-energy attack starts homing, a delay before tension begins draining, and the tension drain rate (zero while input is disabled). The second row is named CP_060_ATTACKH and is loaded as unique row 1, but the reconstructed CP_060 source has no reader for row 1, so its values are not assigned an effect. Unique rows are resolved in CharacterDataTable.Id_CharacterUnique order and read by unchecked row/value indexing.",
+  "rows": {
+    "CP_060": {
+      "title": "Core unique tuning",
+      "overview": "Row index 0 (the first Id_CharacterUnique entry). Three values have traced CP_060 readers; one nonzero value has a plausible but excluded generic AI reader; the remaining ten values have no identified CP_060 read.",
+      "values": {
+        "0": {
+          "label": "Cursed-energy homing collision-lock time",
+          "simple": "When Maki starts the homing part of her first cursed-energy attack, this is how long a damage-collision lock stays active.",
+          "technical": "TCP_060_CursedEnergyAttack_1<TBase>::StartAttackHoming (slot 130) reads this as GetOwnerUniqueFloat(0, 0) and calls SetCollisionLock(9, true, LockTime). UGameActorStatusController::SetCollisionLock inserts or overwrites key 9 and reapplies collision tags; TickCollisionLocks subtracts DeltaTime from every non-negative timer and removes the key once the timer is <= 0. With the row value 0.5, the lock lasts about 0.5 seconds. This use is specific to the CE_1 homing start; the same function also clears stored start counts for the normal, CE-air and super attack types and rotates toward the secondary target.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_060_ActionController.cpp:282",
+            "Source/Abrams/Private/CP_060_ActionController.cpp:311",
+            "Source/Abrams/Private/GameActorStatusController.cpp:31",
+            "Source/Abrams/Private/GameActorStatusController.cpp:61"
+          ]
+        },
+        "1": {
+          "label": "Row-0 value 1 (no CP_060 reader found)",
+          "simple": "This value is 100, but no Maki-specific source path reads it; its meaning is not established.",
+          "technical": "The generic FGameCharacterAIAction_CursedEnergyAttack1Hold::Reset reads row 0 value 1 as Duration = value1 * CursedEnergyLevel + value0, but that executor is registered for CP_040 at AI ordinal 0x11. CP_060's behavior controller overrides ordinal 0x11 with FGameCharacterAIAction_CursedEnergyAttack1ToGoal, whose Reset only chooses a stick direction from the move goal; the base ordinal 0x11 executor is FGameCharacterAIAction_CursedEnergyAttack1. No CP_060 source calls value index 1 with row index 0. The value is therefore unresolved for this character, not a proven AI hold duration.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:1180",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:8",
+            "Source/Abrams/Private/CP_060_BehaviorController.cpp:8",
+            "Source/Abrams/Private/GameCharacterBehaviorController.cpp:99"
+          ]
+        },
+        "2": {
+          "label": "Tension recovery wait",
+          "simple": "After Maki's tension goes up, this is how long she waits before tension starts draining.",
+          "technical": "UCP_060_ActionController::InitCharacterSpecificState (slot 298) reads Owner.Get()->GetCharacterUniqueFloatValue(2, 0) into UGameCharacterStatusController::TensionRecoverWaitDuration. SetTensionGauge copies that duration into TensionRecoverWait only when the new gauge value is >= the current gauge. The status tick decrements TensionRecoverWait by DeltaTime and allows drain only when TensionRecoverWait <= 0 while TensionGauge > 0. Because the timer is reduced by DeltaTime, the stored 7.0 is seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_060_ActionController.cpp:703",
+            "Source/Abrams/Private/CP_060_ActionController.cpp:707",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:1081",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3573"
+          ]
+        },
+        "3": {
+          "label": "Tension drain rate",
+          "simple": "With input enabled, this is how fast tension falls after the wait; with input disabled, it does not fall.",
+          "technical": "UCP_060_ActionController::GetTensionRecoverRate (slot 119) returns 0.0f when the owner's input data reports input disabled; otherwise it returns GetCharacterUniqueFloatValue(3, 0), here 3.0. AGameCharacter::GetTensionRecoverValue multiplies that by Scale = 0 when Setup.TensionGauge == 1, else 1. The status tick then subtracts GetTensionRecoverValue() * DeltaTime from TensionGauge after the wait expires, so under the normal setup the value is gauge units per second and is zero if input is disabled or Setup.TensionGauge == 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_060_ActionController.cpp:586",
+            "Source/Abrams/Private/CP_060_ActionController.cpp:593",
+            "Source/Abrams/Private/GameCharacter.cpp:3071",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3580"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Row 0 is UniqueRows[0] because CharacterDataTable.Id_CharacterUnique lists CP_060 first. The accessor is an unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference; only the two listed unique rows are populated, so a reader asking for a later row would not be supported by the data.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:559",
+            "Source/Abrams/Private/GameCharacter.cpp:1758",
+            "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUnique.h:7"
+          ]
+        },
+        {
+          "text": "MakeUniqueCameraRequest(2, RowIndex) is a shared helper that would read row floats 0..10 as camera offset, angle limits, FOV, blend time, easing selector and orbit values. No CP_060 source calls it, so the zero camera-looking slots in this row are not labelled camera settings for Maki.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:939",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Public/GameCharacterAction.h:205"
+          ]
+        },
+        {
+          "text": "The generic SteerTowardSecondaryTarget helper also divides an angle by row-0 value 0, but its traced callers are CN_041 and CN_140 action classes; the ProjectionSorcery receive fallback is a different action family. Neither is assigned to CP_060.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3492",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:203"
+          ]
+        }
+      ]
+    },
+    "CP_060_ATTACKH": {
+      "title": "Second row (ATTACKH / cursed-energy attack family)",
+      "overview": "Row index 1. The first four values are nonzero (2, 3, 5, 5), but after tracing the CP_060 controller, its action templates, AI/behavior factories and shared unique-float helpers, no CP_060 reader for row 1 was identified. Any suggested meaning would be an inference from the row name or from other characters.",
+      "values": {
+        "0": {
+          "label": "Row-1 value 0 (unresolved)",
+          "simple": "2.0 in the second row; no confirmed effect on Maki in the reconstructed source.",
+          "technical": "This is UniqueRows[1]->FloatValue[0]. The generic camera helper would treat it as CameraOffset.X if MakeUniqueCameraRequest(2, 1) were called, but no CP_060 path does so. CP_060's CE_2 overrides read only internal arm flags and select attack rows/sets; they never call a unique-float accessor with RowIndex 1. Status unresolved: the nonzero value is recorded, not interpreted.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:559",
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/CP_060_ActionController.cpp:101"
+          ]
+        },
+        "1": {
+          "label": "Row-1 value 1 (unresolved)",
+          "simple": "3.0 in the second row; no confirmed effect on Maki in the reconstructed source.",
+          "technical": "This is UniqueRows[1]->FloatValue[1]. MakeUniqueCameraRequest would read it as CameraOffset.Y only when called with row 1; no CP_060 caller was found. The generic AI Hold executor's row-0 value-1 read is a different row and is excluded for CP_060 by the behavior controller override. Status unresolved.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/CP_060_BehaviorController.cpp:8",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:118"
+          ]
+        },
+        "2": {
+          "label": "Row-1 value 2 (unresolved)",
+          "simple": "5.0 in the second row; no confirmed effect on Maki in the reconstructed source.",
+          "technical": "This is UniqueRows[1]->FloatValue[2]. The only generic reader at this position is the CameraOffset.Z assignment in MakeUniqueCameraRequest for a row-1 camera request; no CP_060 source issues that request. Status unresolved.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/CP_060_ActionController.cpp:132"
+          ]
+        },
+        "3": {
+          "label": "Row-1 value 3 (unresolved)",
+          "simple": "5.0 in the second row; no confirmed effect on Maki in the reconstructed source.",
+          "technical": "This is UniqueRows[1]->FloatValue[3]. MakeUniqueCameraRequest would use it as LimitAngleDown for a row-1 camera request, but no CP_060 caller passes row 1. Status unresolved; do not transfer another character's ATTACKH interpretation to this row.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/CP_060_ActionController.cpp:126"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The row key and character data associate it with Maki's cursed-energy attack family, but that is not a consumer trace. CP_060's CE_2 slot 141 finds the attack set through the generic Id_AttackSet_CursedEnergy_2 pointer, and slot 142 changes the attack-row index from cursed-energy level and the charge flag; neither reads this unique row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_060_ActionController.cpp:101",
+            "Source/Abrams/Private/CP_060_ActionController.cpp:134",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:40"
+          ]
+        },
+        {
+          "text": "Both CE_1 and CE_2 action classes are created by CP_060's CreateAction switch, so a retail-only consumer could exist outside the reconstructed bodies. The verification record still marks the CE_1 slots and several CreateAction types as parked/unregistered; this is why the row stays unresolved rather than being declared unused.",
+          "evidence": [
+            "Source/Abrams/Private/CP_060_ActionController.cpp:526",
+            "Source/Abrams/Private/CP_060_ActionController.cpp:554",
+            "Tools/verify/CHAR/CP_060_ActionController.md:69",
+            "Tools/verify/CHAR/CP_060_ActionController.md:234"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Character wiring is explicit: CP_060's ActionControllerType creates UCP_060_ActionController, its AIType creates FGameCharacterAIThinkNode_CP_060, and behavior controller index 6 creates UCP_060_BehaviorController. The behavior controller only specialises AI ordinal 0x11; other ordinals use the parent factory.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:591",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:169",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:1354",
+        "Source/Abrams/Private/CP_060_BehaviorController.cpp:8"
+      ]
+    },
+    {
+      "text": "Maki's visible mechanic is a tension gauge: the CP_060 battle HUD shows its fill and colored level, and the controller changes passive buffs at gauge levels 1, 2 and 3-4. The speed-up applied by OnActionStarted comes from CP_060_Passive buff-state FloatValue[0], not from the CharacterUnique rows in this file.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_060.cpp:28",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_060.cpp:63",
+        "Source/Abrams/Private/CP_060_ActionController.cpp:567",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4202"
+      ]
+    },
+    {
+      "text": "Control quirk: a hit on the owner switches the default action layer into the ground or air CursedEnergyAttack_1 with request flag 2. That is the action family whose homing start uses row-0 value 0. For AI, CP_060 uses a ToGoal executor that only converts the move goal to a stick direction, unlike the generic timed CursedEnergyAttack1Hold that would read row-0 value 1.",
+      "evidence": [
+        "Source/Abrams/Private/CP_060_ActionController.cpp:670",
+        "Source/Abrams/Private/CP_060_ActionController.cpp:682",
+        "Source/Abrams/Private/CP_060_BehaviorController.cpp:8",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:1180"
+      ]
+    },
+    {
+      "text": "Byte-match caution: the CE_1 slot-130 body that reads row-0 value 0 is transcribed in source, but the CP_060 verification record still lists CE_1 types as parked/unregistered and slot 130 among the unregistered bodies. The numeric use is traced in source; its byte-verified retail status is not claimed here.",
+      "evidence": [
+        "Source/Abrams/Private/CP_060_ActionController.cpp:287",
+        "Tools/verify/CHAR/CP_060_ActionController.md:69",
+        "Tools/verify/CHAR/CP_060_ActionController.md:156",
+        "Tools/verify/CHAR/CP_060_ActionController.md:234"
+      ]
+    },
+    {
+      "text": "The two-hop read chain was audited separately: FGameCharacterAction::GetOwnerUniqueFloat calls AGameCharacter::GetCharacterUniqueFloatValue, and the latter is the raw unchecked dereference. Hot-site inlining was measured but not landed, so the source spelling here is the out-of-line call form.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction.cpp:931",
+        "Source/Abrams/Private/GameCharacter.cpp:1758",
+        "Tools/verify/CHAR/UniqueRowsInline.md:18"
+      ]
+    }
+  ]
+}

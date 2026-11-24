@@ -1,0 +1,143 @@
+{
+  "overview": "Yuji’s controller swaps passive buffs as his cursed-energy level changes. His export leaves all unique slots empty.",
+  "technicalOverview": "Yuji Itadori (CP_010) is a playable Jujutsu Sorcerer whose exported CharacterDataTable row has no unique-data rows at all: all nine Id_CharacterUnique entries are None and no CP_010 row exists in any of the five CharacterUniqueDataTable exports. Character setup still builds an all-null UniqueRows array, and the shared unique-float accessor is an unchecked row/value dereference, so there is no shipped CP_010 unique-float tuning to document. His behaviour comes from the ordinary action, command, special-attack and stat tables plus UCP_010_ActionController: that controller has no members and only swaps passive buffs when the cursed-energy level changes, while CreateAction is a plain pass-through to the shared action factory. UCP_010_BehaviorController is an equally small shell with a forward-only AI factory, and the CP_010 think node doubles as the game's default AI node. CP_010 is also the default character id used by many battle, free-battle, menu and save settings.",
+  "rows": {},
+  "notes": [
+    {
+      "text": "No unique row exists for CP_010. The authoritative row input is empty: every one of the nine Id_CharacterUnique names in the exported CharacterDataTable row is None, and none of CharacterUniqueDataTable1..5 contains a CP_010 key. Character setup empties UniqueRows and adds one optional-table result per configured id, so all nine entries are null. AGameCharacter::GetCharacterUniqueFloatValue reads UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds or null check, and FGameCharacterAction::GetOwnerUniqueFloat is just the qualified forward to it. There is therefore no CP_010-specific unique value to assign; any value seen in a modded or future row would be new data, not a shipped default.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:561",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Private/GameCharacterAction.cpp:935",
+        "Source/Abrams/Public/GameCharacter.h:245",
+        "Tools/verify/CHAR/UniqueRowsInline.md:21"
+      ]
+    },
+    {
+      "text": "The action controller is a memberless shell with exactly two late overrides. OnCursedEnergyLevelChanged calls the base first; the base sets the controller's cursed-energy level to min(NewLevel, 3) unless an attack action is active. CP_010 then removes every EGameBuffDebuff::CP_010_Passive stack at level 1, adds BUFF_CP_010_PASSIVE_2 at level 2, and adds BUFF_CP_010_PASSIVE_3 at both level 3 and level 4. CreateAction is only a Super forward, so CP_010 has no special action type of its own and uses the inherited 120-case action factory. Verification records CP_010 as the one 'verified-empty' shell whose late-slot overrides were already complete.",
+      "evidence": [
+        "Source/Abrams/Private/CP_010_ActionController.cpp:7",
+        "Source/Abrams/Private/CP_010_ActionController.cpp:9",
+        "Source/Abrams/Private/CP_010_ActionController.cpp:13",
+        "Source/Abrams/Private/CP_010_ActionController.cpp:16",
+        "Source/Abrams/Private/CP_010_ActionController.cpp:20",
+        "Source/Abrams/Private/CP_010_ActionController.cpp:26",
+        "Source/Abrams/Private/CP_010_ActionController.cpp:28",
+        "Source/Abrams/Public/CP_010_ActionController.h:12",
+        "Source/Abrams/Public/CP_010_ActionController.h:14",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:956",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:958",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:960",
+        "Source/Abrams/Private/GameCharacter.cpp:1367",
+        "Tools/verify/CHAR/batches/batch-action.md:211"
+      ]
+    },
+    {
+      "text": "The level-swapped passives do have traced gameplay effects, but through BuffDebuffDataTable, not the unique table. The exported BUFF_CP_010_PASSIVE_2 and BUFF_CP_010_PASSIVE_3 rows are both EGameBuffDebuff::CP_010_Passive with FloatValue[0] = 0.9 / 0.8 and FloatValue[1] = 1.1 / 1.2. The status controller treats that buff type as a buff, adds its FloatValue[0] to the dash gauge consume-rate accumulator, and adds FloatValue[1] to the dash-end, dash-begin, dash-air-begin and dash-air-end rigidity rates (base rate + buff value - 1). Both buff names are also in the full round-keep list. These are buff-row floats, so they must not be entered into a CharacterUniqueDataTable row.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/EGameBuffDebuff.h:8",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1339",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1429",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:1978",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2734",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2742",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2690",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2699",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2703",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2741",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2800",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2824",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:2848"
+      ]
+    },
+    {
+      "text": "The behaviour controller is a size-0x50 memberless shell: its constructor adds no tables or fields, and slot-87 CreateThinkParam simply returns the parent's result. Verification found that CN_071 and CN_170 pass the identical ClassConstructor as CP_010, so they install CP_010's vtable and inherit that pure-forward slot-87 rather than having their own factory. That is a shared shell/vtable quirk, not evidence that those characters use CP_010's actions or tuning.",
+      "evidence": [
+        "Source/Abrams/Private/CP_010_BehaviorController.cpp:3",
+        "Source/Abrams/Private/CP_010_BehaviorController.cpp:5",
+        "Source/Abrams/Private/CP_010_BehaviorController.cpp:10",
+        "Source/Abrams/Private/CP_010_BehaviorController.cpp:11",
+        "Source/Abrams/Public/CP_010_BehaviorController.h:12",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:1343",
+        "Tools/verify/CHAR/BehaviorController_shells.md:36",
+        "Tools/verify/CHAR/BehaviorController_shells.md:38",
+        "Tools/verify/CHAR/BehaviorController_shells.md:73",
+        "Tools/verify/CHAR/BehaviorController_shells.md:74",
+        "Tools/verify/CHAR/BehaviorController_shells.md:78"
+      ]
+    },
+    {
+      "text": "CP_010 has AIType 1 and its own FGameCharacterAIThinkNode_CP_010. The AI brain also selects this node as the default for None/out-of-range AI types, and CN_170's type-29 slot has no case, so it shares the CP_010 factory. CP_010's think setup disables advanced AI behaviour, uses 800-unit close/mid ranges and 0.5-second think intervals, gives Cursed Energy Attack 1, Cursed Energy Attack 2 and Super Cursed Energy Attack weights 20, 20 and 30, gates CE2 on value D >= 4 and Super on MinAILevel, and limits Super to a 300-unit target range; random setup adds jump-air parameters 11-16 and step parameters 17 and 19, with 19 gated on value D >= 4. The reconstruction notes that SetupThinkParameters is still a DIFF row because of a callee mismatch, so these AI details are observed reconstruction rather than a byte-matched claim.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:146",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:150",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:163",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:209",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:211",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:40",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:41",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:43",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:78",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:83",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:88",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:96",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:98",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:99",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:101",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeRandomParameters.cpp:50",
+        "Tools/verify/CHAR/ai-family-verified.md:126",
+        "Tools/verify/CHAR/GameCharacterAIThinkNode.md:107"
+      ]
+    },
+    {
+      "text": "Shared systems can still ask any character for unique row 0, even when that character has no configured row. The AI curse-attack hold actions read (0,0) plus (1,0) or (2,0) when resetting their hold durations; ProjectionSorceryReceive uses (0,0) as restraint time only when the incoming request has no DamageTableRow; and SteerTowardSecondaryTarget reads (0,0) as an angle divisor, writing a zero turn time when it is not positive. Traps use FGameTrapAction::GetUniqueFloat to forward a value to their spawning character and return 0 if there is no source. CP_010's own CreateAction is a pass-through, and the reconstructed source does not show which of these generic paths CP_010 actually reaches with an all-null UniqueRows array; whether any of them would be exercised is unresolved, and the accessor itself has no null guard.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAINode.cpp:118",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:119",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:129",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:130",
+        "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212",
+        "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3518",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3520",
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/GameTrapActionController.cpp:184",
+        "Source/Abrams/Private/GameTrapActionController.cpp:186",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188",
+        "Source/Abrams/Private/CP_010_ActionController.cpp:28"
+      ]
+    },
+    {
+      "text": "No unique camera preset is configured for CP_010. The shared MakeUniqueCameraRequest reads up to eleven floats from one unique row only when CameraMode is 2: indices 0-2 make the camera offset, 3-4 the up/down angle limits, 5-6 the field of view and blend time, 7 selects the FOV easing among four cases, and 8-10 set orbit yaw, pitch and roll. CP_010 has neither a unique row to supply these values nor a camera-specific override in its action controller; the helper is generic and must not be attributed to another character's row in this wiki entry.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction.cpp:941",
+        "Source/Abrams/Private/GameCharacterAction.cpp:944",
+        "Source/Abrams/Private/GameCharacterAction.cpp:948",
+        "Source/Abrams/Private/GameCharacterAction.cpp:949",
+        "Source/Abrams/Private/GameCharacterAction.cpp:951",
+        "Source/Abrams/Private/GameCharacterAction.cpp:953",
+        "Source/Abrams/Private/GameCharacterAction.cpp:970",
+        "Source/Abrams/Private/GameCharacterAction.cpp:972",
+        "Source/Abrams/Public/GameCharacterAction.h:207",
+        "Source/Abrams/Public/CP_010_ActionController.h:12",
+        "Source/Abrams/Public/CP_010_ActionController.h:14"
+      ]
+    },
+    {
+      "text": "CP_010 is the game's fallback character id. The battle settings constructor sets CharacterId to CP_010 with variation, material pattern and pose 0, and the comment records that unversioned cooked data omits an id equal to CP_010, making the default load-bearing. GameManager and menu-sequence selection fall back to CP_010 when an id is None or unusable, free-battle character slots default to it, and the exported CharacterDataTable row lists 30 CP_010 variations. This default role is separate from the unique-row question: it concerns which character is selected, not any unique tuning row.",
+      "evidence": [
+        "Source/Abrams/Public/GameBattleCharacterSettings.h:21",
+        "Source/Abrams/Public/GameBattleCharacterSettings.h:23",
+        "Source/Abrams/Private/GameManager.cpp:445",
+        "Source/Abrams/Private/GameMenuSequence.cpp:689",
+        "Source/Abrams/Private/GameMenuSequence.cpp:696",
+        "Source/Abrams/Public/GameFreeBattleCharacterSettings.h:22"
+      ]
+    }
+  ]
+}

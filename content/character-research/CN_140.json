@@ -1,0 +1,471 @@
+{
+  "overview": "The Maneworm’s settings shape its leaps, wall dash, and the attack where it hides and reappears.",
+  "technicalOverview": "Maneworm Cursed Spirit (CN_140) is an unselectable AI cursed spirit with a custom action controller. It has five unique-data rows: a base row setting how fast it turns toward a secondary target, two separate leap arcs for the second and second-variant normal attacks, a wall-dash time limit for the first cursed-energy attack, and the hide/warp timing and search distance for the second cursed-energy attack. Rows and float slots are addressed by zero-based numeric index; the descriptions follow traced readers in order and distinguish values actually read for this character from reads that exist only in shared code.",
+  "rows": {
+    "CN_140": {
+      "title": "Base spirit settings: turning and generic AI timing",
+      "overview": "The character's own row mainly sets how fast it turns toward a second target when attacks begin. Other values here are read by generic AI hold nodes that this spirit's AI does not select.",
+      "values": {
+        "0": {
+          "label": "Secondary-target turn speed divisor",
+          "simple": "How quickly the spirit turns to face a second target when a combo attack begins; a larger number makes the turn finish sooner.",
+          "technical": "Stored value 180. UGameCharacterActionController::SteerTowardSecondaryTarget reads unique row 0, value 0 as Divisor: it requires a valid secondary target, computes the undirected 2-D angle in degrees between the owner's forward vector and the direction to that target, and if Divisor > 0 rotates toward the target over OutTurnTime = Angle / Divisor (RotateTowardLocation, Linear, exponent 2.0f). If the target is invalid or Divisor is not positive it writes 0.0f to OutTurnTime and returns. CN_140 reaches the helper only on action start count 0 (first start) of NormalAttack_1, NormalAttack_2 and CursedEnergyAttack_1, and only when the owner's controller is UCN_140_ActionController; the out float is written into the action's ActionElapsedTime and later acts as the threshold for raising flag 159. With 180, a 180-degree turn computes to 1 second; the table stores no unit. Shared victim-side use: generic ProjectionSorceryReceive also uses row 0 value 0 as a restraint duration when the incoming damage row has no RestraintTime; that is not a CN_140-specific action.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_140_ActionController.cpp:81",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:88",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:95",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:97",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:134",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:143",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:145",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:239",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:246",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:248",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3492",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3495",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3516",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3518",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3523",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3524",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214"
+          ]
+        },
+        "1": {
+          "label": "AI CE1 hold duration per level (generic node, not used here)",
+          "simple": "Timing for a shared AI node that holds the first cursed-energy attack button; this character's AI uses an aiming node instead, so no traced effect on it.",
+          "technical": "Stored value 0. Shared FGameCharacterAIAction_CursedEnergyAttack1Hold::Reset computes Duration = row 0 value 0 + row 0 value 1 * CursedEnergyLevel, and Tick holds the CursedEnergyAttack_1 key while Timer <= Duration. CP_040's behavior controller selects this Hold node for AI ordinal 0x11; UCN_140_BehaviorController instead selects FGameCharacterAIAction_CursedEnergyAttack1Aim for its 0x11. No traced CN_140 path reaches the Hold reader: the read is identified in shared code, but its applicability here is unresolved. The stored zero is not evidence that the slot is unused.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:118",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:119",
+            "Source/Abrams/Private/CN_140_BehaviorController.cpp:8",
+            "Source/Abrams/Private/GameCharacterBrain_AI.cpp:1412",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:10"
+          ]
+        },
+        "2": {
+          "label": "AI CE2 hold duration per level (generic node, not used here)",
+          "simple": "The equivalent shared AI hold timing for the second cursed-energy attack; not part of this character's traced AI behavior.",
+          "technical": "Stored value 0. Shared FGameCharacterAIAction_CursedEnergyAttack2Hold::Reset computes Duration = row 0 value 0 + row 0 value 2 * CursedEnergyLevel, then holds the CursedEnergyAttack_2 key. The character behavior controller in Source that maps an ordinal to this Hold node is CP_040 (0x13); CN_140 maps its 0x11 to the Aim node. Read exists in shared code; CN_140 applicability unresolved.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:123",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:129",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:130",
+            "Source/Abrams/Private/CN_140_BehaviorController.cpp:8",
+            "Source/Abrams/Private/GameCharacterBrain_AI.cpp:1412",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:11"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Generic MakeUniqueCameraRequest would read row indices 0-10 as camera offsets, angle limits, FOV, easing and orbit values, but no CN_140 action calls it; those slots are left untraced rather than assigned camera meanings. This character's camera row in the public data only sets a target-height offset.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:1"
+          ]
+        }
+      ]
+    },
+    "CN_140_ATTACKB": {
+      "title": "First normal-attack leap arc (AttackB)",
+      "overview": "Three values define the leaping hit of the second normal attack: arc height, gravity and the farthest target distance the arc solver considers.",
+      "values": {
+        "0": {
+          "label": "Leap peak height",
+          "simple": "How high the spirit aims to rise during the leaping hit; raising it makes a higher, longer arc.",
+          "technical": "Stored value 750. FCN_140_NormalAttack_2 (type 52) fixes template Row = 1 and reads value 0 through GetLaunchHeight() (slot 146). Only on action start count 2 (third start) StartAttackHoming takes owner Z minus target Z as HeightDelta, adds it to this Height when HeightDelta > 0 or Height + HeightDelta >= 0, otherwise forces HeightDelta to 0; the result feeds GameAnimNotify_LaunchSpeed and LaunchAngle. Height is a world-space distance in those formulas; a larger height increases solved flight time and the vertical launch component.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Public/CN_140_Actions.h:137",
+            "Source/Abrams/Public/CN_140_Actions.h:146",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:149",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:153",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:154",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:155",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:165",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:166",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:62",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:72"
+          ]
+        },
+        "1": {
+          "label": "Leap gravity",
+          "simple": "How hard the spirit is pulled down during the leaping hit; larger values make a shorter, faster-falling arc.",
+          "technical": "Stored value 2000. The type-52 template reads value 1 through GetLaunchGravity() (slot 147) for both LaunchSpeed and LaunchAngle at the third start (both use 2 * Gravity terms and divide flight time by Gravity), and again on each tick of start 2 to subtract Gravity * DeltaTime from vertical velocity HomingFloat200. That tick ends the action (flag 159) once vertical velocity <= 0 and the ground trace hits. Units are world units per second squared under the solver's seconds-based time.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Public/CN_140_Actions.h:138",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:165",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:166",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:194",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:195",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:196",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:62",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:72"
+          ]
+        },
+        "2": {
+          "label": "Leap maximum target distance",
+          "simple": "Cap on how far away a target can be when computing the leaping hit; farther targets are treated as this far away.",
+          "technical": "Stored value 1000. Read through GetLaunchMaxDistance() (slot 148) by type 52. Start 2 computes the 2-D owner-to-target distance and applies FMath::Clamp(Distance, 0.0f, MaxDistance), so both 0 and the cap are inclusive; the clamped distance is what LaunchSpeed/LaunchAngle use. It changes the solved arc, not a direct movement distance; closer targets use their real smaller distance.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Public/CN_140_Actions.h:139",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:163",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:164",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:165",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:62",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:72"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The leap happens on action start count 2, not the first start; on the first start this action instead steers toward a secondary target. While the leap is active IsGrounded returns the bLaunched1F8 flag set at the third start.",
+          "evidence": [
+            "Source/Abrams/Private/CN_140_ActionController.cpp:134",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:145",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:151",
+            "Source/Abrams/Public/CN_140_Actions.h:134"
+          ]
+        }
+      ]
+    },
+    "CN_140_ATTACKB_2": {
+      "title": "Second normal-attack leap arc (AttackB 2)",
+      "overview": "A separate copy of the three leap settings for the NormalAttack_2_1 variant: same arc solver, different row and larger arc values.",
+      "values": {
+        "0": {
+          "label": "Variant leap peak height",
+          "simple": "How high the variant leaping hit rises; this variant aims higher than the first one.",
+          "technical": "Stored value 2000. FCN_140_NormalAttack_2_1 (type 54) instantiates the shared template with Row = 2, so GetLaunchHeight() reads row 2 value 0. At the third start HeightDelta (owner Z minus target Z) is added when HeightDelta > 0 or Height + HeightDelta >= 0, otherwise zeroed, and the result feeds the ballistic helpers. Same world-distance units as the first leap row; this is a different action type and a different row, not a fallback to row 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Public/CN_140_Actions.h:137",
+            "Source/Abrams/Public/CN_140_Actions.h:154",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:149",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:153",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:154",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:155",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:165",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:62",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:72"
+          ]
+        },
+        "1": {
+          "label": "Variant leap gravity",
+          "simple": "Gravity used by the variant leap; equal to the first leap's value here.",
+          "technical": "Stored value 2000. Read by the type-54 template's GetLaunchGravity() (slot 147) for LaunchSpeed/LaunchAngle at the third start and for the per-tick vertical velocity reduction while start 2 is flying. Flight ends when vertical velocity <= 0 and the ground trace hits.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Public/CN_140_Actions.h:138",
+            "Source/Abrams/Public/CN_140_Actions.h:154",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:165",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:195",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:196",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:62",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:72"
+          ]
+        },
+        "2": {
+          "label": "Variant leap maximum target distance",
+          "simple": "Distance cap used by the variant leap's arc solver; larger than the first leap's cap.",
+          "technical": "Stored value 2000. Read by the type-54 template's GetLaunchMaxDistance() (slot 148); the 2-D distance to the target is clamped inclusively to [0, 2000] at the third start before the ballistic solve.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Public/CN_140_Actions.h:139",
+            "Source/Abrams/Public/CN_140_Actions.h:154",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:163",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:164",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:165",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:62",
+            "Source/Abrams/Private/GameAnimNotifyHelpers.cpp:72"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The row number is a compile-time template argument (1 for NormalAttack_2, 2 for NormalAttack_2_1), not a dynamic lookup from attack data. The variant also selects the NormalAttack2 voice group.",
+          "evidence": [
+            "Source/Abrams/Public/CN_140_Actions.h:146",
+            "Source/Abrams/Public/CN_140_Actions.h:154",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:209"
+          ]
+        }
+      ]
+    },
+    "CN_140_ATTACKD": {
+      "title": "First cursed-energy attack: wall-dash timer",
+      "overview": "One value bounds the wall-dash phase of the first cursed-energy attack. Other slots in this row are read only by a generic stun reaction that reads its attacker's row 3.",
+      "values": {
+        "0": {
+          "label": "Wall-dash phase time limit",
+          "simple": "How long the spirit keeps dashing along a wall before the attack moves on; the wall phase starts with part of this time already elapsed.",
+          "technical": "Stored value 2.5. FCN_140_CursedEnergyAttack_1::TickAttack reads row 3 value 0 twice, only on action start count 2. In phase 0 a forward line trace of capsule radius + 300 world units that hits a wall-facing normal with (ImpactNormal | ImpactNormal2D) > 0.9 switches to phase 1 and sets ActionElapsedTime = Max(2.5 - 0.5, ActionElapsedTime), i.e. at least 2.0 seconds. In phase 1 a follow-ground blocked test (same reach, trace length 1000) can finish early; otherwise flag 159 is raised when '2.5 > ActionElapsedTime' stops being true (at 2.5 s or later). The timer advances by DeltaTime at the top of start 2; no other start count reads this value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_140_ActionController.cpp:302",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:304",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:307",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:315",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:318",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:321",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:326",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:335",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:337",
+            "Source/Abrams/Private/GameCharacterAction.cpp:933"
+          ]
+        },
+        "5": {
+          "label": "Jugon stun near-distance duration (attacker-side, shared)",
+          "simple": "Stun length used by a generic reaction when the attacker is close; all values in this row are zero, so this would mean no stun time if that path were used.",
+          "technical": "Stored value 0. Generic FGameCharacterAction_JugonStunReceive::Start reads the attacker's row 3 value 5 as TimeNear (along with values 6/7/8 as TimeFar/DistanceFar/DistanceNear). If DistanceFar == DistanceNear it assigns TimeNear directly; when the victim is closer than DistanceNear it also selects TimeNear. The read is from the attacker, so it would matter to CN_140 only if it were the attacker in a JugonStun reaction; no CN_140 attack in the public export requests that damage type, so this is shared-code use with no confirmed CN_140 trigger.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:274",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:279",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:283",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:285"
+          ]
+        },
+        "6": {
+          "label": "Jugon stun far-distance duration (attacker-side, shared)",
+          "simple": "Stun length used by the generic reaction when the attacker is far away.",
+          "technical": "Stored value 0. Same generic reader as value 5: row 3 value 6 is TimeFar, selected when the attacker-to-victim distance is greater than DistanceFar (value 7) or used as the far end of the linear interpolation. No CN_140-specific request for this reaction was traced.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:280",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:286",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:288",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:294"
+          ]
+        },
+        "7": {
+          "label": "Jugon stun far threshold (attacker-side, shared)",
+          "simple": "Distance beyond which the generic reaction uses the far stun time.",
+          "technical": "Stored value 0. Generic JugonStunReceive reads attacker row 3 value 7 as DistanceFar. If it equals DistanceNear (value 8), the near time is used for every distance; otherwise distances greater than DistanceFar select TimeFar. Shared reader only; no CN_140-specific JugonStun attack traced.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:281",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:283",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:286",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:294"
+          ]
+        },
+        "8": {
+          "label": "Jugon stun near threshold (attacker-side, shared)",
+          "simple": "Distance inside which the generic reaction uses the near stun time.",
+          "technical": "Stored value 0. Generic JugonStunReceive reads attacker row 3 value 8 as DistanceNear; distances below it select TimeNear, and distances between it and DistanceFar interpolate linearly between the two times. Shared reader only; no CN_140-specific JugonStun attack traced.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:282",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:285",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:288",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:294"
+          ]
+        }
+      },
+      "untraced": [
+        1,
+        2,
+        3,
+        4,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The 300-unit wall probe and the 0.5-second head start are literals in the action body; only the 2.5-second limit comes from this row.",
+          "evidence": [
+            "Source/Abrams/Private/CN_140_ActionController.cpp:307",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:321"
+          ]
+        }
+      ]
+    },
+    "CN_140_ATTACKE": {
+      "title": "Second cursed-energy attack: hide, warp and hold timing",
+      "overview": "Two values control the vanish-and-reappear follow-up: how far around the target to look for a landing spot, and how long the spirit stays in that phase before the action can finish.",
+      "values": {
+        "0": {
+          "label": "Hidden phase duration",
+          "simple": "How long the spirit waits after warping before the second cursed-energy attack can end; longer means a longer pause.",
+          "technical": "Stored value 1. FCN_140_CursedEnergyAttack_2::TickAttack reads row 4 value 0 only on start count 0, phase 1: ActionElapsedTime accumulates DeltaTime and flag 159 is raised when '1.0 > ActionElapsedTime' becomes false, so the threshold is reached at 1.0 seconds inclusive. Phase 0 of that start (hide + warp) does not use this value, and start counts 1 and 2 use different logic.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_140_ActionController.cpp:455",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:458",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:475",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:476",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:477",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:481",
+            "Source/Abrams/Private/GameCharacterAction.cpp:933"
+          ]
+        },
+        "1": {
+          "label": "Warp search distance around target",
+          "simple": "Extra distance used when looking for a place beside the secondary target after vanishing; larger searches farther from the target.",
+          "technical": "Stored value 300 (world units). At start count 0 phase 0, once IsCurrentAnimationPlaying is false, the action hides the owner and its slot effects, then calls GameWarp_FindPlacementAroundSecondaryTarget(Owner, GetOwnerUniqueFloat(1, 4), 0.0f) and moves there with RequestLocation(Location, 2). The helper returns the owner's location if there is no valid secondary target; otherwise it probes four directions 90 degrees apart around the target, using reach = min(self capsule XY scale) * self capsule radius + this distance + 1, skips wall-blocked sides and picks the ground location closest in Z to the target. The yaw offset is the literal 0.0f, not a table value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_140_ActionController.cpp:461",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:465",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:470",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:471",
+            "Source/Abrams/Private/GameWarpLocation.cpp:616",
+            "Source/Abrams/Private/GameWarpLocation.cpp:618",
+            "Source/Abrams/Private/GameWarpLocation.cpp:620",
+            "Source/Abrams/Private/GameWarpLocation.cpp:631",
+            "Source/Abrams/Private/GameWarpLocation.cpp:634",
+            "Source/Abrams/Private/GameWarpLocation.cpp:637",
+            "Source/Abrams/Private/GameWarpLocation.cpp:679",
+            "Source/Abrams/Private/GameCharacterAction.cpp:933"
+          ]
+        }
+      },
+      "untraced": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Visibility and collision are managed separately from these numbers: notify value -1 locks collision key 2 and hides placement processing, value 0 shows slot effects again, and FinishAttackEffects restores visibility unless the next action is the same type.",
+          "evidence": [
+            "Source/Abrams/Private/CN_140_ActionController.cpp:403",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:405",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:407",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:408",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:412",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:415",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:417",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:509",
+            "Source/Abrams/Private/CN_140_ActionController.cpp:516"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Maneworm Cursed Spirit is an unselectable AI cursed spirit: its character data selects EGameCharacterActionControllerType::CN_140 and EGameCharacterAIType::CN_140, which create this action controller, a dedicated think node, a dedicated behavior controller and a dedicated bone controller. No character-specific .inl, projectile or trap implementation for it exists in Source, so trap forwarding into a source character's unique rows does not apply to its data (its trap and shikigami IDs are None in the exported row).",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:625",
+        "Source/Abrams/Private/GameCharacter.cpp:762",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:202",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:1412",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188",
+        "Source/Abrams/Private/CNCharacterRegistration.cpp:37"
+      ]
+    },
+    {
+      "text": "Its action controller replaces eight action types (normal 1/2/2_1/3, cursed energy 1/2, Down and DownEnd) and explicitly refuses guard, dash, step, jump, air normals, air cursed-energy attacks and both super attacks. That is why shared dash/air/guard unique-row readers are not assigned to this character.",
+      "evidence": [
+        "Source/Abrams/Private/CN_140_ActionController.cpp:536",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:593",
+        "Source/Abrams/Public/CN_140_ActionController.h:7"
+      ]
+    },
+    {
+      "text": "The second cursed-energy reaction is a vanish-and-warp: start 0 hides the owner and slot effects, warps beside the secondary target using row 4 value 1 and waits row 4 value 0; start 1 can finish early on a Fall default action or when notify flag +0x1F9 and a ground hit are set. Only start 2 runs the base tick.",
+      "evidence": [
+        "Source/Abrams/Private/CN_140_ActionController.cpp:465",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:470",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:477",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:487",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:493",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:499"
+      ]
+    },
+    {
+      "text": "The Down and DownEnd overrides ignore facing and always use face-down animation names (DownGroundFD, DownFD, DowningFD, DownEndFD); wall-bound and ground-bound rotations are disabled. No unique-row value is involved in that quirk.",
+      "evidence": [
+        "Source/Abrams/Private/CN_140_ActionController.cpp:31",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:33",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:38",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:45",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:52",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:57",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:64",
+        "Source/Abrams/Public/CN_140_Actions.h:21"
+      ]
+    },
+    {
+      "text": "Retail shares several type-74 cursed-energy bodies with CN_160 (the same RVAs are referenced by both vtables). Those bodies read each owner's own unique rows, so CN_160's reads of its row 1 must not be attributed to CN_140, whose type-74 body reads row 4. Verification notes record the sharing and link-status caveats.",
+      "evidence": [
+        "Tools/verify/CHAR/CN_160_ActionController.md:61",
+        "Tools/verify/CHAR/CN_160_ActionController.md:65",
+        "Tools/verify/REGISTRY/dead-stripped-types.md:84",
+        "Source/Abrams/Public/CN_140_Actions.h:103"
+      ]
+    },
+    {
+      "text": "Unique values are addressed numerically and without checks: CharacterDataTable.Id_CharacterUnique is copied into AGameCharacter::UniqueRows by zero-based position, and GetCharacterUniqueFloatValue(ValueIndex, RowIndex) dereferences UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds check or fallback. A missing row would be null, so the row assignment and value indices here follow the five named rows in the character data rather than string lookups in Source.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Public/GameCharacter.h:1012"
+      ]
+    }
+  ]
+}

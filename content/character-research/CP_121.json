@@ -1,0 +1,1820 @@
+{
+  "overview": "Student Geto’s settings tune summon placement, energy gain, three cursed-energy barrage stages, and the cameras used during them.",
+  "technicalOverview": "Suguru Geto (Student) (CP_121) uses UCP_121_ActionController with a behaviour-controller shell and character-specific action templates. Normal attacks dismiss and resummon shikigami 0 through CN_180; cursed-energy attacks summon, hold and release shikigami 1 through CN_200. Nine ordered CharacterUniqueDataTable4 rows become optional row pointers read through an unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] accessor. They tune shared gain/effect values, normal-attack placement, three cursed-energy-1 barrage stages, their mode-2 cameras, and the cursed-energy-2 summon/drain. This describes reconstructed consumer code: verified means the reader and downstream effect are traced; observed would mean only forwarding is traced.",
+  "rows": {
+    "CP_121": {
+      "title": "Shared character and effect-base values",
+      "overview": "Base row for gain multipliers, shikigami-0 hit-effect offsets, discarded early-finish reads, and delayed-effect clearance.",
+      "values": {
+        "0": {
+          "label": "Level 1 attack energy-gain multiplier",
+          "simple": "Level 1 attacks give 3x the damage row’s cursed-energy gain.",
+          "technical": "GetAttackCursedEnergyGainRate returns this only when CursedEnergyLevel == 1; the status controller multiplies it by DamageRow->CursedEnergy_Add_Attacker and adds it to cursed energy. Same-team receivers are skipped.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:561",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:566",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:2970",
+            "Source/Abrams/Private/GameCharacter.cpp:2578"
+          ]
+        },
+        "1": {
+          "label": "Level 2 attack energy-gain multiplier",
+          "simple": "Level 2 attacks give 4x the damage row’s cursed-energy gain.",
+          "technical": "Same slot-117 path, selected when CursedEnergyLevel == 2. Levels outside 1..3 return 1.0 without reading a unique index.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:561",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:568",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:2970"
+          ]
+        },
+        "2": {
+          "label": "Level 3 attack energy-gain multiplier",
+          "simple": "Level 3 attacks give 5x the damage row’s cursed-energy gain.",
+          "technical": "Same slot-117 path, selected when CursedEnergyLevel == 3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:561",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:570",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:2970"
+          ]
+        },
+        "3": {
+          "label": "First normal-hit effect offset X",
+          "simple": "The first normal-attack summon effect sits 45 units behind the summon point.",
+          "technical": "TCP_121_NormalAttack_1_1 phase 0 passes FVector(U3,U4,U5) to SpawnAttackEffect with the shikigami transform and scale 0.25; the helper rotates the components by the transform axes, adds them to the translation, and spawns FX_CP_121_00111. X is -45 world units on the forward axis.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:941",
+            "Source/Abrams/Private/CN_180_ActionController.cpp:110",
+            "Source/Abrams/Private/CN_180_ActionController.cpp:116"
+          ]
+        },
+        "4": {
+          "label": "First normal-hit effect offset Y",
+          "simple": "The first effect has no right-axis offset.",
+          "technical": "Y component of the same SpawnAttackEffect offset vector; 0 world units on the right axis.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:941",
+            "Source/Abrams/Private/CN_180_ActionController.cpp:116"
+          ]
+        },
+        "5": {
+          "label": "First normal-hit effect offset Z",
+          "simple": "The first effect has no up-axis offset.",
+          "technical": "Z component of the same SpawnAttackEffect offset vector; 0 world units on the up axis.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:941",
+            "Source/Abrams/Private/CN_180_ActionController.cpp:116"
+          ]
+        },
+        "6": {
+          "label": "Normal Attack 2 shikigami effect offset X",
+          "simple": "The Attack_2 hit effect is offset 1 unit along the shikigami forward axis.",
+          "technical": "The _2 branch sets AttackRequest.Vector70 = FVector(U6,U7,U8) and orders Attack_2; FCN_180_Attack_2::Start forwards that vector to SpawnAttackEffect as the FX_CP_121_00111 offset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1159",
+            "Source/Abrams/Private/CN_180_ActionController.cpp:168",
+            "Source/Abrams/Private/CN_180_ActionController.cpp:176"
+          ]
+        },
+        "7": {
+          "label": "Normal Attack 2 shikigami effect offset Y",
+          "simple": "The Attack_2 effect has no right-axis offset.",
+          "technical": "Y component of the Attack_2 Vector70 forwarded to the shikigami effect.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1159",
+            "Source/Abrams/Private/CN_180_ActionController.cpp:176"
+          ]
+        },
+        "8": {
+          "label": "Normal Attack 2 shikigami effect offset Z",
+          "simple": "The Attack_2 effect has no up-axis offset.",
+          "technical": "Z component of the Attack_2 Vector70 forwarded to the shikigami effect.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1159",
+            "Source/Abrams/Private/CN_180_ActionController.cpp:176"
+          ]
+        },
+        "9": {
+          "label": "Normal Attack 3 shikigami effect offset X",
+          "simple": "The Attack_3 hit effect is offset 68 units behind the shikigami.",
+          "technical": "The _3 branch sets AttackRequest.Vector70 = FVector(U9,U10,U11) and orders Attack_3, whose Start forwards it to SpawnAttackEffect. Separately, NormalAttack_1_1::FinishAttackEffects reads 11,10,9 and discards them before finishing the shikigami effect.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1095",
+            "Source/Abrams/Private/CN_180_ActionController.cpp:184",
+            "Source/Abrams/Private/CN_180_ActionController.cpp:192",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1012"
+          ]
+        },
+        "10": {
+          "label": "Normal Attack 3 shikigami effect offset Y",
+          "simple": "The Attack_3 effect has no right-axis offset.",
+          "technical": "Y component of the Attack_3 Vector70 consumed by the shikigami effect; also read and discarded in the early-finish path.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1095",
+            "Source/Abrams/Private/CN_180_ActionController.cpp:192",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1016"
+          ]
+        },
+        "11": {
+          "label": "Normal Attack 3 shikigami effect offset Z",
+          "simple": "The Attack_3 effect has no up-axis offset.",
+          "technical": "Z component of the Attack_3 Vector70 consumed by the shikigami effect; also read and discarded in the early-finish path. Zero itself is not evidence of disuse.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1095",
+            "Source/Abrams/Private/CN_180_ActionController.cpp:192",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1015"
+          ]
+        },
+        "12": {
+          "label": "Delayed-effect forward clearance",
+          "simple": "Delayed effects check up to 150 units forward for blockers.",
+          "technical": "AddDelayedDetachEffect builds Extent = FVector(U12,U13,50) for StateCondition_ClampLocalOffset. The helper traces toward Offset.X - Extent.X and reduces Offset.X from the first filtered hit distance; world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:608",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:610",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:190",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:194"
+          ]
+        },
+        "13": {
+          "label": "Delayed-effect side clearance",
+          "simple": "Delayed effects check up to 50 units sideways for blockers.",
+          "technical": "Y component of the clamp Extent; the helper traces along the right axis chosen by sign(Offset.Y) and rewrites Offset.Y. The Z extent is hard-coded 50 and is not read from this row.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:608",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:610",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:207",
+            "Source/Abrams/Private/GameCharacterAIStateCondition.cpp:214"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "The discarded reads at indices 9-11 are real but write no state in FinishAttackEffects; they are retained because the same floats are used by Attack_3.",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1012",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1017",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1095"
+          ]
+        }
+      ]
+    },
+    "CP_121_NORMALATTACK": {
+      "title": "Normal attack shikigami placement and timing",
+      "overview": "Repeated dismissal/resummon of shikigami 0: the first hit places a copy around the owner, later hits resummon it at the target, and Attack_2/Attack_3 reposition it with attack parameters.",
+      "values": {
+        "0": {
+          "label": "First resummon delay",
+          "simple": "The dismissed shikigami returns after 0.75 seconds.",
+          "technical": "Phase 1 increments ActionElapsedTime and returns while U0 > ActionElapsedTime (strict); at or after 0.75 it activates shikigami 0 and orders Attack_1. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:948",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:950",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:961"
+          ]
+        },
+        "1": {
+          "label": "Attack_1 release delay",
+          "simple": "The summoned shikigami waits at least 1 second before asking to be released.",
+          "technical": "Copied into FShikigamiDamageActionParam.Value64 for Attack_1. FCN_180_Attack_1::Tick returns before requesting release while its Elapsed is below that value. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:965",
+            "Source/Abrams/Private/CN_180_ActionController.cpp:275"
+          ]
+        },
+        "2": {
+          "label": "First placement forward offset",
+          "simple": "The first summoned copy starts 20 units behind the owner.",
+          "technical": "Phase 0 computes Location = owner location + facing*U2 + right*U3 + up*U4, then aims at the secondary target or straight ahead. Value -20 world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:921",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:925",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:927"
+          ]
+        },
+        "3": {
+          "label": "First placement right offset",
+          "simple": "The copy is placed 150 units to the owner’s right.",
+          "technical": "Y/right component of the same placement vector; world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:922",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:925"
+          ]
+        },
+        "4": {
+          "label": "First placement up offset",
+          "simple": "The copy is placed 115 units above the owner.",
+          "technical": "Z/up component of the same placement vector; world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:923",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:925"
+          ]
+        },
+        "5": {
+          "label": "First placement pitch limit",
+          "simple": "The first copy aims at most 20 degrees up or down.",
+          "technical": "Stored as PitchLimit and passed as both MaxUp and MaxDown to CN122_AimRotation, whose elevation clamp uses degree limits.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:932",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:934",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1084",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1099"
+          ]
+        },
+        "6": {
+          "label": "First placement yaw limit",
+          "simple": "The first copy aims at most 20 degrees sideways.",
+          "technical": "Stored as YawLimit and passed as MaxYaw to CN122_AimRotation; its yaw is capped in degrees and the sign comes from the target side.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:933",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:934",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1084",
+            "Source/Abrams/Private/CN_122_ActionController.cpp:1091"
+          ]
+        },
+        "7": {
+          "label": "Attack_2 placement drop",
+          "simple": "The later copy is placed 500 units lower before ground clamping.",
+          "technical": "The Normal Attack 2 branch lowers the target-relative location by FVector::UpVector * U7, then snaps it up if ground is higher. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1142",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1145",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1150"
+          ]
+        },
+        "8": {
+          "label": "Attack_2 target lead distance",
+          "simple": "The copy is pushed 350 units along the target’s movement direction when possible.",
+          "technical": "Distance starts as U8, becomes 0 if the secondary target is in action slot 146, and is quartered if MoveDelta3D0 is zero. If still positive, a line trace runs that far forward and uses the first hit X/Y, or the location moves by direction * Distance. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1114",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1120",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1124",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1128",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1132"
+          ]
+        },
+        "9": {
+          "label": "Attack_3 placement scale",
+          "simple": "The target-relative Attack_3 offset is multiplied by 50.",
+          "technical": "In the _3 branch, Offset = Direction.RotateAngleAxis(U10, Direction ^ Up) and Location = secondary target location + Offset * U9 when valid, else owner location + facing * 1000. This is a distance multiplier, not time or degrees.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1072",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1076",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1074"
+          ]
+        },
+        "10": {
+          "label": "Attack_3 placement angle",
+          "simple": "The Attack_3 approach direction is rotated 60 degrees about its horizontal normal.",
+          "technical": "U10 is the angle passed to RotateAngleAxis for the placement direction. Degrees.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1072"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Indices 11-13 are zero; no CP_121 character reader was identified after checking the controller, actions, shared camera helper and AI code. Other characters’ row-1 readers were not assigned.",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:921",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1072",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1114",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1142"
+          ]
+        }
+      ]
+    },
+    "CP_121_ATTACKG_1": {
+      "title": "Cursed-energy level 1 volley (stage row 2)",
+      "overview": "CE level 1 reads stage row 2: 6 charges, wide jitter and a 400-unit aim tube.",
+      "values": {
+        "0": {
+          "label": "Barrage charge count",
+          "simple": "6 charge effects are created before the volley can fire.",
+          "technical": "Cast to int and stored as FEffectVolley::EffectCount. State 0 spawns one charge each spawn-window step and moves to state 1 when Count >= EffectCount - 1. Value here is 6.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1862",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:163",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:258",
+            "Source/Abrams/Public/CP_121_ActionController.h:88"
+          ]
+        },
+        "1": {
+          "label": "Charge spawn window",
+          "simple": "The 6 charges appear over 0.15 seconds.",
+          "technical": "Stored as SpawnWindowDuration. State 0 uses Interval = SpawnWindowDuration / EffectCount; its delta is DeltaTime divided by owner CustomTimeDilation when positive. Value 0.15 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:164",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:167",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:158"
+          ]
+        },
+        "2": {
+          "label": "Fire group count",
+          "simple": "The charges are split into 1 firing group.",
+          "technical": "Cast to int and stored as FireGroupCount. PerGroup = EffectCount/max(GroupCount,1); shuffled slot modulo PerGroup plus one becomes each Order and Delay = Order*FireInterval. Later repeat delay uses EffectCount/max(GroupCount,0)*FireInterval. Value 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1864",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:285",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:299",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:402"
+          ]
+        },
+        "3": {
+          "label": "Barrage origin X / forward offset",
+          "simple": "The barrage starts 300 units along the forward axis.",
+          "technical": "X component of the Offset passed to AddUnknown168Entry. Entry origin is owner location + forward*X + right*Y + up*Z; the volley tick uses the same X/Y/Z in the bone frame for ring placement and aim origin. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1859",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1888",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:309"
+          ]
+        },
+        "4": {
+          "label": "Barrage origin Y / right offset",
+          "simple": "The barrage origin is shifted 0 units to the right.",
+          "technical": "Y component of the same AddUnknown168Entry Offset and the bone right-axis ring component. Value 0 world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1859",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1888",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:309"
+          ]
+        },
+        "5": {
+          "label": "Barrage origin Z / up offset",
+          "simple": "The barrage origin is 100 units above the reference position.",
+          "technical": "Z component of the same Offset and the bone up-axis ring component. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1859",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1888",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:309"
+          ]
+        },
+        "6": {
+          "label": "Charge ring radius",
+          "simple": "Later charges form rings roughly 200 units from the origin.",
+          "technical": "Charge positions use the PG_Attack_01 bone frame: counts 1-5 step 60 degrees at radius x0.75 (x1.125 for CE level 1 at counts 3 and 4), counts 6-12 step 45 degrees from -22.5 at radius x1.5, and counts 13-19 step 45 degrees at radius x1.5. This stage supplies base radius 200 world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:176",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:182",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:187",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:190"
+          ]
+        },
+        "7": {
+          "label": "Random placement scale",
+          "simple": "Random up/side jitter is scaled by 0.35 of the ring radius.",
+          "technical": "Range = (EffectCount >= 10 ? 0.325 : 0.75) * SpawnPatternRadius * SpawnRandomOffsetScale, with FRandRange(-Range,Range) for Up and Side. Value 0.35; zero means no random offset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:191",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:192",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:193"
+          ]
+        },
+        "8": {
+          "label": "Shot interval",
+          "simple": "Charges fire in waves 0.1 seconds apart.",
+          "technical": "Stored as FireInterval. Each Delay = Order*FireInterval; an attached charge rearms to EffectCount/max(GroupCount,0)*FireInterval; the firing sound retries when volley Timer exceeds FireInterval. Dilation-compensated seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:302",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:402",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:405",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:158"
+          ]
+        },
+        "9": {
+          "label": "Cursed-energy hold drain",
+          "simple": "Holding this stage drains 250 cursed energy per second.",
+          "technical": "CE1 phase 1 calls SetCursedEnergy(CursedEnergy - U9 * DeltaTime). Per-second drain while the hold phase runs, not a one-time cost. Stage 2 (CE level 1) uses 250.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1381",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1824"
+          ]
+        },
+        "10": {
+          "label": "Cursed-energy hold time",
+          "simple": "The timed hold window ends after 0.4 seconds.",
+          "technical": "Phase 1 checks hold <= ActionElapsedTime. At that point it continues only while the CE1 key is held and conditions permit; otherwise it sets the finish flag, detaches effects and restores camera with row 5. Value 0.4 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1383",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1385",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1391",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        },
+        "11": {
+          "label": "Delayed-detach spacing",
+          "simple": "Queued delayed-detach effects are 0.1 seconds apart.",
+          "technical": "On the second CE1 start, StartDelayedDetach(U11) sets Delay = queue index * Interval and detaches each effect. Queue size is 2/3/4 for levels 1/2/3. Value 0.1 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1414",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:632",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:636",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1418"
+          ]
+        },
+        "12": {
+          "label": "Aim-assist tube radius",
+          "simple": "Shots turn toward the target only within 400 units of the volley axis.",
+          "technical": "Stored as AimAssistRadius. With a valid secondary target transformed into the volley bone frame, the turn is attempted only when sqrt(Local.Y^2 + Local.Z^2) < radius (strict). Value 400 world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1870",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:314",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:317"
+          ]
+        },
+        "13": {
+          "label": "Maximum aim correction",
+          "simple": "Each shot can turn at most 15 degrees toward the target.",
+          "technical": "Stored as MaxAimCorrectionDegrees. Target direction must also be within 90 degrees of shot forward; applied turn is min(cap,angle), sign chosen by checking which rotation is closer. Value 15 degrees.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1870",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:320",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:324",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:327"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "Stage row 2 is chosen by GetCursedEnergyStage: CE level 1 -> stage 2; invalid level gives -1 and the accessor has no bounds check. Indices 9-11 are hold-phase reads; 0-8 and 12-13 build the volley on notify 1.",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1824",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1859",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1381",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1414",
+            "Source/Abrams/Private/GameCharacter.cpp:1759"
+          ]
+        }
+      ]
+    },
+    "CP_121_ATTACKG_2": {
+      "title": "Cursed-energy level 2 volley (stage row 3)",
+      "overview": "CE level 2 reads stage row 3: 8 charges, tighter ring, no jitter, wider aim tube.",
+      "values": {
+        "0": {
+          "label": "Barrage charge count",
+          "simple": "8 charge effects are created before the volley can fire.",
+          "technical": "Cast to int and stored as FEffectVolley::EffectCount. State 0 spawns one charge each spawn-window step and moves to state 1 when Count >= EffectCount - 1. Value here is 8.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1862",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:163",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:258",
+            "Source/Abrams/Public/CP_121_ActionController.h:88"
+          ]
+        },
+        "1": {
+          "label": "Charge spawn window",
+          "simple": "The 8 charges appear over 0.15 seconds.",
+          "technical": "Stored as SpawnWindowDuration. State 0 uses Interval = SpawnWindowDuration / EffectCount; its delta is DeltaTime divided by owner CustomTimeDilation when positive. Value 0.15 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:164",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:167",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:158"
+          ]
+        },
+        "2": {
+          "label": "Fire group count",
+          "simple": "The charges are split into 1 firing group.",
+          "technical": "Cast to int and stored as FireGroupCount. PerGroup = EffectCount/max(GroupCount,1); shuffled slot modulo PerGroup plus one becomes each Order and Delay = Order*FireInterval. Later repeat delay uses EffectCount/max(GroupCount,0)*FireInterval. Value 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1864",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:285",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:299",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:402"
+          ]
+        },
+        "3": {
+          "label": "Barrage origin X / forward offset",
+          "simple": "The barrage starts 300 units along the forward axis.",
+          "technical": "X component of the Offset passed to AddUnknown168Entry. Entry origin is owner location + forward*X + right*Y + up*Z; the volley tick uses the same X/Y/Z in the bone frame for ring placement and aim origin. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1859",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1888",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:309"
+          ]
+        },
+        "4": {
+          "label": "Barrage origin Y / right offset",
+          "simple": "The barrage origin is shifted 0 units to the right.",
+          "technical": "Y component of the same AddUnknown168Entry Offset and the bone right-axis ring component. Value 0 world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1859",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1888",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:309"
+          ]
+        },
+        "5": {
+          "label": "Barrage origin Z / up offset",
+          "simple": "The barrage origin is 150 units above the reference position.",
+          "technical": "Z component of the same Offset and the bone up-axis ring component. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1859",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1888",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:309"
+          ]
+        },
+        "6": {
+          "label": "Charge ring radius",
+          "simple": "Later charges form rings roughly 150 units from the origin.",
+          "technical": "Charge positions use the PG_Attack_01 bone frame: counts 1-5 step 60 degrees at radius x0.75 (x1.125 for CE level 1 at counts 3 and 4), counts 6-12 step 45 degrees from -22.5 at radius x1.5, and counts 13-19 step 45 degrees at radius x1.5. This stage supplies base radius 150 world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:176",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:182",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:187",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:190"
+          ]
+        },
+        "7": {
+          "label": "Random placement scale",
+          "simple": "Random up/side jitter is scaled by 0 of the ring radius.",
+          "technical": "Range = (EffectCount >= 10 ? 0.325 : 0.75) * SpawnPatternRadius * SpawnRandomOffsetScale, with FRandRange(-Range,Range) for Up and Side. Value 0; zero means no random offset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:191",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:192",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:193"
+          ]
+        },
+        "8": {
+          "label": "Shot interval",
+          "simple": "Charges fire in waves 0.1 seconds apart.",
+          "technical": "Stored as FireInterval. Each Delay = Order*FireInterval; an attached charge rearms to EffectCount/max(GroupCount,0)*FireInterval; the firing sound retries when volley Timer exceeds FireInterval. Dilation-compensated seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:302",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:402",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:405",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:158"
+          ]
+        },
+        "9": {
+          "label": "Cursed-energy hold drain",
+          "simple": "Holding this stage drains 250 cursed energy per second.",
+          "technical": "CE1 phase 1 calls SetCursedEnergy(CursedEnergy - U9 * DeltaTime). Per-second drain while the hold phase runs, not a one-time cost. Stage 3 (CE level 2) uses 250.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1381",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1824"
+          ]
+        },
+        "10": {
+          "label": "Cursed-energy hold time",
+          "simple": "The timed hold window ends after 0.4 seconds.",
+          "technical": "Phase 1 checks hold <= ActionElapsedTime. At that point it continues only while the CE1 key is held and conditions permit; otherwise it sets the finish flag, detaches effects and restores camera with row 5. Value 0.4 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1383",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1385",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1391",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        },
+        "11": {
+          "label": "Delayed-detach spacing",
+          "simple": "Queued delayed-detach effects are 0.1 seconds apart.",
+          "technical": "On the second CE1 start, StartDelayedDetach(U11) sets Delay = queue index * Interval and detaches each effect. Queue size is 2/3/4 for levels 1/2/3. Value 0.1 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1414",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:632",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:636",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1418"
+          ]
+        },
+        "12": {
+          "label": "Aim-assist tube radius",
+          "simple": "Shots turn toward the target only within 800 units of the volley axis.",
+          "technical": "Stored as AimAssistRadius. With a valid secondary target transformed into the volley bone frame, the turn is attempted only when sqrt(Local.Y^2 + Local.Z^2) < radius (strict). Value 800 world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1870",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:314",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:317"
+          ]
+        },
+        "13": {
+          "label": "Maximum aim correction",
+          "simple": "Each shot can turn at most 30 degrees toward the target.",
+          "technical": "Stored as MaxAimCorrectionDegrees. Target direction must also be within 90 degrees of shot forward; applied turn is min(cap,angle), sign chosen by checking which rotation is closer. Value 30 degrees.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1870",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:320",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:324",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:327"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "Stage row 3 is chosen by GetCursedEnergyStage: CE level 2 -> stage 3; invalid level gives -1 and the accessor has no bounds check. Indices 9-11 are hold-phase reads; 0-8 and 12-13 build the volley on notify 1.",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1824",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1859",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1381",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1414",
+            "Source/Abrams/Private/GameCharacter.cpp:1759"
+          ]
+        }
+      ]
+    },
+    "CP_121_ATTACKG_3": {
+      "title": "Cursed-energy level 3 volley (stage row 4)",
+      "overview": "CE level 3 reads stage row 4: like stage 3 but small jitter and lower hold drain.",
+      "values": {
+        "0": {
+          "label": "Barrage charge count",
+          "simple": "8 charge effects are created before the volley can fire.",
+          "technical": "Cast to int and stored as FEffectVolley::EffectCount. State 0 spawns one charge each spawn-window step and moves to state 1 when Count >= EffectCount - 1. Value here is 8.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1862",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:163",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:258",
+            "Source/Abrams/Public/CP_121_ActionController.h:88"
+          ]
+        },
+        "1": {
+          "label": "Charge spawn window",
+          "simple": "The 8 charges appear over 0.15 seconds.",
+          "technical": "Stored as SpawnWindowDuration. State 0 uses Interval = SpawnWindowDuration / EffectCount; its delta is DeltaTime divided by owner CustomTimeDilation when positive. Value 0.15 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:164",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:167",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:158"
+          ]
+        },
+        "2": {
+          "label": "Fire group count",
+          "simple": "The charges are split into 1 firing group.",
+          "technical": "Cast to int and stored as FireGroupCount. PerGroup = EffectCount/max(GroupCount,1); shuffled slot modulo PerGroup plus one becomes each Order and Delay = Order*FireInterval. Later repeat delay uses EffectCount/max(GroupCount,0)*FireInterval. Value 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1864",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:285",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:299",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:402"
+          ]
+        },
+        "3": {
+          "label": "Barrage origin X / forward offset",
+          "simple": "The barrage starts 300 units along the forward axis.",
+          "technical": "X component of the Offset passed to AddUnknown168Entry. Entry origin is owner location + forward*X + right*Y + up*Z; the volley tick uses the same X/Y/Z in the bone frame for ring placement and aim origin. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1859",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1888",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:309"
+          ]
+        },
+        "4": {
+          "label": "Barrage origin Y / right offset",
+          "simple": "The barrage origin is shifted 0 units to the right.",
+          "technical": "Y component of the same AddUnknown168Entry Offset and the bone right-axis ring component. Value 0 world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1859",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1888",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:309"
+          ]
+        },
+        "5": {
+          "label": "Barrage origin Z / up offset",
+          "simple": "The barrage origin is 150 units above the reference position.",
+          "technical": "Z component of the same Offset and the bone up-axis ring component. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1859",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1888",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:309"
+          ]
+        },
+        "6": {
+          "label": "Charge ring radius",
+          "simple": "Later charges form rings roughly 150 units from the origin.",
+          "technical": "Charge positions use the PG_Attack_01 bone frame: counts 1-5 step 60 degrees at radius x0.75 (x1.125 for CE level 1 at counts 3 and 4), counts 6-12 step 45 degrees from -22.5 at radius x1.5, and counts 13-19 step 45 degrees at radius x1.5. This stage supplies base radius 150 world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:176",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:182",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:187",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:190"
+          ]
+        },
+        "7": {
+          "label": "Random placement scale",
+          "simple": "Random up/side jitter is scaled by 0.1 of the ring radius.",
+          "technical": "Range = (EffectCount >= 10 ? 0.325 : 0.75) * SpawnPatternRadius * SpawnRandomOffsetScale, with FRandRange(-Range,Range) for Up and Side. Value 0.1; zero means no random offset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:191",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:192",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:193"
+          ]
+        },
+        "8": {
+          "label": "Shot interval",
+          "simple": "Charges fire in waves 0.1 seconds apart.",
+          "technical": "Stored as FireInterval. Each Delay = Order*FireInterval; an attached charge rearms to EffectCount/max(GroupCount,0)*FireInterval; the firing sound retries when volley Timer exceeds FireInterval. Dilation-compensated seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:302",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:402",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:405",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:158"
+          ]
+        },
+        "9": {
+          "label": "Cursed-energy hold drain",
+          "simple": "Holding this stage drains 200 cursed energy per second.",
+          "technical": "CE1 phase 1 calls SetCursedEnergy(CursedEnergy - U9 * DeltaTime). Per-second drain while the hold phase runs, not a one-time cost. Stage 4 (CE level 3) uses 200.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1381",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1824"
+          ]
+        },
+        "10": {
+          "label": "Cursed-energy hold time",
+          "simple": "The timed hold window ends after 0.4 seconds.",
+          "technical": "Phase 1 checks hold <= ActionElapsedTime. At that point it continues only while the CE1 key is held and conditions permit; otherwise it sets the finish flag, detaches effects and restores camera with row 5. Value 0.4 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1383",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1385",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1391",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        },
+        "11": {
+          "label": "Delayed-detach spacing",
+          "simple": "Queued delayed-detach effects are 0.1 seconds apart.",
+          "technical": "On the second CE1 start, StartDelayedDetach(U11) sets Delay = queue index * Interval and detaches each effect. Queue size is 2/3/4 for levels 1/2/3. Value 0.1 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1414",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:632",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:636",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1418"
+          ]
+        },
+        "12": {
+          "label": "Aim-assist tube radius",
+          "simple": "Shots turn toward the target only within 800 units of the volley axis.",
+          "technical": "Stored as AimAssistRadius. With a valid secondary target transformed into the volley bone frame, the turn is attempted only when sqrt(Local.Y^2 + Local.Z^2) < radius (strict). Value 800 world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1870",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:314",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:317"
+          ]
+        },
+        "13": {
+          "label": "Maximum aim correction",
+          "simple": "Each shot can turn at most 30 degrees toward the target.",
+          "technical": "Stored as MaxAimCorrectionDegrees. Target direction must also be within 90 degrees of shot forward; applied turn is min(cap,angle), sign chosen by checking which rotation is closer. Value 30 degrees.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1870",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:320",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:324",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:327"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "Stage row 4 is chosen by GetCursedEnergyStage: CE level 3 -> stage 4; invalid level gives -1 and the accessor has no bounds check. Indices 9-11 are hold-phase reads; 0-8 and 12-13 build the volley on notify 1.",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1824",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1859",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1381",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1414",
+            "Source/Abrams/Private/GameCharacter.cpp:1759"
+          ]
+        }
+      ]
+    },
+    "CP_121_ATTACKG_SHOOT_CAMERA_1": {
+      "title": "Cursed-energy 1 camera, stick direction 1",
+      "overview": "Used when CE1 starts with left-stick direction 1 (Y <= -0.5) and when the timed hold ends: a close, high-FOV mode-2 lock-on view.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "The camera sits -70 units along gaze forward from the eye base.",
+          "technical": "MakeUniqueCameraRequest(2,5) copies index 0 into CameraOffset.X; the mode-2 update rotates that offset into gaze space before placing the camera.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1274",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "The camera is shifted -100 units along gaze right.",
+          "technical": "Index 1 becomes CameraOffset.Y in the same mode-2 request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1274",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "The camera is shifted -20 units along gaze up.",
+          "technical": "Index 2 becomes CameraOffset.Z in the same mode-2 request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1274",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "Gaze may go at most 60 degrees below the eye line.",
+          "technical": "Index 3 becomes LimitAngleDown; UpdateRequestCamera clamps downward gaze elevation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1274",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "Gaze may go at most 30 degrees above the eye line.",
+          "technical": "Index 4 becomes LimitAngleUp; UpdateRequestCamera clamps upward gaze elevation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1274",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "Mode entry requests 110 degrees of FOV.",
+          "technical": "Index 5 becomes FieldOfView. ChangeCameraMode starts FOV interpolation only when FOV > 0; zero leaves the current FOV unchanged. This row has 110.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1274",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "FOV changes over 0.25 seconds.",
+          "technical": "Index 6 becomes FieldOfViewBlendTime. With FOV > 0 and this > 0, FovInterp starts with this duration; otherwise FOV snaps. This row has 0.25.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1274",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "Selector 3 chooses the FOV interpolation curve.",
+          "technical": "Index 7 is cast to int: 0 Linear, 1 EaseIn, 2 EaseOut, 3 EaseInOut; other integers leave the default. This row has 3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:939",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:965",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1274",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        },
+        "8": {
+          "label": "Gaze orbit yaw",
+          "simple": "Gaze is orbited 10 degrees about the camera yaw.",
+          "technical": "Index 8 becomes OrbitYaw; UpdateRequestCamera transforms the gaze by the orbit rotator.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1274",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        },
+        "9": {
+          "label": "Gaze orbit pitch",
+          "simple": "Gaze is orbited 5 degrees about the camera pitch.",
+          "technical": "Index 9 becomes OrbitPitch in the same orbit rotator.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1274",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "View roll is set to 5 degrees.",
+          "technical": "Index 10 becomes Roll and is passed to SetViewTarget87 for the final view.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1274",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "MakeUniqueCameraRequest reads only indices 0-10 for mode 2. Indices 11-13 are zero here and no CP_121 reader was identified; zero is not proof of disuse elsewhere.",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1274",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1394",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972"
+          ]
+        }
+      ]
+    },
+    "CP_121_ATTACKG_SHOOT_CAMERA_2": {
+      "title": "Cursed-energy 1 camera, other stick directions",
+      "overview": "Used when CE1 starts outside left-stick direction 1, and always for CE1 Auto: a much farther-back view with no FOV change.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "The camera sits -350 units along gaze forward from the eye base.",
+          "technical": "MakeUniqueCameraRequest(2,6) copies index 0 into CameraOffset.X; the mode-2 update rotates that offset into gaze space before placing the camera.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1281",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1301"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "The camera is shifted 125 units along gaze right.",
+          "technical": "Index 1 becomes CameraOffset.Y in the same mode-2 request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1281",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1301"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "The camera is shifted 50 units along gaze up.",
+          "technical": "Index 2 becomes CameraOffset.Z in the same mode-2 request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1281",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1301"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "Gaze may go at most 60 degrees below the eye line.",
+          "technical": "Index 3 becomes LimitAngleDown; UpdateRequestCamera clamps downward gaze elevation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1281",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1301"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "Gaze may go at most 30 degrees above the eye line.",
+          "technical": "Index 4 becomes LimitAngleUp; UpdateRequestCamera clamps upward gaze elevation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1281",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1301"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "Mode entry does not change FOV.",
+          "technical": "Index 5 becomes FieldOfView. ChangeCameraMode starts FOV interpolation only when FOV > 0; zero leaves the current FOV unchanged. This row has 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1281",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1301"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "No FOV blend is requested.",
+          "technical": "Index 6 becomes FieldOfViewBlendTime. With FOV > 0 and this > 0, FovInterp starts with this duration; otherwise FOV snaps. This row has 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1281",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1301"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "Selector 0 chooses the FOV interpolation curve.",
+          "technical": "Index 7 is cast to int: 0 Linear, 1 EaseIn, 2 EaseOut, 3 EaseInOut; other integers leave the default. This row has 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:939",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:965",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1281",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1301"
+          ]
+        },
+        "8": {
+          "label": "Gaze orbit yaw",
+          "simple": "Gaze is orbited 0 degrees about the camera yaw.",
+          "technical": "Index 8 becomes OrbitYaw; UpdateRequestCamera transforms the gaze by the orbit rotator.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1281",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1301"
+          ]
+        },
+        "9": {
+          "label": "Gaze orbit pitch",
+          "simple": "Gaze is orbited 0 degrees about the camera pitch.",
+          "technical": "Index 9 becomes OrbitPitch in the same orbit rotator.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1281",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1301"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "View roll is set to 0 degrees.",
+          "technical": "Index 10 becomes Roll and is passed to SetViewTarget87 for the final view.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1281",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1301"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "FOV is zero, so the virtual camera does not interpolate FOV even though the helper still reads the easing selector and writes the full request; orbit and roll are also zero.",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1281",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1301",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972"
+          ]
+        }
+      ]
+    },
+    "CP_121_ATTACKH": {
+      "title": "Cursed-energy 2 shikigami 1 summon and drain",
+      "overview": "Controls the CN_200 shikigami used by Cursed Energy Attack 2: summon point, Attack_1 speed by energy level, natural end time, and drain while the shikigami is out.",
+      "values": {
+        "0": {
+          "label": "Shikigami summon forward offset",
+          "simple": "The shikigami is summoned directly beside the owner in the forward axis.",
+          "technical": "TickAttack step 1 builds Offset = facing*U0 + right*U1 and passes it to FindSummonLocation with the shikigami summon placement height. Value 0 world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1668",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1672"
+          ]
+        },
+        "1": {
+          "label": "Shikigami summon right offset",
+          "simple": "The summon point is 115 units to the owner’s right.",
+          "technical": "Right-axis component of the same FindSummonLocation offset; world units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1669",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1672"
+          ]
+        },
+        "2": {
+          "label": "Level 1 shikigami attack speed",
+          "simple": "At level 1 the shikigami Attack_1 uses a 3000-unit speed/range parameter.",
+          "technical": "TickAttack case 1 assigns Vector70.X = U2, orders Attack_1 with ValueA4 = level; FCN_200_AttackAAction uses Request.Vector70.X * 0.5 as the target of its 0.5-second range ease.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1696",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1710",
+            "Source/Abrams/Private/CN_200_Actions.cpp:92",
+            "Source/Abrams/Private/CN_200_Actions.cpp:100"
+          ]
+        },
+        "3": {
+          "label": "Level 2 shikigami attack speed",
+          "simple": "At level 2 the shikigami Attack_1 uses 3500.",
+          "technical": "Same level switch, case 2; reaches the CN_200 charge-range ease through Vector70.X.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1699",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1710",
+            "Source/Abrams/Private/CN_200_Actions.cpp:92"
+          ]
+        },
+        "4": {
+          "label": "Level 3 shikigami attack speed",
+          "simple": "At level 3 the shikigami Attack_1 uses 4000.",
+          "technical": "Same level switch, case 3; reaches the CN_200 charge-range ease through Vector70.X.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1702",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1710",
+            "Source/Abrams/Private/CN_200_Actions.cpp:92"
+          ]
+        },
+        "5": {
+          "label": "CE2 self-end time",
+          "simple": "An unattended CE2 attack ends after 1.35 seconds.",
+          "technical": "On action start count 0, when U5 <= Elapsed, the action sets finish flag 159, Byte16 and Phase MAX. Seconds; checked before the summon-step machine.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1651",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1654",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1656"
+          ]
+        },
+        "6": {
+          "label": "Shikigami-out cursed energy drain",
+          "simple": "While shikigami 1 is out, cursed energy drains 25 per second.",
+          "technical": "GetCursedEnergyDrainRate returns U6 only with slot-192 suppression false, no CE2 action before its flag-15A window, shikigami 1 requested active and not releasing; otherwise 0. Status tick applies positive Drain * DeltaTime.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:537",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:553",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3434",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3439"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The shikigami’s Attack_1 and Summon actions are CN_200, not AGameShikigami using ShikigamiUniqueDataTable; CN_200 is documented as CP_121’s shikigami using CP_121 effects and a CP_121 counter damage row.",
+          "evidence": [
+            "Tools/verify/CHAR/CN_200_Actions.md:5",
+            "Tools/verify/CHAR/CN_200_Actions.md:6",
+            "Source/Abrams/Private/CN_200_Actions.cpp:37",
+            "Source/Abrams/Private/CN_200_Actions.cpp:260"
+          ]
+        }
+      ]
+    },
+    "CP_121_ATTACKB_SHOOT_CAMERA": {
+      "title": "First normal attack camera",
+      "overview": "Used on the first start of Normal Attack 1 / its air counterpart; restored to the saved mode when the attack finishes while in mode 2.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "The camera sits -200 units along gaze forward from the eye base.",
+          "technical": "MakeUniqueCameraRequest(2,8) copies index 0 into CameraOffset.X; the mode-2 update rotates that offset into gaze space before placing the camera.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:889",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1007"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "The camera is shifted -150 units along gaze right.",
+          "technical": "Index 1 becomes CameraOffset.Y in the same mode-2 request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:889",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1007"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "The camera is shifted 15 units along gaze up.",
+          "technical": "Index 2 becomes CameraOffset.Z in the same mode-2 request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:889",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1007"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "Gaze may go at most 60 degrees below the eye line.",
+          "technical": "Index 3 becomes LimitAngleDown; UpdateRequestCamera clamps downward gaze elevation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:889",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1007"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "Gaze may go at most 30 degrees above the eye line.",
+          "technical": "Index 4 becomes LimitAngleUp; UpdateRequestCamera clamps upward gaze elevation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:889",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1007"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "Mode entry requests 110 degrees of FOV.",
+          "technical": "Index 5 becomes FieldOfView. ChangeCameraMode starts FOV interpolation only when FOV > 0; zero leaves the current FOV unchanged. This row has 110.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:889",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1007"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "FOV changes over 0.25 seconds.",
+          "technical": "Index 6 becomes FieldOfViewBlendTime. With FOV > 0 and this > 0, FovInterp starts with this duration; otherwise FOV snaps. This row has 0.25.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:889",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1007"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "Selector 3 chooses the FOV interpolation curve.",
+          "technical": "Index 7 is cast to int: 0 Linear, 1 EaseIn, 2 EaseOut, 3 EaseInOut; other integers leave the default. This row has 3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:939",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:965",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:889",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1007"
+          ]
+        },
+        "8": {
+          "label": "Gaze orbit yaw",
+          "simple": "Gaze is orbited 10 degrees about the camera yaw.",
+          "technical": "Index 8 becomes OrbitYaw; UpdateRequestCamera transforms the gaze by the orbit rotator.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:889",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1007"
+          ]
+        },
+        "9": {
+          "label": "Gaze orbit pitch",
+          "simple": "Gaze is orbited 5 degrees about the camera pitch.",
+          "technical": "Index 9 becomes OrbitPitch in the same orbit rotator.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:889",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1007"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "View roll is set to 5 degrees.",
+          "technical": "Index 10 becomes Roll and is passed to SetViewTarget87 for the final view.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:530",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:889",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1007"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The request is made only at action start count zero; the finish path restores the saved mode with 90 FOV and zero blend time.",
+          "evidence": [
+            "Source/Abrams/Private/CP_121_ActionController.cpp:889",
+            "Source/Abrams/Private/CP_121_ActionController.cpp:1007",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Two shikigami are separate: shikigami 0 is the CN_180 dummy used by normal attacks; shikigami 1 is the CN_200 unit summoned by CP_121_ATTACKH. CN_180 actions also read their own CN_180 unique rows for dissolve/height; those are not CP_121 rows.",
+      "evidence": [
+        "Source/Abrams/Private/CP_121_ActionController.cpp:921",
+        "Source/Abrams/Private/CP_121_ActionController.cpp:941",
+        "Source/Abrams/Private/CP_121_ActionController.cpp:1668",
+        "Source/Abrams/Private/CP_121_ActionController.cpp:1696",
+        "Source/Abrams/Private/CN_180_ActionController.cpp:223",
+        "Tools/verify/CHAR/CN_200_Actions.md:5"
+      ]
+    },
+    {
+      "text": "The unique row index for a CE1 barrage is the stage, not the attack-set level name: levels 1/2/3 map to rows CP_121_ATTACKG_1/_2/_3. Attack-set selection separately uses GetCursedEnergyAttackSetIndex (level minus one, or 3 on the finish target) with retail attack-set name arrays.",
+      "evidence": [
+        "Source/Abrams/Private/CP_121_ActionController.cpp:1824",
+        "Source/Abrams/Private/CP_121_ActionController.cpp:1501",
+        "Source/Abrams/Private/CP_121_ActionController.cpp:1508",
+        "Source/Abrams/Public/GameCharacterAction_CursedEnergyAttack.h:25"
+      ]
+    },
+    {
+      "text": "Direction 1 here means left-stick Y <= -0.5. It selects ATTACKG_1 attack sets and row 5 camera; other directions select ATTACKG_2 and row 6. CP_121 AI specialises only index 0x12 with FGameCharacterAIAction_CursedEnergyAttack1DownHold using stick (0,-1).",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterInputData.cpp:331",
+        "Source/Abrams/Private/GameCharacterInputData.cpp:337",
+        "Source/Abrams/Private/CP_121_ActionController.cpp:1272",
+        "Source/Abrams/Private/CP_121_ActionController.cpp:1508",
+        "Source/Abrams/Private/CP_121_BehaviorController.cpp:8",
+        "Source/Abrams/Public/GameCharacterAINode.h:338"
+      ]
+    },
+    {
+      "text": "There is no CP_121-specific .inl. Unique reads use the out-of-line accessor and shared FGameCharacterAction helper; the inlined variant in GameCharacterActionInline.h is shared, not per-character. Verification notes record the retail accessor as the raw unchecked deref.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Public/GameCharacterActionInline.h:9",
+        "Tools/verify/CHAR/UniqueRowsInline.md:19",
+        "Tools/verify/CHAR/UniqueRowsInline.md:21"
+      ]
+    },
+    {
+      "text": "The controller overrides slots 86, 112, 113, 117, 192, 223, 256 and 290. Its factory creates twelve CP_121 action types and delegates others to base; the behaviour controller is a size-matched shell whose only override is the AI factory.",
+      "evidence": [
+        "Tools/verify/CHAR/batches/batch-action.md:279",
+        "Source/Abrams/Public/CP_121_ActionController.h:153",
+        "Source/Abrams/Public/CP_121_ActionController.h:158",
+        "Source/Abrams/Private/CP_121_ActionController.cpp:796",
+        "Source/Abrams/Private/CP_121_BehaviorController.cpp:8"
+      ]
+    },
+    {
+      "text": "While shikigami 1 is out, recovery wait is forced to zero; with positive drain, zero cursed energy or defeat can force its release. The CN_200 verification note records the same shikigami/effect relationship.",
+      "evidence": [
+        "Source/Abrams/Private/CP_121_ActionController.cpp:475",
+        "Source/Abrams/Private/CP_121_ActionController.cpp:525",
+        "Source/Abrams/Private/CP_121_ActionController.cpp:537",
+        "Source/Abrams/Private/CP_121_ActionController.cpp:1715",
+        "Tools/verify/CHAR/CN_200_Actions.md:5"
+      ]
+    }
+  ]
+}

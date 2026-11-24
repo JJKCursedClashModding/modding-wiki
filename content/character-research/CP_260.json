@@ -1,0 +1,989 @@
+{
+  "overview": "Dagon’s settings tune his normal attack chains, the water-barrier support effect, and volleys from his summons.",
+  "technicalOverview": "Dagon (CP_260) is a cursed-spirit AI character with one core unique row, four CursedEnergyAttack_1 (ATTACKG) rows and four CursedEnergyAttack_2 (ATTACKH) rows. The core row times Dagon’s own normal-attack chains, ground marks and shikigami placement; the ATTACKG rows feed a temporary water-barrier support effect and the ATTACKH rows feed CN_270 shikigami volleys. Row numbers are the zero-based positions in CharacterDataTable.Id_CharacterUnique, and the values are read from AGameCharacter’s UniqueRows; summoned shikigami use a separate ShikigamiUniqueDataTable.",
+  "rows": {
+    "CP_260": {
+      "title": "Core combat tuning",
+      "overview": "General row for Dagon’s own character actions. It sets two Normal Attack 2 charge pairs, ground-effect timings and scales, a remembered-target timer, and shikigami placement and finish-state fanning. The supported level-specific barrier and summon values live on the ATTACKG and ATTACKH rows instead.",
+      "values": {
+        "0": {
+          "label": "Chain A charge limit",
+          "simple": "How long the FX 00113 follow-up charge takes before it can finish, when the button is released.",
+          "technical": "Only at start count 1 and phase 0 of the subgroup-A NormalAttack_2 actions. Elapsed time is advanced by slot 1 when the effect-armed flag is set, otherwise by plain DeltaTime; when elapsed >= 0.2 and NormalAttack_2 is not held, the attack sets its completion phase and flag. The limit is in elapsed-time units, so it is not fixed wall time while slot 1 is active.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:775",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:778"
+          ]
+        },
+        "1": {
+          "label": "Chain A charge rate",
+          "simple": "Slows the FX 00113 follow-up charge while the water shield was active when the attack began.",
+          "technical": "Used only as the multiplier on elapsed time when the action’s effect-armed flag is set; that flag is set on start when the CP_260 controller’s shield value is positive. With 0.5, elapsed advances at half speed, so the 0.2 limit takes about twice as long; when not armed the rate is 1.0. This is row 0 slot 1, not the shield strength on ATTACKG rows.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:671",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:775"
+          ]
+        },
+        "2": {
+          "label": "Chain B charge limit",
+          "simple": "How long the FX 00123 follow-up charge takes before it can finish.",
+          "technical": "Only at start count 1 and phase 0 of the subgroup-B NormalAttack_2_1 actions. Elapsed time is advanced by slot 3 when armed, otherwise by plain DeltaTime; when elapsed >= 0.5 and NormalAttack_2 is not held, the attack completes. The comparison is inclusive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:910",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:913"
+          ]
+        },
+        "3": {
+          "label": "Chain B charge rate",
+          "simple": "Speed multiplier for the FX 00123 follow-up charge while armed.",
+          "technical": "Used exactly like slot 1 but for subgroup B. The stored value is 1.0, so in this data the armed and unarmed rates are the same. It is only read when the effect-armed flag is set.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:671",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:910"
+          ]
+        },
+        "4": {
+          "label": "Ground effect scale",
+          "simple": "Controls how large Dagon’s ground burst effects appear.",
+          "technical": "Read from row 0 in two places: the FX_CP_260_08111 burst spawned after the ground mark charge, and FX_CP_260_08112 spawned under the secondary target. Both use 4 as the uniform actor transform scale and write Niagara EffectSize as 4 * 100 = 400 with Fade set to 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:373",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:532"
+          ]
+        },
+        "5": {
+          "label": "Shield-target memory",
+          "simple": "How long the last shikigami-hit target remains remembered after a finish-state attack.",
+          "technical": "When the CN_270 shikigami hits Dagon’s secondary target in the finish state, the controller stores that actor and sets its timer to row 0 slot 5 = 2.0. ActionTick subtracts DeltaTime divided by CustomTimeDilation only while the timer is > 0, and clears the actor when it reaches <= 0. Initial state uses -1.0 as the cleared sentinel.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:498",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:267",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:269",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1926",
+            "Source/Abrams/Private/CN_270_Actions.cpp:87"
+          ]
+        },
+        "6": {
+          "label": "Swapped summon height",
+          "simple": "Moves the replacement shikigami vertically after it is placed near the secondary target.",
+          "technical": "In the pending shikigami swap path, after the target point is projected 450 units outward and clamped to ground, this value is added to Location.Z. The value is -50, so it lowers the final placement by 50 units; no later clamp is applied after the addition. The same block then applies the tilt from slot 9.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1605",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1611",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1614"
+          ]
+        },
+        "7": {
+          "label": "Finish contact scale",
+          "simple": "Makes ground-contact effects bigger only when Dagon is the finish target.",
+          "technical": "The controller helper returns this row 0 value only when the battle manager marks the owner as the finish target; otherwise it falls back to 1.0. Both NormalAttack_2 contact spawners use it as the uniform actor scale and in the 45 * scale offset from the hit normal. Thus 1.5 applies only in the finish state, not to ordinary hits.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:485",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:491",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:869",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:989"
+          ]
+        },
+        "8": {
+          "label": "Volley hit cap",
+          "simple": "Maximum number of hits one victim can take from the tracked eight-effect volley.",
+          "technical": "On hit-track contact, each eligible GameTraceChannel5 hit increments that victim’s count. On collision query, a tracked victim is accepted only while count < row 0 slot 8. With 10, the first ten hits pass and the eleventh and later hits are refused; the test is strict, not inclusive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:193",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:211"
+          ]
+        },
+        "9": {
+          "label": "Swapped summon tilt",
+          "simple": "Tilts the replacement shikigami’s orientation.",
+          "technical": "Used as -Tilt in both a rotation about the owner’s right vector and the FRotator pitch fed into the spawn orientation. FRotator arguments are degrees, so the stored 10 is a 10-degree tilt; it affects the MakeFromXZ basis used for the summoned shikigami.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1612",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1614",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1615"
+          ]
+        },
+        "10": {
+          "label": "Ground mark charge",
+          "simple": "Delay from placing the ground mark to the burst appearing.",
+          "technical": "TickGroundEffects state 0 accumulates Delta and stays in state 0 while row 0 slot 10 > EffectStateTime. At >= 1.0 it advances to state 1, spawns FX_CP_260_08111 at the mark’s transform, and applies the slot-4 scale. The boundary is inclusive because the code breaks only while the stored time is greater.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:359",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:373"
+          ]
+        },
+        "11": {
+          "label": "Burst active time",
+          "simple": "How long the ground burst can keep colliding before it starts fading.",
+          "technical": "TickGroundEffects state 1 adds Delta and stays active while row 0 slot 11 > EffectStateTime. At >= 1.0 it disables attack, damage and nullify collisions on the burst and starts the fade interpolator. If the burst is already released, it fades immediately without waiting for this time.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:394",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:398"
+          ]
+        },
+        "12": {
+          "label": "Finish fan spread",
+          "simple": "Sets the sideways spread of the five shikigami summoned in the finish state.",
+          "technical": "The non-auto finish path reads slot 12 once and uses it as the yaw magnitude: the first shikigami gets 0 degrees, then the remaining indices get roughly +/- one and +/- two times the spread by the code’s integer formula, i.e. -20, +20, -40 and +40 degrees here. The ordinary volley and Auto variants do not use this fan.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1482",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1492",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1538"
+          ]
+        }
+      },
+      "untraced": [
+        13
+      ],
+      "notes": [
+        {
+          "text": "The shared camera helper reads row slots 0–10 into camera offsets and angles, but no CP_260-specific call site for that helper was found; the traced CP_260 uses of these slots are combat timings, scales and placement values.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:778",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:913"
+          ]
+        }
+      ]
+    },
+    "CP_260_ATTACKG_1": {
+      "title": "Cursed-energy attack 1 (1)",
+      "overview": "Unique row 1, reached by the CursedEnergyAttack_1 routing for 1. Its first four values set the charge time of the waist effect and, when the second start creates the support effect, the barrier’s strength/time, hit allowance and damage-combo override.",
+      "values": {
+        "0": {
+          "label": "Waist-effect duration",
+          "simple": "The first part of the barrier attack lasts 2 before the action can finish on its own.",
+          "technical": "On start count 1, ActionElapsedTime increases by DeltaTime and the action completes when elapsed >= 2. The row is chosen as finish target ? 4 : controller CursedEnergyLevel, so this row is used for cursed-energy level 1 (or by the finish target). The comparison is inclusive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1268",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:42"
+          ]
+        },
+        "1": {
+          "label": "Barrier amount and time",
+          "simple": "The support barrier starts with 100.",
+          "technical": "When the second start spawns FX_CP_260_07112/07122, the controller sets SupportShieldRowIndex to 1 and copies slot 1 = 100. While positive, this same number is the remaining time reduced by DeltaTime and the cap used to absorb incoming damage into the gauge; it also enables super armor, blocks cursed-technique and follow-up actions, and overrides combo damage. It is not reduced by the absorbed damage itself. When it reaches <= 0, the support effect is released.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:95",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:96",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1935",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1849",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1779",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1801",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1958"
+          ]
+        },
+        "2": {
+          "label": "Barrier hit allowance",
+          "simple": "The barrier can take 3 counted hits.",
+          "technical": "This float is cast to int32 as SupportShieldHits on barrier creation. Every received damage decrements it, and at <= 0 the support effect is handed off and the barrier state is reset to the -1 sentinel.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:97",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1832",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:62"
+          ]
+        },
+        "3": {
+          "label": "Barrier combo rate",
+          "simple": "Damage combo rate becomes 0.9 while the barrier is up.",
+          "technical": "Copied to SupportShieldDamageRate on barrier creation. GetDamageComboRate returns this value instead of the normal action-derived rate only while SupportShield > 0; otherwise the inherited value is used.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:98",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1752",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1754"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The four ATTACKG rows are level/finish variants: the source selects row 4 for the battle’s finish target and rows 1–3 for the controller’s cursed-energy level. Do not transfer these values to row 0, where indices 1–3 have different normal-attack meanings.",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:95",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1268",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:158"
+          ]
+        }
+      ]
+    },
+    "CP_260_ATTACKG_2": {
+      "title": "Cursed-energy attack 1 (2)",
+      "overview": "Unique row 2, reached by the CursedEnergyAttack_1 routing for 2. Its first four values set the charge time of the waist effect and, when the second start creates the support effect, the barrier’s strength/time, hit allowance and damage-combo override.",
+      "values": {
+        "0": {
+          "label": "Waist-effect duration",
+          "simple": "The first part of the barrier attack lasts 1.5 before the action can finish on its own.",
+          "technical": "On start count 1, ActionElapsedTime increases by DeltaTime and the action completes when elapsed >= 1.5. The row is chosen as finish target ? 4 : controller CursedEnergyLevel, so this row is used for cursed-energy level 2 (or by the finish target). The comparison is inclusive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1268",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:42"
+          ]
+        },
+        "1": {
+          "label": "Barrier amount and time",
+          "simple": "The support barrier starts with 150.",
+          "technical": "When the second start spawns FX_CP_260_07112/07122, the controller sets SupportShieldRowIndex to 2 and copies slot 1 = 150. While positive, this same number is the remaining time reduced by DeltaTime and the cap used to absorb incoming damage into the gauge; it also enables super armor, blocks cursed-technique and follow-up actions, and overrides combo damage. It is not reduced by the absorbed damage itself. When it reaches <= 0, the support effect is released.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:95",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:96",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1935",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1849",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1779",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1801",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1958"
+          ]
+        },
+        "2": {
+          "label": "Barrier hit allowance",
+          "simple": "The barrier can take 5 counted hits.",
+          "technical": "This float is cast to int32 as SupportShieldHits on barrier creation. Every received damage decrements it, and at <= 0 the support effect is handed off and the barrier state is reset to the -1 sentinel.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:97",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1832",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:62"
+          ]
+        },
+        "3": {
+          "label": "Barrier combo rate",
+          "simple": "Damage combo rate becomes 0.8 while the barrier is up.",
+          "technical": "Copied to SupportShieldDamageRate on barrier creation. GetDamageComboRate returns this value instead of the normal action-derived rate only while SupportShield > 0; otherwise the inherited value is used.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:98",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1752",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1754"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The four ATTACKG rows are level/finish variants: the source selects row 4 for the battle’s finish target and rows 1–3 for the controller’s cursed-energy level. Do not transfer these values to row 0, where indices 1–3 have different normal-attack meanings.",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:95",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1268",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:158"
+          ]
+        }
+      ]
+    },
+    "CP_260_ATTACKG_3": {
+      "title": "Cursed-energy attack 1 (3)",
+      "overview": "Unique row 3, reached by the CursedEnergyAttack_1 routing for 3. Its first four values set the charge time of the waist effect and, when the second start creates the support effect, the barrier’s strength/time, hit allowance and damage-combo override.",
+      "values": {
+        "0": {
+          "label": "Waist-effect duration",
+          "simple": "The first part of the barrier attack lasts 1 before the action can finish on its own.",
+          "technical": "On start count 1, ActionElapsedTime increases by DeltaTime and the action completes when elapsed >= 1. The row is chosen as finish target ? 4 : controller CursedEnergyLevel, so this row is used for cursed-energy level 3 (or by the finish target). The comparison is inclusive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1268",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:42"
+          ]
+        },
+        "1": {
+          "label": "Barrier amount and time",
+          "simple": "The support barrier starts with 200.",
+          "technical": "When the second start spawns FX_CP_260_07112/07122, the controller sets SupportShieldRowIndex to 3 and copies slot 1 = 200. While positive, this same number is the remaining time reduced by DeltaTime and the cap used to absorb incoming damage into the gauge; it also enables super armor, blocks cursed-technique and follow-up actions, and overrides combo damage. It is not reduced by the absorbed damage itself. When it reaches <= 0, the support effect is released.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:95",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:96",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1935",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1849",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1779",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1801",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1958"
+          ]
+        },
+        "2": {
+          "label": "Barrier hit allowance",
+          "simple": "The barrier can take 7 counted hits.",
+          "technical": "This float is cast to int32 as SupportShieldHits on barrier creation. Every received damage decrements it, and at <= 0 the support effect is handed off and the barrier state is reset to the -1 sentinel.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:97",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1832",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:62"
+          ]
+        },
+        "3": {
+          "label": "Barrier combo rate",
+          "simple": "Damage combo rate becomes 0.7 while the barrier is up.",
+          "technical": "Copied to SupportShieldDamageRate on barrier creation. GetDamageComboRate returns this value instead of the normal action-derived rate only while SupportShield > 0; otherwise the inherited value is used.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:98",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1752",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1754"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The four ATTACKG rows are level/finish variants: the source selects row 4 for the battle’s finish target and rows 1–3 for the controller’s cursed-energy level. Do not transfer these values to row 0, where indices 1–3 have different normal-attack meanings.",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:95",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1268",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:158"
+          ]
+        }
+      ]
+    },
+    "CP_260_ATTACKG_4": {
+      "title": "Cursed-energy attack 1 (finish target)",
+      "overview": "Unique row 4, reached by the CursedEnergyAttack_1 routing for finish target. Its first four values set the charge time of the waist effect and, when the second start creates the support effect, the barrier’s strength/time, hit allowance and damage-combo override.",
+      "values": {
+        "0": {
+          "label": "Waist-effect duration",
+          "simple": "The first part of the barrier attack lasts 0.5 before the action can finish on its own.",
+          "technical": "On start count 1, ActionElapsedTime increases by DeltaTime and the action completes when elapsed >= 0.5. The row is chosen as finish target ? 4 : controller CursedEnergyLevel, so this row is used for cursed-energy level finish target (or by the finish target). The comparison is inclusive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1268",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:42"
+          ]
+        },
+        "1": {
+          "label": "Barrier amount and time",
+          "simple": "The support barrier starts with 250.",
+          "technical": "When the second start spawns FX_CP_260_07112/07122, the controller sets SupportShieldRowIndex to 4 and copies slot 1 = 250. While positive, this same number is the remaining time reduced by DeltaTime and the cap used to absorb incoming damage into the gauge; it also enables super armor, blocks cursed-technique and follow-up actions, and overrides combo damage. It is not reduced by the absorbed damage itself. When it reaches <= 0, the support effect is released.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:95",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:96",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1935",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1849",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1779",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1801",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1958"
+          ]
+        },
+        "2": {
+          "label": "Barrier hit allowance",
+          "simple": "The barrier can take 10 counted hits.",
+          "technical": "This float is cast to int32 as SupportShieldHits on barrier creation. Every received damage decrements it, and at <= 0 the support effect is handed off and the barrier state is reset to the -1 sentinel.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:97",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1832",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:62"
+          ]
+        },
+        "3": {
+          "label": "Barrier combo rate",
+          "simple": "Damage combo rate becomes 0.5 while the barrier is up.",
+          "technical": "Copied to SupportShieldDamageRate on barrier creation. GetDamageComboRate returns this value instead of the normal action-derived rate only while SupportShield > 0; otherwise the inherited value is used.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:98",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1752",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1754"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The four ATTACKG rows are level/finish variants: the source selects row 4 for the battle’s finish target and rows 1–3 for the controller’s cursed-energy level. Do not transfer these values to row 0, where indices 1–3 have different normal-attack meanings.",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:95",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1268",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:158"
+          ]
+        }
+      ]
+    },
+    "CP_260_ATTACKH_1": {
+      "title": "Cursed-energy attack 2 (1)",
+      "overview": "Unique row 5, selected through the CP_260 summon-row rules. It drives the shikigami volley schedule and the parameters handed to CN_270 shikigami. Row 8 is the non-Auto finish-target fan variant; Auto actions stay on the level rows.",
+      "values": {
+        "0": {
+          "label": "Volley count",
+          "simple": "Sends 1 shikigami volleys.",
+          "technical": "For non-finish actions the action reads this row as Count. After each summon it increments SummonedCount and moves to the final phase when SummonedCount >= Count. The selected row comes from GetSummonUniqueRow, which maps cursed-energy levels 1/2/3 to rows 5/6/7.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1528",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1545",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1392",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1394",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1398",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19"
+          ]
+        },
+        "1": {
+          "label": "First summon delay",
+          "simple": "First summon happens at 0 seconds.",
+          "technical": "Phase 0 adds DeltaTime and reads this slot every tick; when this value <= elapsed it resets elapsed, plays the standby animation, summons either the ordinary volley or the five-shikigami finish fan, increments the count, and advances phase. Equality already triggers. Row 5 is selected by the dynamic summon-row rules.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1532",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1536",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1542",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1392",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1394",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1398",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19"
+          ]
+        },
+        "2": {
+          "label": "Repeat summon delay",
+          "simple": "Later volleys repeat every 0.5 seconds.",
+          "technical": "Phase 1 reads this slot each tick; when this value <= elapsed it resets elapsed, jumps the animation back to its default section, summons one more volley, and advances or ends based on the count. Equality triggers. This phase is skipped entirely on the forced-one-volley finish path.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1549",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1552",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1555"
+          ]
+        },
+        "3": {
+          "label": "Final wait",
+          "simple": "After the last summon, the action ends 0.5 seconds later.",
+          "technical": "Phase 2 reads this slot each tick; when this value <= elapsed it sets the unbounded completion phase, resets elapsed and calls the action-completion flag. The comparison is inclusive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1559",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1561",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1564"
+          ]
+        },
+        "4": {
+          "label": "Shikigami lifetime",
+          "simple": "Each summoned CN_270 shikigami is given 5 seconds before release.",
+          "technical": "The character action calls PlayUniqueAction with notification 100 and this row value; CN_270’s controller assigns it to the shikigami Timer. That timer decreases by DeltaTime while positive, and the shikigami is released once it is <= 0. This value is read from the character’s UniqueRows, not from the shikigami’s own table.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1457",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1491",
+            "Source/Abrams/Private/CN_270_ActionController.cpp:91",
+            "Source/Abrams/Private/CN_270_ActionController.cpp:69"
+          ]
+        },
+        "5": {
+          "label": "Summoned scale target",
+          "simple": "Summoned shikigami grow from 0.01 to 2 scale.",
+          "technical": "The value is placed in the shikigami attack request’s Vector70.X. CN_270’s Attack_1 Start passes it as the end value of an EaseOut scale interpolator that starts at 0.01.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1469",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1504",
+            "Source/Abrams/Private/CN_270_Actions.cpp:167"
+          ]
+        },
+        "6": {
+          "label": "Summoned scale time",
+          "simple": "The growth takes 0.3 seconds.",
+          "technical": "The value is placed in the shikigami attack request’s Vector70.Y. CN_270’s Attack_1 Start passes it as the duration of the EaseOut scale interpolator.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1470",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1505",
+            "Source/Abrams/Private/CN_270_Actions.cpp:167"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "CP_260 forwards these numbers into CN_270 shikigami requests; CN_270 and CN_272 have their own ShikigamiUniqueDataTable rows and their own unchecked accessor. The shikigami table must not be confused with these AGameCharacter rows.",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1469",
+            "Source/Abrams/Private/GameShikigami.cpp:1251",
+            "Source/Abrams/Private/GameDataTableManager.cpp:242",
+            "Tools/verify/CHAR/CN_270_Actions.md:48"
+          ]
+        }
+      ]
+    },
+    "CP_260_ATTACKH_2": {
+      "title": "Cursed-energy attack 2 (2)",
+      "overview": "Unique row 6, selected through the CP_260 summon-row rules. It drives the shikigami volley schedule and the parameters handed to CN_270 shikigami. Row 8 is the non-Auto finish-target fan variant; Auto actions stay on the level rows.",
+      "values": {
+        "0": {
+          "label": "Volley count",
+          "simple": "Sends 2 shikigami volleys.",
+          "technical": "For non-finish actions the action reads this row as Count. After each summon it increments SummonedCount and moves to the final phase when SummonedCount >= Count. The selected row comes from GetSummonUniqueRow, which maps cursed-energy levels 1/2/3 to rows 5/6/7.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1528",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1545",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1392",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1394",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1398",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19"
+          ]
+        },
+        "1": {
+          "label": "First summon delay",
+          "simple": "First summon happens at 0 seconds.",
+          "technical": "Phase 0 adds DeltaTime and reads this slot every tick; when this value <= elapsed it resets elapsed, plays the standby animation, summons either the ordinary volley or the five-shikigami finish fan, increments the count, and advances phase. Equality already triggers. Row 6 is selected by the dynamic summon-row rules.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1532",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1536",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1542",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1392",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1394",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1398",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19"
+          ]
+        },
+        "2": {
+          "label": "Repeat summon delay",
+          "simple": "Later volleys repeat every 0.5 seconds.",
+          "technical": "Phase 1 reads this slot each tick; when this value <= elapsed it resets elapsed, jumps the animation back to its default section, summons one more volley, and advances or ends based on the count. Equality triggers. This phase is skipped entirely on the forced-one-volley finish path.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1549",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1552",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1555"
+          ]
+        },
+        "3": {
+          "label": "Final wait",
+          "simple": "After the last summon, the action ends 0.5 seconds later.",
+          "technical": "Phase 2 reads this slot each tick; when this value <= elapsed it sets the unbounded completion phase, resets elapsed and calls the action-completion flag. The comparison is inclusive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1559",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1561",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1564"
+          ]
+        },
+        "4": {
+          "label": "Shikigami lifetime",
+          "simple": "Each summoned CN_270 shikigami is given 10 seconds before release.",
+          "technical": "The character action calls PlayUniqueAction with notification 100 and this row value; CN_270’s controller assigns it to the shikigami Timer. That timer decreases by DeltaTime while positive, and the shikigami is released once it is <= 0. This value is read from the character’s UniqueRows, not from the shikigami’s own table.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1457",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1491",
+            "Source/Abrams/Private/CN_270_ActionController.cpp:91",
+            "Source/Abrams/Private/CN_270_ActionController.cpp:69"
+          ]
+        },
+        "5": {
+          "label": "Summoned scale target",
+          "simple": "Summoned shikigami grow from 0.01 to 2 scale.",
+          "technical": "The value is placed in the shikigami attack request’s Vector70.X. CN_270’s Attack_1 Start passes it as the end value of an EaseOut scale interpolator that starts at 0.01.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1469",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1504",
+            "Source/Abrams/Private/CN_270_Actions.cpp:167"
+          ]
+        },
+        "6": {
+          "label": "Summoned scale time",
+          "simple": "The growth takes 0.3 seconds.",
+          "technical": "The value is placed in the shikigami attack request’s Vector70.Y. CN_270’s Attack_1 Start passes it as the duration of the EaseOut scale interpolator.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1470",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1505",
+            "Source/Abrams/Private/CN_270_Actions.cpp:167"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "CP_260 forwards these numbers into CN_270 shikigami requests; CN_270 and CN_272 have their own ShikigamiUniqueDataTable rows and their own unchecked accessor. The shikigami table must not be confused with these AGameCharacter rows.",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1469",
+            "Source/Abrams/Private/GameShikigami.cpp:1251",
+            "Source/Abrams/Private/GameDataTableManager.cpp:242",
+            "Tools/verify/CHAR/CN_270_Actions.md:48"
+          ]
+        }
+      ]
+    },
+    "CP_260_ATTACKH_3": {
+      "title": "Cursed-energy attack 2 (3)",
+      "overview": "Unique row 7, selected through the CP_260 summon-row rules. It drives the shikigami volley schedule and the parameters handed to CN_270 shikigami. Row 8 is the non-Auto finish-target fan variant; Auto actions stay on the level rows.",
+      "values": {
+        "0": {
+          "label": "Volley count",
+          "simple": "Sends 3 shikigami volleys.",
+          "technical": "For non-finish actions the action reads this row as Count. After each summon it increments SummonedCount and moves to the final phase when SummonedCount >= Count. The selected row comes from GetSummonUniqueRow, which maps cursed-energy levels 1/2/3 to rows 5/6/7.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1528",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1545",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1392",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1394",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1398",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19"
+          ]
+        },
+        "1": {
+          "label": "First summon delay",
+          "simple": "First summon happens at 0 seconds.",
+          "technical": "Phase 0 adds DeltaTime and reads this slot every tick; when this value <= elapsed it resets elapsed, plays the standby animation, summons either the ordinary volley or the five-shikigami finish fan, increments the count, and advances phase. Equality already triggers. Row 7 is selected by the dynamic summon-row rules.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1532",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1536",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1542",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1392",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1394",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1398",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19"
+          ]
+        },
+        "2": {
+          "label": "Repeat summon delay",
+          "simple": "Later volleys repeat every 0.5 seconds.",
+          "technical": "Phase 1 reads this slot each tick; when this value <= elapsed it resets elapsed, jumps the animation back to its default section, summons one more volley, and advances or ends based on the count. Equality triggers. This phase is skipped entirely on the forced-one-volley finish path.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1549",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1552",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1555"
+          ]
+        },
+        "3": {
+          "label": "Final wait",
+          "simple": "After the last summon, the action ends 0.5 seconds later.",
+          "technical": "Phase 2 reads this slot each tick; when this value <= elapsed it sets the unbounded completion phase, resets elapsed and calls the action-completion flag. The comparison is inclusive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1559",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1561",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1564"
+          ]
+        },
+        "4": {
+          "label": "Shikigami lifetime",
+          "simple": "Each summoned CN_270 shikigami is given 15 seconds before release.",
+          "technical": "The character action calls PlayUniqueAction with notification 100 and this row value; CN_270’s controller assigns it to the shikigami Timer. That timer decreases by DeltaTime while positive, and the shikigami is released once it is <= 0. This value is read from the character’s UniqueRows, not from the shikigami’s own table.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1457",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1491",
+            "Source/Abrams/Private/CN_270_ActionController.cpp:91",
+            "Source/Abrams/Private/CN_270_ActionController.cpp:69"
+          ]
+        },
+        "5": {
+          "label": "Summoned scale target",
+          "simple": "Summoned shikigami grow from 0.01 to 2 scale.",
+          "technical": "The value is placed in the shikigami attack request’s Vector70.X. CN_270’s Attack_1 Start passes it as the end value of an EaseOut scale interpolator that starts at 0.01.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1469",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1504",
+            "Source/Abrams/Private/CN_270_Actions.cpp:167"
+          ]
+        },
+        "6": {
+          "label": "Summoned scale time",
+          "simple": "The growth takes 0.3 seconds.",
+          "technical": "The value is placed in the shikigami attack request’s Vector70.Y. CN_270’s Attack_1 Start passes it as the duration of the EaseOut scale interpolator.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1470",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1505",
+            "Source/Abrams/Private/CN_270_Actions.cpp:167"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "CP_260 forwards these numbers into CN_270 shikigami requests; CN_270 and CN_272 have their own ShikigamiUniqueDataTable rows and their own unchecked accessor. The shikigami table must not be confused with these AGameCharacter rows.",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1469",
+            "Source/Abrams/Private/GameShikigami.cpp:1251",
+            "Source/Abrams/Private/GameDataTableManager.cpp:242",
+            "Tools/verify/CHAR/CN_270_Actions.md:48"
+          ]
+        }
+      ]
+    },
+    "CP_260_ATTACKH_4": {
+      "title": "Cursed-energy attack 2 (finish target)",
+      "overview": "Unique row 8, selected through the CP_260 summon-row rules. It drives the shikigami volley schedule and the parameters handed to CN_270 shikigami. Row 8 is the non-Auto finish-target fan variant; Auto actions stay on the level rows.",
+      "values": {
+        "0": {
+          "label": "Volley count",
+          "simple": "Stored as 3, but the finish path is hard-coded to a single volley.",
+          "technical": "In the traced non-auto finish path, the battle finish-target check makes Count = 1 directly, so this stored value is not read; the Auto variants also skip the finish row. With Count = 1, the phase immediately becomes the final phase after the first summon.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1528",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1545",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1392",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1394",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1398",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19"
+          ]
+        },
+        "1": {
+          "label": "First summon delay",
+          "simple": "First summon happens at 0 seconds.",
+          "technical": "Phase 0 adds DeltaTime and reads this slot every tick; when this value <= elapsed it resets elapsed, plays the standby animation, summons either the ordinary volley or the five-shikigami finish fan, increments the count, and advances phase. Equality already triggers. Row 8 is selected by the dynamic summon-row rules.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1532",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1536",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1542",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1392",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1394",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1398",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19"
+          ]
+        },
+        "2": {
+          "label": "Repeat summon delay",
+          "simple": "Stored as 0.5, but the finish path never enters the repeat phase.",
+          "technical": "Phase 1 is the only reader, but the finish path forces Count = 1, so after the first summon the state moves to phase 2 and this value is never consulted in the traced flow. It remains part of the row data.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1528",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1545",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1549"
+          ]
+        },
+        "3": {
+          "label": "Final wait",
+          "simple": "After the last summon, the action ends 0.5 seconds later.",
+          "technical": "Phase 2 reads this slot each tick; when this value <= elapsed it sets the unbounded completion phase, resets elapsed and calls the action-completion flag. The comparison is inclusive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1559",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1561",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1564"
+          ]
+        },
+        "4": {
+          "label": "Shikigami lifetime",
+          "simple": "Each summoned CN_270 shikigami is given 15 seconds before release.",
+          "technical": "The character action calls PlayUniqueAction with notification 100 and this row value; CN_270’s controller assigns it to the shikigami Timer. That timer decreases by DeltaTime while positive, and the shikigami is released once it is <= 0. This value is read from the character’s UniqueRows, not from the shikigami’s own table.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1457",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1491",
+            "Source/Abrams/Private/CN_270_ActionController.cpp:91",
+            "Source/Abrams/Private/CN_270_ActionController.cpp:69"
+          ]
+        },
+        "5": {
+          "label": "Summoned scale target",
+          "simple": "Summoned shikigami grow from 0.01 to 5 scale.",
+          "technical": "The value is placed in the shikigami attack request’s Vector70.X. CN_270’s Attack_1 Start passes it as the end value of an EaseOut scale interpolator that starts at 0.01.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1469",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1504",
+            "Source/Abrams/Private/CN_270_Actions.cpp:167"
+          ]
+        },
+        "6": {
+          "label": "Summoned scale time",
+          "simple": "The growth takes 0.35 seconds.",
+          "technical": "The value is placed in the shikigami attack request’s Vector70.Y. CN_270’s Attack_1 Start passes it as the duration of the EaseOut scale interpolator.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1470",
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1505",
+            "Source/Abrams/Private/CN_270_Actions.cpp:167"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "CP_260 forwards these numbers into CN_270 shikigami requests; CN_270 and CN_272 have their own ShikigamiUniqueDataTable rows and their own unchecked accessor. The shikigami table must not be confused with these AGameCharacter rows.",
+          "evidence": [
+            "Source/Abrams/Private/CP_260_ActionController.cpp:1469",
+            "Source/Abrams/Private/GameShikigami.cpp:1251",
+            "Source/Abrams/Private/GameDataTableManager.cpp:242",
+            "Tools/verify/CHAR/CN_270_Actions.md:48"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Row indices are positional, not looked up by the unique row name at read time. Character setup fills UniqueRows in Id_CharacterUnique order, and both AGameCharacter and FGameCharacterAction’s helper index the arrays directly without bounds checks. Missing or short rows therefore have no in-code fallback.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:560",
+        "Source/Abrams/Private/GameCharacter.cpp:561",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933"
+      ]
+    },
+    {
+      "text": "Dynamic row routing is level based. The controller’s cursed-energy level is clamped to 1–3; CE_1 explicitly uses unique row 4 for the battle’s finish target. CE_2’s summon row helper uses the action’s cursed-energy level (which can come from AttackIndex when that is 1–3) and uses row 8 only for a non-Auto finish target.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:158",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:95",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:1268",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:1392",
+        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+        "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:42"
+      ]
+    },
+    {
+      "text": "The water barrier is a controller state, not just a visual. While its amount is positive it absorbs damage into the gauge, grants super armor, blocks CursedEnergyAttack_1/2 actions and follow-ups, and swaps the damage-combo rate. Its hit allowance and lifetime are separate ATTACKG slots; a CN_270 shikigami hit on the secondary target can also back-feed the remembered target and its timer.",
+      "evidence": [
+        "Source/Abrams/Private/CP_260_ActionController.cpp:96",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:97",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:98",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:1752",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:1779",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:1801",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:1832",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:1849",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:1935",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:1958",
+        "Source/Abrams/Private/CN_270_Actions.cpp:87"
+      ]
+    },
+    {
+      "text": "The CE_2 mechanic summons CN_270 shikigami. Ordinary attacks release one free slot at a time; the non-Auto finish fan releases five in a spread. The lifetime, final scale and scale time are read from CP_260’s rows and forwarded in the shikigami request. Verification notes record the CP_260 controller helpers and the CN_270 setter, and the finish-scale helper has a byte-matched lane verdict.",
+      "evidence": [
+        "Source/Abrams/Private/CP_260_ActionController.cpp:1457",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:1469",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:1482",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:1528",
+        "Source/Abrams/Private/CN_270_ActionController.cpp:91",
+        "Source/Abrams/Private/CN_270_Actions.cpp:167",
+        "Tools/verify/CHAR/CP_260_ActionController.md:194",
+        "Tools/verify/CHAR/CN_270_Actions.md:48",
+        "Tools/verify/LANES/w19-flash__chars__03.md:18"
+      ]
+    },
+    {
+      "text": "NormalAttack_2 has two independent contact families using different core slots: the FX 00113 chain uses slots 0/1, while the FX 00123 chain uses slots 2/3. One contact spawns a single effect; the other spawns eight and registers them with the controller hit tracker. The tracked hit cap and finish-only size fallback are both read from row 0.",
+      "evidence": [
+        "Source/Abrams/Private/CP_260_ActionController.cpp:775",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:778",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:910",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:913",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:869",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:211",
+        "Source/Abrams/Private/CP_260_ActionController.cpp:491"
+      ]
+    },
+    {
+      "text": "The character has a specialized AI think node but no CP_260-specific behavior-controller source or per-character .inl was found. The AI tick sets brain keys from the controller’s finish-target test rather than from UniqueRows; generic AI hold actions that read core slots 0/1/2 belong to the CP_040 and CP_050 behavior factories and are not assigned to CP_260 here.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:191",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:787",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:118",
+        "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+        "Source/Abrams/Private/CP_050_BehaviorController.cpp:11"
+      ]
+    },
+    {
+      "text": "Verification notes place several CP_260 controller slots in the matched Shipping chunk and record the reconstructed helper roles; they do not change the row interpretation, which is taken from the current Source readers.",
+      "evidence": [
+        "Tools/verify/LANES/wave10-CHc.md:47",
+        "Tools/verify/CHAR/CP_260_ActionController.md:299"
+      ]
+    }
+  ]
+}

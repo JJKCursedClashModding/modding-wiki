@@ -1,0 +1,122 @@
+{
+  "overview": "The Quadrupedal Cursed Spirit leaves all unique slots empty. The notes cover its controller and attack behavior.",
+  "technicalOverview": "Quadrupedal Cursed Spirit (CN_150) is a non-selectable, single-variant enemy whose exported character row has no character-unique data at all: all nine Id_CharacterUnique slots are None, so there are no unique floats to tune and no CN_150 source reads one. Its behavior comes from a small dedicated controller set instead. The character row selects action controller CN_150, bone controller CN_150 and AI type CN_150. The action controller overrides only two ground normal attacks (both report themselves as not grounded) and refuses a long list of dash, guard, step, follow-up, air, cursed-energy and super actions; the bone controller registers four foot-IK points for the front and back legs; the AI think node picks a rival by cursed-energy level. Step, break-fall and cursed-energy settings are borrowed as data from CP_010, but that is data reuse rather than CP_010 controller inheritance. No trap, shikigami, projectile or unique-camera path consumes CN_150 values.",
+  "rows": {},
+  "notes": [
+    {
+      "text": "There is nothing to configure in the nine unique slots. The authoritative input is empty and the exported character row sets every Id_CharacterUnique entry to None; AGameCharacter still reserves one UniqueRows entry per name (nine null pointers here). Its shared reader AGameCharacter::GetCharacterUniqueFloatValue is an unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference; FGameCharacterAction::GetOwnerUniqueFloat forwards to it, and MakeUniqueCameraRequest would read value indices 0-10 of a supplied row. No CN_150 action, effect callback, anim instance, bone controller or AI function calls any of them, and no CN_150 source has a literal unique row/value index. Therefore there are no 14 subvalues to list for this character, and zeros elsewhere are not evidence of hidden CN_150 settings. Trap forwarding uses a different object's unique row and returns 0 with no source interface; AGameShikigami's same-named method reads ShikigamiUniqueDataTable, not CharacterUniqueDataTable. CN_150 has no trap or shikigami rows and no shikigami controller.",
+      "evidence": [
+        "JJKCCDatatables/datatables/CharacterDataTable.json:3925",
+        "JJKCCDatatables/datatables/CharacterDataTable.json:3935",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUnique.h:11",
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941",
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/GameShikigami.cpp:1250",
+        "Tools/verify/CHAR/UniqueRowsInline.md:19"
+      ]
+    },
+    {
+      "text": "Character data wires three dedicated classes, not a shared fighter. AGameCharacter's factories create UCN_150_ActionController for ActionControllerType CN_150 and UCN_150_BoneController from the same controller enum, while the AI factory creates FGameCharacterAIThinkNode_CN_150 for AIType CN_150. The AI node is the 0x1A8-byte NonPlayable type with factory 0x14119ba70. The action controller itself is a footprint-zero shell (0x168 bytes, same as its base) with no members; its only declarations are the action factory and answer overrides.",
+      "evidence": [
+        "JJKCCDatatables/datatables/CharacterDataTable.json:3940",
+        "JJKCCDatatables/datatables/CharacterDataTable.json:3943",
+        "Source/Abrams/Private/GameCharacter.cpp:626",
+        "Source/Abrams/Private/GameCharacter.cpp:763",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:203",
+        "Source/Abrams/Public/GameCharacterAIThinkNode.h:588",
+        "Source/Abrams/Public/CN_150_ActionController.h:12",
+        "Tools/verify/CHAR/batches/batch-action.md:51",
+        "Tools/verify/CHAR/CN_150_ActionController.md:6"
+      ]
+    },
+    {
+      "text": "The action layer is deliberately narrow. The controller's factory overrides only NormalAttack_1 and NormalAttack_2; every other action type goes to the shared UGameCharacterActionController factory. It refuses air-start dashes and jumps, Guard/GuardAir, Step/StepAir, the 1_1 and 3 attack follow-ups, every air normal attack, and all cursed-energy and super actions. Both of its attack classes report IsGrounded false where generic attacks report true, and neither reads a unique value. Tag-combo joining, revival-buff application and every situation-voice index are also answered false. The older verification record still describes type 48 as unregistered while the current source writes both factory arms, so the effect behavior below is traced from reconstructed code and decoded RVAs rather than claimed as byte-matched.",
+      "evidence": [
+        "Source/Abrams/Private/CN_150_ActionController.cpp:40",
+        "Source/Abrams/Private/CN_150_ActionController.cpp:55",
+        "Source/Abrams/Private/CN_150_ActionController.cpp:83",
+        "Source/Abrams/Public/CN_150_ActionController.h:14",
+        "Source/Abrams/Public/CN_150_Actions.h:13",
+        "Source/Abrams/Public/CN_150_Actions.h:23",
+        "Source/Abrams/Public/GameCharacterAction_Attack.h:32",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:556",
+        "Tools/verify/CHAR/CN_150_ActionController.md:15",
+        "Tools/verify/CHAR/CN_150_ActionController.md:30"
+      ]
+    },
+    {
+      "text": "NormalAttack_1 has a character-specific ground-FX hook, but it is not a unique-number read. When the played effect's row id is FX_CN_000_03101, the action line-traces from 200 engine units above that effect location to 200 below it and asks for the MapGround row matching the hit physics surface. Soil, Concrete, Grass, Gravel, Iron, Tile and Wood select FX_CN_000_03211; Water selects FX_CN_000_03221. The chosen effect is played at the original effect's transform with layer-effect and skip-initialize both false; a missed trace, an unmapped surface or any other effect id does nothing. No CN_150 projectile, spawner or trap-forwarding call site was found, and the effect table rows are shared FX names rather than character-unique data.",
+      "evidence": [
+        "Source/Abrams/Public/GameEffect.h:35",
+        "Source/Abrams/Private/CN_150_ActionController.cpp:11",
+        "Source/Abrams/Private/CN_150_ActionController.cpp:22",
+        "Source/Abrams/Private/CN_150_ActionController.cpp:32",
+        "Source/Abrams/Private/GameCharacter.cpp:3697",
+        "Source/Abrams/Private/GameCharacter.cpp:3700",
+        "Source/Abrams/Public/GameCharacterAction.h:183",
+        "JJKCCDatatables/datatables/EffectDataTable.json:9255"
+      ]
+    },
+    {
+      "text": "The skeleton setup is a four-legged variant. Ankle-bone lookup requires LB_toe, RB_toe and head; foot-IK setup casts the anim instance to UCN_150_AnimInstance and registers keys 0 and 1 for the front legs (L_knee/L_toe and R_knee/R_toe) plus keys 4 and 5 for the back legs. A traced quirk is that the back entries point both toe and knee at the same resolved bone: LB_knee for key 4 and RB_toe for key 5, because retail looks those two names up twice. All four IKs use FootIKLimit[0], which is 15.0 in the exported row, and AnkleHeight is set to 1.0. Any missing required bone makes setup fail, and the shared bone-controller initializer treats that as a failed init. Lean, aim-offset and foot-bend updates are empty leaf overrides. The extra back-toe effect locations and alphas live on UCN_150_AnimInstance and are zeroed in its constructor.",
+      "evidence": [
+        "Source/Abrams/Private/CN_150_BoneController.cpp:9",
+        "Source/Abrams/Private/CN_150_BoneController.cpp:24",
+        "Source/Abrams/Private/CN_150_BoneController.cpp:37",
+        "Source/Abrams/Private/CN_150_BoneController.cpp:46",
+        "Source/Abrams/Private/CN_150_BoneController.cpp:64",
+        "Source/Abrams/Private/CN_150_BoneController.cpp:82",
+        "Source/Abrams/Private/CN_150_BoneController.cpp:86",
+        "Source/Abrams/Public/CN_150_AnimInstance.h:11",
+        "Source/Abrams/Private/CN_150_AnimInstance.cpp:10",
+        "Source/Abrams/Private/GameCharacterBoneController.cpp:37",
+        "JJKCCDatatables/datatables/CharacterDataTable.json:3960"
+      ]
+    },
+    {
+      "text": "The AI uses behavior groups rather than unique values. SetupThinkParameters installs slots 06, 09, 18, 19, 23, 24, 27, 28, 12 and 34, and the random-parameter builder adds jump-air parameters plus slots 36, 37 and 39; none of these reads a character-unique float. The leaf Tick first clears every rival's Unknown20, then starts from the target's clamped cursed-energy level, finds a rival other than the target with the lowest level strictly below it, and gives that rival Unknown20 = 200. Slot 34 is a weighted group at evaluation order 280 with MaxBrainLevel 10 and is recorded as a byte match in the AI verification ledger; the factory table agrees on the 0x1A8 object size. There is no separate CN_150 behavior controller in this source.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:3005",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeRandomParameters.cpp:691",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:312",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:337",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:8745",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:8748",
+        "Tools/verify/CHAR/ai-wave4-T.md:38",
+        "Tools/verify/CHAR/ai-factory-table.md:27",
+        "Tools/verify/BEHAV/behav.json:31390"
+      ]
+    },
+    {
+      "text": "The data role matches a stripped AI brawler. The action row populates only ground NormalAttack_1 (CN_150_ATTACKA) and NormalAttack_2 (CN_150_ATTACKB); air, auto, follow-up, third-hit, cursed-energy, super and extra attack sets are None. Each of the two attack sets has only a setup and one active attack id. The special-attack row has no tag-combo damage, solo special, domain expansion or ranking record. Step and break-fall action ids and the cursed-energy table are CP_010 data, while the character row keeps ActionControllerType CN_150 and AIType CN_150, so CP_010's controller behavior is not inherited. There is one variation, CN_150_00, and CharacterSelect is None.",
+      "evidence": [
+        "JJKCCDatatables/datatables/ActionDataTable.json:3535",
+        "JJKCCDatatables/datatables/ActionDataTable.json:3542",
+        "JJKCCDatatables/datatables/ActionDataTable.json:3554",
+        "JJKCCDatatables/datatables/ActionDataTable.json:3570",
+        "JJKCCDatatables/datatables/AttackSetDataTable.json:8397",
+        "JJKCCDatatables/datatables/AttackSetDataTable.json:8419",
+        "JJKCCDatatables/datatables/CharacterSpecialAttackDataTable.json:240",
+        "JJKCCDatatables/datatables/CharacterDataTable.json:3883",
+        "JJKCCDatatables/datatables/CharacterDataTable.json:3940"
+      ]
+    },
+    {
+      "text": "No per-character include file hides an extra reader: the three CN_150 .cpp files and their headers include only ordinary headers, and the shared inlined unique-float helper in GameCharacterActionInline.h is not included by any of them. Reconstruction status is mixed, so keep these findings source-traced rather than byte-certified: the action-controller record says the surface-FX slot was blocked on an unproven lookup-map spelling, and the AI Tick is listed as certified by BEHAV while an older unity note records 25 unmasked diffs. Neither status changes the no-unique-row conclusion; it only limits claims about exact retail bytes.",
+      "evidence": [
+        "Source/Abrams/Private/CN_150_ActionController.cpp:1",
+        "Source/Abrams/Public/CN_150_Actions.h:1",
+        "Source/Abrams/Private/CN_150_BoneController.cpp:1",
+        "Source/Abrams/Private/CN_150_AnimInstance.cpp:1",
+        "Source/Abrams/Public/GameCharacterActionInline.h:7",
+        "Tools/verify/CHAR/CN_150_ActionController.md:32",
+        "Tools/verify/BEHAV/behav.json:31390",
+        "Tools/verify/UNITY/unity.json:67969"
+      ]
+    }
+  ]
+}

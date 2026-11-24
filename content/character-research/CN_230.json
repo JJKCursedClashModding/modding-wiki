@@ -1,0 +1,502 @@
+{
+  "overview": "Haruta’s unique settings affect summon orders, beam steering, and the camera during the beam attack.",
+  "technicalOverview": "Haruta Shigemo is reconstructed as a shikigami-and-beam specialist. His character row selects three CharacterUniqueDataTable5 rows and a dedicated action controller; the code never searches those rows by name, it reads them through zero-based Id_CharacterUnique indexes. Row 0 holds general level-advantage, merge, ordering and summon timings; row 1 steers the sustained CursedEnergyAttack_2 beam through AttackH and selects summoned-attack durations; row 2 is a single virtual-camera preset used while that beam is active. Several row-0 values are forwarded as parameters into the CN_231 shikigami controller. Those are Haruta values, not reads of the shikigami own ShikigamiUniqueDataTable.",
+  "rows": {
+    "CN_230": {
+      "title": "General Haruta tuning",
+      "overview": "The main row covers level-based offense and cursed-energy rates, the cost and drain of keeping the shikigami summoned, the weapon recall animation, and the timings handed to different shikigami attacks.",
+      "values": {
+        "0": {
+          "label": "Higher-level damage multiplier",
+          "simple": "Haruta deals 1.5x damage when his cursed-energy level is strictly higher than the target level.",
+          "technical": "GetSendAttackDamageRate returns FloatValue[0] only when the receiver exists, a receiver level exists, and the owner clamped cursed-energy level is strictly greater than that level. A character receiver contributes its clamped level; a shikigami receiver overrides it with the shikigami owner level. All other cases return 1.0. This action-controller multiplier is then multiplied with the battle-team and status-controller factors in GAISlot141.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:466",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:484",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:491",
+            "Source/Abrams/Private/GameCharacter.cpp:3442"
+          ]
+        },
+        "1": {
+          "label": "Higher-level cursed-energy gain multiplier",
+          "simple": "Haruta gains 1.5x the damage row attacker cursed-energy gain against a lower-level target.",
+          "technical": "GetAttackCursedEnergyGainRate repeats the strict owner-level greater-than receiver-level test and returns FloatValue[1], otherwise 1.0. Status OnDamageDealt multiplies this result by DamageRow->CursedEnergy_Add_Attacker when adding cursed energy; friendly-fire receivers are rejected earlier in that function.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:466",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:512",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:519",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:2957",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:2970"
+          ]
+        },
+        "2": {
+          "label": "Weapon recall ease duration",
+          "simple": "How long the stored weapon takes to slide from its raised position into the hand during the recall attack.",
+          "technical": "On the first ExtraAttack_1 start, phase 0 detaches the weapon and calls WeaponEase.Start(0,1,FloatValue[2],EaseOut,2,2). The third Start argument is the interpolator duration in delta-time seconds; its Update finishes when Duration <= Elapsed. The eased value drives CN230_MoveWeapon until inactive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:296",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:315",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:318",
+            "Source/Framework/Public/StudioFloatEaseInterpolator.h:81",
+            "Source/Framework/Public/StudioFloatEaseInterpolator.h:104"
+          ]
+        },
+        "3": {
+          "label": "Shikigami merge energy drain",
+          "simple": "Keeping the shikigami summoned drains 5 cursed-energy per second, except while it is releasing.",
+          "technical": "GetCursedEnergyDrainRate returns FloatValue[3] only when shikigami slot 0 is requested active and its release action is not active; otherwise 0. The status tick reads this through GetActionValue113 and subtracts Drain * DeltaTime when Drain >= 0, so the value is a per-second rate, not a one-time charge.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:499",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:501",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:505",
+            "Source/Abrams/Private/GameCharacter.cpp:3031",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3434",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3436"
+          ]
+        },
+        "4": {
+          "label": "Damage-order cursed-energy cost",
+          "simple": "Ordering the shikigami while Haruta is in a damage reaction costs 100 cursed energy.",
+          "technical": "In ActionTick, after a DamageDefault start, holding CursedEnergyAttack_2 calls TryOrderShikigami. If that function reports an order was actually issued, current energy is replaced by Max(CurrentEnergy - FloatValue[4], 0), flooring the result at zero. The charge is therefore conditional on the full order gate, not merely on holding the button.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:29",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:54",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:1428",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:1434",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:1437"
+          ]
+        },
+        "5": {
+          "label": "Summoned normal-attack duration",
+          "simple": "The summoned shikigami normal strike has a 1-second homing/flight phase.",
+          "technical": "When NormalAttack_3 summons shikigami 0, Haruta sends FloatValue[5] as FShikigamiDamageActionParam.Value64 in the Attack_1 request. CN_231 attack tick advances from that homing phase to the falling phase only when ActionElapsedTime is strictly greater than Request.Value64.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:676",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:696",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:697",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:589",
+            "Source/Abrams/Public/CN_231_Actions.h:148"
+          ]
+        },
+        "6": {
+          "label": "Up-stick shikigami order duration",
+          "simple": "A forward-stick shikigami order uses a 3-second attack phase.",
+          "technical": "TryOrderShikigami requires a valid target, shikigami 0 requested active and not attacking, damaged or releasing, and at least one distance within the shikigami auto-attack thresholds. If the left stick is up (Y >= 0.5 and at most 45.0001 degrees from up), it sets CN231 target mode 2 and sends Attack_3; otherwise it sends a direct Attack_3 command with FloatValue[6] as Value64. The CN231 attack tick leaves phase 0 only when ActionElapsedTime > Value64.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:29",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:36",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:52",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:63",
+            "Source/Abrams/Private/GameCharacterInputData.cpp:331",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:589"
+          ]
+        },
+        "7": {
+          "label": "Order mode time limit",
+          "simple": "A forward-stick order keeps its special follow-target mode for 15 seconds.",
+          "technical": "TryOrderShikigami passes FloatValue[7] as TimeLimit to UCN_231_ActionController::SetTargetMode(2, 27, Radius, TimeLimit, 1). CN231 stores it as TargetModeTimeLimit, subtracts DeltaTime while it is >= 0, and resets the whole target mode when it becomes < 0 and no attack action is active.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:54",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:58",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:187",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:192",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:312"
+          ]
+        },
+        "8": {
+          "label": "Order proximity radius",
+          "simple": "The ordered shikigami triggers its follow-up when it comes within 2000 world-distance units of the target.",
+          "technical": "TryOrderShikigami passes FloatValue[8] as Radius to SetTargetMode with action type 27. CN231 checks only while no attack action is active and the target is valid: if DistSquared(shikigami, target) < Radius * Radius, it pushes damage action 27. Equality does not trigger.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:55",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:58",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:195",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:200",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:202"
+          ]
+        },
+        "9": {
+          "label": "Super summoned attack duration",
+          "simple": "The super-art summoned shikigami first attack phase lasts 20 seconds.",
+          "technical": "On the super cursed-energy summon, Haruta sends FloatValue[9] as Value64 in an Attack_4 request. CN231 uses Value64 for Attack_4 phase 0 in the same shared attack tick and advances only when ActionElapsedTime is strictly greater than it.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:739",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:765",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:767",
+            "Source/Abrams/Public/CN_231_Actions.h:199",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:589"
+          ]
+        },
+        "10": {
+          "label": "Super summoned backstep duration",
+          "simple": "The super summoned shikigami backsteps for 0.9 seconds before its next attack phase.",
+          "technical": "FloatValue[10] is written to Vector70.X of the same Attack_4 request. CN231 Attack_4 own TickAttackPhase backsteps along -forward while homing and advances only when ActionElapsedTime > Vector70.X.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:766",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:767",
+            "Source/Abrams/Public/CN_231_Actions.h:203",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:705",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:718"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": []
+    },
+    "CN_230_ATTACKH": {
+      "title": "AttackH beam steering and summon timings",
+      "overview": "This row controls the second start of CursedEnergyAttack_2: handheld-style stick steering of the beam, its time limit and tilt clamps, and the duration passed to the summoned shikigami Attack_2 by cursed-energy level.",
+      "values": {
+        "0": {
+          "label": "Beam steering time limit",
+          "simple": "Player-controlled beam steering ends after 1 second.",
+          "technical": "Only action start count 1 runs the steering branch. ActionElapsedTime is advanced by DeltaTime and the effect is released when ActionElapsedTime >= FloatValue[0], or earlier when the CursedEnergyAttack_2 key is released after ActionElapsedTime > 0.05. Releasing sets the action completion byte, jumps the phase to MAX_int32 and raises flag 159.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:822",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:833",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:846",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:848",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:851"
+          ]
+        },
+        "1": {
+          "label": "Beam yaw limit per side",
+          "simple": "The player can steer 90 degrees to either side of the recorded starting yaw.",
+          "technical": "YawLimit = FloatValue[1] * 0.5 = 90. YawOffset is accumulated from stick X and FMath::Clamp-ed into the inclusive range -90..90, then added to StartYaw to request the owner rotation. The half factor is explicit in code; the stored row value itself is 180.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:838",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:839",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:841"
+          ]
+        },
+        "2": {
+          "label": "Downward beam tilt limit",
+          "simple": "Downward full-body tilt is blocked; the stored limit is 0.",
+          "technical": "PitchDown = FloatValue[2]. The code clamps FullBodyRollAngle with lower bound -PitchDown and upper bound PitchUp. With the stored zero, the lower bound is -0, so stick-down input cannot make this controller value negative. Zero is actively read here and is not evidence that the slot is unused.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:843",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:845",
+            "Source/Abrams/Public/CN_230_Actions.h:214"
+          ]
+        },
+        "3": {
+          "label": "Upward beam tilt limit",
+          "simple": "The beam gesture can tilt upward up to 45 degrees.",
+          "technical": "PitchUp = FloatValue[3] and is the inclusive upper bound of the FMath::Clamp applied to FullBodyRollAngle. That clamped angle is later eased onto the character and used as negative pitch for the spawned beam effect.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:844",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:845",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:1125",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:1148"
+          ]
+        },
+        "4": {
+          "label": "Beam stick steering speed",
+          "simple": "Stick input changes the beam yaw and tilt at 360 degrees per second before clamping.",
+          "technical": "Turn = FloatValue[4] * DeltaTime. Stick.X * Turn accumulates into YawOffset; -Stick.Y * Turn changes FullBodyRollAngle. Both results are then clamped by the yaw and tilt limits. A zero stick applies no change.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:837",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:839",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:845"
+          ]
+        },
+        "5": {
+          "label": "Attack_2 duration at level 1 or fallback",
+          "simple": "A level-1 summon sends the shikigami Attack_2 into its next phase after 2.5 seconds.",
+          "technical": "When the beam summon is consumed, ValueIndex starts at 5 and is explicitly selected for GetCursedEnergyLevel() == 1. FloatValue[ValueIndex] becomes Attack_2 Value64; CN231 advances the attack phase only when ActionElapsedTime > Value64. Any level outside cases 1, 2 and 3 keeps the initialized index 5.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:912",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:915",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:919",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:920",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:589"
+          ]
+        },
+        "6": {
+          "label": "Attack_2 duration at level 2",
+          "simple": "A level-2 summon uses 2.75 seconds for the same shikigami attack phase.",
+          "technical": "GetCursedEnergyLevel() == 2 switches ValueIndex from 5 to 6 before the same Attack_2 Value64 read and strict greater-than phase transition.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:912",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:916",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:919",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:589"
+          ]
+        },
+        "7": {
+          "label": "Attack_2 duration at level 3",
+          "simple": "A level-3 summon uses 3 seconds for the same shikigami attack phase.",
+          "technical": "GetCursedEnergyLevel() == 3 switches ValueIndex to 7. This is the only source of the value 3 in this row; higher or otherwise unmatched levels do not select index 7 because the switch has no other cases.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:912",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:917",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:919",
+            "Source/Abrams/Private/CN_231_ActionController.cpp:589"
+          ]
+        }
+      },
+      "untraced": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": []
+    },
+    "CN_230_ATTACKH_SHOOT_CAMERA": {
+      "title": "AttackH camera preset",
+      "overview": "The beam entry notify builds one virtual-camera request from this row. Indices 0 through 10 are all read by the shared helper; the trailing three zeros have no located reader.",
+      "values": {
+        "0": {
+          "label": "Camera offset forward axis",
+          "simple": "Moves the beam camera -150 along its gaze-relative forward axis.",
+          "technical": "MakeUniqueCameraRequest(2, 2) writes FloatValue[0] to FVirtualCameraRequest.CameraOffset.X. The virtual camera rotates the whole offset by the gaze rotation and adds it to the eye base, then traces from the gaze toward that position to avoid blocking geometry.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_230_ActionController.cpp:1094",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:393"
+          ]
+        },
+        "1": {
+          "label": "Camera offset side axis",
+          "simple": "Moves the beam camera +90 along the gaze-relative side axis.",
+          "technical": "The helper reads FloatValue[1] into CameraOffset.Y before constructing the FVector. It is part of the same rotated offset as index 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera offset vertical axis",
+          "simple": "Moves the beam camera -10 along the gaze-relative vertical axis.",
+          "technical": "The helper reads FloatValue[2] into CameraOffset.Z before constructing the FVector; the camera applies it in gaze-rotation space, not as a fixed world-Z offset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:945",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Maximum downward gaze angle",
+          "simple": "The camera may look up to 60 degrees below the eye line.",
+          "technical": "The helper writes FloatValue[3] to LimitAngleDown. In the virtual camera, when the gaze is below the eye, an elevation strictly greater than this degree limit is rotated back to the limit. The limit selection uses the down value when gaze Z <= eye Z; equal-Z gaze has zero elevation and is not clamped.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:32",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Maximum upward gaze angle",
+          "simple": "The camera may look up to 30 degrees above the eye line.",
+          "technical": "The helper writes FloatValue[4] to LimitAngleUp. When the gaze is above the eye, elevation strictly greater than this degree limit is rotated back to it.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:33",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "5": {
+          "label": "Beam camera field of view",
+          "simple": "The beam camera requests a 30-degree field of view.",
+          "technical": "The helper writes FloatValue[5] to FieldOfView. SetCameraMode applies a positive field of view; because index 6 is zero here, it snaps immediately instead of interpolating. Restoring the saved camera uses a separate hard-coded 90 field of view, not this row value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:570",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:575",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:580",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:1035"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "The 30-degree view change is instantaneous because its blend time is 0.",
+          "technical": "This index has two traced uses. MakeUniqueCameraRequest copies it to FieldOfViewBlendTime; the beam exit and summon-clear paths also build a restore request with FOV 90 and this same value. A value <= 0 makes SetCameraMode assign the field of view directly and stop interpolation, so both transitions snap. The zero is read, not skipped.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:580",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:1036",
+            "Source/Abrams/Private/CN_230_ActionController.cpp:1119"
+          ]
+        },
+        "7": {
+          "label": "Field-of-view easing selector",
+          "simple": "Easing is set to Linear, but the zero blend time means no easing is visible here.",
+          "technical": "The helper casts FloatValue[7] to an integer: 0 selects EEasingFunc::Linear, 1 EaseIn, 2 EaseOut and 3 EaseInOut; other values leave the default. That selector is passed to FovInterp.Start only when FieldOfViewBlendTime > 0, which is false for the current row.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:954",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:36",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578"
+          ]
+        },
+        "8": {
+          "label": "Camera orbit yaw",
+          "simple": "No extra yaw orbit is applied.",
+          "technical": "The helper writes FloatValue[8] to OrbitYaw. The virtual camera builds an FRotator from OrbitPitch and OrbitYaw and skips the orbit transform entirely when that rotator is zero, so 0 is read but has no geometric effect.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421"
+          ]
+        },
+        "9": {
+          "label": "Camera orbit pitch",
+          "simple": "No extra pitch orbit is applied.",
+          "technical": "The helper writes FloatValue[9] to OrbitPitch; together with index 8 it forms the orbit rotator that is skipped when zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "No additional camera roll is applied.",
+          "technical": "The helper writes FloatValue[10] to Request.Roll. Unlike the orbit pair, roll is passed to SetViewTarget87 even when zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": []
+    }
+  },
+  "notes": [
+    {
+      "text": "These row names are data labels, not code dispatch keys. AGameCharacter copies every non-None Id_CharacterUnique into UniqueRows in character-row order, and GetCharacterUniqueFloatValue performs an unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] read; the three row names supplied for CN_230 therefore become rows 0, 1 and 2.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUnique.h:15",
+        "Source/Abrams/Public/GameCharacter.h:245"
+      ]
+    },
+    {
+      "text": "The merge partner is shikigami CN_231. Haruta summons it from the R_weapon or R_hand socket, sends the CE level plus these row values as shikigami action parameters, and orders Attack_1, Attack_2, Attack_3, Attack_4 or Attack_5. The shikigami has its own ShikigamiUniqueDataTable and accessor, so those parameter values must not be mistaken for shikigami unique-row reads.",
+      "evidence": [
+        "Source/Abrams/Private/CN_230_ActionController.cpp:676",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:696",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:765",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:766",
+        "Source/Abrams/Private/CN_231_ActionController.cpp:312",
+        "Source/Abrams/Private/GameShikigami.cpp:870",
+        "Source/Abrams/Private/GameShikigami.cpp:874",
+        "Source/Abrams/Private/GameShikigami.cpp:1251"
+      ]
+    },
+    {
+      "text": "Control quirk: stick up and stick down do different things while the shikigami is out. Up selects the timed CN231 target mode with the 15-second limit and 2000-unit proximity action; down sends the direct Attack_3 command with the row-0 duration. The direction test is inclusive at 45.0001 degrees and uses a 0.5 stick threshold.",
+      "evidence": [
+        "Source/Abrams/Private/CN_230_ActionController.cpp:36",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:52",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:63",
+        "Source/Abrams/Private/GameCharacterInputData.cpp:331",
+        "Source/Abrams/Private/GameCharacterInputData.cpp:337",
+        "Source/Abrams/Private/GameCharacterInputData.cpp:348"
+      ]
+    },
+    {
+      "text": "The camera helper first argument is a selector inside MakeUniqueCameraRequest, not the camera mode finally requested: Haruta calls MakeUniqueCameraRequest(2, 2) and passes the resulting request to SetCameraMode(3, true, ...). Leaving AttackH restores the saved mode with a separate request, using row-2 index 6 as its blend time.",
+      "evidence": [
+        "Source/Abrams/Private/CN_230_ActionController.cpp:1094",
+        "Source/Abrams/Private/GameCharacterAction.cpp:942",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:1032",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:1036"
+      ]
+    },
+    {
+      "text": "Passive quirk: SetupPassives adds BUFF_CN_230_PASSIVE or BUFF_CN_230_PASSIVE_ST depending on setup unique mode 1, and dims the gradation decal by 0.1 per stack. A lethal hit can trigger one ExtraAttack_2 revival that consumes one stack; listed passive hits such as CN_230_ATTACKC_01_01 and two CN_231 hits also drive the guard-break effect.",
+      "evidence": [
+        "Source/Abrams/Private/CN_230_ActionController.cpp:554",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:1269",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:1273",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:1299",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:1198"
+      ]
+    },
+    {
+      "text": "Haruta has specialized AI wiring but it does not consume these unique rows directly: UCN_230_BehaviorController substitutes the CursedEnergyAttack2Up, CursedEnergyAttack2Orbit and ToggleCursedEnergyAttack2 executors for ordinals 0x12, 0x13 and 0x16, while the dedicated think node prioritizes rivals by lowest cursed-energy level and then nearest distance. The level ordering is conceptually related to the row-0 level-advantage rates, but is a separate AI rule.",
+      "evidence": [
+        "Source/Abrams/Private/CN_230_BehaviorController.cpp:8",
+        "Source/Abrams/Private/CN_230_BehaviorController.cpp:10",
+        "Source/Abrams/Private/CN_230_BehaviorController.cpp:11",
+        "Source/Abrams/Private/CN_230_BehaviorController.cpp:12",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:1416",
+        "Source/Abrams/Public/GameCharacterAIThinkNode.h:785",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:812",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:840"
+      ]
+    },
+    {
+      "text": "The generic trap/spawner forwarding helper FGameTrapAction::GetUniqueFloat does read a spawner character rows, but no CN_230 action path in this source calls it; Haruta forwarding is through shikigami action parameters. Table files 1 through 5 are all registered as possible sources for Id_CharacterUnique, so the row asset name is a storage location rather than a separate accessor.",
+      "evidence": [
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188",
+        "Source/Abrams/Private/GameDataTableManager.cpp:220",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:693",
+        "Source/Abrams/Private/CN_230_ActionController.cpp:697"
+      ]
+    }
+  ]
+}

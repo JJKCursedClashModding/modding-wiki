@@ -2,6 +2,7 @@
 import Reference from '../../layouts/Reference.astro';
 import InlineText from '../../layouts/InlineText.astro';
 import CrossReferences from '../../layouts/CrossReferences.astro';
+import { characterHref, characterRowOwners, characters, uniqueRowAnchor } from '../../characters.js';
 import { categoryNames, enumHref, fieldAnchor, fieldParentName, groups, hrefFor, referencedBy, slugFor } from '../../data.js';
 
 export function getStaticPaths() {
@@ -33,6 +34,14 @@ const fieldColumns = [
   ['.simple', 'Description'],
 ];
 const componentCount = group.fields.length - fieldGroups.size;
+let rowLinks = {};
+if (group.id === 'CharacterDataTable') {
+  rowLinks = Object.fromEntries(characters.map(({ id, name }) => [id, [[name, characterHref(id)]]]));
+} else if (group.id === 'CharacterUniqueDataTable') {
+  rowLinks = Object.fromEntries([...characterRowOwners].map(([key, owners]) => [key, owners.map(({ id, name, index }) => [
+    name, `${characterHref(id)}#${uniqueRowAnchor(index)}`,
+  ])]));
+}
 ---
 <Reference title={group.id} description={group.overview ?? group.description ?? `Unreal schema for ${group.id}.`} current={group.id} section="tables">
   <div class="doc-grid">
@@ -40,6 +49,9 @@ const componentCount = group.fields.length - fieldGroups.size;
       <div class="breadcrumb"><a href={`${base}tables/`}>DataTables</a><span aria-hidden="true">/</span><a href={`${base}tables/#${group.category}`}>{categoryNames[group.category]}</a></div>
       <h1 class="table-title">{group.id}</h1>
       <p class="lead"><InlineText value={group.overview ?? group.description ?? 'Purpose is pending review.'} /></p>
+      {['CharacterDataTable', 'CharacterUniqueDataTable'].includes(group.id) && (
+        <p class="section-intro"><a href={`${base}characters/`}>Browse unique rows and their values by character</a></p>
+      )}
       <details class="table-details">
         <summary>Table details</summary>
         {group.overview && group.description && group.overview !== group.description && (
@@ -134,7 +146,7 @@ const componentCount = group.fields.length - fieldGroups.size;
           <thead><tr><th scope="col">Asset</th><th scope="col">Rows</th><th scope="col">Import key</th></tr></thead>
           <tbody>{group.variants.map(({ name, rows, importKey }) => <tr><td><code>{name}</code></td><td>{formatCount(rows)}</td><td><code>{importKey ?? '—'}</code></td></tr>)}</tbody>
         </table></div>
-        <details class="key-browser" data-key-file={`${base}row-keys/${slugFor(group.id)}.json`} data-variants={JSON.stringify(group.variants.map(({ name }) => name))}>
+        <details class="key-browser" data-key-file={`${base}row-keys/${slugFor(group.id)}.json`} data-variants={JSON.stringify(group.variants.map(({ name }) => name))} data-row-links={Object.keys(rowLinks).length ? JSON.stringify(rowLinks) : undefined}>
           <summary>Browse {formatCount(group.rowKeyCount)} row keys</summary>
           <label class="filter-label" for="key-filter">Find a row key</label>
           <input class="filter" type="search" id="key-filter" placeholder="Row key" autocomplete="off" />
@@ -271,6 +283,7 @@ const componentCount = group.fields.length - fieldGroups.size;
       const keyResults = browser.querySelector('.key-results');
       const keyFilter = browser.querySelector('#key-filter');
       const variants = JSON.parse(browser.dataset.variants);
+      const rowLinks = new Map(Object.entries(JSON.parse(browser.dataset.rowLinks ?? '{}')));
       let keyData;
       let request;
 
@@ -287,6 +300,18 @@ const componentCount = group.fields.length - fieldGroups.size;
           name.textContent = key;
           assets.textContent = indices.map((index) => variants[index]).join(', ');
           item.append(name, assets);
+          const links = rowLinks.get(key);
+          if (links) {
+            const related = document.createElement('div');
+            related.className = 'key-character-links';
+            for (const [label, href] of links) {
+              const link = document.createElement('a');
+              link.textContent = label;
+              link.href = href;
+              related.append(link);
+            }
+            item.append(related);
+          }
           keyResults.append(item);
         }
       }

@@ -1,0 +1,213 @@
+{
+  "overview": "Naobito’s unique settings tune Projection Sorcery, including the counter-guard cost, drain, and hold time.",
+  "technicalOverview": "Naobito Zen'in (CP_270) is an AGameCharacter whose only populated unique row is CP_270 in CharacterUniqueDataTable1. Its first seven values tune the character's Projection Sorcery loop: the self-restraint fallback duration, the normal-attack cancel cost, the counter-guard entry threshold and cursed-energy drain, and three short timers/caps. CP_270 uses UCP_270_ActionController, with a CP_270 behavior controller and AI think node; every traced unique-float read selects zero-based row 0. This is not the shikigami data path, which uses ShikigamiUniqueDataTable. Slots 7-13 have no identified readers in the searched source; their zero values are not being treated as proof that they are unused.",
+  "rows": {
+    "CP_270": {
+      "title": "Projection Sorcery tuning row",
+      "overview": "The one shared tuning row for CP_270 actions. Values 0-6 are read directly from UniqueRows[0] or through the GUF alias, which resolves to the same array. The trailing zero slots are untraced, not declared unused.",
+      "values": {
+        "0": {
+          "label": "Projection-sorcery restraint fallback",
+          "simple": "How long the frozen projection-sorcery reaction lasts when no damage row gives a duration.",
+          "technical": "FGameCharacterAction_ProjectionSorceryReceive::Tick adds DeltaTime to ActionElapsedTime in phase 0 and uses Request.DamageTableRow->RestraintTime when that row exists; otherwise it calls GetOwnerUniqueFloat(0, 0), which is UniqueRows[0]->FloatValue[0]. The value is therefore an elapsed-time duration in seconds. CP_270's own bFlag270 route starts this action with FGameCharacterActionRequest(true), whose DamageTableRow is null, so that route uses this 1.4-second fallback; a route that supplies a damage row ignores slot 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:203",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:215",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1894",
+            "Source/Abrams/Public/GameCharacterAction.h:79",
+            "Source/Abrams/Private/GameCharacterAction.cpp:225",
+            "Source/Abrams/Public/GameCharacterActionInline.h:12"
+          ]
+        },
+        "1": {
+          "label": "Normal-attack cancel cost",
+          "simple": "The base cursed-energy cost of continuing a normal-attack chain away from neutral.",
+          "technical": "Used twice by TCP_270_NormalAttack. In slot 83, after the base cancel gate passes and ProjectionSorceryCancelCount is below 4, a current action that is neither AttackDefault nor the same action type requires CursedEnergy - GetPassiveAttackRate() * slot1 >= 0; otherwise the request is refused with reason 100. In slot 130, under the same switch, the exact product is subtracted with SetCursedEnergy and the stack count is incremented and clamped to 0..4. GetPassiveAttackRate starts at 1.0 and is adjusted by active CP_110/CP_150 passive buffs, so 100 is the cost before those multipliers, in the same raw cursed-energy units as the status value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_270_ActionController.cpp:137",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:156",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:160",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:182",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:194",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:198",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:111",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:649",
+            "Tools/verify/CHAR/CP_270_ActionController.md:188"
+          ]
+        },
+        "2": {
+          "label": "Counter-guard activation threshold",
+          "simple": "The current cursed energy needed to switch the guard into its counter-guard form.",
+          "technical": "CanFinishOpponent first searches all opponent teams, including hidden characters, for a finish target. Only when one exists does it compare the owner's current CursedEnergy against GetCharacterUniqueFloatValue(2, 0) with >=; with 100, a finish target and at least 100 current cursed energy arm the counter guard. Guard, GuardAir and both JustGuard start paths call SetGuardEffect with this result when entering from a different guard form; transitions between guard forms keep the existing effect instead.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_270_ActionController.cpp:79",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:88",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:91",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:916",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:925",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:933",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1033",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1040"
+          ]
+        },
+        "3": {
+          "label": "Counter-guard cursed-energy drain",
+          "simple": "How much cursed energy the counter guard burns per second.",
+          "technical": "GetCursedEnergyDrainRate returns slot 3 only when the counter-guard effect flag is set and Unknown274 is 1; otherwise it returns 0. The status tick subtracts Drain * DeltaTime whenever the returned drain is nonnegative, so with 90 the active counter guard spends 90 cursed-energy units per second. When cursed energy reaches zero, the CP_270 guard tick clears the counter flag, turns the guard effect off and restarts the normal guard animation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1722",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1724",
+            "Source/Abrams/Private/GameCharacter.cpp:3031",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3432",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3436",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:894",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:903"
+          ]
+        },
+        "4": {
+          "label": "ExtraAttack step cap",
+          "simple": "The largest number of AttackG dash/jump steps allowed in one chain.",
+          "technical": "TCP_270_ExtraAttack tests StepCount < GetOwnerUniqueFloatInline(4, 0) before accepting a Dash or Jump follow-up and before StartStep is called. The first homing start sets StepCount to 0 and the following step start increments it to 1; every chained StartStep increments it again. The comparison is strictly less than, so 2 permits at most two total steps, namely the initial step plus one chained dash or jump. Both ExtraAttack_1 and ExtraAttack_2 use the same template.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1163",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1180",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1204",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1259",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1318",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1321",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1345",
+            "Source/Abrams/Public/CP_270_Actions.h:383"
+          ]
+        },
+        "5": {
+          "label": "Attack warp collision-lock timer",
+          "simple": "How briefly the character is collision-locked while an AttackG step or homing warp hides the model.",
+          "technical": "UpdateUniqueFloatCollisionLock copies slot 5 into Unknown1D8 and, when it is positive, adds collision lock 9 with SetCollisionLock(9, true, -1.0f). OnHomingWarpStart contains the same inlined read for every homing warp. ActionTick later subtracts time-dilation-adjusted DeltaTime from Unknown1D8 while input is enabled and removes lock 9 when it reaches zero. The helper is also called by the ExtraAttack step starts. With 0.1, the timer is 0.1 seconds. NormalAttack_2_1 additionally mirrors lock 9 to and from lock 0 while that lock exists, but does not read slot 5 itself.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1551",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1553",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1555",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1195",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1242",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1898",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1904",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1939",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1942",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:496"
+          ]
+        },
+        "6": {
+          "label": "Counter-guard grace timer",
+          "simple": "How long a fully charged counter guard waits before it starts draining cursed energy.",
+          "technical": "When SetGuardEffect turns the counter guard on, StateTimer is assigned slot 6. Unknown274 is set to 0 only when the character is at maximum cursed-energy level and current CursedEnergy is at CursedEnergyMax; otherwise it is set to 1 immediately. While the guard is active and Unknown274 is still 0, ActionTick counts StateTimer down by time-dilation-adjusted DeltaTime and flips Unknown274 to 1 at or below zero. Since the drain rate requires Unknown274 == 1, 0.2 gives a 0.2-second grace period in the fully charged case and no grace in the other case. Unknown274 is reset to 0 when the guard effect is off.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1640",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1646",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1648",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1651",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1909",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1911",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1914",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1918",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1722"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Slots 7-13 were left untraced only after searching character, shared action, AI, trap and camera consumers. The shared MakeUniqueCameraRequest would read row slots 0-10, but no CP_270 call site for it was found; FGameTrapAction::GetUniqueFloat is a trap/spawner forwarder and CP_270 has no trap call site. Those helpers are excluded rather than silently assigned to this character.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameTrapActionController.cpp:182",
+            "Source/Abrams/Private/GameTrapActionController.cpp:188",
+            "Source/Abrams/Private/CP_270_ActionController.cpp:1179"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Row indices are positional. AGameCharacter builds UniqueRows by walking CharacterDataTable.Id_CharacterUnique in order, including null entries for missing rows, and the accessor indexes both arrays without bounds checks. The GUF spelling used by CP_270 action code resolves to the same UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:560",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Public/GameCharacterActionInline.h:10",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Tools/verify/CHAR/UniqueRowsInline.md:19"
+      ]
+    },
+    {
+      "text": "Projection Sorcery's visible stack counter is separate from the unique floats. Normal attacks and some CursedEnergyAttack_1/2 starts increment ProjectionSorceryCancelCount to a maximum of 4; that count selects alternate damage IDs, sets the after-image sound pitch, and drives the four-icon battle widget. The unique floats set the cost and timing around that state rather than being the stack count itself.",
+      "evidence": [
+        "Source/Abrams/Private/CP_270_ActionController.cpp:111",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:558",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1438",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1461",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1603",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1613",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_270.cpp:26",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_270.cpp:47"
+      ]
+    },
+    {
+      "text": "Counter guard is a full behavior switch, not only a VFX. While it is on, the controller returns 0 guard-durability damage rate and disallows guard rigidity/knockback, and guarded hits spawn FX_CP_270_00131. The waist effects FX_CP_270_00211/00212 are fixed IDs; their spawn/despawn code does not read a unique-row slot.",
+      "evidence": [
+        "Source/Abrams/Private/CP_270_ActionController.cpp:951",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:960",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1634",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1660",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1694",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1728",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1738"
+      ]
+    },
+    {
+      "text": "AI delegation does not add another unique-row reader. CP_270's behavior controller overrides only AI ordinal 0x13 with FGameCharacterAIAction_CursedEnergyAttack2_8EA0, and the CP_270 think node is selected separately. The generic Hold executors that read unique slots 0, 1 and 2 are instantiated by CP_040/CP_050 behavior controllers, not by CP_270.",
+      "evidence": [
+        "Source/Abrams/Private/CP_270_BehaviorController.cpp:7",
+        "Source/Abrams/Private/CP_270_BehaviorController.cpp:13",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:192",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:1397",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:123",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:2348",
+        "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+        "Source/Abrams/Private/CP_050_BehaviorController.cpp:11",
+        "Tools/verify/CHAR/BehaviorController_shells.md:56"
+      ]
+    },
+    {
+      "text": "The only inline header included by this controller for unique access is the shared GameCharacterActionInline.h. The CP_210_Actions.h include is used here only for CP_210_FindActionStepRow, which resolves ActionStep rows and has no unique-float access; no separate CP_270 .inl file is involved.",
+      "evidence": [
+        "Source/Abrams/Private/CP_270_ActionController.cpp:25",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:32",
+        "Source/Abrams/Private/CP_270_ActionController.cpp:1179",
+        "Source/Abrams/Public/CP_210_Actions.h:392",
+        "Source/Abrams/Private/CP_210_ActionController.cpp:483",
+        "Source/Abrams/Public/GameCharacterActionInline.h:10"
+      ]
+    }
+  ]
+}

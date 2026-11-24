@@ -1,0 +1,1390 @@
+{
+  "overview": "Uraume’s settings tune ice volleys, waves, vortexes, and pillars. Several rows change with cursed-energy level.",
+  "technicalOverview": "Uraume (CN_250) uses UCN_250_ActionController with nine ordered CharacterUniqueDataTable5 rows: a shared base row, a normal-attack row, three cursed-energy-1 ice-volley level rows, three cursed-energy-2 vortex/pillar level rows, and a super ice-stage row. Character setup resolves each Id_CharacterUnique name to a row pointer in order; the two-hop unique-float helper is an unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] read. The controller owns persistent fields, crawling waves, trap volleys, pillars, decals, and delayed decals, and its per-frame tick advances all of them on owner time-dilated delta.",
+  "rows": {
+    "CN_250": {
+      "title": "Shared character and ice-wall settings",
+      "overview": "This base row drives the low-HP passive and its healing follow-up, the first normal-attack shot cycle, the crawling wave ease, and three height multipliers for the ice walls raised in the super finisher.",
+      "values": {
+        "0": {
+          "label": "Passive HP threshold",
+          "simple": "The passive turns on at or below this fraction of maximum health.",
+          "technical": "OnHitPointChanged returns if bPassiveBuffConsumed is true or a CN_250_Passive stack already exists. It then compares NewHitPoint / HitPointMax against this value and adds BUFF_CN_250_PASSIVE only when the ratio is at or below it (the strict early return is Ratio > value). Unitless HP ratio. A generic ProjectionSorceryReceive fallback also reads (0,0) as restraint time only when the incoming damage row is null.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:251",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:262",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:266",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212"
+          ]
+        },
+        "1": {
+          "label": "Passive heal, level 1",
+          "simple": "Level 1 restores this fraction of maximum health.",
+          "technical": "The armed ExtraAttack_1 tick reads (1,0) only when the controller CursedEnergyLevel is 1. It adds HitPointMax * value to current HP, removes CN_250_Passive, and sets bPassiveBuffConsumed. Unitless multiplier of maximum HP.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:317",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:334",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:341"
+          ]
+        },
+        "2": {
+          "label": "Passive heal, level 2",
+          "simple": "Level 2 restores this fraction of maximum health.",
+          "technical": "Same ExtraAttack_1 heal path as index 1, selected when CursedEnergyLevel is 2; HP gain is HitPointMax * value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:317",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:337",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:341"
+          ]
+        },
+        "3": {
+          "label": "Passive heal, level 3",
+          "simple": "Level 3 restores this fraction of maximum health.",
+          "technical": "Same ExtraAttack_1 heal path as index 1, selected when CursedEnergyLevel is 3; HP gain is HitPointMax * value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:317",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:340",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:341"
+          ]
+        },
+        "4": {
+          "label": "Charged shot count",
+          "simple": "Controls how many charge shots happen before the final shot.",
+          "technical": "In NormalAttack_1 first-start phase 0, each charge increments ShotCount and sets Phase = (ShotCount < value) ? 1 : 3. With the current value 3, counts 1 through 3 continue the charge cycle and count 4 enters the final phase. Compared as a float count.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:542",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:571"
+          ]
+        },
+        "5": {
+          "label": "Charge interval",
+          "simple": "Time spent charging before each shot.",
+          "technical": "Phase 0 accumulates DeltaTime and returns while value > ActionElapsedTime; when elapsed reaches or exceeds it, FX_CN_250_01102 is spawned where the charge effect stood and the charge effect is finished. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:558",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:565"
+          ]
+        },
+        "6": {
+          "label": "Repeat wait",
+          "simple": "Wait before a held attack can restart the charge cycle.",
+          "technical": "Phase 1 accumulates time and returns while value > elapsed, then advances to phase 2. Holding NormalAttack_1 in phases 1 or 2 sets bRepeatRequested, which restarts charging in phase 2. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:583",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:591",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:600"
+          ]
+        },
+        "7": {
+          "label": "Release wait",
+          "simple": "Wait after releasing before the final shot phase.",
+          "technical": "Phase 2 returns while value > elapsed. If no repeat was requested, reaching this time sets flag 159 and Byte16 and ends the attack phase. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:603",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:608"
+          ]
+        },
+        "8": {
+          "label": "Final shot delay",
+          "simple": "Extra wait before the final shot finishes.",
+          "technical": "Phase 3 accumulates DeltaTime and sets flag 159 and Byte16 once elapsed reaches or exceeds this value. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:613",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:617"
+          ]
+        },
+        "9": {
+          "label": "Wave ease target",
+          "simple": "How large the crawling wave effect grows as it moves.",
+          "technical": "When NormalAttack_2_1 receives a wave order, the wave ease starts at 1.0 and targets this value over 1 second with EaseOut (enum 6). TickWaves advances the ease by 1 / RemainingSteps for each spawned step. Unitless actor scale target.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1040",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1057",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2736"
+          ]
+        },
+        "10": {
+          "label": "Inner ice-wall height scale",
+          "simple": "Final height multiplier for the closest stage-spawned ice wall.",
+          "technical": "The stage trap row with Index 10 (TR_061_00 at 250 units) forwards this value through PlayUniqueAction(200). The ice wall maps id 200 to HeightScale, which multiplies its final actor Z scale and the transform of its finish effect. Unitless multiplier.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:97",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2055",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2617",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2460"
+          ]
+        },
+        "11": {
+          "label": "Middle ice-wall height scale",
+          "simple": "Final height multiplier for the middle stage-spawned ice walls.",
+          "technical": "The stage trap row with Index 11 (TR_061_10 at 750 units) forwards this value through PlayUniqueAction(200) into the ice wall HeightScale used for final Z scale and finish-effect transform. Unitless multiplier.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:103",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2055",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2617",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2523"
+          ]
+        },
+        "12": {
+          "label": "Outer ice-wall height scale",
+          "simple": "Final height multiplier for the farthest stage-spawned ice walls.",
+          "technical": "The stage trap row with Index 12 (TR_061_10 at 1250 units) forwards this value through PlayUniqueAction(200) into the ice wall HeightScale used for final Z scale and finish-effect transform. Unitless multiplier.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:109",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2055",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2617",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2523"
+          ]
+        }
+      },
+      "untraced": [
+        13
+      ],
+      "notes": [
+        {
+          "text": "The passive is not automatically permanent: the HP hook refuses to start it if the consumed flag is set, and the ExtraAttack_1 heal is the path that removes CN_250_Passive and sets that flag.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:251",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:317",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:346"
+          ]
+        },
+        {
+          "text": "The final super stage spawns 18 ice walls. Their distances and angles are hard-coded in the trap-spawn table; only the per-ring HeightScale values come from row 0 indices 10, 11, and 12.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:97",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2000",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2055"
+          ]
+        }
+      ]
+    },
+    "CN_250_NORMALATTACK": {
+      "title": "Normal-attack reach, field, and wave settings",
+      "overview": "This row controls how far normal attacks reach, the persistent field created by the _1_1 follow-up, placement and stepping of crawling waves, and the growth and timing of the NormalAttack_3 spot effects.",
+      "values": {
+        "0": {
+          "label": "Normal attack reach clamp",
+          "simple": "Maximum horizontal distance used to pull a target or spot toward the owner.",
+          "technical": "NormalAttack_1_1 clamps a chosen field point to this distance from the owner before tracing; NormalAttack_3 uses it as the threshold beyond which a far target is replaced by a point this far in front of the owner. World units, compared against 2-D distance with > and then used as a vector length.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1120",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1123",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2325",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2329"
+          ]
+        },
+        "1": {
+          "label": "Field radius",
+          "simple": "Size of the persistent normal-attack field.",
+          "technical": "Passed to StartField as Radius. It sets the FX_CN_250_02102 effect scale (Radius * 0.02) and is later the 3-D distance limit for tracking opponents; opponents with Height >= 0 inside this radius get FX_CN_250_02201 and periodic CN_250_ATTACKB_01_01 hits. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2358",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2223",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2509"
+          ]
+        },
+        "2": {
+          "label": "Field activation delay",
+          "simple": "Wait before the field becomes active.",
+          "technical": "Stored as ActivationDelayRemaining by StartField. TickField subtracts DeltaTime and returns while the remaining value is above 0; only then does it spawn FX_CN_250_02103 and start the fade-in. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2358",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2237",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2441"
+          ]
+        },
+        "3": {
+          "label": "Field active duration",
+          "simple": "How long the field keeps hitting opponents.",
+          "technical": "Stored as ActiveTimeRemaining by StartField. In field state 1, after each damage tick the field subtracts DeltaTime and advances to the fade-out state when the remaining value is no longer above 0. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2358",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2238",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2558"
+          ]
+        },
+        "4": {
+          "label": "Field damage interval",
+          "simple": "Time between repeated field hits.",
+          "technical": "Stored as Field.Interval by StartField. TickField adds DeltaTime to an accumulator and, when it is at or above this value, applies CN_250_ATTACKB_01_01 to every tracked opponent and resets the accumulator. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2358",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2235",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2542"
+          ]
+        },
+        "5": {
+          "label": "Charge time and spot trace distance",
+          "simple": "Charge duration for NormalAttack_1 and placement distance for NormalAttack_2_1.",
+          "technical": "Two traced uses share this index. NormalAttack_1 phase 0 waits until ActionElapsedTime reaches this value before firing FX_CN_250_01102. NormalAttack_2_1 also uses it as the forward length of the 60 x 60 capsule trace that chooses the ground spot for a wave. Seconds for the charge; world units for the trace length.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:558",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1011"
+          ]
+        },
+        "6": {
+          "label": "Wave interval",
+          "simple": "Wait between crawling wave steps.",
+          "technical": "Stored as Wave.Interval when NormalAttack_2_1 orders a wave. TickWaves adds DeltaTime and only attempts a step when Wave.Time is at or above this interval. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1043",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2665"
+          ]
+        },
+        "7": {
+          "label": "Wave step distance",
+          "simple": "How far the crawling wave advances per step.",
+          "technical": "Stored as Wave.Distance; TickWaves traces a wall check and moves Wave.Location along Direction by this distance after each interval. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1042",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2688"
+          ]
+        },
+        "8": {
+          "label": "Wave step count",
+          "simple": "Maximum number of steps in a crawling wave.",
+          "technical": "Cast to int32 and stored in both RemainingSteps and Unknown40; the wave is removed after this count is exhausted, and Unknown40 also sets the per-step ease rate. Count.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1041",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1053",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2736"
+          ]
+        },
+        "9": {
+          "label": "Spot effect ease target",
+          "simple": "Final scale of the growing NormalAttack_3 spot effects.",
+          "technical": "NormalAttack_3 starts its ease from 0.01 toward this unitless value over row index 12 seconds using Linear easing. The current ease value sets the actor scale of FX_CN_250_05102 and FX_CN_250_05103.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1222",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1225"
+          ]
+        },
+        "10": {
+          "label": "Far-spot threshold",
+          "simple": "Distance beyond which the attack spot is pulled closer.",
+          "technical": "NormalAttack_3 first chooses the secondary target or target vector. If the 2-D distance from the owner exceeds this value, it replaces the spot with a point this far along the direction from the owner and runs ceiling/wall traces. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1120",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1123"
+          ]
+        },
+        "11": {
+          "label": "Ceiling lift distance",
+          "simple": "How far upward the attack spot is traced for a ceiling.",
+          "technical": "NormalAttack_3 traces from the chosen spot to Spot + UpVector * this value against ceiling object types; the spot Z becomes the first hit Z or the end Z when no ceiling is found. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1137",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1141"
+          ]
+        },
+        "12": {
+          "label": "Spot growth duration",
+          "simple": "Time over which the NormalAttack_3 spot effects grow.",
+          "technical": "Passed as the duration of the Linear ease used for FX_CN_250_05102 / 05103 scale. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1222"
+          ]
+        },
+        "13": {
+          "label": "Final spot wait",
+          "simple": "Delay before the NormalAttack_3 phase ends.",
+          "technical": "Phase 3 accumulates DeltaTime and sets flag 159 and Byte16 when elapsed reaches or exceeds this value. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1270",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1274"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "Index 5 is deliberately shared by two different normal attacks: the charge-cycle timer and the wave spot trace length; changing it changes both behaviors.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:558",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1011"
+          ]
+        },
+        {
+          "text": "The _1_1 field point is selected by the attack key pressed on the second start (normal 1 = secondary target, normal 2 = nearest teammate, normal 3 = forward) before the row 1 reach and field values are applied.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2259",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2325",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2358"
+          ]
+        }
+      ]
+    },
+    "CN_250_ATTACKG_1": {
+      "title": "Cursed-energy-1 ice volley, level 1",
+      "overview": "Level-1 settings for the ice-wall volley armed when FX_CN_250_07111 plays.",
+      "values": {
+        "0": {
+          "label": "Attack end delay",
+          "simple": "First-start wait before the cursed-energy attack finishes.",
+          "technical": "The row is chosen dynamically: AttackIndex 1/2/3 maps to this row, otherwise the controller CursedEnergyLevel is used; values outside 1..3 leave the row index at -1. On the first start, TickAttack adds DeltaTime and sets flag 159 and Byte16 once this value is reached; later starts use the normal attack-base tick instead. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:397",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:466",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:475"
+          ]
+        },
+        "1": {
+          "label": "Volley interval",
+          "simple": "Time between successive ice-wall volleys.",
+          "technical": "Passed to StartTrapVolley as Interval. TickTrapVolley accumulates DeltaTime and spawns the next volley only after the accumulator reaches this value; the accumulator resets each volley. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:460",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:386",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1441"
+          ]
+        },
+        "2": {
+          "label": "Volley count",
+          "simple": "Number of volleys left before the source effect ends.",
+          "technical": "Passed to StartTrapVolley as the remaining count and cast to int32. TickTrapVolley decrements it each volley and finishes the source effect when it falls below 1. Count.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:460",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:388",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1497",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1533"
+          ]
+        },
+        "3": {
+          "label": "First wall delay",
+          "simple": "Pause before the first ice-wall rise.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 3, which the ice wall stores as FirstDelay (seconds before the first rise).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:456",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1525",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2612"
+          ]
+        },
+        "4": {
+          "label": "First wall duration",
+          "simple": "Time taken by the first ice-wall rise.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 2, which the ice wall stores as FirstDuration (the first rise easing time in seconds).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:455",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1524",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2611"
+          ]
+        },
+        "5": {
+          "label": "First wall height",
+          "simple": "Height scale reached by the first ice-wall rise.",
+          "technical": "It is put in the trap volley threshold list and forwarded as trap action id 1, which the ice wall stores as FirstHeight (the first rise target scale).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:454",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1523",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2610"
+          ]
+        },
+        "6": {
+          "label": "Second wall delay",
+          "simple": "Pause before the second ice-wall rise.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 30, which the ice wall stores as SecondDelay (seconds before the second rise).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:458",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1528",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2615"
+          ]
+        },
+        "7": {
+          "label": "Second wall duration",
+          "simple": "Time taken by the second ice-wall rise.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 20, which the ice wall stores as SecondDuration (the second rise easing time in seconds).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:457",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2614"
+          ]
+        },
+        "8": {
+          "label": "Wall finish delay",
+          "simple": "Wait before the ice wall finishes.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 100, which the ice wall stores as FinishDelay (seconds before the wall finishes).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:459",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1529",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2616"
+          ]
+        },
+        "9": {
+          "label": "Per-wall height scale step",
+          "simple": "Increases the height scale of later walls in a volley.",
+          "technical": "Passed to StartTrapVolley as the volley Unknown08. For wall index i, TickTrapVolley computes Scale = floor((i + 1) / 2) * this value + 1.0 and forwards it as trap action id 200, which the ice wall stores as HeightScale. Unitless increment.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:460",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:389",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1494",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1530",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2617"
+          ]
+        }
+      },
+      "untraced": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The level row is chosen by AttackIndex 1..3, falling back to the controller cursed-energy level; no lookup by attack-set name is used for these floats.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:397",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:444",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:454"
+          ]
+        },
+        {
+          "text": "The six threshold values are reordered when forwarded: row floats 5, 4, 3, 7, 6, 8 become trap action ids 1, 2, 3, 20, 30, 100 respectively.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:454",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1523",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1529"
+          ]
+        }
+      ]
+    },
+    "CN_250_ATTACKG_2": {
+      "title": "Cursed-energy-1 ice volley, level 2",
+      "overview": "Level-2 settings for the same ice-wall volley machinery.",
+      "values": {
+        "0": {
+          "label": "Attack end delay",
+          "simple": "First-start wait before the cursed-energy attack finishes.",
+          "technical": "The row is chosen dynamically: AttackIndex 1/2/3 maps to this row, otherwise the controller CursedEnergyLevel is used; values outside 1..3 leave the row index at -1. On the first start, TickAttack adds DeltaTime and sets flag 159 and Byte16 once this value is reached; later starts use the normal attack-base tick instead. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:397",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:466",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:475"
+          ]
+        },
+        "1": {
+          "label": "Volley interval",
+          "simple": "Time between successive ice-wall volleys.",
+          "technical": "Passed to StartTrapVolley as Interval. TickTrapVolley accumulates DeltaTime and spawns the next volley only after the accumulator reaches this value; the accumulator resets each volley. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:460",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:386",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1441"
+          ]
+        },
+        "2": {
+          "label": "Volley count",
+          "simple": "Number of volleys left before the source effect ends.",
+          "technical": "Passed to StartTrapVolley as the remaining count and cast to int32. TickTrapVolley decrements it each volley and finishes the source effect when it falls below 1. Count.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:460",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:388",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1497",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1533"
+          ]
+        },
+        "3": {
+          "label": "First wall delay",
+          "simple": "Pause before the first ice-wall rise.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 3, which the ice wall stores as FirstDelay (seconds before the first rise).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:456",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1525",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2612"
+          ]
+        },
+        "4": {
+          "label": "First wall duration",
+          "simple": "Time taken by the first ice-wall rise.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 2, which the ice wall stores as FirstDuration (the first rise easing time in seconds).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:455",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1524",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2611"
+          ]
+        },
+        "5": {
+          "label": "First wall height",
+          "simple": "Height scale reached by the first ice-wall rise.",
+          "technical": "It is put in the trap volley threshold list and forwarded as trap action id 1, which the ice wall stores as FirstHeight (the first rise target scale).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:454",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1523",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2610"
+          ]
+        },
+        "6": {
+          "label": "Second wall delay",
+          "simple": "Pause before the second ice-wall rise.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 30, which the ice wall stores as SecondDelay (seconds before the second rise).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:458",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1528",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2615"
+          ]
+        },
+        "7": {
+          "label": "Second wall duration",
+          "simple": "Time taken by the second ice-wall rise.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 20, which the ice wall stores as SecondDuration (the second rise easing time in seconds).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:457",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2614"
+          ]
+        },
+        "8": {
+          "label": "Wall finish delay",
+          "simple": "Wait before the ice wall finishes.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 100, which the ice wall stores as FinishDelay (seconds before the wall finishes).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:459",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1529",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2616"
+          ]
+        },
+        "9": {
+          "label": "Per-wall height scale step",
+          "simple": "Increases the height scale of later walls in a volley.",
+          "technical": "Passed to StartTrapVolley as the volley Unknown08. For wall index i, TickTrapVolley computes Scale = floor((i + 1) / 2) * this value + 1.0 and forwards it as trap action id 200, which the ice wall stores as HeightScale. Unitless increment.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:460",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:389",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1494",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1530",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2617"
+          ]
+        }
+      },
+      "untraced": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The level row is chosen by AttackIndex 1..3, falling back to the controller cursed-energy level; no lookup by attack-set name is used for these floats.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:397",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:444",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:454"
+          ]
+        },
+        {
+          "text": "The six threshold values are reordered when forwarded: row floats 5, 4, 3, 7, 6, 8 become trap action ids 1, 2, 3, 20, 30, 100 respectively.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:454",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1523",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1529"
+          ]
+        },
+        {
+          "text": "A separate shared JugonStunReceive path reads the attacker row 3 floats 5, 6, 7, and 8 as near/far stun durations and distance thresholds. That is a conditional shared consumer; it is not part of the traced CN_250 ice-volley chain.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:279",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:282"
+          ]
+        }
+      ]
+    },
+    "CN_250_ATTACKG_3": {
+      "title": "Cursed-energy-1 ice volley, level 3",
+      "overview": "Level-3 settings for the same ice-wall volley machinery.",
+      "values": {
+        "0": {
+          "label": "Attack end delay",
+          "simple": "First-start wait before the cursed-energy attack finishes.",
+          "technical": "The row is chosen dynamically: AttackIndex 1/2/3 maps to this row, otherwise the controller CursedEnergyLevel is used; values outside 1..3 leave the row index at -1. On the first start, TickAttack adds DeltaTime and sets flag 159 and Byte16 once this value is reached; later starts use the normal attack-base tick instead. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:397",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:466",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:475"
+          ]
+        },
+        "1": {
+          "label": "Volley interval",
+          "simple": "Time between successive ice-wall volleys.",
+          "technical": "Passed to StartTrapVolley as Interval. TickTrapVolley accumulates DeltaTime and spawns the next volley only after the accumulator reaches this value; the accumulator resets each volley. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:460",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:386",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1441"
+          ]
+        },
+        "2": {
+          "label": "Volley count",
+          "simple": "Number of volleys left before the source effect ends.",
+          "technical": "Passed to StartTrapVolley as the remaining count and cast to int32. TickTrapVolley decrements it each volley and finishes the source effect when it falls below 1. Count.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:460",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:388",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1497",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1533"
+          ]
+        },
+        "3": {
+          "label": "First wall delay",
+          "simple": "Pause before the first ice-wall rise.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 3, which the ice wall stores as FirstDelay (seconds before the first rise).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:456",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1525",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2612"
+          ]
+        },
+        "4": {
+          "label": "First wall duration",
+          "simple": "Time taken by the first ice-wall rise.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 2, which the ice wall stores as FirstDuration (the first rise easing time in seconds).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:455",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1524",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2611"
+          ]
+        },
+        "5": {
+          "label": "First wall height",
+          "simple": "Height scale reached by the first ice-wall rise.",
+          "technical": "It is put in the trap volley threshold list and forwarded as trap action id 1, which the ice wall stores as FirstHeight (the first rise target scale).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:454",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1523",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2610"
+          ]
+        },
+        "6": {
+          "label": "Second wall delay",
+          "simple": "Pause before the second ice-wall rise.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 30, which the ice wall stores as SecondDelay (seconds before the second rise).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:458",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1528",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2615"
+          ]
+        },
+        "7": {
+          "label": "Second wall duration",
+          "simple": "Time taken by the second ice-wall rise.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 20, which the ice wall stores as SecondDuration (the second rise easing time in seconds).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:457",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2614"
+          ]
+        },
+        "8": {
+          "label": "Wall finish delay",
+          "simple": "Wait before the ice wall finishes.",
+          "technical": "It is put in the threshold list and forwarded as trap action id 100, which the ice wall stores as FinishDelay (seconds before the wall finishes).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:459",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1529",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2616"
+          ]
+        },
+        "9": {
+          "label": "Per-wall height scale step",
+          "simple": "Increases the height scale of later walls in a volley.",
+          "technical": "Passed to StartTrapVolley as the volley Unknown08. For wall index i, TickTrapVolley computes Scale = floor((i + 1) / 2) * this value + 1.0 and forwards it as trap action id 200, which the ice wall stores as HeightScale. Unitless increment.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:460",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:389",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1494",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1530",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2617"
+          ]
+        }
+      },
+      "untraced": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The level row is chosen by AttackIndex 1..3, falling back to the controller cursed-energy level; no lookup by attack-set name is used for these floats.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:397",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:444",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:454"
+          ]
+        },
+        {
+          "text": "The six threshold values are reordered when forwarded: row floats 5, 4, 3, 7, 6, 8 become trap action ids 1, 2, 3, 20, 30, 100 respectively.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:454",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1523",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1529"
+          ]
+        }
+      ]
+    },
+    "CN_250_ATTACKH_1": {
+      "title": "Cursed-energy-2 vortex and pillars, level 1",
+      "overview": "Level-1 settings for the expanding vortex, its repeating sprays, and the pillars dropped on caught opponents.",
+      "values": {
+        "0": {
+          "label": "Vortex height",
+          "simple": "How far above the owner the vortex is placed.",
+          "technical": "The row is chosen dynamically: AttackIndex 1/2/3 maps to this row, otherwise the controller CursedEnergyLevel is used; values outside 1..3 leave the row index at -1. On the first start it is the upward trace length from the owner root; the vortex spawns at the trace end or at the first wall impact Z. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2818",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2919",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2928"
+          ]
+        },
+        "1": {
+          "label": "Vortex growth duration",
+          "simple": "Time taken for the vortex radius to expand.",
+          "technical": "Passed as the duration of the Linear ease that grows the radius from index 2 to index 3. Also divides the starting radius in the spray turn-rate expression. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2914",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2915"
+          ]
+        },
+        "2": {
+          "label": "Vortex starting radius",
+          "simple": "Radius at which the vortex begins.",
+          "technical": "Start value of the radius ease and numerator of the spray turn-rate formula. The current eased radius is also used as the spray spawn distance. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2914",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2915",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:3048"
+          ]
+        },
+        "3": {
+          "label": "Vortex target radius",
+          "simple": "Final radius of the vortex and pillar capture range.",
+          "technical": "End value of the radius ease and the Niagara Radius parameter. On the second start, an opponent is eligible for a pillar when its 2-D distance from the vortex centre minus twice its capsule radius is at or below this value; the comparison is strictly greater-than to skip. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2894",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2914",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2946"
+          ]
+        },
+        "4": {
+          "label": "Spray turn-rate multiplier",
+          "simple": "Affects how fast the paired sprays rotate around the vortex.",
+          "technical": "TurnRate is computed as index 2 / index 1 * this value * 20. The spray interval is eased radius * PI * 0.1388889 / TurnRate, and the accumulated angle uses 1 / eased radius * TurnRate * DeltaTime. Unitless multiplier inside that traced formula.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2915",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2916",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2975"
+          ]
+        },
+        "5": {
+          "label": "Pillar radius",
+          "simple": "Width and ground-probe radius of a dropped pillar.",
+          "technical": "Passed to StartPillar. It sizes the pillar decal Y/Z, the Niagara Radius parameter, the attack capsule radius, and the radius used for the four ground probes. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2902",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2181",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1812"
+          ]
+        },
+        "6": {
+          "label": "Pillar ground delay",
+          "simple": "Wait before a pillar finds its ground position.",
+          "technical": "Passed as Timer70. TickPillars counts it down, then traces down from Z=1, snaps the base to ground, probes water, sets the sound, and advances the pillar state. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2902",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1691",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1777"
+          ]
+        },
+        "7": {
+          "label": "Pillar effect delay",
+          "simple": "Wait before spawning the visible pillar effect.",
+          "technical": "Passed as Timer74. When it reaches zero, TickPillars spawns FX_CN_250_08302_<level>, sets its Niagara Radius and BeamLength, and sizes its capsules. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2902",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1796",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1806"
+          ]
+        },
+        "8": {
+          "label": "Pillar finish delay",
+          "simple": "Lifetime before a pillar is cleaned up.",
+          "technical": "Passed as Timer78. TickPillars spawns queued effects while it is above zero; once it reaches zero it finishes the pillar effects, fades the decal, stops the sound, and parks the pillar in state -1. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2902",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1843",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1864"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Both the out-of-line GetUniqueRow and the inlined variant select rows 5, 6, or 7 from AttackIndex 1..3 with a fallback to the controller cursed-energy level; invalid levels leave the row index at -1.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:3088",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2823"
+          ]
+        },
+        {
+          "text": "The pillar level used for FX_CN_250_08302_<level> comes from the controller CursedEnergyLevel captured when StartPillar queues the pillar, not from the unique row itself.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2181",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1796"
+          ]
+        }
+      ]
+    },
+    "CN_250_ATTACKH_2": {
+      "title": "Cursed-energy-2 vortex and pillars, level 2",
+      "overview": "Level-2 settings for the same vortex, spray, and pillar machinery.",
+      "values": {
+        "0": {
+          "label": "Vortex height",
+          "simple": "How far above the owner the vortex is placed.",
+          "technical": "The row is chosen dynamically: AttackIndex 1/2/3 maps to this row, otherwise the controller CursedEnergyLevel is used; values outside 1..3 leave the row index at -1. On the first start it is the upward trace length from the owner root; the vortex spawns at the trace end or at the first wall impact Z. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2818",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2919",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2928"
+          ]
+        },
+        "1": {
+          "label": "Vortex growth duration",
+          "simple": "Time taken for the vortex radius to expand.",
+          "technical": "Passed as the duration of the Linear ease that grows the radius from index 2 to index 3. Also divides the starting radius in the spray turn-rate expression. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2914",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2915"
+          ]
+        },
+        "2": {
+          "label": "Vortex starting radius",
+          "simple": "Radius at which the vortex begins.",
+          "technical": "Start value of the radius ease and numerator of the spray turn-rate formula. The current eased radius is also used as the spray spawn distance. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2914",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2915",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:3048"
+          ]
+        },
+        "3": {
+          "label": "Vortex target radius",
+          "simple": "Final radius of the vortex and pillar capture range.",
+          "technical": "End value of the radius ease and the Niagara Radius parameter. On the second start, an opponent is eligible for a pillar when its 2-D distance from the vortex centre minus twice its capsule radius is at or below this value; the comparison is strictly greater-than to skip. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2894",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2914",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2946"
+          ]
+        },
+        "4": {
+          "label": "Spray turn-rate multiplier",
+          "simple": "Affects how fast the paired sprays rotate around the vortex.",
+          "technical": "TurnRate is computed as index 2 / index 1 * this value * 20. The spray interval is eased radius * PI * 0.1388889 / TurnRate, and the accumulated angle uses 1 / eased radius * TurnRate * DeltaTime. Unitless multiplier inside that traced formula.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2915",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2916",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2975"
+          ]
+        },
+        "5": {
+          "label": "Pillar radius",
+          "simple": "Width and ground-probe radius of a dropped pillar.",
+          "technical": "Passed to StartPillar. It sizes the pillar decal Y/Z, the Niagara Radius parameter, the attack capsule radius, and the radius used for the four ground probes. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2902",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2181",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1812"
+          ]
+        },
+        "6": {
+          "label": "Pillar ground delay",
+          "simple": "Wait before a pillar finds its ground position.",
+          "technical": "Passed as Timer70. TickPillars counts it down, then traces down from Z=1, snaps the base to ground, probes water, sets the sound, and advances the pillar state. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2902",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1691",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1777"
+          ]
+        },
+        "7": {
+          "label": "Pillar effect delay",
+          "simple": "Wait before spawning the visible pillar effect.",
+          "technical": "Passed as Timer74. When it reaches zero, TickPillars spawns FX_CN_250_08302_<level>, sets its Niagara Radius and BeamLength, and sizes its capsules. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2902",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1796",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1806"
+          ]
+        },
+        "8": {
+          "label": "Pillar finish delay",
+          "simple": "Lifetime before a pillar is cleaned up.",
+          "technical": "Passed as Timer78. TickPillars spawns queued effects while it is above zero; once it reaches zero it finishes the pillar effects, fades the decal, stops the sound, and parks the pillar in state -1. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2902",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1843",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1864"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Both the out-of-line GetUniqueRow and the inlined variant select rows 5, 6, or 7 from AttackIndex 1..3 with a fallback to the controller cursed-energy level; invalid levels leave the row index at -1.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:3088",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2823"
+          ]
+        },
+        {
+          "text": "The pillar level used for FX_CN_250_08302_<level> comes from the controller CursedEnergyLevel captured when StartPillar queues the pillar, not from the unique row itself.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2181",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1796"
+          ]
+        }
+      ]
+    },
+    "CN_250_ATTACKH_3": {
+      "title": "Cursed-energy-2 vortex and pillars, level 3",
+      "overview": "Level-3 settings for the same vortex, spray, and pillar machinery.",
+      "values": {
+        "0": {
+          "label": "Vortex height",
+          "simple": "How far above the owner the vortex is placed.",
+          "technical": "The row is chosen dynamically: AttackIndex 1/2/3 maps to this row, otherwise the controller CursedEnergyLevel is used; values outside 1..3 leave the row index at -1. On the first start it is the upward trace length from the owner root; the vortex spawns at the trace end or at the first wall impact Z. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2818",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2919",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2928"
+          ]
+        },
+        "1": {
+          "label": "Vortex growth duration",
+          "simple": "Time taken for the vortex radius to expand.",
+          "technical": "Passed as the duration of the Linear ease that grows the radius from index 2 to index 3. Also divides the starting radius in the spray turn-rate expression. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2914",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2915"
+          ]
+        },
+        "2": {
+          "label": "Vortex starting radius",
+          "simple": "Radius at which the vortex begins.",
+          "technical": "Start value of the radius ease and numerator of the spray turn-rate formula. The current eased radius is also used as the spray spawn distance. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2914",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2915",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:3048"
+          ]
+        },
+        "3": {
+          "label": "Vortex target radius",
+          "simple": "Final radius of the vortex and pillar capture range.",
+          "technical": "End value of the radius ease and the Niagara Radius parameter. On the second start, an opponent is eligible for a pillar when its 2-D distance from the vortex centre minus twice its capsule radius is at or below this value; the comparison is strictly greater-than to skip. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2894",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2914",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2946"
+          ]
+        },
+        "4": {
+          "label": "Spray turn-rate multiplier",
+          "simple": "Affects how fast the paired sprays rotate around the vortex.",
+          "technical": "TurnRate is computed as index 2 / index 1 * this value * 20. The spray interval is eased radius * PI * 0.1388889 / TurnRate, and the accumulated angle uses 1 / eased radius * TurnRate * DeltaTime. Unitless multiplier inside that traced formula.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2915",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2916",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2975"
+          ]
+        },
+        "5": {
+          "label": "Pillar radius",
+          "simple": "Width and ground-probe radius of a dropped pillar.",
+          "technical": "Passed to StartPillar. It sizes the pillar decal Y/Z, the Niagara Radius parameter, the attack capsule radius, and the radius used for the four ground probes. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2902",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2181",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1812"
+          ]
+        },
+        "6": {
+          "label": "Pillar ground delay",
+          "simple": "Wait before a pillar finds its ground position.",
+          "technical": "Passed as Timer70. TickPillars counts it down, then traces down from Z=1, snaps the base to ground, probes water, sets the sound, and advances the pillar state. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2902",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1691",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1777"
+          ]
+        },
+        "7": {
+          "label": "Pillar effect delay",
+          "simple": "Wait before spawning the visible pillar effect.",
+          "technical": "Passed as Timer74. When it reaches zero, TickPillars spawns FX_CN_250_08302_<level>, sets its Niagara Radius and BeamLength, and sizes its capsules. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2902",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1796",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1806"
+          ]
+        },
+        "8": {
+          "label": "Pillar finish delay",
+          "simple": "Lifetime before a pillar is cleaned up.",
+          "technical": "Passed as Timer78. TickPillars spawns queued effects while it is above zero; once it reaches zero it finishes the pillar effects, fades the decal, stops the sound, and parks the pillar in state -1. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2902",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1843",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1864"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Both the out-of-line GetUniqueRow and the inlined variant select rows 5, 6, or 7 from AttackIndex 1..3 with a fallback to the controller cursed-energy level; invalid levels leave the row index at -1.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:3088",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2823"
+          ]
+        },
+        {
+          "text": "The pillar level used for FX_CN_250_08302_<level> comes from the controller CursedEnergyLevel captured when StartPillar queues the pillar, not from the unique row itself.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2181",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1796"
+          ]
+        }
+      ]
+    },
+    "CN_250_ATTACKI": {
+      "title": "Super ice-stage layout and timing",
+      "overview": "This row defines the super attack decal stage: its total duration, three bands of random marker placement, the ceiling trace and delayed decal timing, the pause before the walls appear, and the finish delay forwarded to those walls.",
+      "values": {
+        "0": {
+          "label": "Stage duration",
+          "simple": "How long the first decal-spawning phase lasts.",
+          "technical": "StartDecalStage stores it as DecalStage.Duration. TickDecalStage grows the stage decal from 0.01 to 30.0 across this time and advances to phase 1 when stage Time is at or above it. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:690",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1974",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1979"
+          ]
+        },
+        "1": {
+          "label": "Marker ceiling trace height",
+          "simple": "How high above a marker the ceiling check reaches.",
+          "technical": "For each randomized marker, TickDecalStage traces from marker + Up to marker + Up * (this value + 50) against ceiling objects. On a hit, the marker Z becomes impact Z - 100; otherwise it becomes the trace end Z. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1940",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1947"
+          ]
+        },
+        "2": {
+          "label": "Delayed decal effect delay",
+          "simple": "Delay before a marker spawns its ice effect.",
+          "technical": "Passed to AddDelayedDecal as Delay. The delayed decal marker uses it as the EaseOut duration from scale 0.01 to 70; when the delay expires, FX_CN_250_09101 is spawned. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1962",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1395",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1417"
+          ]
+        },
+        "3": {
+          "label": "First placement band minimum",
+          "simple": "Closest random distance for the first marker band.",
+          "technical": "Entry 0 Min of the decal stage interval list. Each time the entry fires, FRandRange(Min, Max) chooses the radial distance from the stage centre. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:696",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1932"
+          ]
+        },
+        "4": {
+          "label": "First placement band maximum",
+          "simple": "Farthest random distance for the first marker band.",
+          "technical": "Entry 0 Max passed to the same FRandRange call for the first marker band. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:697",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1932"
+          ]
+        },
+        "5": {
+          "label": "First placement interval",
+          "simple": "How often the first marker band fires.",
+          "technical": "Entry 0 Interval. The entry timer starts at 1000 and fires when Time is at or above this value, then resets to 0. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:695",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1928"
+          ]
+        },
+        "6": {
+          "label": "Second placement band minimum",
+          "simple": "Closest random distance for the second marker band.",
+          "technical": "Entry 1 Min used by the second interval entry when it fires. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:700",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1925"
+          ]
+        },
+        "7": {
+          "label": "Second placement band maximum",
+          "simple": "Farthest random distance for the second marker band.",
+          "technical": "Entry 1 Max used by the second interval entry when it fires. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:701",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1925"
+          ]
+        },
+        "8": {
+          "label": "Second placement interval",
+          "simple": "How often the second marker band fires.",
+          "technical": "Entry 1 Interval for the second timed placement band. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:699",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1928"
+          ]
+        },
+        "9": {
+          "label": "Third placement band minimum",
+          "simple": "Closest random distance for the third marker band.",
+          "technical": "Entry 2 Min used by the third interval entry when it fires. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:704",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1925"
+          ]
+        },
+        "10": {
+          "label": "Third placement band maximum",
+          "simple": "Farthest random distance for the third marker band.",
+          "technical": "Entry 2 Max used by the third interval entry when it fires. World units.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:705",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1925"
+          ]
+        },
+        "11": {
+          "label": "Third placement interval",
+          "simple": "How often the third marker band fires.",
+          "technical": "Entry 2 Interval for the third timed placement band. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:703",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1928"
+          ]
+        },
+        "12": {
+          "label": "Pre-wall pause",
+          "simple": "Wait before the stage starts raising walls.",
+          "technical": "In decal-stage phase 1, stage Time accumulates and advances to phase 2 only when it reaches or exceeds this value. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1979",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1983"
+          ]
+        },
+        "13": {
+          "label": "Stage wall finish delay",
+          "simple": "Wait before a stage-spawned ice wall finishes.",
+          "technical": "Stage trap spawn calls PlayUniqueAction(100, this value). The ice wall maps id 100 to FinishDelay, which counts down before FinishAction. Seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2054",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2616",
+            "Source/Abrams/Private/GameTrapActionController.cpp:2465"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "The three placement bands are initialized in one block with Time = 1000 so each band can fire immediately on the first qualifying tick; each band independently controls interval, minimum radius, and maximum radius.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:693",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:705",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1925"
+          ]
+        },
+        {
+          "text": "Stage wall height does not come from row 8: the trap spawn table Index values 10, 11, and 12 select base-row floats 10, 11, and 12 as the HeightScale argument.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:97",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2000",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:2055"
+          ]
+        },
+        {
+          "text": "The stage is aborted when no attack action is active, and ResetCharacterSpecificActionState also clears it; the row values only apply while its phase machine is active.",
+          "evidence": [
+            "Source/Abrams/Private/CN_250_ActionController.cpp:1913",
+            "Source/Abrams/Private/CN_250_ActionController.cpp:856"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "The consumer code is reconstructed: class and member names are ours, but the row and float indices, call order, and branch conditions below are traced from the listed sources. GetOwnerUniqueFloat is only a two-hop accessor and performs no bounds or null checking.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUnique.h:13",
+        "Tools/verify/CHAR/UniqueRowsInline.md:20"
+      ]
+    },
+    {
+      "text": "UCN_250_ActionController is created for controller type CN_250 and overrides CreateAction for the character-specific ground and air attack classes; other action types fall through to the shared base factory.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:631",
+        "Source/Abrams/Private/CN_250_ActionController.cpp:191",
+        "Tools/verify/CHAR/CN_250_ActionController.md:3"
+      ]
+    },
+    {
+      "text": "The cursed-energy level rows are selected dynamically by attack index first, not by the attack-set row name: CE_1 reads rows 2/3/4 and CE_2 reads rows 5/6/7. A separate passive heal uses base row indices 1/2/3 by controller level.",
+      "evidence": [
+        "Source/Abrams/Private/CN_250_ActionController.cpp:397",
+        "Source/Abrams/Private/CN_250_ActionController.cpp:2823",
+        "Source/Abrams/Private/CN_250_ActionController.cpp:334"
+      ]
+    },
+    {
+      "text": "The ice-wall forwarding chain is traced through three layers: the CN_250 volley/stage controller supplies FloatParameters, AGameTrapAction_IceWall::UniqueAction stores them by id, and the wall Tick consumes them. This is why several row values appear only as forwarded trap parameters rather than direct reads in CN_250 code.",
+      "evidence": [
+        "Source/Abrams/Private/CN_250_ActionController.cpp:1523",
+        "Source/Abrams/Private/GameTrapActionController.cpp:2605",
+        "Source/Abrams/Private/GameTrapActionController.cpp:2460"
+      ]
+    },
+    {
+      "text": "UCN_250_BehaviorController has no data members; its only specialized behavior branch creates FGameCharacterAIAction_CursedEnergyGuard for AI index 0x16. The AI tick uses the controller field state and the active super action to set think-state values, but does not read these unique floats directly.",
+      "evidence": [
+        "Source/Abrams/Private/CN_250_BehaviorController.cpp:7",
+        "Source/Abrams/Private/CN_250_BehaviorController.cpp:10",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:1073",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:1091"
+      ]
+    },
+    {
+      "text": "Shared MakeUniqueCameraRequest is not assigned to these rows by any traced CN_250 path; it reads floats 0..10 only when an action explicitly calls it with a camera row index. The generic SteerTowardSecondaryTarget reader of base (0,0) is also only called from other character families in the available source.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction.cpp:941",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3492",
+        "Source/Abrams/Private/CN_041_ActionController.cpp:391"
+      ]
+    }
+  ]
+}

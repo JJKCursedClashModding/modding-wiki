@@ -1,0 +1,1094 @@
+{
+  "overview": "Jogo’s settings tune his volcano traps, beam attacks, and the cameras for those moves.",
+  "technicalOverview": "Jogo (CP_140) uses UCP_140_ActionController with eight populated CharacterUniqueDataTable4 rows. The table is reached through zero-based Id_CharacterUnique row indices and an unchecked FloatValue lookup. Action code reads the base row for passive/basic-attack tuning and one-shot volcano placement, the fire-pillar row for both marker placement and the trigger volcano, three separate rows for rank/domain-finish/auto beam parameters, and three camera rows for action-specific virtual-camera requests. A dedicated behavior controller and AI think node specialize two AI executors, while traps delegate their unique-value reads to the spawning character through FGameTrapAction::GetUniqueFloat.",
+  "rows": {
+    "CP_140": {
+      "title": "Base tuning and low-HP passive",
+      "overview": "General-purpose values for volcano placement, the low-health passive, basic-attack auto-turning, and the level-3 Cursed Energy Attack 2 hold limit.",
+      "values": {
+        "0": {
+          "label": "Volcano trap placement range",
+          "simple": "Limits how far Jogo’s first volcano trap can be placed from him when he targets a distant enemy.",
+          "technical": "NormalAttack_2 UniqueAction reads value 0 of row 0 with GetOwnerUniqueFloat(0, 0). It takes the target location; if FVector::Dist2D(owner location, target location) is strictly greater than this value, it clamps the horizontal position to owner + normalized direction * value and keeps the target Z before ground-snapping and spawning TR_010_01. At exactly the value no clamp occurs. The number is used directly as an Unreal world-space distance with no unit conversion in source.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:941",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:944",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:945",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:948",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:953"
+          ]
+        },
+        "1": {
+          "label": "One-shot volcano eruption delay",
+          "simple": "How long the first fire pillar waits before its visible eruption effect appears.",
+          "technical": "FGameTrapAction_VolcanoOneShot Tick state 0 adds DeltaTime to Timer and when value 1 of row 0 is less than or equal to Timer, it spawns FX_CP_140_05102 at the spine_B bone transform and a DCL_00100 decal. The comparison is inclusive; DeltaTime makes the unit seconds. FGameTrapAction::GetUniqueFloat forwards this to the trap’s source character and returns 0.0f if there is no source; CP_140’s Action_SpawnTrapById supplies the character and initializes SpawnFlag to 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:182",
+            "Source/Abrams/Private/GameTrapActionController.cpp:188",
+            "Source/Abrams/Private/GameTrapActionController.cpp:212",
+            "Source/Abrams/Private/GameTrapActionController.cpp:227",
+            "Source/Abrams/Private/GameTrapActionController.cpp:235",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:1409",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:1422"
+          ]
+        },
+        "2": {
+          "label": "Low-HP passive threshold",
+          "simple": "Turns Jogo’s ranked cursed-energy passive on at 30% maximum health or less, and off above it.",
+          "technical": "OnHitPointChanged computes Ratio = NewHitPoint / HitPointMax, then reads value 2 of row 0 directly and tests value >= Ratio. Equality counts as low health. Only a change of the boolean updates state: turning on adds BUFF_CP_140_PASSIVE_1/2/3 for the current level (levels 3 and 4 both use _3), and turning off removes every EGameBuffDebuff::CP_140_Passive state. On a level change while already low, the level buff is added again.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:632",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:636",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:637",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:643",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:649",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:272",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:277",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:309"
+          ]
+        },
+        "3": {
+          "label": "Level-3 CE2 held-input limit",
+          "simple": "On the second level-3 Cursed Energy Attack 2 start, holding the button can prolong the wind-up for up to 5 seconds.",
+          "technical": "TickAttack only applies this in cursed-energy level 3, start count 1. If the CursedEnergyAttack_2 key is held it increments ActionElapsedTime, then reads value 3 of row 0 as HoldTime and returns while HoldTime < 0.0f or HoldTime > ActionElapsedTime. A negative configured value is an unlimited-hold sentinel; the actual 5 is not negative, so the branch ends when the key is released or elapsed time reaches 5. At exactly 5 the strict > test fails and flag 159 is raised.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1545",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1551",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1558",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1565",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1567",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1568",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1569",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1574"
+          ]
+        },
+        "4": {
+          "label": "Basic-attack auto-turn angle",
+          "simple": "Starts turning Jogo toward the target once the target is 120 degrees or more away from his facing direction.",
+          "technical": "NormalAttack_1 TickAttack runs only while bUniqueActionActive is 1. It measures AngleBetweenDegrees(owner forward, horizontal vector to GetTargetVector48) and reads value 4 of row 0 as MinAngle. The steering block requires MinAngle < 180.0f and Angle >= MinAngle; equality turns. A configured value of 180 or more would disable this steering. The configured 120 enables it. The factor (180 - Angle) / (180 - MinAngle) also scales value 5, so the speed is strongest at the threshold and falls to zero as the angle approaches 180.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:879",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:886",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:890",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:893",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:894",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:895",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:902"
+          ]
+        },
+        "5": {
+          "label": "Basic-attack auto-turn speed",
+          "simple": "Sets the base speed of that target-facing rotation while the first normal attack’s unique action is active.",
+          "technical": "The same NormalAttack_1 steering block reads value 5 of row 0 and multiplies it by (180 - Angle) / (180 - MinAngle). The result is passed as InterpSpeed to UKismetMathLibrary::RInterpTo with DeltaTime, and bSteerTowardMoveInput is cleared while steering. No separate smoothing constant is taken from this row.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:895",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:902",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:903",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:904",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:905"
+          ]
+        }
+      },
+      "untraced": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "These base-row slots are shared by other characters’ trap classes: PlantRootMove and PlantWall read row 0 slots 1/4/5/6/7 with their own spawners. Those reads are not Jogo’s; Jogo’s TR_010_01 is VolcanoOneShot and only reads row 0 slot 1.",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:569",
+            "Source/Abrams/Private/GameTrapActionController.cpp:603",
+            "Source/Abrams/Private/GameTrapActionController.cpp:653",
+            "Source/Abrams/Private/GameTrapActionController.cpp:691",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:953"
+          ]
+        }
+      ]
+    },
+    "CP_140_TRAPFIREPILLAR": {
+      "title": "Marker placement and volcano trigger",
+      "overview": "Slots 0 through 3 steer the FX_CP_140_06101 marker in NormalAttack_2_1; slots 4 through 7 control the hidden VolcanoTrigger trap placed at the marker. Slots 8 through 13 have no identified CP_140 read.",
+      "values": {
+        "0": {
+          "label": "Marker placement max hold",
+          "simple": "While Normal Attack 2 is held, Jogo can keep steering the marker for up to 1.5 seconds.",
+          "technical": "In TCP_140_NormalAttack_2_1<TBase>::TickAttack phase 1, ActionElapsedTime is incremented and row 1 slot 0 is read as the hold limit. The phase continues only while IsGameKeyHeld(NormalAttack_2) is true and HoldLimit > ActionElapsedTime; the strict > comparison means the hold ends exactly at 1.5 seconds even if the key stays down, and it ends sooner on key release. The unit is seconds because ActionElapsedTime accumulates DeltaTime.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:992",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1002",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1003",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1269",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1270",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1272",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1274"
+          ]
+        },
+        "1": {
+          "label": "Marker forward speed",
+          "simple": "The placement marker advances 1800 world-space units per second along Jogo’s facing direction.",
+          "technical": "Phase 1 builds the marker Goal as marker location + owner facing forward vector * row 1 slot 1 * DeltaTime, before wall sweeps and ground probes adjust it. The value is applied directly to an FVector each tick, so it is a speed in Unreal world units per second; no unit conversion is performed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1067",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1071",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1072",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1073",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1074"
+          ]
+        },
+        "2": {
+          "label": "Marker lateral stick speed",
+          "simple": "Left-stick sideways input moves the marker at a rate scaled by 2500 world-space units per second.",
+          "technical": "The same phase-1 Goal expression adds owner right vector * row 1 slot 2 * (DeltaTime * GetLeftStick().X). Positive stick X moves along the right vector and negative stick X reverses it; the source applies the value directly with no conversion or separate curve.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1071",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1073",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1074"
+          ]
+        },
+        "3": {
+          "label": "Initial marker distance",
+          "simple": "The marker starts 300 world-space units ahead of Jogo before it is dropped and adjusted to the ground.",
+          "technical": "In phase 0, after the start animation stops, row 1 slot 3 multiplies the owner’s facing forward vector and is added to the owner location to form Target. That Target is then used by the downward ground trace and becomes the spawn transform for FX_CP_140_06101. There is no comparison here; the configured distance is applied once to place the initial marker.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1011",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1013",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1017",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1018",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1022",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1045",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1058"
+          ]
+        },
+        "4": {
+          "label": "Trigger volcano lifetime",
+          "simple": "The trigger trap gives up after 30 seconds if no enemy is found.",
+          "technical": "FGameTrapAction_VolcanoTrigger Tick state 0 first grounds the trap with a short line trace. It then evaluates bNoGround || GetUniqueFloat(4, 1) < ElapsedTime; if either is true it finishes. The time comparison is strict, so at exactly the configured value with ground still present the trap does not finish until a later tick. The unit is seconds because ElapsedTime is accumulated from DeltaTime.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:380",
+            "Source/Abrams/Private/GameTrapActionController.cpp:395",
+            "Source/Abrams/Private/GameTrapActionController.cpp:400",
+            "Source/Abrams/Private/GameTrapActionController.cpp:403",
+            "Source/Abrams/Private/GameTrapActionController.cpp:405"
+          ]
+        },
+        "5": {
+          "label": "Trigger volcano detection radius",
+          "simple": "Sets how wide the enemy check is around the hidden trigger.",
+          "technical": "The same state 0 performs SphereTraceMultiForObjects from the trap location to trap location + trap up vector * value 6, using value 5 of row 1 as the sphere radius. It tests CN_050_CharacterObjectTypes, sorts multiple hits, and advances only for a visible AGameCharacter on a different team (GAISlot001 differs from the source).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:409",
+            "Source/Abrams/Private/GameTrapActionController.cpp:410",
+            "Source/Abrams/Private/GameTrapActionController.cpp:411",
+            "Source/Abrams/Private/GameTrapActionController.cpp:412",
+            "Source/Abrams/Private/GameTrapActionController.cpp:421",
+            "Source/Abrams/Private/GameTrapActionController.cpp:425",
+            "Source/Abrams/Private/GameTrapActionController.cpp:427"
+          ]
+        },
+        "6": {
+          "label": "Trigger volcano detection height",
+          "simple": "Sets how high above the trap the enemy-detection sweep reaches.",
+          "technical": "Used as the length of the upward sweep: SweepEnd = trap location + trap up vector * value 6, paired with value 5 as radius. It is a world-space vector length in the trap’s up direction; the source applies it directly to FVector without a unit conversion.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:410",
+            "Source/Abrams/Private/GameTrapActionController.cpp:411",
+            "Source/Abrams/Private/GameTrapActionController.cpp:412"
+          ]
+        },
+        "7": {
+          "label": "Eruption delay after trigger",
+          "simple": "After an enemy triggers the trap, 0.3 seconds pass before the fire pillar effect appears.",
+          "technical": "In state 2, Timer accumulates DeltaTime and value 7 of row 1 is the threshold: if value <= Timer, FX_CP_140_05102 is spawned at the spine_B transform and an effect-finished/nullified callback is bound. The comparison is inclusive; the unit is seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:454",
+            "Source/Abrams/Private/GameTrapActionController.cpp:456",
+            "Source/Abrams/Private/GameTrapActionController.cpp:457",
+            "Source/Abrams/Private/GameTrapActionController.cpp:459",
+            "Source/Abrams/Private/GameTrapActionController.cpp:464",
+            "Source/Abrams/Private/GameTrapActionController.cpp:470"
+          ]
+        }
+      },
+      "untraced": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "This single unique row has two owners: TCP_140_NormalAttack_2_1 TickAttack reads slots 0-3 to place and steer the marker, while FGameTrapAction_VolcanoTrigger reads slots 4-7 for the TR_010_02 trap placed at that marker. TR_010_01 is the separate VolcanoOneShot trap and reads base row slot 1 instead.",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:992",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1002",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1003",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1018",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1073",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1074",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1270",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1058",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1276",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1284",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1285",
+            "Source/Abrams/Private/GameTrapActionController.cpp:193",
+            "Source/Abrams/Private/GameTrapActionController.cpp:319",
+            "Source/Abrams/Private/GameTrapActionController.cpp:380",
+            "Source/Abrams/Private/GameTrapActionController.cpp:403",
+            "Source/Abrams/Private/GameTrapActionController.cpp:410",
+            "Source/Abrams/Private/GameTrapActionController.cpp:411",
+            "Source/Abrams/Private/GameTrapActionController.cpp:457",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:1409",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:1422"
+          ]
+        },
+        {
+          "text": "The SpawnFlag == 1 override at GameTrapActionController.cpp:581 is inside PlantRootMove (a different character’s trap), not VolcanoTrigger. Jogo’s Action_SpawnTrapById initializes traps with SpawnFlag 0.",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:523",
+            "Source/Abrams/Private/GameTrapActionController.cpp:581",
+            "Source/Abrams/Private/GameTrapActionController.cpp:583",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:1409",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:1422"
+          ]
+        }
+      ]
+    },
+    "CP_140_CURSEDBEAM": {
+      "title": "Normal cursed beam by energy level",
+      "overview": "Energy-drain threshold, minimum active time, and stick-turn rate for the regular beam; the finish-target form replaces these values with CP_140_CURSEDBEAM_DE.",
+      "values": {
+        "0": {
+          "label": "Level-1 beam energy drain",
+          "simple": "At level 1, the beam spends 175 cursed-energy units per second after its warm-up.",
+          "technical": "UpdateBeamParameters reads row 2 slot 0 into BeamLimit when IsFinishTarget is false and GetCursedEnergyLevel is 1. After ActionElapsedTime reaches BeamDuration, TickAttack subtracts DeltaTime * BeamLimit from current cursed energy. A configured BeamLimit of 0.0f would be a sentinel letting IsBeamActive ignore remaining energy, but the actual value is 175.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1445",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1449",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1457",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1459",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1460",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:173",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:176",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1482"
+          ]
+        },
+        "1": {
+          "label": "Level-1 beam warm-up",
+          "simple": "At level 1, the beam runs for 0.9 seconds before it starts draining energy or requires the held key to remain active.",
+          "technical": "Row 2 slot 1 becomes BeamDuration for level 1. IsBeamActive returns true while (CursedEnergyAttack_1 key held || ActionElapsedTime < BeamDuration) and (CursedEnergy > 0 || BeamLimit == 0). Strict < means at 0.9 the grace period ends. This is seconds because ActionElapsedTime accumulates DeltaTime.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1461",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1478",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1480",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1482"
+          ]
+        },
+        "2": {
+          "label": "Level-2 beam energy drain",
+          "simple": "At level 2, the beam spends 175 cursed-energy units per second after its warm-up.",
+          "technical": "UpdateBeamParameters reads row 2 slot 2 into BeamLimit for cursed-energy level 2. The same post-warm-up subtraction applies. Higher values drain more per second; the actual level-2 value equals level 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1463",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1464",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:173",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:176"
+          ]
+        },
+        "3": {
+          "label": "Level-2 beam warm-up",
+          "simple": "At level 2, the beam’s minimum active/grace time is 0.9 seconds.",
+          "technical": "Row 2 slot 3 becomes BeamDuration for level 2 and feeds the same IsBeamActive test as slot 1. Equality with ActionElapsedTime ends the time-only grace; after that the held key and energy condition apply.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1465",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1480",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1482"
+          ]
+        },
+        "4": {
+          "label": "Level-3 beam energy drain",
+          "simple": "At level 3, the beam spends 175 cursed-energy units per second after its warm-up.",
+          "technical": "Row 2 slot 4 becomes BeamLimit for cursed-energy level 3. It is used only when the target is not a finish target; finish targets take row 5 slot 0 instead.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1449",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1467",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1468",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:173",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:176"
+          ]
+        },
+        "5": {
+          "label": "Level-3 beam warm-up",
+          "simple": "At level 3, the beam’s minimum active/grace time is 0.9 seconds.",
+          "technical": "Row 2 slot 5 becomes BeamDuration for level 3 and is used by the same IsBeamActive condition. No different finish-target or auto override applies to this slot for the normal level-3 class.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1469",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1480",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1482"
+          ]
+        },
+        "6": {
+          "label": "Beam steering rate",
+          "simple": "Sets how fast stick input can sweep the beam’s aim while it is growing.",
+          "technical": "Read once outside the level switch as BeamRate. Each tick, yaw rotation is changed by Stick.X * DeltaTime * BeamRate, and the animation’s FullBodyRotation.Roll is reduced by Stick.Y * DeltaTime * BeamRate then clamped to the hardcoded range -30 through 60 degrees. The numeric 15 is therefore applied per second to both yaw and animation roll; it is shared by levels 1-3 in this row.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1456",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:234",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:235",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:238",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:239"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The beam’s visible length is not a unique-table value: BeamTimer grows by DeltaTime * 10000 and is capped at 4000, then the hit trace can shorten BeamLength to Hit.Distance + 1 at the first qualifying contact.",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:178",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:179",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:187",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:201"
+          ]
+        },
+        {
+          "text": "Slots 0 and 1 of this row are also read by FGameTrapAction_FlowerMachineGun, but that is a different trap action and is not spawned by CP_140’s trap IDs.",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1251",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1306",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1335"
+          ]
+        }
+      ]
+    },
+    "CP_140_ATTACKG_SHOOT_CAMERA": {
+      "title": "Attack G marker camera",
+      "overview": "Custom virtual camera used while Jogo places the TR_010_02 marker in the second normal attack.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "Moves the camera along the gaze-space forward axis for the marker-placement shot.",
+          "technical": "MakeUniqueCameraRequest(CameraMode=2, RowIndex=3) reads row 3 slot 0 into FVirtualCameraRequest.CameraOffset.X. The camera later applies CameraOffset in the gaze rotation’s space, so this is not a world-X offset. The configured -450 is applied to every Attack G camera request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:974",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:980",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:383",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "Moves the camera sideways in gaze space; zero means no sideways offset.",
+          "technical": "Row 3 slot 1 is read into CameraOffset.Y by the mode-2 helper. Zero still produces a read and an explicit zero component; it does not disable the camera request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:980",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "Moves the camera vertically in gaze space; this row uses 150.",
+          "technical": "Row 3 slot 2 is read into CameraOffset.Z and rotated with the other offset components by the gaze quaternion before the camera position is set.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:980",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "Caps how far below the eye the camera may look at 60 degrees.",
+          "technical": "Row 3 slot 3 becomes LimitAngleDown. When the gaze target is below the camera base and its elevation is strictly greater than this limit, the gaze is clamped to the limit. Equality is allowed. Degrees are used by the rotator math.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:980",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:376",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "Caps how far above the eye the camera may look at 30 degrees.",
+          "technical": "Row 3 slot 4 becomes LimitAngleUp. When the gaze target is above the base and elevation is strictly greater than this limit, the gaze is clamped. The lower 30 here makes upward movement tighter than downward movement; no inference beyond that comparison is made.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:980",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "Leaves the field of view unchanged because this row sets it to zero.",
+          "technical": "Row 3 slot 5 is still read as FieldOfView, but SetCameraMode only applies a new FOV when it is greater than 0.0f. With 0, the existing FOV remains and any FOV interpolation is stopped.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:980",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:574",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:583"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "No FOV blend is scheduled because this row’s blend time is zero.",
+          "technical": "Row 3 slot 6 becomes FieldOfViewBlendTime. It is read unconditionally, but because the FOV value is 0 the blend branch is not entered. If FOV were positive, 0 would mean an immediate snap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:980",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:580",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:582"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "Selects linear FOV easing, though this row has no positive FOV to interpolate.",
+          "technical": "Row 3 slot 7 is cast to int32 by MakeUniqueCameraRequest: 0=Linear, 1=EaseIn, 2=EaseOut, 3=EaseInOut. Other values leave the default easing unchanged. The configured 0 maps to Linear; it is only consumed if a blend actually runs.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:980",
+            "Source/Abrams/Private/GameCharacterAction.cpp:939",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:955",
+            "Source/Abrams/Private/GameCharacterAction.cpp:967"
+          ]
+        },
+        "8": {
+          "label": "Orbit yaw",
+          "simple": "No horizontal gaze orbit is applied for this camera.",
+          "technical": "Row 3 slot 8 becomes OrbitYaw. The camera builds FRotator(OrbitPitch, OrbitYaw, 0) and only transforms the gaze when the orbit rotator is non-zero; with all orbit values 0, that block is skipped.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:980",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:419",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421"
+          ]
+        },
+        "9": {
+          "label": "Orbit pitch",
+          "simple": "No vertical gaze orbit is applied for this camera.",
+          "technical": "Row 3 slot 9 becomes OrbitPitch in the same orbit rotator. Zero contributes to the IsZero test that skips the orbit transform.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:980",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "No extra roll is applied for this camera.",
+          "technical": "Row 3 slot 10 becomes Request.Roll and is handed to SetViewTarget87 as the final roll argument. Zero means no roll adjustment.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:980",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:429",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "This camera is requested only when NormalAttack_2_1 starts; the phase-3 and FinishAttackEffects restores pass a default-constructed FVirtualCameraRequest, not row 3.",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:974",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:980",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1291",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1298",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1318",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1321"
+          ]
+        }
+      ]
+    },
+    "CP_140_ATTACKH_SHOOT_CAMERA": {
+      "title": "Attack H beam camera",
+      "overview": "Virtual camera used during the Cursed Energy Attack 1 beam. Its field of view is 110 at start but is overwritten to 90 when the beam’s second phase restores the camera.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "Places the beam camera along the gaze-space forward axis at -180.",
+          "technical": "Row 4 slot 0 is read into CameraOffset.X by MakeUniqueCameraRequest(2, 4). It is applied in gaze space, not as a world-X translation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:59",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:62",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:252",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "Moves the beam camera sideways in gaze space by -150.",
+          "technical": "Row 4 slot 1 is read into CameraOffset.Y on both the start request and the phase-2 re-request. The negative value shifts the offset opposite the gaze-space right axis.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:62",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:252",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "Raises the beam camera by 100 in gaze space.",
+          "technical": "Row 4 slot 2 is read into CameraOffset.Z and rotated with the rest of the offset before the camera location is computed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:62",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:252",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "Allows the beam camera to look at most 60 degrees below the eye.",
+          "technical": "Row 4 slot 3 becomes LimitAngleDown. The gaze is clamped only when it is below the base and elevation is strictly greater than 60; equality passes. This is the same limit as the Attack G camera row.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:62",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:252",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:376",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "Allows the beam camera to look at most 30 degrees above the eye.",
+          "technical": "Row 4 slot 4 becomes LimitAngleUp; above-base gaze with elevation strictly greater than 30 is clamped back to 30.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:62",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:252",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "Sets a 110-degree field of view when the beam starts, but the phase-2 restore overwrites it with 90.",
+          "technical": "On StartAttackHoming, row 4 slot 5 becomes FieldOfView = 110 and is applied. In TickAttack case 2, MakeUniqueCameraRequest(2, 4) reads the same 110, but the very next statement assigns Request.FieldOfView = 90.0f before SetCameraMode, so the actual phase-2 FOV is 90, not 110.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:62",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:252",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:253",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:254",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:574"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "Blends the field-of-view change over 0.25 seconds.",
+          "technical": "Row 4 slot 6 becomes FieldOfViewBlendTime. Because the start FOV is positive, SetCameraMode starts FovInterp from the current FOV to 110 over 0.25 seconds using the easing selected by slot 7. The same 0.25 is read in the phase-2 request, but that request’s FOV has been overwritten to 90.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:62",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:252",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:253",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "Uses EaseInOut for the 0.25-second FOV blend.",
+          "technical": "Row 4 slot 7 is cast to int32 by the camera helper: 0=Linear, 1=EaseIn, 2=EaseOut, 3=EaseInOut. The configured 3 maps to EEasingFunc::EaseInOut and is passed to FovInterp.Start during the start request’s FOV blend.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:62",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:964",
+            "Source/Abrams/Private/GameCharacterAction.cpp:965",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578"
+          ]
+        },
+        "8": {
+          "label": "Orbit yaw",
+          "simple": "Orbits the gaze 10 degrees around the camera for the beam shot.",
+          "technical": "Row 4 slot 8 becomes OrbitYaw. The camera creates FRotator(OrbitPitch, OrbitYaw, 0) and, because it is non-zero, transforms the gaze about the camera with that rotation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:62",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:252",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:423"
+          ]
+        },
+        "9": {
+          "label": "Orbit pitch",
+          "simple": "Orbits the gaze -10 degrees in pitch for the beam shot.",
+          "technical": "Row 4 slot 9 becomes OrbitPitch in the same non-zero orbit rotator. Negative pitch tilts the orbit in the opposite direction; no extra clamp is applied to this value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:62",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:252",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:423"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Adds 5 degrees of roll to the final beam view.",
+          "technical": "Row 4 slot 10 becomes Request.Roll and is passed to SetViewTarget87 with the computed camera location and gaze. It is applied after any orbit transform.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:62",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:252",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:429",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The beam’s final FinishAttackEffects also passes a zeroed request with FOV 90 when the camera mode is still 2; that path does not re-read row 4.",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:71",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:74",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:76",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:77"
+          ]
+        }
+      ]
+    },
+    "CP_140_CURSEDBEAM_DE": {
+      "title": "Finish-target beam",
+      "overview": "Replaces the normal rank-based beam settings when the battle manager marks the owner’s target as a finish target.",
+      "values": {
+        "0": {
+          "label": "Finish beam energy drain",
+          "simple": "Spends 100 cursed-energy units per second after the finish beam’s warm-up.",
+          "technical": "IsFinishTarget(Owner) makes UpdateBeamParameters return after reading row 5 slots 0, 1 and 2. Slot 0 becomes BeamLimit, used as DeltaTime * BeamLimit subtraction once ActionElapsedTime reaches BeamDuration. The zero-energy sentinel check in IsBeamActive still applies to BeamLimit generally, but this configured value is 100.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1445",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1449",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1450",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1451",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:173",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:176",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1482"
+          ]
+        },
+        "1": {
+          "label": "Finish beam warm-up",
+          "simple": "The finish beam runs for 0.5 seconds before energy drain or the held-key requirement matters.",
+          "technical": "Row 5 slot 1 becomes BeamDuration. IsBeamActive uses ActionElapsedTime < BeamDuration as one way to remain active; strict < means the grace ends once elapsed time reaches 0.5 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1452",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1480",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1482"
+          ]
+        },
+        "2": {
+          "label": "Finish beam steering rate",
+          "simple": "Lets stick input sweep the finish beam faster than the normal beam.",
+          "technical": "Row 5 slot 2 becomes BeamRate and is used in the same yaw and clamped animation-roll calculations as the normal beam. The configured 25 is applied per second; the normal row uses 15 and the auto row also uses 15.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1453",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:234",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:238",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:239"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "This row bypasses the cursed-energy level switch entirely; it is selected by IsFinishTarget, not by level 4 or an auto variant.",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1445",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1449",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1454"
+          ]
+        }
+      ]
+    },
+    "CP_140_CURSEDBEAM_AUTO": {
+      "title": "Auto cursed beam",
+      "overview": "Dedicated beam parameters for CursedEnergyAttack_1_Auto and its air variant, independent of rank and finish-target status.",
+      "values": {
+        "0": {
+          "label": "Auto beam energy drain",
+          "simple": "Nominally sets a 175 energy-drain rate for the auto beam.",
+          "technical": "UpdateBeamParameters reads row 6 slot 0 into BeamLimit for types 73/77. The auto class overrides IsBeamActive to ActionElapsedTime < BeamDuration only, so this value is stored but does not gate duration or energy in the auto variant.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1502",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1505",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1510",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1511",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1513"
+          ]
+        },
+        "1": {
+          "label": "Auto beam duration",
+          "simple": "The auto beam is active for 0.9 seconds.",
+          "technical": "Row 6 slot 1 becomes BeamDuration. FCP_140_CursedEnergyAttack_1_Auto::IsBeamActive returns only ActionElapsedTime < BeamDuration; strict < means exactly 0.9 ends the active check. It does not check the held key or remaining cursed energy as the normal beam does.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1506",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1510",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1511",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1513"
+          ]
+        },
+        "2": {
+          "label": "Auto beam steering rate",
+          "simple": "Sets stick-steering speed for the auto beam to 15.",
+          "technical": "Row 6 slot 2 becomes BeamRate and is used by the inherited TickAttack yaw and animation-roll code. Unlike the normal beam, the auto active test can stop that ticking before a longer hold would matter.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1507",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:234",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:238",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:239",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:242"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The auto variant also uses GetAutoComboDamageRate and the Id_AttackSet_CursedEnergy_1_Auto row finder; those are not CharacterUnique values.",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1490",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1493",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1496",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1499"
+          ]
+        }
+      ]
+    },
+    "CP_140_ATTACKE_SHOOT_CAMERA": {
+      "title": "Attack E camera",
+      "overview": "Custom virtual camera for the Cursed Energy Attack 2 trigger, applied only for the first unique action parameter.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "Places the Attack E camera at -350 along the gaze-space forward axis.",
+          "technical": "CursedEnergyAttack_2 UniqueAction returns immediately unless IntParameter == 0; otherwise it saves the current camera mode and calls MakeUniqueCameraRequest(2, 7). Row 7 slot 0 becomes CameraOffset.X in gaze space.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1518",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1520",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1522",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1526",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "Moves the Attack E camera sideways in gaze space by 125.",
+          "technical": "Row 7 slot 1 is read into CameraOffset.Y by the mode-2 helper. The positive value offsets along the gaze-space right axis.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "Raises the Attack E camera by 50 in gaze space.",
+          "technical": "Row 7 slot 2 is read into CameraOffset.Z and rotated into world space with the other offset components when the camera position is computed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "Caps the Attack E camera at 60 degrees below the eye.",
+          "technical": "Row 7 slot 3 becomes LimitAngleDown; below-base gaze with elevation strictly greater than 60 is clamped to 60, while equality is allowed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:376",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "Caps the Attack E camera at 30 degrees above the eye.",
+          "technical": "Row 7 slot 4 becomes LimitAngleUp; above-base gaze with elevation strictly greater than 30 is clamped to 30.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "Leaves field of view unchanged because this row sets it to zero.",
+          "technical": "Row 7 slot 5 is read as FieldOfView, but the camera only applies a positive FOV. With 0, the existing FOV is kept and FovInterp is stopped.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:574",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:583"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "No FOV interpolation is started because FOV is zero; the zero blend time is still read.",
+          "technical": "Row 7 slot 6 becomes FieldOfViewBlendTime. It participates only in the positive-FOV branch; a positive FOV with this 0 would snap immediately.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:582"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "Selects linear easing by default, but no FOV blend runs for this row.",
+          "technical": "Row 7 slot 7 is cast to int32 in the shared helper: 0=Linear, 1=EaseIn, 2=EaseOut, 3=EaseInOut. The configured 0 maps to Linear and would be used only if a positive FOV and blend time were configured.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:955",
+            "Source/Abrams/Private/GameCharacterAction.cpp:967"
+          ]
+        },
+        "8": {
+          "label": "Orbit yaw",
+          "simple": "Applies no horizontal gaze orbit for this camera.",
+          "technical": "Row 7 slot 8 becomes OrbitYaw. With all orbit components zero, the camera’s non-zero-orbit transform is skipped.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421"
+          ]
+        },
+        "9": {
+          "label": "Orbit pitch",
+          "simple": "Applies no vertical gaze orbit for this camera.",
+          "technical": "Row 7 slot 9 becomes OrbitPitch in the same orbit rotator and contributes to its zero test.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Applies no additional roll for this camera.",
+          "technical": "Row 7 slot 10 becomes Request.Roll and is passed to SetViewTarget87; 0 means no roll adjustment.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1527",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:429",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The camera is only requested when IntParameter is exactly 0; other parameters skip camera setup entirely. Leaving the action restores a default-constructed request rather than re-reading row 7.",
+          "evidence": [
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1518",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1522",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1527",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1622",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1625"
+          ]
+        },
+        {
+          "text": "Row 7 slots 11-13 are read by FGameTrapAction_Uzumaki for CN_122’s movement/aim limits, not by CP_140’s Attack E camera request; they are therefore left untraced for Jogo.",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1420",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1855",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1856",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1857",
+            "Source/Abrams/Private/CP_140_ActionController.cpp:1527"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Row indices are zero-based positions in Id_CharacterUnique, and AGameCharacter::GetCharacterUniqueFloatValue performs UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds check. Action code usually reaches it through FGameCharacterAction::GetOwnerUniqueFloat; traps reach it through FGameTrapAction::GetUniqueFloat, which substitutes 0.0f only when the trap has no source interface.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:561",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1758",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Private/GameCharacterAction.cpp:935",
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188"
+      ]
+    },
+    {
+      "text": "Jogo’s action controller tracks every spawned trap, forces the oldest VolcanoTrigger to finish when a second appears, and finishes any spawned trap whose action reports the typed hit check. It also tracks FX_CP_140_00401_1..5 effects from NormalAttack_3 and spawns follow-up effects 04113/02202 or 04112 based on whether a collision cancelled the follow-up.",
+      "evidence": [
+        "Source/Abrams/Private/CP_140_ActionController.cpp:586",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:595",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:599",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:673",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:678",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:681",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:755",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:1335",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:1353",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:1397",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:1408"
+      ]
+    },
+    {
+      "text": "UCP_140_BehaviorController is a size-0 shell that only specializes AI indices 0x0E (NormalAttack2Down executor) and 0x11 (CursedEnergyAttack1 executor); all other indices use the parent factory. CP_140’s AI executor aims the left stick from the controller’s AimOrigin, and the AI think tick resets that state when no attack is active.",
+      "evidence": [
+        "Source/Abrams/Public/CP_140_BehaviorController.h:10",
+        "Source/Abrams/Private/CP_140_BehaviorController.cpp:8",
+        "Source/Abrams/Private/CP_140_BehaviorController.cpp:12",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:1991",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:2014",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:526"
+      ]
+    },
+    {
+      "text": "No CP_140-specific .inl file is included by these sources. Beam and camera behavior comes from CP_140_ActionController.cpp plus the shared FGameCharacterAction helpers; volcano behavior comes from the shared UGameTrapActionController/FGameTrapAction code driven by the trap row’s ActionType.",
+      "evidence": [
+        "Source/Abrams/Private/CP_140_ActionController.cpp:1",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:3",
+        "Source/Abrams/Private/CP_140_ActionController.cpp:6",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941",
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/GameTrapManager.cpp:99",
+        "Source/Abrams/Private/GameTrapManager.cpp:109"
+      ]
+    }
+  ]
+}

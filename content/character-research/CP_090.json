@@ -1,0 +1,277 @@
+{
+  "overview": "Nanami’s settings tune when his passive activates, where its effects appear, and how long the special follow-up waits.",
+  "technicalOverview": "Kento Nanami (CP_090) has two unique-data rows. The first sets when his passive wakes up near the end of a battle and where his special effect appears (in front of him or on a nearby second target). The second holds a 0.75-second timing value for each cursed-energy level; it gates the special follow-up rather than directly changing damage. His action controller builds ten custom attack classes that all start the same two-effect visual chain, and he has character-specific AI and behavior classes. No trap, spawner, or shikigami unique-row forwarding was found for him.",
+  "rows": {
+    "CP_090": {
+      "title": "Passive timing and special-effect placement",
+      "overview": "Three useful numbers: the late-battle passive window, how close a second target must be before the effect snaps to it, and how far ahead of the owner the effect appears otherwise. The other eleven slots are zero and have no CP_090 reader in the traced source.",
+      "values": {
+        "0": {
+          "label": "Passive-on battle-clock window",
+          "simple": "With the default setup, the passive turns on once the battle clock is at 60 or less. Some setups make it always on or keep it off.",
+          "technical": "ActionTick (controller slot 86) reads GetCharacterUniqueFloatValue(0, 0) only when input is enabled, the CP_090_Passive buff stack is not above zero, and SetupUniqueMode is neither 1 (skip) nor 2 (apply with no clock check). In the default branch it returns when Time <= 0.0f or Time > FloatValue[0], so with 60 the inclusive window is 0 < remaining time <= 60 battle-clock seconds (the clock is shown in seconds). It then calls ApplyPassiveLevel(GetCursedEnergyLevelClamped()), which returns early when the owner is defeated. A generic ProjectionSorceryReceive fallback also reads index 0 as a restraint time when its damage row is null, but that is not established as CP_090's normal use. CursedEnergyAttack1/2Hold AI nodes read (0, 0) too, yet CP_090's behavior controller replaces AI index 0x11 with a chance node.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_090_ActionController.cpp:794",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:797",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:799",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:803",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:811",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:813",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:820",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:763",
+            "Source/Abrams/Private/GameBattleManager.cpp:2292",
+            "Source/Abrams/Private/GameOutGameTimeLimitWidget.cpp:72",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:118",
+            "Source/Abrams/Private/CP_090_BehaviorController.cpp:13",
+            "Tools/verify/CHAR/CP_090_ActionController.md:135"
+          ]
+        },
+        "1": {
+          "label": "Secondary-target snap distance",
+          "simple": "When a second target is within 300 distance units, the special effect appears on that target instead of in front of Nanami.",
+          "technical": "StartUniqueEffect reads GetCharacterUniqueFloatValue(1, 0) when any of the ten CP_090 actions runs UniqueAction with IntParameter 100 and its controller casts to UCP_090_ActionController. A valid secondary target is required and FVector::Dist(owner, target) <= FloatValue[0] is inclusive: with 300, a target at exactly 300 qualifies. On success the spawn point becomes the secondary target's GAISlot015 location and FX_CP_090_00101 attaches to that target's mesh at socket \"root\"; otherwise the owner-relative point from FloatValue[2] is kept and the effect attaches to the owner's mesh. This is a world-space distance (300 Unreal world units at normal scale), not a ratio, and no clamp is applied. A generic CursedEnergyAttack1Hold AI node also reads (1, 0) as a per-level duration, but CP_090 does not instantiate hold nodes.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_090_ActionController.cpp:30",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:32",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:36",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:39",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:41",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:46",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:54",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:60",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:106",
+            "Tools/verify/CHAR/CP_090_ActionController.md:11",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:119"
+          ]
+        },
+        "2": {
+          "label": "Forward spawn distance for the effect",
+          "simple": "With no nearby second target, the effect starts 300 distance units in front of Nanami.",
+          "technical": "Read as GetCharacterUniqueFloatValue(2, 0) in the same StartUniqueEffect call. Initial location = owner's GAISlot015 location + GetFacingForwardVector() * FloatValue[1], so 300 means 300 world units ahead; a negative value would put it behind, and no minimum or clamp exists. A successful secondary-target test overwrites this location with the target's position. FX_CP_090_00101 is stored in the controller, attached at \"root\", initialized with the owner, and its Niagara \"Hit\" float is cleared to 0; if SpawnEffect returns null, the function returns with the null stored. A generic CursedEnergyAttack2Hold AI node also reads (2, 0) as a per-level duration, but CP_090 does not instantiate hold nodes.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_090_ActionController.cpp:33",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:34",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:41",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:42",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:47",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:48",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:49",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:60",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:65",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:130"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The two effects form a chain: FX_CP_090_00101 stays in the controller with Hit = 0; AdvanceUniqueEffect sets Hit = 1, reattaches it to the owner's mesh, spawns FX_CP_090_00102 at its transform, and does not store the second effect back. Leaving AttackDefault clears the stored pointer and pool-releases the first effect if it has not already finished.",
+          "evidence": [
+            "Source/Abrams/Private/CP_090_ActionController.cpp:62",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:65",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:75",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:81",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:86",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:88",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:95",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:838",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:846"
+          ]
+        },
+        {
+          "text": "Zeros in slots 3-13 mean only that no CP_090 reader was identified. The shared MakeUniqueCameraRequest helper can read row floats 0-10, but no CP_090 call site was found; trap/spawner code reads different rows of a spawner's source character.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1441",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1842",
+            "Source/Abrams/Private/GameCharacter.cpp:559"
+          ]
+        }
+      ]
+    },
+    "CP_090_ATTACKG": {
+      "title": "Cursed-energy attack charge times by level",
+      "overview": "Three equal 0.75 values are selected by cursed-energy level; each is the minimum hold time before the next attack start can advance the special follow-up. The other eleven slots are zero with no identified CP_090 reader.",
+      "values": {
+        "0": {
+          "label": "Level 1 charge time",
+          "simple": "At level 1, the special follow-up is ready after 0.75 seconds of holding the cursed-energy attack.",
+          "technical": "In TCP_090_CursedEnergyAttack_1::TickAttack (action types 72 and 76), the first-start case runs only while ShouldTriggerUniqueEffect() is true, i.e. IsGameKeyHeld(CursedEnergyAttack_1). It adds DeltaTime to ActionElapsedTime and, for GetCursedEnergyLevel() == 1, reads GetOwnerUniqueFloat(0, 1). A negative duration returns; otherwise the gate passes once Duration <= ActionElapsedTime, so 0.75 is an inclusive minimum and 0 would pass on the first charged tick. Passing the gate reaches the SetFlag159 path; the effect advance itself occurs on the second start after the retrigger check. Auto classes contain the same mapped read (LevelIndex 0 at line 608), but their slot 146 gate is false, so that branch is unreachable for them.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_090_ActionController.cpp:438",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:443",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:444",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:446",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:448",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:451",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:462",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:466",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:528",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:530",
+            "Source/Abrams/Public/CP_090_Actions.h:211",
+            "Tools/verify/CHAR/CP_090_ActionController.md:48"
+          ]
+        },
+        "1": {
+          "label": "Level 2 charge time",
+          "simple": "At level 2, the same 0.75-second hold is required.",
+          "technical": "Same first-start, key-held path but selected when GetCursedEnergyLevel() == 2: Duration = GetOwnerUniqueFloat(1, 1) in the manual classes. Negative returns; the gate passes when FloatValue[1] <= accumulated action time (inclusive at exactly 0.75 seconds). Auto classes map level 2 to this index but do not enter the branch because their ShouldTriggerUniqueEffect slot is the false fold. Levels outside 1-3 return before any duration is read.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_090_ActionController.cpp:448",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:454",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:462",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:466",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:596",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:608",
+            "Source/Abrams/Public/CP_090_Actions.h:211"
+          ]
+        },
+        "2": {
+          "label": "Level 3 charge time",
+          "simple": "At level 3, the 0.75-second hold is also used.",
+          "technical": "Same gate when GetCursedEnergyLevel() == 3: Duration = GetOwnerUniqueFloat(2, 1) for the manual classes. Negative returns and the gate passes when Duration <= ActionElapsedTime, inclusive at 0.75. Level 3 is also the clamp ceiling for the passive buff level passed by the action controller, but that buff level is separate status data, not this float. Auto classes map level 3 to this index in the shared template while their trigger gate stays false.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_090_ActionController.cpp:448",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:457",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:462",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:466",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:600",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:608",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:158",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:820"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "In traced consumers these floats only time the same visual follow-up, not damage scaling: on the second action start the retrigger key check, UniqueActionState latch, and GetFlag158 decide whether AdvanceUniqueEffect sets Hit and spawns FX_CP_090_00102.",
+          "evidence": [
+            "Source/Abrams/Private/CP_090_ActionController.cpp:472",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:477",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:481",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:485",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:81",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:86"
+          ]
+        },
+        {
+          "text": "Variant quirk: auto Cursed Energy Attack 1 uses the constant false hold gate, so the level-indexed charge reads in the shared TickAttack source are unreachable for types 73 and 77. Their different second-start gate accepts a pressed NormalAttack_1 or CursedEnergyAttack_1 key.",
+          "evidence": [
+            "Source/Abrams/Public/CP_090_Actions.h:211",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:581",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:687",
+            "Source/Abrams/Private/CP_090_ActionController.cpp:691",
+            "Tools/verify/CHAR/CP_090_ActionController.md:48"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Controller scope: the factory creates ten special attack classes (NormalAttack_2, its auto and air versions; NormalAttack_3 and air; CursedEnergyAttack_1, its auto and air versions) and delegates every other action type to the base factory. All ten share the UniqueAction 100 entry point.",
+      "evidence": [
+        "Source/Abrams/Private/CP_090_ActionController.cpp:731",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:748",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:758",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:106",
+        "Tools/verify/CHAR/CP_090_ActionController.md:11"
+      ]
+    },
+    {
+      "text": "When the unique action never began, these attacks change their own combo rows: NormalAttack_2 swaps attack row 1 for row 2, CursedEnergyAttack_1 swaps row 3 for row 4, and request filtering drops the action at start counts 1 or 3 respectively. NormalAttack_3 has the same row swap without a separate trigger helper.",
+      "evidence": [
+        "Source/Abrams/Private/CP_090_ActionController.cpp:165",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:169",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:174",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:505",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:509",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:517",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:377",
+        "Tools/verify/CHAR/CP_090_ActionController.md:44"
+      ]
+    },
+    {
+      "text": "Passive presentation is controller-driven: voice 10 plays once, the SE_CP_090_02001 cue is skipped while CP_090_Passive is up, and levels 1, 2, and 3-or-4 add BUFF_CP_090_PASSIVE_1, _2, or _3. The one-shot voice flag resets at character init, and the buff is refreshed when cursed-energy level changes while active.",
+      "evidence": [
+        "Source/Abrams/Private/CP_090_ActionController.cpp:761",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:767",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:772",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:776",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:826",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:830",
+        "Source/Abrams/Private/CP_090_ActionController.cpp:856"
+      ]
+    },
+    {
+      "text": "AI is wired separately: AIType and action-controller type 10 select FGameCharacterAIThinkNode_CP_090 and UCP_090_BehaviorController. The behavior controller specialises AI indices 0x0b, 0x0d, 0x0f, and 0x11 with four chance-node classes and forwards everything else to the parent; the think node uses fixed close/mid ranges. Do not assign another character's hold-node unique-float reads to him.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:173",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:1358",
+        "Source/Abrams/Private/CP_090_BehaviorController.cpp:8",
+        "Source/Abrams/Private/CP_090_BehaviorController.cpp:15",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1012",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1015",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+        "Tools/verify/CHAR/GameCharacterAIThinkNode.md:116"
+      ]
+    },
+    {
+      "text": "Shared readers checked and not assigned: SteerTowardSecondaryTarget divides by unique float (0, 0) but its listed callers are CN_041 and CN_140; MakeUniqueCameraRequest reads row floats 0-10 but has no CP_090 call site; trap/spawner code uses its source actor's unique rows 7 and 8; AGameShikigami uses ShikigamiUniqueDataTable rather than CharacterUniqueDataTable.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3492",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+        "Source/Abrams/Private/CN_041_ActionController.cpp:391",
+        "Source/Abrams/Private/CN_140_ActionController.cpp:97",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941",
+        "Source/Abrams/Private/GameTrapActionController.cpp:1441",
+        "Source/Abrams/Public/GameTrapAction.h:104",
+        "Source/Abrams/Public/GameShikigami.h:349"
+      ]
+    },
+    {
+      "text": "The accessor is a raw unchecked lookup, UniqueRows[RowIndex]->FloatValue[ValueIndex], with no bounds or null checks and no conversion for missing rows. A zero in an unread slot is not a fallback supplied by the accessor. Character setup fills these row pointers in Id_CharacterUnique order, so row 0 is the first entry and row 1 the second.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Source/Abrams/Public/GameCharacterActionInline.h:10"
+      ]
+    }
+  ]
+}

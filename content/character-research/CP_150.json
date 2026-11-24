@@ -1,0 +1,987 @@
+{
+  "overview": "Hanami’s settings tune charged attacks, a rapid flower burst, root traps, and homing walls at different cursed-energy levels.",
+  "technicalOverview": "Hanami (CP_150) uses UCP_150_ActionController with eight populated unique rows. The values divide into a small shared tuning row, a held third-attack charge, the flower-machine-gun burst, level-specific root traps (including Auto overrides), and three cursed-energy-2 homing-wall rows. Row numbers are zero-based positions in CharacterDataTable.Id_CharacterUnique, and trap behaviours read the same values through GetUniqueFloat/GetCharacterUniqueFloatValue. Effects below are traced from reconstructed source; where a downstream helper is shared, the entry says so.",
+  "rows": {
+    "CP_150": {
+      "title": "Core timing and plant-pattern scale factors",
+      "overview": "One normal-attack interruption cutoff, three speed divisors for the level-specific root trap, and three divisors used only when the passive buff is active. The trailing zero slots have no CP_150-specific read in the traced source.",
+      "values": {
+        "0": {
+          "label": "Projectile hold cutoff",
+          "simple": "How long the first normal attack keeps waiting while its projectiles are still alive.",
+          "technical": "In TCP_150_NormalAttack_1::TickAttack on start count 0 and phase 1, with a non-empty CollectedEffects list and at least one effect not finished: ActionElapsedTime increases and the tick returns while 0.3 > ActionElapsedTime. Once that strict test fails, every collected effect has attack and damage collisions disabled and its movement controller reset; the action sets Byte16, PhaseUnbounded and flag159. This is a time in seconds from DeltaTime accumulation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:207",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:218",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:226"
+          ]
+        },
+        "1": {
+          "label": "Root trap speed divisor, level 1",
+          "simple": "How much pattern 1 stretches Hanami's level-1 root-trap wind-up and rise.",
+          "technical": "FGameTrapAction_PlantRootMove reads value 1 of row 0 only when the trap source has material pattern 1 and SpawnCursedEnergyLevel == 1. Speed is 1.5; Rate is Speed != 0 ? 1/Speed : 1, and Rate multiplies both the initial Timer (from row 3 value 6, or row 7 value 2 for auto) and the rise/spin duration from row 3 value 0 (or row 7 value 0 for auto). Without pattern 1 Speed stays 1.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:572",
+            "Source/Abrams/Private/GameTrapActionController.cpp:603",
+            "Source/Abrams/Private/GameTrapActionController.cpp:607",
+            "Source/Abrams/Private/GameTrapActionController.cpp:674",
+            "Source/Abrams/Private/GameTrapActionController.cpp:695"
+          ]
+        },
+        "2": {
+          "label": "Root trap speed divisor, level 2",
+          "simple": "How much pattern 1 stretches Hanami's level-2 root-trap wind-up and rise.",
+          "technical": "Same PlantRootMove pattern-1 gate as value 1, selected when SpawnCursedEnergyLevel == 2. Speed is 2; Rate = 1/2, applied to the initial Timer (row 3 value 7) and the rise duration (row 3 value 1). The nonzero guard falls back to Rate 1 if the value were zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:575",
+            "Source/Abrams/Private/GameTrapActionController.cpp:603",
+            "Source/Abrams/Private/GameTrapActionController.cpp:607",
+            "Source/Abrams/Private/GameTrapActionController.cpp:660",
+            "Source/Abrams/Private/GameTrapActionController.cpp:694"
+          ]
+        },
+        "3": {
+          "label": "Root trap speed divisor, level 3",
+          "simple": "How much pattern 1 stretches Hanami's level-3 root-trap wind-up and rise.",
+          "technical": "Same PlantRootMove pattern-1 gate, selected when SpawnCursedEnergyLevel == 3. Speed is 3; Rate = 1/3, applied to the initial Timer (row 3 value 8) and the rise duration (row 3 value 2).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:578",
+            "Source/Abrams/Private/GameTrapActionController.cpp:603",
+            "Source/Abrams/Private/GameTrapActionController.cpp:607",
+            "Source/Abrams/Private/GameTrapActionController.cpp:664",
+            "Source/Abrams/Private/GameTrapActionController.cpp:694"
+          ]
+        },
+        "4": {
+          "label": "Passive homing interval divisor, level 1",
+          "simple": "Pattern-1 multiplier that slows level-1 homing-wall waves; also the level-1 wall speed divisor.",
+          "technical": "Two traced uses. (1) UCP_150_ActionController::AddHomingShot uses this as Divisor only when BUFF_CP_150_PASSIVE has a stack > 0 and the controller cursed energy level is 1; ScaledInterval = (Divisor != 0 ? 1/Divisor : 1) * row 4 value 4. With no passive stack Divisor stays 1. (2) FGameTrapAction_PlantWall uses value 4 of row 0 as its pattern-1 Speed for level 1, then Rate = Speed != 0 ? 1/Speed : 1 multiplies the rise duration from row 4 value 5.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:651",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:656",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:666",
+            "Source/Abrams/Private/GameTrapActionController.cpp:914",
+            "Source/Abrams/Private/GameTrapActionController.cpp:920",
+            "Source/Abrams/Private/GameTrapActionController.cpp:934"
+          ]
+        },
+        "5": {
+          "label": "Passive homing interval divisor, level 2",
+          "simple": "Pattern-1 multiplier that slows level-2 homing-wall waves; also the level-2 wall speed divisor.",
+          "technical": "Same two uses as value 4, selected for cursed energy level 2: passive-stack divisor for row 5 value 4 in AddHomingShot, and PlantWall pattern-1 Speed for the rise duration from row 5 value 5. Zero divisor guards keep the original interval/duration.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:651",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:659",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:666",
+            "Source/Abrams/Private/GameTrapActionController.cpp:923",
+            "Source/Abrams/Private/GameTrapActionController.cpp:931",
+            "Source/Abrams/Private/GameTrapActionController.cpp:934"
+          ]
+        },
+        "6": {
+          "label": "Passive homing interval divisor, level 3",
+          "simple": "Pattern-1 multiplier that slows level-3 homing-wall waves; also the level-3 wall speed divisor.",
+          "technical": "Same two uses, selected for cursed energy level 3: passive-stack divisor for row 6 value 4 in AddHomingShot, and PlantWall pattern-1 Speed for the rise duration from row 6 value 5. The passive stack test is GetBuffDebuffStack(CP_150_Passive, nullptr) > 0.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:651",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:662",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:666",
+            "Source/Abrams/Private/GameTrapActionController.cpp:926",
+            "Source/Abrams/Private/GameTrapActionController.cpp:931",
+            "Source/Abrams/Private/GameTrapActionController.cpp:934"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The row number is the zero-based position in CharacterDataTable.Id_CharacterUnique; the optional row list is copied in order into UniqueRows, and the float getter is an unchecked UniqueRows[Row]->FloatValue[Value] dereference, so a missing row is not given a default here.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:559",
+            "Source/Abrams/Private/GameCharacter.cpp:563",
+            "Source/Abrams/Private/GameCharacter.cpp:1761"
+          ]
+        },
+        {
+          "text": "Material pattern 1 is the switch that both applies BUFF_CP_150_PASSIVE and turns on the row-0/row-4..6 speed divisors used by the plant traps.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1005",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1007",
+            "Source/Abrams/Private/GameTrapActionController.cpp:674",
+            "Source/Abrams/Private/GameTrapActionController.cpp:914"
+          ]
+        }
+      ]
+    },
+    "CP_150_ATTACKD": {
+      "title": "NormalAttack_3_1 charge values",
+      "overview": "Holding the third normal attack builds charge; these values set the cutoff and the two resource gain rates. The cutoff is compared strictly, so the charge can pass it on the next tick.",
+      "values": {
+        "0": {
+          "label": "Maximum charge time",
+          "simple": "How long the held third attack can keep charging.",
+          "technical": "TickCharge accumulates ChargeTime while bChargeActive is set. On the finishing start count (1 for ground type 58, 3 for air type 70), the action keeps waiting only while EGameInputKey::NormalAttack_3 is held and 5 > ChargeTime. Once that strict comparison fails it sets Byte16, PhaseUnbounded and flag159 and clears bChargeActive. Unit: seconds of DeltaTime.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:462",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:478",
+            "Source/Abrams/Public/CP_150_Actions.h:93"
+          ]
+        },
+        "1": {
+          "label": "Cursed energy experience per second",
+          "simple": "How much attack experience the charge gives while the gauge is not at its threshold.",
+          "technical": "When bChargeActive is set and IsCursedEnergyGaugeAtThreshold() is false, TickCharge calls AddCursedEnergyExp(30 * DeltaTime). The threshold predicate is LevelThreshold[Unknown170] <= CursedEnergyGauge; this is the experience branch, not gauge gain.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:462",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:471",
+            "Source/Abrams/Public/GameCharacterStatusController.h:494"
+          ]
+        },
+        "2": {
+          "label": "Cursed energy gauge per second",
+          "simple": "How much cursed energy gauge the charge gives once the current level threshold is met.",
+          "technical": "When bChargeActive is set and IsCursedEnergyGaugeAtThreshold() is true, TickCharge calls AddCursedEnergy(35 * DeltaTime) instead of the experience branch. Rate is per second and is multiplied by DeltaTime.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:465",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:467"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Charge only starts when the action's slot-3 notify fires (UniqueAction sets bChargeActive; both notify parameters are ignored). Reset clears ChargeTime and the flag at start count 0.",
+          "evidence": [
+            "Source/Abrams/Public/CP_150_Actions.h:84",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:449",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:448"
+          ]
+        }
+      ]
+    },
+    "CP_150_ATTACKF": {
+      "title": "FlowerMachineGun / trap-shot burst values",
+      "overview": "Values used by the TR_020_00 flower trap and the three-stage hand-off to the character controller: a short notify delay, the trap's own lifetime, the burst's timing and size, and a placement clamp.",
+      "values": {
+        "0": {
+          "label": "Notify delay after setup",
+          "simple": "How long the flower waits before signalling the character's actions again.",
+          "technical": "In FGameTrapAction_FlowerMachineGun::Tick state 3, Delay is read from value 0 of row 2 and compared with a per-state Timer. Here it is 0, so once state 3 begins, Delay <= Timer is true on that tick and PlayUniqueAction(1, 0.0) is forwarded to the source character. A null source would substitute 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1303",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1306",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1309"
+          ]
+        },
+        "1": {
+          "label": "Flower lifetime after hand-off",
+          "simple": "How long the flower trap remains active after starting its burst.",
+          "technical": "In FlowerMachineGun state 6, Timer accumulates and the trap calls Finish() once 1 <= Timer. This begins after state 5 has called UCP_150_ActionController::StartTrapShot with the trap location, target location and target actor.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:1316",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1326",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1335"
+          ]
+        },
+        "2": {
+          "label": "Trap-shot phase 0 wait",
+          "simple": "How long the controller waits before placing the burst marker.",
+          "technical": "TickTrapShot only runs while TrapShot.bActive. Its phase timer uses DeltaTime divided by CustomTimeDilation when that value is positive, otherwise raw DeltaTime. Phase 0 returns until PhaseTime >= 2 seconds; then it refreshes the target location, clamps XY distance and snaps the marker to ground before spawning the DCL_80200 decal and SE_CP_150_01361.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1257",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1263",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1269",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1293"
+          ]
+        },
+        "3": {
+          "label": "Trap-shot phase 1 wait",
+          "simple": "How long the marker stays before the burst and ground drops appear.",
+          "technical": "Phase 1 returns until PhaseTime >= 0.5 seconds. It then reads value 5 of this row as Radius, spawns FX_CP_150_06111 with that Niagara Radius and capsule radius, places nine FX_CP_150_06112/06122 drops, and fades the decal.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1321",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1325",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1333"
+          ]
+        },
+        "4": {
+          "label": "Trap-shot phase 2 wait",
+          "simple": "How long the burst remains before the controller releases its effects.",
+          "technical": "Phase 2 accumulates the same dilation-adjusted timer and calls FCP_150_TrapShotState::Release() once PhaseTime >= 2 seconds. Release finishes pooled effects, fades the decal and stops the 3D sound.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1412",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1164"
+          ]
+        },
+        "5": {
+          "label": "Burst radius and decal size",
+          "simple": "How wide the burst marker and its effect are.",
+          "technical": "One value feeds several places in phase 0/1: decal Size.Y and Size.Z are set to 500, the FX_CP_150_06111 Niagara Radius parameter and capsule radius/collision-manager request use 500, the eight outer ground drops are offset by Radius * 0.5, and each drop is scaled by Radius * 0.002. These are world-space distances used by FVector and capsule calls.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1305",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1325",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1343",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1358",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1388"
+          ]
+        },
+        "6": {
+          "label": "Trap placement clamp distance",
+          "simple": "How far the burst can be pulled away from the flower's origin.",
+          "technical": "In phase 0, if the 2-D distance from TrapShot.TrapLocation to TrapShot.TrapOrigin exceeds 3000 world-space units, the location is reset to TrapOrigin plus the normalized XY direction times 3000. The Z is then cleared before ground snapping.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1277",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1279",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1281"
+          ]
+        }
+      },
+      "untraced": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "TR_020_00 is spawned by NormalAttack_2's notify 0 after a short backward trace; the air form's notify 1 additionally sets flag159. The trap's notify 1 is broadcast by the action controller to every active layer action's slot 3.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:359",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:369",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:2803"
+          ]
+        },
+        {
+          "text": "StartTrapShot only copies From, To and Target and arms the shot; all row-2 timing and geometry is consumed later by TickTrapShot from the controller's ActionTick.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:934",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1428",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:1424"
+          ]
+        }
+      ]
+    },
+    "CP_150_ATTACKG": {
+      "title": "Root-rise trap (cursed energy 1) values",
+      "overview": "Level-specific timings for the TR_030_00 PlantRootMove trap: start delay, rise time, placement range and how long the trap waits before finishing. Auto versions override three of these from ATTACKG_AUTO.",
+      "values": {
+        "0": {
+          "label": "Root rise duration, level 1",
+          "simple": "How long the level-1 root takes to rise.",
+          "technical": "PlantRootMove state 1 selects this value for SpawnCursedEnergyLevel == 1 and passes 0.5 seconds (multiplied by the pattern-1 Rate from row 0 value 1) to Rise.Start(0, 3000, Duration). The matching damage row is CP_150_ATTACKG_01_01_1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:650",
+            "Source/Abrams/Private/GameTrapActionController.cpp:656",
+            "Source/Abrams/Private/GameTrapActionController.cpp:695"
+          ]
+        },
+        "1": {
+          "label": "Root rise duration, level 2",
+          "simple": "How long the level-2 root takes to rise.",
+          "technical": "Same as value 0 for SpawnCursedEnergyLevel == 2, using row 0 value 2 as the pattern-1 divisor. Damage row: CP_150_ATTACKG_01_01_2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:660",
+            "Source/Abrams/Private/GameTrapActionController.cpp:661",
+            "Source/Abrams/Private/GameTrapActionController.cpp:694"
+          ]
+        },
+        "2": {
+          "label": "Root rise duration, level 3",
+          "simple": "How long the level-3 root takes to rise.",
+          "technical": "Same as value 0 for SpawnCursedEnergyLevel == 3, using row 0 value 3 as the pattern-1 divisor. Damage row: CP_150_ATTACKG_01_01_3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:664",
+            "Source/Abrams/Private/GameTrapActionController.cpp:665",
+            "Source/Abrams/Private/GameTrapActionController.cpp:694"
+          ]
+        },
+        "3": {
+          "label": "Root trap placement range, level 1",
+          "simple": "How far from the character the level-1 root trap can be placed.",
+          "technical": "TCP_150_CursedEnergyAttack_1<TBase>::GetTrapRange writes 2000 world-space units for action cursed energy level 1. UniqueAction clamps the secondary target's XY position to that range around the owner before grounding and spawning TR_030_00.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:797",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:800",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:827"
+          ]
+        },
+        "4": {
+          "label": "Root trap placement range, level 2",
+          "simple": "How far from the character the level-2 root trap can be placed.",
+          "technical": "GetTrapRange writes 3000 world-space units for level 2; the same XY clamp applies to the TR_030_00 spawn target.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:803",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:827",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:830"
+          ]
+        },
+        "5": {
+          "label": "Root trap placement range, level 3",
+          "simple": "How far from the character the level-3 root trap can be placed.",
+          "technical": "GetTrapRange writes 4000 world-space units for level 3; the same XY clamp applies to the TR_030_00 spawn target.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:806",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:827",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:830"
+          ]
+        },
+        "6": {
+          "label": "Root trap initial wait, level 1",
+          "simple": "How long the level-1 trap sits before its root attack begins.",
+          "technical": "PlantRootMove::Start assigns 0.3 seconds to Timer for level 1. Tick state 0 decrements that Timer; when it reaches <= 0 it spawns FX_CP_150_00211 and advances. The pattern-1 Rate from row 0 value 1 multiplies this Timer in Start before ticking.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:572",
+            "Source/Abrams/Private/GameTrapActionController.cpp:607",
+            "Source/Abrams/Private/GameTrapActionController.cpp:631"
+          ]
+        },
+        "7": {
+          "label": "Root trap initial wait, level 2",
+          "simple": "How long the level-2 trap sits before its root attack begins.",
+          "technical": "Same state-0 countdown for level 2, initialized to 0.3 seconds and multiplied by the pattern-1 Rate from row 0 value 2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:575",
+            "Source/Abrams/Private/GameTrapActionController.cpp:603",
+            "Source/Abrams/Private/GameTrapActionController.cpp:607"
+          ]
+        },
+        "8": {
+          "label": "Root trap initial wait, level 3",
+          "simple": "How long the level-3 trap sits before its root attack begins.",
+          "technical": "Same state-0 countdown for level 3, initialized to 0.2 seconds and multiplied by the pattern-1 Rate from row 0 value 3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:578",
+            "Source/Abrams/Private/GameTrapActionController.cpp:603",
+            "Source/Abrams/Private/GameTrapActionController.cpp:607"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The same CE_1 slot-3 body is used for ground/air and Auto variants; the Auto variant changes both GetTrapRange and the SpawnFlag passed into AGameTrapManager::InitializeTrap, which is why row 7 can replace these level values.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:813",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:822",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:845"
+          ]
+        },
+        {
+          "text": "PlantRootMove uses GetUniqueFloat, which returns 0 immediately when the trap has no source interface; otherwise it forwards to that source character's GetCharacterUniqueFloatValue.",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:182",
+            "Source/Abrams/Private/GameTrapActionController.cpp:186"
+          ]
+        }
+      ]
+    },
+    "CP_150_ATTACKH_1": {
+      "title": "Cursed-energy-2 homing wall, level 1",
+      "overview": "Settings for the level-1 homing shot and the PlantWall traps it lays. The same row is selected dynamically by the controller's cursed energy level; the level also picks the plant-wall damage row.",
+      "values": {
+        "0": {
+          "label": "PlantWall trap count",
+          "simple": "How many homing wall traps one cursed-energy-2 shot lays.",
+          "technical": "AddHomingShot converts value 0 of this row to int32 and stores it as FCP_150_HomingShot::SpawnCount. TickHomingShots stops a shot's spawning once SpawnIndex reaches that count (3 here). Even counts spawn two traps per batch; odd counts spawn one after the first.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:645",
+            "Source/Abrams/Public/CP_150_HomingShot.h:24",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:704",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:777"
+          ]
+        },
+        "1": {
+          "label": "Minimum wall spawn radius",
+          "simple": "Closest distance from the shot origin at which a wall can be placed.",
+          "technical": "Stored as SpawnRadiusMin. Each step computes Distance = Lerp(SpawnRadiusMin, SpawnRadiusMax, abs(cos(Step * Spread))) and offsets the candidate trap location by that world-space distance along the fanned direction.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:647",
+            "Source/Abrams/Public/CP_150_HomingShot.h:30",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:736",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:737"
+          ]
+        },
+        "2": {
+          "label": "Maximum wall spawn radius",
+          "simple": "Farthest distance from the shot origin at which a wall can be placed.",
+          "technical": "Stored as SpawnRadiusMax and used as the upper endpoint of the same Lerp for every wall candidate.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:648",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:736"
+          ]
+        },
+        "3": {
+          "label": "Wall fan spread",
+          "simple": "How widely the homing walls are fanned around the shot direction.",
+          "technical": "Stored as SpawnSpreadAngleDegrees (47 degrees). At batch 0 with an even trap count it is halved; otherwise the direction is rotated by +/-(Step * Spread) degrees around the shot's up axis, alternating sides within the batch. The same scaled value is the argument to the cosine used by the distance Lerp.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:646",
+            "Source/Abrams/Public/CP_150_HomingShot.h:26",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:713",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:728",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:734"
+          ]
+        },
+        "4": {
+          "label": "Wall wave interval",
+          "simple": "How long between successive waves of homing walls.",
+          "technical": "Value 4 of this row is Unique4 in AddHomingShot. ScaledInterval = (passive active ? 1/row0 value 4 : 1) * Unique4 is stored as SpawnInterval; after a batch actually spawns a trap, SpawnTimer is reset to SpawnInterval. Zero divisor falls back to a multiplier of 1.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:649",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:650",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:666",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:668",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:775"
+          ]
+        },
+        "5": {
+          "label": "Wall rise duration",
+          "simple": "How long the plant wall takes to rise.",
+          "technical": "FGameTrapAction_PlantWall picks this row by cursed energy level (4/5/6), then multiplies value 5 by the pattern-1 Rate from row 0 value 4 and passes it to Rise.Start. With no pattern 1 the duration is the raw 0.25 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:898",
+            "Source/Abrams/Private/GameTrapActionController.cpp:931",
+            "Source/Abrams/Private/GameTrapActionController.cpp:934",
+            "Source/Abrams/Private/GameTrapActionController.cpp:935",
+            "Source/Abrams/Private/GameTrapActionController.cpp:937"
+          ]
+        },
+        "6": {
+          "label": "Wall post-rise hold",
+          "simple": "How long the wall stays active after it finishes rising.",
+          "technical": "PlantWall state 0 assigns value 6 of this row to Timer (2 seconds). State 2 decrements that Timer and finishes the trap action when it is <= 0, if the controller has no unfinished action.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:938",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1034",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1040"
+          ]
+        },
+        "7": {
+          "label": "Wall rise height factor",
+          "simple": "How high each plant wall rises.",
+          "technical": "PlantWall computes RiseHeight = value 7 * 500.0 and passes it to Rise.Start. Here that gives 250 world-space units for this level.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:936",
+            "Source/Abrams/Private/GameTrapActionController.cpp:937",
+            "Source/Abrams/Public/GameTrapAction.h:189"
+          ]
+        },
+        "8": {
+          "label": "Homing shot start delay",
+          "simple": "How long after the cursed-energy-2 shot is created before walls appear.",
+          "technical": "AddHomingShot stores value 8 as FCP_150_HomingShot::SpawnDelay. TickHomingShots decrements it by the dilation-adjusted Delta and skips the shot while it remains > 0 before starting the SpawnTimer countdown.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:667",
+            "Source/Abrams/Public/CP_150_HomingShot.h:31",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:691",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:696"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Ground CursedEnergyAttack_2 calls AddHomingShot on start count 0 and air CursedEnergyAttackAir_2 on start count 2. Both snap the start Z to ground and aim in 2-D at the secondary target, falling back to the owner's forward vector if no valid target or a zero direction.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:564",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:581",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:594",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:602"
+          ]
+        },
+        {
+          "text": "AddHomingShot chooses rows 4/5/6 from the controller's cursed energy level, not from the function's Level argument; levels outside 1-3 leave Row at -1 and no fallback is applied before the unchecked float getter.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:628",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:632",
+            "Source/Abrams/Private/GameCharacter.cpp:1761"
+          ]
+        },
+        {
+          "text": "Wall traps use alternating TR_031_00 and TR_031_10 rows, record their weak handles on the shot, and report hits back to the controller so a previously hit actor is not collided with again.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:715",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:768",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:954",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:965"
+          ]
+        }
+      ]
+    },
+    "CP_150_ATTACKH_2": {
+      "title": "Cursed-energy-2 homing wall, level 2",
+      "overview": "Settings for the level-2 homing shot and the PlantWall traps it lays. The same row is selected dynamically by the controller's cursed energy level; the level also picks the plant-wall damage row.",
+      "values": {
+        "0": {
+          "label": "PlantWall trap count",
+          "simple": "How many homing wall traps one cursed-energy-2 shot lays.",
+          "technical": "AddHomingShot converts value 0 of this row to int32 and stores it as FCP_150_HomingShot::SpawnCount. TickHomingShots stops a shot's spawning once SpawnIndex reaches that count (5 here). Even counts spawn two traps per batch; odd counts spawn one after the first.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:645",
+            "Source/Abrams/Public/CP_150_HomingShot.h:24",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:704",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:777"
+          ]
+        },
+        "1": {
+          "label": "Minimum wall spawn radius",
+          "simple": "Closest distance from the shot origin at which a wall can be placed.",
+          "technical": "Stored as SpawnRadiusMin. Each step computes Distance = Lerp(SpawnRadiusMin, SpawnRadiusMax, abs(cos(Step * Spread))) and offsets the candidate trap location by that world-space distance along the fanned direction.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:647",
+            "Source/Abrams/Public/CP_150_HomingShot.h:30",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:736",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:737"
+          ]
+        },
+        "2": {
+          "label": "Maximum wall spawn radius",
+          "simple": "Farthest distance from the shot origin at which a wall can be placed.",
+          "technical": "Stored as SpawnRadiusMax and used as the upper endpoint of the same Lerp for every wall candidate.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:648",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:736"
+          ]
+        },
+        "3": {
+          "label": "Wall fan spread",
+          "simple": "How widely the homing walls are fanned around the shot direction.",
+          "technical": "Stored as SpawnSpreadAngleDegrees (47 degrees). At batch 0 with an even trap count it is halved; otherwise the direction is rotated by +/-(Step * Spread) degrees around the shot's up axis, alternating sides within the batch. The same scaled value is the argument to the cosine used by the distance Lerp.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:646",
+            "Source/Abrams/Public/CP_150_HomingShot.h:26",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:713",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:728",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:734"
+          ]
+        },
+        "4": {
+          "label": "Wall wave interval",
+          "simple": "How long between successive waves of homing walls.",
+          "technical": "Value 4 of this row is Unique4 in AddHomingShot. ScaledInterval = (passive active ? 1/row0 value 5 : 1) * Unique4 is stored as SpawnInterval; after a batch actually spawns a trap, SpawnTimer is reset to SpawnInterval. Zero divisor falls back to a multiplier of 1.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:649",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:650",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:666",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:668",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:775"
+          ]
+        },
+        "5": {
+          "label": "Wall rise duration",
+          "simple": "How long the plant wall takes to rise.",
+          "technical": "FGameTrapAction_PlantWall picks this row by cursed energy level (4/5/6), then multiplies value 5 by the pattern-1 Rate from row 0 value 5 and passes it to Rise.Start. With no pattern 1 the duration is the raw 0.25 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:898",
+            "Source/Abrams/Private/GameTrapActionController.cpp:931",
+            "Source/Abrams/Private/GameTrapActionController.cpp:934",
+            "Source/Abrams/Private/GameTrapActionController.cpp:935",
+            "Source/Abrams/Private/GameTrapActionController.cpp:937"
+          ]
+        },
+        "6": {
+          "label": "Wall post-rise hold",
+          "simple": "How long the wall stays active after it finishes rising.",
+          "technical": "PlantWall state 0 assigns value 6 of this row to Timer (3 seconds). State 2 decrements that Timer and finishes the trap action when it is <= 0, if the controller has no unfinished action.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:938",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1034",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1040"
+          ]
+        },
+        "7": {
+          "label": "Wall rise height factor",
+          "simple": "How high each plant wall rises.",
+          "technical": "PlantWall computes RiseHeight = value 7 * 500.0 and passes it to Rise.Start. Here that gives 375 world-space units for this level.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:936",
+            "Source/Abrams/Private/GameTrapActionController.cpp:937",
+            "Source/Abrams/Public/GameTrapAction.h:189"
+          ]
+        },
+        "8": {
+          "label": "Homing shot start delay",
+          "simple": "How long after the cursed-energy-2 shot is created before walls appear.",
+          "technical": "AddHomingShot stores value 8 as FCP_150_HomingShot::SpawnDelay. TickHomingShots decrements it by the dilation-adjusted Delta and skips the shot while it remains > 0 before starting the SpawnTimer countdown.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:667",
+            "Source/Abrams/Public/CP_150_HomingShot.h:31",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:691",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:696"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Ground CursedEnergyAttack_2 calls AddHomingShot on start count 0 and air CursedEnergyAttackAir_2 on start count 2. Both snap the start Z to ground and aim in 2-D at the secondary target, falling back to the owner's forward vector if no valid target or a zero direction.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:564",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:581",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:594",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:602"
+          ]
+        },
+        {
+          "text": "AddHomingShot chooses rows 4/5/6 from the controller's cursed energy level, not from the function's Level argument; levels outside 1-3 leave Row at -1 and no fallback is applied before the unchecked float getter.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:628",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:632",
+            "Source/Abrams/Private/GameCharacter.cpp:1761"
+          ]
+        },
+        {
+          "text": "Wall traps use alternating TR_031_00 and TR_031_10 rows, record their weak handles on the shot, and report hits back to the controller so a previously hit actor is not collided with again.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:715",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:768",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:954",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:965"
+          ]
+        }
+      ]
+    },
+    "CP_150_ATTACKH_3": {
+      "title": "Cursed-energy-2 homing wall, level 3",
+      "overview": "Settings for the level-3 homing shot and the PlantWall traps it lays. The same row is selected dynamically by the controller's cursed energy level; the level also picks the plant-wall damage row.",
+      "values": {
+        "0": {
+          "label": "PlantWall trap count",
+          "simple": "How many homing wall traps one cursed-energy-2 shot lays.",
+          "technical": "AddHomingShot converts value 0 of this row to int32 and stores it as FCP_150_HomingShot::SpawnCount. TickHomingShots stops a shot's spawning once SpawnIndex reaches that count (5 here). Even counts spawn two traps per batch; odd counts spawn one after the first.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:645",
+            "Source/Abrams/Public/CP_150_HomingShot.h:24",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:704",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:777"
+          ]
+        },
+        "1": {
+          "label": "Minimum wall spawn radius",
+          "simple": "Closest distance from the shot origin at which a wall can be placed.",
+          "technical": "Stored as SpawnRadiusMin. Each step computes Distance = Lerp(SpawnRadiusMin, SpawnRadiusMax, abs(cos(Step * Spread))) and offsets the candidate trap location by that world-space distance along the fanned direction.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:647",
+            "Source/Abrams/Public/CP_150_HomingShot.h:30",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:736",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:737"
+          ]
+        },
+        "2": {
+          "label": "Maximum wall spawn radius",
+          "simple": "Farthest distance from the shot origin at which a wall can be placed.",
+          "technical": "Stored as SpawnRadiusMax and used as the upper endpoint of the same Lerp for every wall candidate.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:648",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:736"
+          ]
+        },
+        "3": {
+          "label": "Wall fan spread",
+          "simple": "How widely the homing walls are fanned around the shot direction.",
+          "technical": "Stored as SpawnSpreadAngleDegrees (47 degrees). At batch 0 with an even trap count it is halved; otherwise the direction is rotated by +/-(Step * Spread) degrees around the shot's up axis, alternating sides within the batch. The same scaled value is the argument to the cosine used by the distance Lerp.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:646",
+            "Source/Abrams/Public/CP_150_HomingShot.h:26",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:713",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:728",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:734"
+          ]
+        },
+        "4": {
+          "label": "Wall wave interval",
+          "simple": "How long between successive waves of homing walls.",
+          "technical": "Value 4 of this row is Unique4 in AddHomingShot. ScaledInterval = (passive active ? 1/row0 value 6 : 1) * Unique4 is stored as SpawnInterval; after a batch actually spawns a trap, SpawnTimer is reset to SpawnInterval. Zero divisor falls back to a multiplier of 1.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:649",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:650",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:666",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:668",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:775"
+          ]
+        },
+        "5": {
+          "label": "Wall rise duration",
+          "simple": "How long the plant wall takes to rise.",
+          "technical": "FGameTrapAction_PlantWall picks this row by cursed energy level (4/5/6), then multiplies value 5 by the pattern-1 Rate from row 0 value 6 and passes it to Rise.Start. With no pattern 1 the duration is the raw 0.25 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:898",
+            "Source/Abrams/Private/GameTrapActionController.cpp:931",
+            "Source/Abrams/Private/GameTrapActionController.cpp:934",
+            "Source/Abrams/Private/GameTrapActionController.cpp:935",
+            "Source/Abrams/Private/GameTrapActionController.cpp:937"
+          ]
+        },
+        "6": {
+          "label": "Wall post-rise hold",
+          "simple": "How long the wall stays active after it finishes rising.",
+          "technical": "PlantWall state 0 assigns value 6 of this row to Timer (3 seconds). State 2 decrements that Timer and finishes the trap action when it is <= 0, if the controller has no unfinished action.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:938",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1034",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1040"
+          ]
+        },
+        "7": {
+          "label": "Wall rise height factor",
+          "simple": "How high each plant wall rises.",
+          "technical": "PlantWall computes RiseHeight = value 7 * 500.0 and passes it to Rise.Start. Here that gives 500 world-space units for this level.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:936",
+            "Source/Abrams/Private/GameTrapActionController.cpp:937",
+            "Source/Abrams/Public/GameTrapAction.h:189"
+          ]
+        },
+        "8": {
+          "label": "Homing shot start delay",
+          "simple": "How long after the cursed-energy-2 shot is created before walls appear.",
+          "technical": "AddHomingShot stores value 8 as FCP_150_HomingShot::SpawnDelay. TickHomingShots decrements it by the dilation-adjusted Delta and skips the shot while it remains > 0 before starting the SpawnTimer countdown.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:667",
+            "Source/Abrams/Public/CP_150_HomingShot.h:31",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:691",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:696"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Ground CursedEnergyAttack_2 calls AddHomingShot on start count 0 and air CursedEnergyAttackAir_2 on start count 2. Both snap the start Z to ground and aim in 2-D at the secondary target, falling back to the owner's forward vector if no valid target or a zero direction.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:564",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:581",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:594",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:602"
+          ]
+        },
+        {
+          "text": "AddHomingShot chooses rows 4/5/6 from the controller's cursed energy level, not from the function's Level argument; levels outside 1-3 leave Row at -1 and no fallback is applied before the unchecked float getter.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:628",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:632",
+            "Source/Abrams/Private/GameCharacter.cpp:1761"
+          ]
+        },
+        {
+          "text": "Wall traps use alternating TR_031_00 and TR_031_10 rows, record their weak handles on the shot, and report hits back to the controller so a previously hit actor is not collided with again.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:715",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:768",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:954",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:965"
+          ]
+        }
+      ]
+    },
+    "CP_150_ATTACKG_AUTO": {
+      "title": "Auto root-rise overrides",
+      "overview": "Overrides for the Auto cursed-energy-1 attacks: one rise time, one placement range and one zero initial wait. SpawnFlag 1 on the TR_030_00 trap selects these instead of the level-based ATTACKG values.",
+      "values": {
+        "0": {
+          "label": "Auto root rise duration",
+          "simple": "How long the auto root takes to rise.",
+          "technical": "PlantRootMove state 1 checks SpawnFlag == 1 and replaces the level duration with GetUniqueFloat(0, 7), i.e. 0.25 seconds, before applying the row-0 pattern-1 Rate. The damage row is forced to CP_150_ATTACKG_01_01_1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:668",
+            "Source/Abrams/Private/GameTrapActionController.cpp:670",
+            "Source/Abrams/Private/GameTrapActionController.cpp:671",
+            "Source/Abrams/Private/GameTrapActionController.cpp:695"
+          ]
+        },
+        "1": {
+          "label": "Auto trap placement range",
+          "simple": "How far from the character the auto root trap can be placed.",
+          "technical": "FCP_150_CursedEnergyAttack_1_Auto and FCP_150_CursedEnergyAttackAir_1_Auto override GetTrapRange to write 4000 world-space units. UniqueAction then uses that range to clamp the secondary target's XY position before spawning TR_030_00.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:850",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:853",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:856",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:827"
+          ]
+        },
+        "2": {
+          "label": "Auto root initial wait",
+          "simple": "How long the auto trap waits before its attack begins.",
+          "technical": "PlantRootMove::Start checks SpawnFlag == 1 and sets Timer directly from value 2 of row 7, or 0 if there is no source interface. Because the value is 0, state 0 proceeds on its first tick. Row 0's pattern-1 Rate still multiplies this Timer in Start.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameTrapActionController.cpp:581",
+            "Source/Abrams/Private/GameTrapActionController.cpp:583",
+            "Source/Abrams/Private/GameTrapActionController.cpp:607",
+            "Source/Abrams/Private/GameTrapActionController.cpp:631"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Auto status is decided by the action type (CursedEnergyAttack_1_Auto or Air_1_Auto), then passed as the SpawnFlag to InitializeTrap; the same true flag is also used in the collision-parameter Setup call for the root trap.",
+          "evidence": [
+            "Source/Abrams/Private/CP_150_ActionController.cpp:822",
+            "Source/Abrams/Private/CP_150_ActionController.cpp:845",
+            "Source/Abrams/Private/GameTrapActionController.cpp:738"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "AGameCharacter creates this controller only for EGameCharacterActionControllerType::CP_150. Its CreateAction override supplies Hanami-specific normal and cursed-energy actions for sixteen types and delegates all other types to the base factory.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:601",
+        "Source/Abrams/Private/CP_150_ActionController.cpp:884",
+        "Source/Abrams/Private/CP_150_ActionController.cpp:921"
+      ]
+    },
+    {
+      "text": "The behaviour controller is a size-zero shell for this character: AI index 0x10 gets FGameCharacterAIAction_NormalAttack3DownHold, matching the held third-attack mechanic; every other index delegates to the parent factory.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:1370",
+        "Source/Abrams/Private/CP_150_BehaviorController.cpp:8",
+        "Source/Abrams/Private/CP_150_BehaviorController.cpp:12"
+      ]
+    },
+    {
+      "text": "The CP_150 AI setup uses advanced behaviour, close/mid ranges of 1000/500/1500, weights 20 for both cursed-energy attacks and 30 for the super, and gates normal-attack 3/3_1 and cursed-energy 2 on value D being at least 4.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1733",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1773",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1797",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1778",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1783",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:1794"
+      ]
+    },
+    {
+      "text": "The shared trap helper GetUniqueFloat returns 0 if a trap has no source interface; the character action helper GetOwnerUniqueFloat directly calls the owner character's float getter. Neither adds row-index bounds safety.",
+      "evidence": [
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/GameCharacterAction.cpp:935",
+        "Source/Abrams/Private/GameCharacter.cpp:1761"
+      ]
+    },
+    {
+      "text": "The shared TR_030_00 spawn tail is also used by CP_130 cursed-energy slot 3 bodies, but the row meanings here are CP_150's: do not transfer them to another character code that reuses the row names.",
+      "evidence": [
+        "Source/Abrams/Public/GameCharacterActionController.h:874",
+        "Source/Abrams/Private/GameCharacter.cpp:559"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,259 @@
+{
+  "overview": "Megumi’s unique settings tune the cost of keeping and commanding summons, when their follow-ups trigger, and how the camera adjusts.",
+  "technicalOverview": "Megumi Fushiguro (CP_030) has exactly one populated unique row: CP_030 in CharacterUniqueDataTable4, placed in CharacterDataTable.Id_CharacterUnique slot 0. The row is a shikigami cost-and-control sheet, not a set of camera presets. A value of 5 is the cursed energy drained each second while a shikigami is out, 3 is the cursed-energy level needed for held-button shikigami orders and 150 is their cost, and 2 is the level needed for the CE2 shikigami follow-up. The pair 3500/1000 is an inclusive distance window for that follow-up's longer-range shikigami attack, 120 offsets the third shikigami's summon in front of Megumi, and 400/1 set the virtual-camera distance and its blend when the shikigami count changes. The reconstructed code reaches these numbers by numeric row and float index; it never looks the row name up by string. Indices 9-13 are zero and no reader of them was identified in the traced sources, which is not by itself proof that they cannot be used.",
+  "rows": {
+    "CP_030": {
+      "title": "Shikigami order, summon and camera tuning",
+      "overview": "The only row is read in five places: the controller's cursed-energy drain slot, the held-button order tick, two CE attack action families, the third-shikigami summon action, and the controller's camera request on shikigami-count changes. Nine of its fourteen floats have a traced reader; the remaining five are zero with no identified read.",
+      "values": {
+        "0": {
+          "label": "Cursed-energy drain per second while a shikigami is out",
+          "simple": "Megumi loses 5 cursed energy every second as long as a shikigami is active; the drain pauses for part of his CE1 attack.",
+          "technical": "Stored value 5.0. UCP_030_ActionController::GetCursedEnergyDrainRate (vtable slot 113) first returns 0.0f when ActiveShikigamis.Num() <= 0, and also returns 0.0f when the Attack-layer action is CursedEnergyAttack_1 or CursedEnergyAttackAir_1 and IsAttackActionFlag15A() is false; otherwise it returns GetCharacterUniqueFloatValue(0, 0). AGameCharacter::GetActionValue113 forwards that slot to the status controller's per-frame tick, which subtracts Drain * DeltaTime from CursedEnergy only when Drain >= 0.0f, so the unit is cursed-energy points per second. A larger value drains faster and 0 would make the drain inactive. Two generic, non-CP_030-specific readers also use (0, 0): UGameCharacterActionController::SteerTowardSecondaryTarget requires it to be positive and divides an angle by it for a turn time when a valid secondary target exists, and FGameCharacterAction_ProjectionSorceryReceive uses it only as a fallback RestraintTime when Request.DamageTableRow is null. CP_030's own AI override uses FGameCharacterAIAction_ToggleCursedEnergyAttack1 at index 0x16, which does not read this value; the generic CursedEnergyAttack1Hold/2Hold readers of (0, 0), (1, 0) and (2, 0) belong to other characters' behavior factories.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_030_ActionController.cpp:26",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:28",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:35",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:41",
+            "Source/Abrams/Private/GameCharacter.cpp:3031",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3434",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3492",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+            "Source/Abrams/Private/CP_030_BehaviorController.cpp:12"
+          ]
+        },
+        "1": {
+          "label": "Upper distance bound for the long-range CE2 shikigami follow-up",
+          "simple": "At CE level 3 or higher, a shikigami can use its farther follow-up attack when the target is between 1000 and 3500 units away; 3500 is the far edge of that window.",
+          "technical": "Stored value 3500.0. Read as GetOwnerUniqueFloat(ShikigamiIndex, 0) inside TCP_030_CursedEnergyAttack_2<TBase, bAutoRow>::UniqueAction, where ShikigamiIndex is (GetShikigamiUnknown374(0) != 1). Thus this is float index 1 only when shikigami 0 is not requested active and shikigami 1 is the one being ordered; when the index is 0 neither this value nor index 2 is read. It is used only on the first attack start (GetActionStartCount == 0), after the row-0 index-3 level gate and after the ActiveShikigamis.Num() > 0 check. With CursedEnergyLevel >= 3 and TargetDistance >= row-0 index 2 (1000), the additional test NearDistance >= TargetDistance selects EGameShikigamiActionType::Attack_6 instead of the default Attack_3; both comparisons are inclusive, so 1000 <= TargetDistance <= 3500 qualifies. The source calls this 3500 value NearDistance and the 1000 value FarDistance, but the comparisons make them the upper and lower bounds respectively. TargetDistance was captured in StartAttackHoming as FVector::Dist of the owner's GAISlot014 location and its TargetVector48, in world-distance units. Increasing 3500 admits more distant targets; lowering it excludes them. The four CE2 classes (ground/air, normal/auto) share this body; on repeat starts with a hit on the secondary target the code sends Attack_4 and reads no unique float.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_030_ActionController.cpp:457",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:459",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:471",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:472",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:477",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:479",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:483",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:494",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:576",
+            "Source/Abrams/Public/CP_030_Actions.h:156"
+          ]
+        },
+        "2": {
+          "label": "Lower distance bound for the long-range CE2 shikigami follow-up",
+          "simple": "The farther follow-up attack is not used when the target is closer than 1000 units.",
+          "technical": "Stored value 1000.0. Read as GetOwnerUniqueFloat(ShikigamiIndex + 1, 0) in the same first-start CE2 branch as index 1, so with ShikigamiIndex == 1 it is float index 2. The guard is TargetDistance >= FarDistance, inclusive: at exactly 1000 the distance test passes; below 1000 the shikigami is sent to the default Attack_3 instead of Attack_6, provided the level-3 and 3500 upper-bound tests also hold. Increasing this value makes very close targets fall back to Attack_3; lowering it lets closer targets qualify. No read occurs on repeat CE2 starts or when the chosen shikigami index is 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_030_ActionController.cpp:471",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:475",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:478",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:479",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:483",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:578"
+          ]
+        },
+        "3": {
+          "label": "Minimum cursed-energy level for the CE2 shikigami follow-up",
+          "simple": "The CE2 attack only calls a shikigami to follow up at cursed-energy level 2 or higher.",
+          "technical": "Stored value 2.0. At the top of TCP_030_CursedEnergyAttack_2<TBase, bAutoRow>::UniqueAction, Level is the float cast of ActionController->CursedEnergyLevel and any Level < GetOwnerUniqueFloat(3, 0) returns immediately. The comparison is strict less-than, so level 2 passes and level 1 does not; higher values would require a higher level. An early return skips the ActiveShikigamis check, the shikigami target assignment and both shikigami attack requests. This gate is shared by all four CE2 variants (CursedEnergyAttack_2, _2_Auto, Air_2, Air_2_Auto).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_030_ActionController.cpp:457",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:459",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:460",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:465",
+            "Source/Abrams/Public/CP_030_Actions.h:161"
+          ]
+        },
+        "4": {
+          "label": "Cursed-energy level needed to order shikigami with CE1 held",
+          "simple": "Megumi can issue the held-button shikigami orders at cursed-energy level 3.",
+          "technical": "Stored value 3.0. UCP_030_ActionController::TickShikigamiOrders returns immediately when the float cast of StatusController->GetCursedEnergyLevelClamped() is less than GetCharacterUniqueFloatValue(4, 0). GetCursedEnergyLevelClamped is min(CursedEnergyLevel, 3), so level 3 is the inclusive pass point and a stored value above 3 could never be reached through this path. After the level gate the code additionally requires the CursedEnergyAttack_1 game key to be held, a clear damage-action slot 80 or Unknown169 == 1, and ActiveShikigamis.Num() > 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_030_ActionController.cpp:810",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:812",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:816",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:820",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:824",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:158",
+            "Source/Abrams/Public/CP_030_ActionController.h:50"
+          ]
+        },
+        "5": {
+          "label": "Forward summon offset for the third shikigami",
+          "simple": "The third shikigami is placed 120 units in front of Megumi when his light finisher summons it.",
+          "technical": "Stored value 120.0. In TCP_030_NormalAttack_Summon<TBase, SummonAttackType>::TickAttack, after bSummonRequested is set while GetActionStartCount(this action) == 0, shikigami index 2 is activated, ResetActions(false) and the placement flag at +0x440 are applied, then the offset vector is GetFacingForwardVector() * GetOwnerUniqueFloat(5, 0). That vector and the shikigami's FollowHeightOffset (+0x458) go to FCP_030_ActionHelpers::FindSummonLocation with GAISlot196 as the helper and the world; the result is passed to RequestLocation(..., 3). FindSummonLocation starts from the helper's location plus the offset plus Up * height, raises both trace endpoints 100 units, and on a line-trace hit snaps X/Y to the first ImpactPoint + ImpactNormal * 100, otherwise keeps the raw offset position. The summon then gets the owner's root rotation, the owner's secondary target, and a SummonIdle change with ValueA0 = 1, ValueA1 = 22 for NormalAttack_3/Air_3 or 23 for NormalAttack_3_1/Air_3_1. Larger values place the summon farther in front before the trace adjustment. The other CP_030 summon offsets are hard-coded at -100*(forward + right) and do not use this slot.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_030_ActionController.cpp:374",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:378",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:388",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:394",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:398",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:399",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:406",
+            "Source/Abrams/Private/GameWarpLocation.cpp:145",
+            "Source/Abrams/Private/GameWarpLocation.cpp:151",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:566",
+            "Source/Abrams/Public/CP_030_Actions.h:26"
+          ]
+        },
+        "6": {
+          "label": "Extra camera distance while a shikigami is out",
+          "simple": "The battle camera keeps 400 more units of distance on its shikigami request while a shikigami is active.",
+          "technical": "Stored value 400.0. Read in UCP_030_ActionController::ActionTick only on the transition where bShikigamiOut differs from (ActiveShikigamis.Num() > 0). Together with index 7 it is passed as SetDistanceRequest(3, Distance, BlendTime) when a shikigami is out, or RemoveDistanceRequest(3, BlendTime) when none is out; both reads happen in that branch, so no camera request is issued on ordinary ticks. UGameCharacterVirtualCamera stores the request under key 3 and eases toward the largest active distance request, restoring the base key-0 distance when the last request is removed. Units are world distance; a larger value pulls the camera farther out if key 3 becomes the largest request. This is a direct SetDistanceRequest call, not MakeUniqueCameraRequest.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_030_ActionController.cpp:993",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:995",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:999",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:1003",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:1006",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:474",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:490"
+          ]
+        },
+        "7": {
+          "label": "Blend time for the shikigami camera distance",
+          "simple": "The camera's shikigami distance change takes 1 second.",
+          "technical": "Stored value 1.0. Read next to index 6 in the same ActionTick transition branch and passed as BlendTime to either SetDistanceRequest(3, ...) or RemoveDistanceRequest(3, ...). Both forward it to UGameCharacterVirtualCamera::UpdateDistanceRequest, which starts the distance interpolation over that duration with EaseInOut; a larger value makes the change slower and a non-positive value would make the base-distance restore take the wait path. The unit is seconds, matching the interpolation duration used by the camera request. It is not the FOV easing selector that float index 7 would mean in the generic MakeUniqueCameraRequest helper: CP_030 has no call to that helper in the traced sources.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_030_ActionController.cpp:993",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:996",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:999",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:1003",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:474",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:490",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:525",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941"
+          ]
+        },
+        "8": {
+          "label": "Cursed-energy cost of a held shikigami order update",
+          "simple": "Issuing held-button shikigami orders costs 150 cursed energy, once per update that actually orders something.",
+          "technical": "Stored value 150.0. In UCP_030_ActionController::TickShikigamiOrders, after the level/key/damage/active-shikigami gates, the code computes CursedEnergy = FMath::Max(StatusController->CursedEnergy - GetCharacterUniqueFloatValue(8, 0), 0.0f). It then loops over ActiveShikigamis, and for each one that IsOrderReady and CanOrderAttack restarts its order cooldown, sets its target actor to the owner's target actor, and sends shikigami Attack_1. bOrdered gates the single SetCursedEnergy(CursedEnergy) call, so the 150-point cost is charged once per tick regardless of how many shikigami were ordered, and never when none was ordered. The value is floored at zero rather than allowing negative cursed energy; higher values cost more, lower values cost less.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_030_ActionController.cpp:810",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:828",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:830",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:832",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:836",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:840",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:842"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The 3500/1000 distance pair is used only for the first CE2 start and only when shikigami 0 is not the ordered one. On later starts with a secondary-target hit the action sends shikigami Attack_4 without reading any unique float, so changing these values does not alter that branch.",
+          "evidence": [
+            "Source/Abrams/Private/CP_030_ActionController.cpp:472",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:475",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:494",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:501"
+          ]
+        },
+        {
+          "text": "Index 5 affects only shikigami 2, summoned by the NormalAttack_3 / NormalAttack_3_1 families and their air versions. The alternative summons of shikigami 0 or 1 in the CE1 and CE2 start logic use a hard-coded -(forward + right) * 100 placement instead.",
+          "evidence": [
+            "Source/Abrams/Private/CP_030_ActionController.cpp:394",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:398",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:566",
+            "Source/Abrams/Private/CP_030_ActionController.cpp:648",
+            "Source/Abrams/Public/CP_030_Actions.h:145"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Only Id_CharacterUnique slot 0 is populated for CP_030; AGameCharacter copies that list into UniqueRows in order, and GetCharacterUniqueFloatValue is a raw unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference. A literal such as row 0 therefore means this row for Megumi, but the same numeric row can mean a different row name for another character. Zero in indices 9-13 means no reader was found, not a guaranteed dead slot.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Source/Abrams/Public/GameCharacter.h:245",
+        "Tools/verify/CHAR/UniqueRowsInline.md:19"
+      ]
+    },
+    {
+      "text": "The shikigami list is the heart of this controller: ActiveShikigamis is added to on summon start and removed on release, PendingShikigami is restored when a battle sequence stops, active shikigami are released when cursed energy hits zero or the owner is defeated/down, and bShikigamiOut tracks whether the camera request should exist. The owned attack classes also choose between CP_030_ATTACKF and ATTACKG attack-set names depending on shikigami availability and order readiness.",
+      "evidence": [
+        "Source/Abrams/Private/CP_030_ActionController.cpp:48",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:72",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:490",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:590",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:736",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:964",
+        "Source/Abrams/Public/CP_030_ActionController.h:26",
+        "Source/Abrams/Public/CP_030_ActionController.h:30"
+      ]
+    },
+    {
+      "text": "Control quirk: while CursedEnergyAttack_1 / Air_1 is on the attack layer, bAttackDefaultActive starts as 0 and the controller refuses Guard, Step, normal attacks, CE attacks and super attacks. The CE1 action's UniqueAction sets that byte to 1 and OnActionStarted clears it on a CE1 start, so an AttackDefault start reopens those actions. None of these gates reads the unique row directly.",
+      "evidence": [
+        "Source/Abrams/Private/CP_030_ActionController.cpp:606",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:854",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:881",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:883",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:895",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:905",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:909",
+        "Source/Abrams/Public/CP_030_ActionController.h:24"
+      ]
+    },
+    {
+      "text": "UCP_030_ActionController::CreateAction covers fourteen action types (the CP_030 normal and CE attack classes) and delegates every other type to UGameCharacterActionController::CreateAction. UCP_030_BehaviorController only specialises AI index 0x16 with FGameCharacterAIAction_ToggleCursedEnergyAttack1 and forwards all other indices to the parent. No CP_030-specific .inl is included by these translation units; the HUD widget reuses FCP_030_ActionHelpers::IsOrderReady and CanOrderAttack for the CN_010/CN_020 recast gauges.",
+      "evidence": [
+        "Source/Abrams/Private/CP_030_ActionController.cpp:765",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:798",
+        "Source/Abrams/Private/CP_030_BehaviorController.cpp:8",
+        "Source/Abrams/Private/CP_030_BehaviorController.cpp:10",
+        "Source/Abrams/Private/GameCharacterBehaviorController.cpp:99",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_030.cpp:32",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_030.cpp:61"
+      ]
+    },
+    {
+      "text": "Do not mix up similarly named code. CN_030 is a shikigami source family, not Megumi's character controller. Shikigami action and movement code calls a GetCharacterUniqueFloatValue override on AGameShikigami, whose UniqueRows come from ShikigamiUniqueDataTable, not from CharacterUniqueDataTable4. CP_030's character row also names no trap, and FGameTrapAction::GetUniqueFloat either returns 0 without a source interface or forwards to that source, so no trap/projectile forwarding is part of these nine reads.",
+      "evidence": [
+        "Source/Abrams/Private/CN_030_Actions.cpp:1",
+        "Source/Abrams/Private/CP_030_ActionController.cpp:1",
+        "Source/Abrams/Private/GameShikigami.cpp:870",
+        "Source/Abrams/Private/GameShikigami.cpp:1251",
+        "Source/Abrams/Public/GameShikigami.h:350",
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188",
+        "Source/AbramsDataTable/Public/GameDataTableRow_Character.h:42"
+      ]
+    },
+    {
+      "text": "The verification record proves only scoped byte matches for CP_030: the NormalAttack_2_1 and CursedEnergyAttack_2 OnDamageDealt callbacks, and the lane notes mark the shikigami order tick and CE2 UniqueAction as byte-equal HOLD bodies and ActionTick as MATCH. These are notes about reconstructed consumer code, not a claim that every listed function is byte-identical or that a game build was run.",
+      "evidence": [
+        "Tools/verify/CHAR/CP_030_ActionController.md:13",
+        "Tools/verify/CHAR/CP_030_ActionController.md:14",
+        "Tools/verify/CHAR/CP_030_ActionController.md:20",
+        "Tools/verify/LANES/w21-cp-050s.md:19",
+        "Tools/verify/LANES/w21-cp-050s.md:126",
+        "Tools/verify/LANES/w21-cp-050s.md:153"
+      ]
+    }
+  ]
+}

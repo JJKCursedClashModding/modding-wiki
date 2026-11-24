@@ -1,0 +1,404 @@
+{
+  "overview": "Sukuna’s settings tune his Coercion charge and healing, ground-slam placement, and the camera during his second cursed-energy attack.",
+  "technicalOverview": "Ryomen Sukuna (CP_020) has three populated unique rows. Row 0 drives the Coercion charge/heal and the shockwave from super cursed-energy hits. Row 1 places NormalAttack_1’s ground-slam point and the downward trace that snaps it to ground. Row 2 is the camera preset for charging/releasing CursedEnergyAttack_2 (Attack H). CP_020 has its own controller and twelve custom action types, but inherits shared base actions and camera helpers. No CP020-specific .inl is included.",
+  "rows": {
+    "CP_020": {
+      "title": "Coercion, stored heal, and super-attack shockwave",
+      "overview": "The main row holds the level threshold and heal multiplier for the Coercion charge, plus the start radius, end radius and duration of the shockwave from super cursed-energy hits. Generic row-0 readers exist, but the AI hold and steering reads were not traced to a CP020 caller.",
+      "values": {
+        "0": {
+          "label": "Coercion heal multiplier; generic fallback timing",
+          "simple": "With Coercion charged, 0.85 times damage taken is saved as later healing. The same number is a fallback restraint time if Sukuna receives projection sorcery with no damage row.",
+          "technical": "UCP_020_ActionController::OnDamageReceived calls the base first, then requires IsCoercionCharged() and sets Status->PendingHealAmount = GetCharacterUniqueFloatValue(0,0) * Damage (0.85 * Damage here). OnDamageDealt adds a positive saved amount to current hit points only while the charge test still passes and IsHitPointEmpty() is false, then clears it; knockout clears it too. Shared ProjectionSorceryReceive uses GetOwnerUniqueFloat(0,0) as RestraintTime only when Request.DamageTableRow is null; a real damage row wins. Shared AI hold nodes use this as a base duration and base steering uses it as an angle divisor, but the traced CP020 behavior path selects different AI actions and no CP020 caller of steering was found.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_020_ActionController.cpp:722",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:724",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:725",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:776",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:831",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:835",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:118",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517"
+          ]
+        },
+        "1": {
+          "label": "Coercion charge level threshold",
+          "simple": "Coercion charging is available at cursed-energy level 2 or higher while the cursed-energy disable timer is not running.",
+          "technical": "IsCoercionCharged() first returns false when CursedEnergyDisabledTimeLeft > 0; otherwise it returns static_cast<float>(CursedEnergyLevel) >= GetCharacterUniqueFloatValue(1,0), so level 2 is included. The inlined twin IsCoercionCountReached() applies the same test in OnDamageDealt; the out-of-line copy serves controller slots 173/183. The BUFF_COERCION_CP_020 grant is separate: level 3, or level 4 when the previous level was not 3. A generic AI hold node multiplies this value by CursedEnergyLevel, but CP020 was not traced to that node.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_020_ActionController.cpp:708",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:710",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:714",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:737",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:748",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:805",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:811",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:119"
+          ]
+        },
+        "2": {
+          "label": "Super shockwave starting radius",
+          "simple": "Super cursed-energy hits start a shockwave at a 1000-unit radius around Sukuna.",
+          "technical": "In OnDamageDealt, only when DamageRow->AttackType == EGameAttackType::SuperCursedEnergyAttack, GetCharacterUniqueFloatValue(2,0) is passed as StartRadius to AGameBattleManager::StartShockwave with the owner location as Center. StartShockwave uses it as the From value of a linear radius ease; initial destructible target collection uses EndRadius instead.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_020_ActionController.cpp:820",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:822",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:824",
+            "Source/Abrams/Private/GameBattleSystems_A.cpp:127",
+            "Source/Abrams/Private/GameBattleSystems_A.cpp:155"
+          ]
+        },
+        "3": {
+          "label": "Super shockwave ending radius",
+          "simple": "The super-attack shockwave expands out to 3000 units.",
+          "technical": "GetCharacterUniqueFloatValue(3,0) is EndRadius. StartShockwave adds tickable, not-yet-broken destructible objects whose squared distance from the center is <= EndRadius * EndRadius (it skips only when greater), and uses the same value as the To value of the linear radius ease.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_020_ActionController.cpp:825",
+            "Source/Abrams/Private/GameBattleSystems_A.cpp:143",
+            "Source/Abrams/Private/GameBattleSystems_A.cpp:147",
+            "Source/Abrams/Private/GameBattleSystems_A.cpp:148",
+            "Source/Abrams/Private/GameBattleSystems_A.cpp:155"
+          ]
+        },
+        "4": {
+          "label": "Super shockwave expansion duration",
+          "simple": "The shockwave radius change takes 1 unit of engine time.",
+          "technical": "GetCharacterUniqueFloatValue(4,0) is passed as Duration to StartShockwave, which calls Radius.Start(StartRadius, EndRadius, Duration, EEasingFunc::Linear, 2.0f, 2). The interpolator advances Duration by DeltaTime and completes when Elapsed >= Duration; no CP020-specific scaling is applied.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_020_ActionController.cpp:826",
+            "Source/Abrams/Private/GameBattleSystems_A.cpp:155",
+            "Source/Framework/Public/StudioFloatEaseInterpolator.h:81",
+            "Source/Framework/Public/StudioFloatEaseInterpolator.h:104",
+            "Source/Framework/Public/StudioFloatEaseInterpolator.h:105"
+          ]
+        }
+      },
+      "untraced": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The AI hold readers of row 0 are real shared code, but CP020 does not use those executors in the traced setup: CP040 (and CP050 for one variant) select the Hold nodes, while the base factory used by CP020 selects CursedEnergyAttack1/CursedEnergyAttack2.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+            "Source/Abrams/Private/CP_050_BehaviorController.cpp:11",
+            "Source/Abrams/Private/GameCharacterBehaviorController.cpp:119",
+            "Source/Abrams/Private/GameCharacterBehaviorController.cpp:121"
+          ]
+        },
+        {
+          "text": "Do not merge the level-3 Coercion buff with the level-2 heal threshold: the buff grant checks level 3 (or level 4 from a different previous level), while the heal path only checks >= the row-0 threshold and the disable timer.",
+          "evidence": [
+            "Source/Abrams/Private/CP_020_ActionController.cpp:714",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:742",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:748"
+          ]
+        }
+      ]
+    },
+    "CP_020_ATTACKA": {
+      "title": "NormalAttack_1 ground-slam placement",
+      "overview": "Both ground and air NormalAttack_1 use this row: it puts the effect point ahead of Sukuna, then starts a downward trace above that point and snaps to the first hit.",
+      "values": {
+        "0": {
+          "label": "Forward reach to the slam point",
+          "simple": "The slam effect is aimed 300 world units ahead of Sukuna.",
+          "technical": "FCP_020_NormalAttack_1 and FCP_020_NormalAttackAir_1 both call TCP_020_NormalAttack_1::UniqueAction. Offset starts as ZeroVector, Offset.X = GetOwnerUniqueFloat(0,1) = 300, the actor rotation rotates that offset, and it is added to owner location to make the effect/trace point. Y/Z stay zero. Both variants share this value; no other float in this row affects the point.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_020_ActionController.cpp:85",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:90",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:91",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:92",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:93",
+            "Source/Abrams/Public/CP_020_Actions.h:45",
+            "Source/Abrams/Public/CP_020_Actions.h:50",
+            "Tools/verify/CHAR/CP_020_ActionController.md:45"
+          ]
+        },
+        "1": {
+          "label": "Downward trace start height",
+          "simple": "The ground check starts 150 world units above the aimed point and traces down to it.",
+          "technical": "When ShouldTraceGround() is true (always for CP020 NormalAttack_1), TraceStart = candidate point + UpVector * GetOwnerUniqueFloat(1,1) = +150 world units and TraceEnd is the candidate point. StateCondition_LineTraceMulti uses the shared shot-blocker object types; on a hit whose first result has |Distance| > 1e-8, the effect translation becomes Hits[0].ImpactPoint. The trace runs for both ground and air variants; only the later surface-effect gate differs.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_020_ActionController.cpp:95",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:99",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:100",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:101",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:103",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:106",
+            "Source/Abrams/Public/CP_020_Actions.h:32",
+            "Tools/verify/CHAR/CP_020_ActionController.md:51"
+          ]
+        }
+      },
+      "untraced": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The ground variant also looks up the surface at the final point and plays a mapped effect; the air variant skips that step. This is a fixed virtual override, not another float in this row.",
+          "evidence": [
+            "Source/Abrams/Public/CP_020_Actions.h:33",
+            "Source/Abrams/Public/CP_020_Actions.h:35",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:120",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:125"
+          ]
+        },
+        {
+          "text": "The spawned base effects are fixed ids (FX_CP_020_01101 ground, FX_CP_020_01111 air); no unique-float lookup selects them.",
+          "evidence": [
+            "Source/Abrams/Private/CP_020_ActionController.cpp:147",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:151",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:155"
+          ]
+        }
+      ]
+    },
+    "CP_020_ATTACKH_SHOOT_CAMERA": {
+      "title": "Attack H charge/release camera preset",
+      "overview": "CursedEnergyAttack_2 saves the current camera mode and switches to camera mode 2 with this row when UniqueAction parameter is 0. The shared MakeUniqueCameraRequest helper reads indices 0-10 from row 2; index 6 is also reused when handing the camera back.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "The camera is offset -150 along the gaze-space X axis.",
+          "technical": "GetCharacterUniqueFloatValue(0,2) becomes Request.CameraOffset.X in FGameCharacterAction::MakeUniqueCameraRequest, which only fills the request for CameraMode == 2 (CP020 passes 2). Mode-2 code rotates the whole offset by gaze rotation before adding it to the eye base; -150 is the literal X component, not an inferred direction.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_020_ActionController.cpp:422",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:383",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "The camera is offset -65 along the gaze-space Y axis.",
+          "technical": "GetCharacterUniqueFloatValue(1,2) is stored in OffsetY and written to Request.CameraOffset.Y, part of the same rotated camera placement as index 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "The camera is offset 15 along the gaze-space Z axis.",
+          "technical": "GetCharacterUniqueFloatValue(2,2) is stored in OffsetZ and written to Request.CameraOffset.Z before the mode-2 camera applies the rotated offset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948"
+          ]
+        },
+        "3": {
+          "label": "Maximum downward gaze angle",
+          "simple": "The look-at point can sit up to 60 degrees below the eye line.",
+          "technical": "GetCharacterUniqueFloatValue(3,2) becomes Request.LimitAngleDown. Mode-2 code compares AngleBetweenDegrees(gaze direction, horizontal gaze heading) against 60 when the gaze target is below the eye and clamps only when the angle is greater; equality is allowed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:32",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Maximum upward gaze angle",
+          "simple": "The look-at point can sit up to 30 degrees above the eye line.",
+          "technical": "GetCharacterUniqueFloatValue(4,2) becomes Request.LimitAngleUp. The same clamp uses it when the gaze target is above the eye; the test is strictly greater-than.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:33",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "5": {
+          "label": "Camera field of view",
+          "simple": "The charge camera uses an 85-degree field of view.",
+          "technical": "GetCharacterUniqueFloatValue(5,2) becomes Request.FieldOfView. ChangeCameraMode applies a new FOV only when it is > 0; 85 qualifies, and with the positive blend time at index 6 the FOV is interpolated rather than snapped.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:574",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "FOV changes take 0.2 time units; the same value blends the camera back to a 90-degree FOV on release.",
+          "technical": "MakeUniqueCameraRequest writes GetCharacterUniqueFloatValue(6,2) to Request.FieldOfViewBlendTime, easing the 85-degree charge FOV over 0.2. It is read again in TCP_020_CursedEnergyAttack_2::FinishAttackEffects: only when the next action is AttackDefault and the camera is still in mode 2 does CP020 set FieldOfView = 90 with this blend time and restore SavedCameraMode. Positive blend time starts FovInterp; <= 0 would snap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:498",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:501",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:505",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:510",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:511",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:512",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578"
+          ]
+        },
+        "7": {
+          "label": "Field-of-view easing selector",
+          "simple": "FOV blending uses Linear easing.",
+          "technical": "GetCharacterUniqueFloatValue(7,2) is cast to int32 and switched: 0 -> Linear, 1 -> EaseIn, 2 -> EaseOut, 3 -> EaseInOut, other values leave the request default. Here 0 is a read value selecting Linear, not an absent setting.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:939",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:955",
+            "Source/Abrams/Private/GameCharacterAction.cpp:956"
+          ]
+        },
+        "8": {
+          "label": "Gaze orbit yaw",
+          "simple": "The gaze is orbited 5 degrees in yaw around the camera.",
+          "technical": "GetCharacterUniqueFloatValue(8,2) becomes Request.OrbitYaw. Mode-2 code builds FRotator(OrbitPitch, OrbitYaw, 0) and, when non-zero, rotates the gaze around the camera before the final look rotation.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:426"
+          ]
+        },
+        "9": {
+          "label": "Gaze orbit pitch",
+          "simple": "No extra pitch is applied to the gaze orbit.",
+          "technical": "GetCharacterUniqueFloatValue(9,2) becomes Request.OrbitPitch and is the Pitch component of that FRotator. It is explicitly read even though zero here; the five-degree yaw from index 8 still makes the orbit rotator non-zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "No roll is applied by this camera request.",
+          "technical": "GetCharacterUniqueFloatValue(10,2) becomes Request.Roll and is passed to SetViewTarget87 as the roll argument. The read happens even when the value is zero; zero means an unrolled view.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The camera switch happens only for UniqueAction IntParameter 0; parameter 1 only sets the release flag. The previous camera mode is saved before the switch and restored on the guarded finish path.",
+          "evidence": [
+            "Source/Abrams/Private/CP_020_ActionController.cpp:409",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:411",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:413",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:420",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:422",
+            "Source/Abrams/Private/CP_020_ActionController.cpp:512"
+          ]
+        },
+        {
+          "text": "This row is CP020’s CursedEnergyAttack_2 data. Other characters call the same MakeUniqueCameraRequest with their own indices, so equal field positions elsewhere are not evidence of shared values.",
+          "evidence": [
+            "Source/Abrams/Private/CP_020_ActionController.cpp:84",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Tools/verify/CHAR/CP_020_ActionController.md:84"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Row numbers are positional: Id_CharacterUnique is copied into UniqueRows in order and GetCharacterUniqueFloatValue is an unchecked UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference. A zero float means the stored value is zero, not that the slot is unused.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:561",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1758",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Tools/verify/CHAR/UniqueRowsInline.md:19",
+        "Tools/verify/CHAR/UniqueRowsInline.md:21"
+      ]
+    },
+    {
+      "text": "CP020’s controller creates twelve action types (ground/air NormalAttack_1, four NormalAttack_3 variants, ground/air CursedEnergyAttack_1 and _2, and both ExtraAttacks); other types fall back to UGameCharacterActionController::CreateAction. That is why shared camera and projection-sorcery helpers matter here while other characters’ controllers do not.",
+      "evidence": [
+        "Source/Abrams/Private/CP_020_ActionController.cpp:569",
+        "Source/Abrams/Private/CP_020_ActionController.cpp:573",
+        "Source/Abrams/Private/CP_020_ActionController.cpp:596",
+        "Source/Abrams/Private/CP_020_ActionController.cpp:598",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:875",
+        "Tools/verify/CHAR/CP_020_ActionController.md:28"
+      ]
+    },
+    {
+      "text": "No CP020-specific .inl is part of these reads: CP_020_ActionController.cpp includes its own headers and ordinary game headers, while row-2 camera requests are built by the shared FGameCharacterAction::MakeUniqueCameraRequest body.",
+      "evidence": [
+        "Source/Abrams/Private/CP_020_ActionController.cpp:1",
+        "Source/Abrams/Private/CP_020_ActionController.cpp:25",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941"
+      ]
+    },
+    {
+      "text": "Trap and shikigami readers were not assigned to these rows: FGameTrapAction::GetUniqueFloat forwards through a trap’s source interface and AGameShikigami::GetCharacterUniqueFloatValue reads shikigami rows from ShikigamiUniqueDataTables; neither is AGameCharacter’s CP_020 path.",
+      "evidence": [
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188",
+        "Source/Abrams/Private/GameShikigami.cpp:874",
+        "Source/Abrams/Private/GameShikigami.cpp:1251"
+      ]
+    },
+    {
+      "text": "Coercion healing is cleared on knockout, while reaching level 3 or above on revival can grant the Coercion buff; these are separate from the row-0 charge threshold and are not additional unique floats.",
+      "evidence": [
+        "Source/Abrams/Private/CP_020_ActionController.cpp:773",
+        "Source/Abrams/Private/CP_020_ActionController.cpp:776",
+        "Source/Abrams/Private/CP_020_ActionController.cpp:781",
+        "Source/Abrams/Private/CP_020_ActionController.cpp:787"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,408 @@
+{
+  "overview": "Nobara’s settings tune her nail attack’s movement, the delay before Hairpin and Resonance damage lands, and her attack camera.",
+  "technicalOverview": "Nobara Kugisaki (CP_040) uses UCP_040_ActionController for combat and UCP_040_BehaviorController plus FGameCharacterAIThinkNode_CP_040 for AI. Three rows in CharacterUniqueDataTable2 are loaded in order through CharacterDataTable.Id_CharacterUnique and exposed as zero-based row indices on AGameCharacter.UniqueRows; each row has fourteen FloatValue slots. Row 0 supplies AI key-hold timings and two delayed-detonation delays, row 1 supplies turning and movement for the nail-gun-style normal attack, and row 2 supplies the dedicated mode-2 camera request used by Cursed Energy Attack 1 and its auto variant. Every access described here is AGameCharacter::GetCharacterUniqueFloatValue on a character row, not AGameShikigami's separate ShikigamiUniqueDataTable. Reads are direct and unchecked. The consumers are reconstructed source: several bodies are byte-matched while others are accepted diffs or still open, so the notes distinguish direct source traces from unverified game-facing interpretation. No CP_040-specific .inl file is included; the character TU includes CP_040_Actions.h and calls the shared MakeUniqueCameraRequest helper in GameCharacterAction.cpp.",
+  "rows": {
+    "CP_040": {
+      "title": "Shared AI timing and marker detonations",
+      "overview": "One base key-hold duration shared by two AI attack executors, level-scaled additions for each cursed-energy attack, and the delays before Hairpin and Resonance marker damage lands.",
+      "values": {
+        "0": {
+          "label": "AI base hold time",
+          "simple": "The starting amount of time the AI holds either cursed-energy attack key.",
+          "technical": "0.15 seconds. Both FGameCharacterAIAction_CursedEnergyAttack1Hold::Reset and FGameCharacterAIAction_CursedEnergyAttack2Hold::Reset assign this value to Duration before adding their separate level-scaled term. During Tick, the key is held while the timer is at or below Duration; the first tick with Timer strictly greater than Duration advances to the release phase, which lasts until Timer is strictly greater than 1.0 second. A separate shared fallback also reads the same slot: ProjectionSorceryReceive uses it as RestraintTime only when the action request has no DamageTableRow; when that row exists, the row's RestraintTime takes precedence. The controller's CursedEnergyLevel is unrelated to this base term.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:118",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:129",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:149",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:177",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214"
+          ]
+        },
+        "1": {
+          "label": "CE1 level hold and Hairpin detonation delay",
+          "simple": "The per-level addition to AI Cursed Energy Attack 1 hold time, and the pause before stuck Hairpins explode.",
+          "technical": "0.15 seconds. In AI executor 0x11, Duration is row 0 slot 1 multiplied by the action controller's CursedEnergyLevel and then added to slot 0; because this slot is 0 in the data, every level computes 0.15 seconds. The controller initializes CursedEnergyLevel to 1 and updates it to min(new level, 3) when no attack is active, so normal values are 1 through 3. The same slot is passed as Delay to DetonateHairpins when Cursed Energy Attack 1 or its Auto variant receives UniqueAction parameter 10. DetonateHairpins first checks the cached bOpponentHasHairpin flag, then schedules one delayed damage request for every owner-owned Hairpin_1 through Hairpin_3 stack on every opponent. Since 0.15 is positive, AddMultiHit routes each request to the target's delayed-damage queue; the target's status tick subtracts its dilation-adjusted DeltaTime and applies the damage on the first tick where the remaining delay is at or below zero. The AI hold mapping is byte-matched; the detonation body is reconstructed and its verification entry is still open.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:119",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:960",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:504",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:628",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:391",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:472",
+            "Source/Abrams/Private/GameBattleSystems_A.cpp:1114",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:3378",
+            "Tools/verify/CHAR/CP_040_ActionController.md:7"
+          ]
+        },
+        "2": {
+          "label": "CE2 level hold time",
+          "simple": "How much longer the AI holds Cursed Energy Attack 2 at higher cursed-energy levels.",
+          "technical": "0.15 seconds per level. AI executor 0x13 computes Duration as row 0 slot 2 multiplied by CursedEnergyLevel plus slot 0, giving 0.30, 0.45 and 0.60 seconds at levels 1, 2 and 3. CursedEnergyLevel comes from the action controller, which is initialized to 1 and clamped with min(new level, 3) outside attacks. The release check is strict: the key is pressed until Timer is greater than Duration. No additional use of this slot was found in the traced CP_040 paths.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:130",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:68",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:960",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:177"
+          ]
+        },
+        "6": {
+          "label": "Resonance detonation delay",
+          "simple": "How long after the attack cue the Resonance damage lands.",
+          "technical": "5.0 seconds. Cursed Energy Attack 2 calls DetonateResonance from every UniqueAction invocation, regardless of its parameters. DetonateResonance requires a valid secondary target, requires that target to be one of the owner's opponents, and requires StateCondition_HasResonance to accept it. It selects Resonance_3, then 2, then 1 in that priority, spawns the matching FX at the target's waist bone, and passes this value as Delay to AddMultiHit with the matching CP_040_ATTACKH_02_01_n damage row. Because the value is greater than zero, AddMultiHit queues delayed damage on the target rather than entering its repeating multi-hit list; the target applies the request when its countdown is at or below zero. If no such target or Resonance stack exists, no damage is scheduled. This call is visible in the reconstruction, but DetonateResonance is recorded as an accepted byte diff rather than a byte match.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Public/CP_040_Actions.h:126",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:702",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:741",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:769",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:775",
+            "Source/Abrams/Private/GameBattleSystems_A.cpp:1114",
+            "Tools/verify/LANES/w23-char-e.md:24"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The two detonation delays use different slots and different target rules: slot 1 is the 0.15-second Hairpin detonation used by Cursed Energy Attack 1 and its Auto form, while slot 6 is the 5-second Resonance detonation used by Cursed Energy Attack 2. They are not interchangeable.",
+          "evidence": [
+            "Source/Abrams/Private/CP_040_ActionController.cpp:504",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:775"
+          ]
+        },
+        {
+          "text": "The AI hold values are read by shared AI executor classes, but only indices 0x11 and 0x13 are specialised by Nobara's behavior controller; all other AI indices are inherited from the parent factory.",
+          "evidence": [
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:10",
+            "Source/Abrams/Private/CP_040_BehaviorController.cpp:12",
+            "Tools/verify/CHAR/ai-family-verified.md:46"
+          ]
+        }
+      ]
+    },
+    "CP_040_NAILGUN": {
+      "title": "Nail-gun normal attack movement",
+      "overview": "Turning response, horizontal input speed, and the timing and speed of the downward phase of the rebuilt normal attack used by the ground and air normal-attack actions.",
+      "values": {
+        "0": {
+          "label": "Non-scripted turn response",
+          "simple": "How quickly the character faces the target while the attack is outside its scripted action window.",
+          "technical": "90. This is read only when the rebuilt normal attack's bUniqueActionInactive flag is nonzero, which is its reset state and the state after UniqueActionEnd. In that branch, TickAttack builds a horizontal target rotation from the owner position to the target vector, passes the current root rotation, that target, DeltaTime and this value as the interpolation speed to RInterpTo, then requests the result from the movement controller. When the flag is clear during the UniqueAction notify window, this interpolation branch is skipped and the movement controller's zero-duration RotateTowardTarget path handles rotation instead. No explicit conversion or clamp is applied to the value at this site.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_040_ActionController.cpp:290",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:301",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:302",
+            "Source/Abrams/Public/CP_040_Actions.h:23"
+          ]
+        },
+        "1": {
+          "label": "Descending speed",
+          "simple": "How fast the character drops once the attack enters its descent phase.",
+          "technical": "200 world units per second by the source's multiplication with DeltaTime. It is read into DescendSpeed only when bDescend is set; otherwise the downward contribution is exactly zero. The final tick request is the current location plus DeltaTime multiplied by the sum of DownVector times this speed and the movement controller's input direction times slot 3. The same template serves NormalAttack_1 and NormalAttackAir_1, so neither the row name nor this read is limited to the ground variant.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_040_ActionController.cpp:311",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:314",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:318",
+            "Source/Abrams/Public/CP_040_Actions.h:46",
+            "Source/Abrams/Public/CP_040_Actions.h:51"
+          ]
+        },
+        "2": {
+          "label": "Descent repeat threshold",
+          "simple": "Decides on which consecutive normal attack the descent starts.",
+          "technical": "2 is converted to int32 and reduced by one, so bDescend becomes true when StartCount is greater than or equal to 1. StartCount is the stored count of prior ended actions of that exact action type since AttackDefault; it is absent or zero on the first start, incremented when the action ends, and all attack counts are removed when AttackDefault starts. Consequently the first consecutive start does not descend and the first repeat onward does. Ground and air action types are counted separately. A non-integer value would be truncated before the subtraction; this row has an exact integer value.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_040_ActionController.cpp:280",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:281",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:270",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:1003",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:1157"
+          ]
+        },
+        "3": {
+          "label": "Horizontal stick movement speed",
+          "simple": "How fast the attack follows directional input across the ground.",
+          "technical": "500 world units per second by the source's multiplication with DeltaTime. Every TickAttack reads the movement controller's input move direction, replaces it with zero when its size is at or below zero, and adds Direction multiplied by this value and DeltaTime to the requested location. This applies whether or not bDescend is set; slot 1 adds the vertical component only after the descent condition passes. Higher values increase horizontal displacement per tick and zero would remove it; no maximum or acceleration is applied here.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_040_ActionController.cpp:305",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:310",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:318"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The row is consumed through the shared TCP_040_NormalAttack_1 template, not by a row-name lookup in source. The action controller creates separate concrete objects for NormalAttack_1 and NormalAttackAir_1.",
+          "evidence": [
+            "Source/Abrams/Private/CP_040_ActionController.cpp:919",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:921"
+          ]
+        },
+        {
+          "text": "Projectile effects played by this attack are remembered, and later hits, guards and contacts whose instigator is that effect are counted as the attack's own. That attribution feeds the held-attack request filter, but it does not read this unique row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_040_ActionController.cpp:266",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:222",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:332"
+          ]
+        }
+      ]
+    },
+    "CP_040_ATTACKG_SHOOT_CAMERA": {
+      "title": "Cursed Energy Attack 1 special camera",
+      "overview": "The mode-2 virtual camera request used when Cursed Energy Attack 1 or its Auto variant starts, plus the blend time reused when the normal camera and 90-degree field of view are restored.",
+      "values": {
+        "0": {
+          "label": "Camera forward offset",
+          "simple": "Moves the camera back along the direction the camera is looking.",
+          "technical": "-150. MakeUniqueCameraRequest places this in CameraOffset.X. The mode-2 camera computes a gaze rotation with MakeFromX and sets CameraLocation to the eye base plus that rotation applied to the whole offset, so negative X is opposite gaze-forward before the later obstruction pull-in. No unit conversion is performed at the read or placement site.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:385",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera sideways offset",
+          "simple": "Shifts the special camera to one side of the view.",
+          "technical": "90. Stored as CameraOffset.Y by the same helper and rotated with the offset vector into world space in gaze-rotation space. Positive Y is the rotation's Y component; obstruction correction and orbit are applied after placement.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera vertical offset",
+          "simple": "Lowers the special camera relative to the view direction.",
+          "technical": "-10. Read first into OffsetZ and placed in CameraOffset.Z by MakeUniqueCameraRequest, then transformed with the other offset components into the final camera position. Negative Z is downward in the gaze-rotation frame before obstruction correction.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "Stops the special camera from looking too far below the character.",
+          "technical": "60 degrees. Stored as LimitAngleDown. UpdateRequestCamera measures gaze elevation with AngleBetweenDegrees; when the gaze point is below the eye base and elevation is strictly greater than 60, it rotates the gaze back to exactly 60 degrees below. Equality is not clamped. When the gaze point is below or level with the base, this is the limit selected by the clamp branch.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:376",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "Stops the special camera from looking too far above the character.",
+          "technical": "30 degrees. Stored as LimitAngleUp. When the gaze point is above the eye base and measured elevation is strictly greater than 30, the camera solver rotates the gaze to exactly 30 degrees above; equality is allowed. Values at or below zero would clamp more aggressively, but this row is positive.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:380"
+          ]
+        },
+        "5": {
+          "label": "Requested field of view",
+          "simple": "Leaves the current field of view unchanged when the special camera opens.",
+          "technical": "0. It is copied into FieldOfView by MakeUniqueCameraRequest. ChangeCameraMode only starts an FOV interpolation when the new value is greater than zero, so zero neither changes FOV nor stops the existing interpolator. The later restore path does not reuse this slot: it constructs a different request with FOV 90.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:592"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "With the stored value of zero, the return to the normal 90-degree field of view is instant.",
+          "technical": "0 seconds. At camera entry it is copied into FieldOfViewBlendTime, but the row's FieldOfView is also zero, so no FOV blend starts there. Both Cursed Energy Attack 1 and its Auto variant separately read row 2 slot 6 when finishing into AttackDefault while still in camera mode 2: they build a fresh request with FOV 90 and this blend time, then restore SavedCameraMode. Because the value is not greater than zero, ChangeCameraMode assigns 90 immediately and stops the FOV interpolator. Positive values would ease the change; the request's easing field is left at its default in this restore path.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:593",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:683"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "Chooses the curve used if an FOV blend is active.",
+          "technical": "0. The shared helper casts this float to int32: 0 selects Linear, 1 EaseIn, 2 EaseOut, 3 EaseInOut; any other value leaves the request's default Linear choice unchanged. With this row's FOV and blend time both zero, the selector does not affect camera entry. The FOV-restore request is separately default-constructed and does not copy this row's selector.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:955",
+            "Source/Abrams/Private/GameCharacterAction.cpp:967",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:591"
+          ]
+        },
+        "8": {
+          "label": "Camera orbit yaw",
+          "simple": "Would swing the gaze horizontally around the camera; zero keeps it centered.",
+          "technical": "0. Stored as OrbitYaw. The camera solver constructs an orbit rotator with this as Yaw and only transforms the gaze point around the camera when the orbit rotator is nonzero; zero skips that transform entirely.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421"
+          ]
+        },
+        "9": {
+          "label": "Camera orbit pitch",
+          "simple": "Would swing the gaze vertically around the camera; zero keeps it centered.",
+          "technical": "0. Stored as OrbitPitch and used as the Pitch component of the same orbit rotator. Because both orbit values are zero, the orbit branch is skipped and the final look rotation is derived directly from camera position to gaze.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:429"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Leaves the special camera unrolled.",
+          "technical": "0. Read into Request.Roll and passed directly as the roll argument to SetViewTarget87 when the mode-2 view target is installed. If a view blend is active, the roll is blended from the saved roll toward this value; zero here contributes no row-driven tilt.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:608"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The row is selected by the explicit helper call MakeUniqueCameraRequest(2, 2). For ordinary Cursed Energy Attack 1, the camera switch happens on the first start only when the left stick is not down; the Auto variant always switches on its first start.",
+          "evidence": [
+            "Source/Abrams/Private/CP_040_ActionController.cpp:545",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:548",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:551",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:652",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:655"
+          ]
+        },
+        {
+          "text": "The special camera is restored only when the attack finishes into AttackDefault and the owner is still in camera mode 2. UniqueAction parameter 0 also restores the saved mode with a default request if mode 2 is still active.",
+          "evidence": [
+            "Source/Abrams/Private/CP_040_ActionController.cpp:508",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:586",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:679"
+          ]
+        },
+        {
+          "text": "MakeUniqueCameraRequest is shared with other characters, so its field mapping is not CP_040-specific; what is CP_040-specific is that this character passes row index 2 to it. The helper is recorded as a byte-match miss in the unique-row inlining study, while its call sites and RVA are established.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/CP_040_ActionController.cpp:551",
+            "Tools/verify/CHAR/UniqueRowsInline.md:88"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Character setup is explicit: the character row creates UCP_040_ActionController, the brain creates UCP_040_BehaviorController, and the AI selects FGameCharacterAIThinkNode_CP_040. The behavior controller only specialises AI executors 0x11 and 0x13, which are exactly the two hold executors that read row 0.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:589",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:1349",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:166",
+        "Source/Abrams/Private/CP_040_BehaviorController.cpp:10"
+      ]
+    },
+    {
+      "text": "The action factory builds eight character-specific actions: ground and air normal attack 1, cursed energy attacks 1 and 2 with their air forms, and the Cursed Energy Attack 1 Auto pair. Other action types fall through to the base factory. This explains why one unique row can be read by several action types without being an action row itself.",
+      "evidence": [
+        "Source/Abrams/Private/CP_040_ActionController.cpp:919",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:934",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:936"
+      ]
+    },
+    {
+      "text": "Hairpins and Resonance drive the passive loop: applying either stack adds BUFF_CP_040_PASSIVE to Nobara, hitting a target that carries either stack with a damage row granting positive attacker cursed-energy experience plays the buff icon, and the passive is removed when no opponent carries her Hairpin or Resonance stacks.",
+      "evidence": [
+        "Source/Abrams/Private/CP_040_ActionController.cpp:209",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:173",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:194",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:58"
+      ]
+    },
+    {
+      "text": "Holding the left stick down is a real control branch, not just animation flavor. The shared test uses stick direction 1 with 45.0001 degrees and 0.5 as arguments. It selects the G2 attack set instead of G1 for Cursed Energy Attack 1, selects H2 instead of H1 for Cursed Energy Attack 2, gates neutral-cancel checks on the cached Hairpin or Resonance state, and suppresses the special camera on the first Cursed Energy Attack 1 start.",
+      "evidence": [
+        "Source/Abrams/Private/CP_040_ActionController.cpp:491",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:609",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:898",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:532",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:837",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:548"
+      ]
+    },
+    {
+      "text": "Weapon variant CP_040_50 changes two hit sounds: SE_CP_040_02001 becomes SE_CP_040_02101 and SE_CP_040_02011 becomes SE_CP_040_02111, but only when the currently selected variation row's Id_CharacterWeapon is CP_040_50. Other rows keep the damage row's original sound.",
+      "evidence": [
+        "Source/Abrams/Private/CP_040_ActionController.cpp:141",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:147",
+        "Source/Abrams/Private/CP_040_ActionController.cpp:152"
+      ]
+    },
+    {
+      "text": "Row resolution has no fallback at read time. Character setup builds UniqueRows by resolving each Id_CharacterUnique name, with None entries becoming null; GetCharacterUniqueFloatValue then indexes the row array and FloatValue array directly with no bounds check. The zero-valued slots listed as untraced above were found without an identified CP_040 reader, not because a zero value was treated as proof that no reader exists.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:451",
+        "Source/Abrams/Private/GameCharacter.cpp:1759"
+      ]
+    },
+    {
+      "text": "Verification status is mixed: the controller's action-accept, damage-dealt and debuff-applied overrides are recorded as matched, while ActionTick and the damage-sound override are diffs and DetonateHairpins remains open. DetonateResonance is another accepted diff. This is why the detonation and movement details above are labelled observed rather than byte-verified.",
+      "evidence": [
+        "Tools/verify/CHAR/CP_040_ActionController.md:5",
+        "Tools/verify/CHAR/CP_040_ActionController.md:6",
+        "Tools/verify/CHAR/CP_040_ActionController.md:7",
+        "Tools/verify/LANES/w23-char-e.md:24"
+      ]
+    }
+  ]
+}

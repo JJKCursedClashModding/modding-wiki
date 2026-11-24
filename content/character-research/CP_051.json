@@ -1,0 +1,934 @@
+{
+  "overview": "Student Gojo has separate settings for Limitless, homing attacks, beam attacks at each cursed-energy level, and the beam camera.",
+  "technicalOverview": "Satoru Gojo (Student) uses one CP_051-specific action controller built around the Limitless passive. Its seven unique rows are a core tuning block, two homing melee blocks (Attack C and Attack E), three cursed-energy beam blocks selected by cursed-energy level, and one beam-camera block. CharacterDataTable's Id_CharacterUnique array is loaded into a zero-based UniqueRows list, so row 0 is CP_051, row 1 CP_051_ATTACKC, row 2 CP_051_ATTACKE, rows 3-5 are the beam levels, and row 6 is the camera row. Every description below is traced from reconstructed consumer source; several of those bodies are still byte-mismatch lanes, so the exact in-game feel is observed code behavior rather than a claim of byte-perfect retail matching.",
+  "rows": {
+    "CP_051": {
+      "title": "Core Gojo tuning",
+      "overview": "The main row holds floating movement, the idle Limitless charge, and the passive damage and speed bonuses. It is read by CP_051's own action and controller overrides, not by a separate character-specific behaviour controller.",
+      "values": {
+        "0": {
+          "label": "Horizontal float inertia",
+          "simple": "How much forward/side momentum Gojo keeps when he starts floating.",
+          "technical": "Unique row 0, value 0 = 0.1. FCP_051_Floating::GetFloatingInertiaRate returns this value and Floating::Start passes it to MovementController::ScaleInertia as the horizontal rate (value 1 is the vertical rate). An inherited helper, UGameCharacterActionController::SteerTowardSecondaryTarget, also divides a target-facing angle by this same row-0 value when it is greater than zero; at zero or below it sets the turn time to zero and does not rotate. No CP_051 action in the current source calls that steering helper, so the steering reading is inherited availability, not a traced CP_051 move.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1515",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1479",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3494",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3517"
+          ]
+        },
+        "1": {
+          "label": "Vertical float inertia",
+          "simple": "How much upward inertia Gojo keeps when floating starts.",
+          "technical": "Unique row 0, value 1 = 0.1. FCP_051_Floating::GetFloatingInertiaRateZ returns it, and Floating::Start passes it as the Z rate to ScaleInertia. A shared AI charge-hold class also uses value 0 + value 1 * cursed-energy level as its hold duration, but no CP_051 behaviour controller instantiates that class; that AI use is not assigned to CP_051 here.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1521",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1479",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:119"
+          ]
+        },
+        "2": {
+          "label": "Floating repeat cap",
+          "simple": "Limits how many times the midair float action can be restarted.",
+          "technical": "Unique row 0, value 2 = 1.0. FCP_051_Floating::CanCancelCurrent casts it to int (1) and returns false once the Floating action's start count is greater than or equal to that number; below the cap it falls through to the ground-trace check. The value is also used by a shared AI charge-hold duration formula, but that hold class is not instantiated by CP_051's AI node.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1489",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1496",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:123",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:130"
+          ]
+        },
+        "3": {
+          "label": "Cursed-energy gate and hit-absorb cost",
+          "simple": "The cursed-energy amount Gojo must keep for the Limitless state, and the amount spent when a hit is absorbed.",
+          "technical": "Unique row 0, value 3 = 100. TickIdleCountdown clears both idle timers and stops charging when cursed energy minus 100 is negative. SetHitAbsorbed always computes Remaining = cursed energy - 100; it actually writes that value back and emits its effect call only when bValue is true and IdleBuffTime > 0, but the separate check 'Remaining < 100' clears IdleBuffTime even when no absorption was applied.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1006",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1007",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1173",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1179"
+          ]
+        },
+        "4": {
+          "label": "Idle setup time and gauge scale",
+          "simple": "How long Gojo must stay idle before Limitless is fully charged.",
+          "technical": "Unique row 0, value 4 = 0.5. TickIdleCountdown adds DeltaTime to IdleGaugeTime only while a Default-layer Idle or Floating action is active; when the test '(0.5 >= IdleGaugeTime)' is false, IdleBuffTime is refilled from value 5. ActionTick otherwise writes the Limitless gauge as (1 / 0.5) * IdleGaugeTime * 100, clamped by SetLimitlessGaugeValue to 0-100.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1023",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1026",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1338",
+            "Source/Abrams/Public/GameCharacterStatusController.h:220"
+          ]
+        },
+        "5": {
+          "label": "Limitless buff duration",
+          "simple": "How long the idle Limitless window lasts after it triggers.",
+          "technical": "Unique row 0, value 5 = 3.0 seconds. It is assigned to IdleBuffTime only on the transition where IdleGaugeTime becomes greater than value 4; afterwards IdleBuffTime decreases by DeltaTime. While IdleBuffTime > 0 the gauge is forced to 100 and several controller flags (limitless active, passive hit, throw/buff/combo allowances) change.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1028",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1031",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:963",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:883"
+          ]
+        },
+        "6": {
+          "label": "Cursed-energy experience recovery bonus",
+          "simple": "A multiplier applied to cursed-energy experience recovered over time.",
+          "technical": "Unique row 0, value 6 = 2.5. UCP_051_ActionController::GetCursedEnergyExpRecoverWithTimeBonus returns it only when the controller has been initialized and the owner's setup unique mode is not 1; otherwise it returns 0.0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:863",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:867"
+          ]
+        },
+        "7": {
+          "label": "Passive beam reach speed multiplier",
+          "simple": "Makes the Cursed Energy 2 beam reach its target faster while the passive is on.",
+          "technical": "Unique row 0, value 7 = 1.2. In FCP_051_CursedEnergyAttack_2::UpdateEffectLocation the level-selected speed (row 3 or row 4, value 2) is multiplied by 1.2 when CP_051_Passive is active and by 1.0 otherwise. The resulting Step = Speed * DeltaTime drives EffectElapsed and the beam endpoint blend.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:778",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:781",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:787"
+          ]
+        },
+        "8": {
+          "label": "Passive beam charge rate",
+          "simple": "Makes the second cursed-energy attack's hold phase fill faster while the passive is active.",
+          "technical": "Unique row 0, value 8 = 1.3. In FCP_051_CursedEnergyAttack_2::TickAttack Phase 1, ActionElapsedTime is increased by 1.3 * DeltaTime when CP_051_Passive is active, and by 1.0 * DeltaTime otherwise, before it is compared with the level's hold duration. This speeds up the charge timer; it is not a damage multiplier.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:538",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:541",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:546"
+          ]
+        },
+        "9": {
+          "label": "Passive second cursed-energy attack damage",
+          "simple": "Extra damage on the second cursed-energy attack while the passive is active.",
+          "technical": "Unique row 0, value 9 = 1.2. FCP_051_CursedEnergyAttack_2::GetActionDamageRate returns it only when CP_051_Passive stack is greater than 0, otherwise 1.0. The controller multiplies all active layer actions' GetActionDamageRate values for the final action damage rate.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:727",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:731",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:2220",
+            "Source/Abrams/Private/GameCharacterActionController.cpp:2227",
+            "Tools/verify/CHAR/CP_051_ActionController.md:99"
+          ]
+        },
+        "10": {
+          "label": "Passive first cursed-energy attack damage",
+          "simple": "Extra damage on the first cursed-energy shot while the passive is active.",
+          "technical": "Unique row 0, value 10 = 1.15. TCP_051_CursedEnergyAttack_1<TBase>::GetActionDamageRate returns it only when CP_051_Passive stack is greater than 0, otherwise 1.0. It applies to the regular CursedEnergyAttack_1 and its air version; the _Auto variants keep the generic auto-combo damage-rate body and do not read this slot. The same (10, 0) read is recorded in the CP_051 verification note.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1614",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1618",
+            "Source/Abrams/Public/CP_051_Actions.h:134",
+            "Source/Abrams/Public/CP_051_Actions.h:141",
+            "Tools/verify/CHAR/CP_051_ActionController.md:82"
+          ]
+        },
+        "11": {
+          "label": "Extra attack collision-lock time",
+          "simple": "How long the collision lock stays on after the passive-triggering extra attack ends.",
+          "technical": "Unique row 0, value 11 = 1.5. FCP_051_ExtraAttack_1::FinishAttackEffects calls SetCollisionLock(9, true, 1.5). The lock is created at the start of that action with a -1.0 duration and cleared in UCP_051_ActionController::OnActionEnded when key 9 exists.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1770",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1777",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1201",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1203"
+          ]
+        }
+      },
+      "untraced": [
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The passive is set from costume pattern 1 or by ExtraAttack_1: SetupPassives adds BUFF_CP_051_PASSIVE when AppliedPattern == 1, and SetPassiveActive toggles it from the extra attack. Most of the damage-rate reads above are gated on that buff, not merely on having this data row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1146",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1152",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1750",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:1754"
+          ]
+        },
+        {
+          "text": "GetCharacterUniqueFloatValue is a raw UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference with no bounds checks; the CP_051 action helper GetOwnerUniqueFloat is a second hop to it. Missing rows or short arrays would not be defended against here.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacter.cpp:1759",
+            "Source/Abrams/Private/GameCharacterAction.cpp:933",
+            "Tools/verify/CHAR/UniqueRowsInline.md:21"
+          ]
+        },
+        {
+          "text": "Shared row-0 readers outside CP_051's own controller were checked: the inherited steering helper is called only by CN_041/CN_140 action source, the AI hold classes are created by CP_040/CP_050 behaviour controllers, and ProjectionSorceryReceive is a separate action. They are not attributed to CP_051's moves.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterActionController.cpp:3494",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:210",
+            "Source/Abrams/Private/GameCharacterBrain_AI.cpp:168"
+          ]
+        }
+      ]
+    },
+    "CP_051_ATTACKC": {
+      "title": "Attack C homing phases and push",
+      "overview": "Row 1 tunes Gojo's second normal attack (Attack C): four phase lengths, two force values for the homing pull, and two offsets for where the strike effect appears.",
+      "values": {
+        "0": {
+          "label": "Standby phase time",
+          "simple": "Delay before the homing-ready pose is considered complete.",
+          "technical": "Unique row 1, value 0 = 0.15. In TickStandbyPhases at StartCount 0 for NormalAttack_2, Phase 1 advances only when ActionElapsedTime >= 0.15; elapsed then resets to 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:250",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:264"
+          ]
+        },
+        "1": {
+          "label": "Homing wait time",
+          "simple": "How long Gojo holds the attack while looking for or closing on the secondary target.",
+          "technical": "Unique row 1, value 1 = 0.25. In Phase 2, if the target is within the CP_051_AttackC_01 homing row's positive HomingDistance, a repeat request is made instead. Otherwise elapsed increases and advances at >= 0.25, finishing the charge effect if it is still valid.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:287",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:300",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:305"
+          ]
+        },
+        "2": {
+          "label": "End pose time",
+          "simple": "Delay before the finishing animation plays.",
+          "technical": "Unique row 1, value 2 = 0.25. Phase 3 advances when elapsed >= 0.25, resets elapsed, and plays AttackC_01_End_01.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:300",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:304"
+          ]
+        },
+        "3": {
+          "label": "Homing-hit end delay",
+          "simple": "How long the hit effect remains before the attack ends on the third hit.",
+          "technical": "Unique row 1, value 3 = 0.15. At StartCount 3, TickAttack calls TickEndPhases with FloatIndex 3 and row 1. When elapsed reaches 0.15 it finishes FX_CP_051_00101, then either exits immediately while homing is active or plays the CP_051_ATTACK_END_01 attack animation when it is not.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:318",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:324",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:399"
+          ]
+        },
+        "4": {
+          "label": "Target pull strength",
+          "simple": "How strongly the secondary target is pulled toward the strike point.",
+          "technical": "Unique row 1, value 4 = 4500. While bHomingActive and a valid secondary target exist, TickAttack calls AddPushOutRequest with this as Param20. The battle system forwards it to ApplyExternalForce as the force strength; radius -1 bypasses the request radius cull.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:424",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:284",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:95",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:113"
+          ]
+        },
+        "5": {
+          "label": "Target pull gravity correction",
+          "simple": "How much the pull's vertical motion is corrected against gravity.",
+          "technical": "Unique row 1, value 5 = 0.2. It is passed as Param24 of the same AddPushOutRequest, which reaches ApplyExternalForce as the gravity-correction argument. The exact physical units are not established in this source.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:424",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:95",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:113"
+          ]
+        },
+        "6": {
+          "label": "Strike effect forward offset",
+          "simple": "Extra distance in front of Gojo where the attack effect and pull point appear.",
+          "technical": "Unique row 1, value 6 = 50. UniqueAction with IntParameter 0 uses it as ForwardOffset, and TickAttack uses it again for GetHomingPosition. The final point is owner location + facing * (owner scaled capsule radius + target scaled capsule radius + 50) + up * VerticalOffset.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:162",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:167",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:383",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:421"
+          ]
+        },
+        "7": {
+          "label": "Strike effect height offset",
+          "simple": "How far above Gojo the attack effect and pull point appear.",
+          "technical": "Unique row 1, value 7 = 50. It is the VerticalOffset for SpawnAttackEffect and GetHomingPosition on NormalAttack_2, added along the owner's up vector. It is read even though it matches the hardcoded default used by other attack counts.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:168",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:142",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:383",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:422"
+          ]
+        }
+      },
+      "untraced": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "A line trace from Gojo to the secondary target cancels homing before the push is applied while the attack's start count is 3 or less; the row-4 and row-5 force values are never reached on that tick.",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:406",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:417"
+          ]
+        },
+        {
+          "text": "The effect is FX_CP_051_00101 with SE_CP_051_01011 and is attached to the owner's root bone. This is effect handling traced from the action code, not a value in this unique row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:142",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:153",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:158"
+          ]
+        }
+      ]
+    },
+    "CP_051_ATTACKE": {
+      "title": "Attack E dual homing phases",
+      "overview": "Row 2 tunes Gojo's third normal attack (Attack E). It has two separate homing bursts: StartCount 3/4 uses values 4-7 and value 3, while StartCount 6/7 repeats with values 9-12 and value 8.",
+      "values": {
+        "0": {
+          "label": "Standby phase time",
+          "simple": "Delay before the first Attack E homing pose completes.",
+          "technical": "Unique row 2, value 0 = 0.15. TickStandbyPhases is called with row index 2 at StartCount 0; Phase 1 advances at elapsed >= 0.15.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:250",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:264",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:437"
+          ]
+        },
+        "1": {
+          "label": "First homing wait time",
+          "simple": "How long the first wind-up holds before advancing.",
+          "technical": "Unique row 2, value 1 = 0.25. Phase 2 advances at elapsed >= 0.25 unless the CP_051_AttackE_01 homing row reports the target inside its positive HomingDistance, in which case a repeat is requested.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:287",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:300",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:437"
+          ]
+        },
+        "2": {
+          "label": "First end pose time",
+          "simple": "Delay before the first finishing animation.",
+          "technical": "Unique row 2, value 2 = 0.25. Phase 3 advances at elapsed >= 0.25 and plays AttackE_01_End_01.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:300",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:306",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:437"
+          ]
+        },
+        "3": {
+          "label": "First homing-hit end delay",
+          "simple": "End delay for the StartCount 4 burst.",
+          "technical": "Unique row 2, value 3 = 0.15. At StartCount 4, TickEndPhases receives FloatIndex 3 on row 2 and uses this as the timer before finishing the attack effect or playing CP_051_ATTACK_END_01.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:318",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:324",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:441"
+          ]
+        },
+        "4": {
+          "label": "First burst pull strength",
+          "simple": "Force applied to the target during the StartCount 3/4 burst.",
+          "technical": "Unique row 2, value 4 = 4500. It is the Strength argument of AddPushOutRequest while StartCount is 3 or 4 and homing is active; the battle system forwards it to ApplyExternalForce. Radius is -1, so no distance cull is applied to the queued request.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:457",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:486",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:95",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:113"
+          ]
+        },
+        "5": {
+          "label": "First burst gravity correction",
+          "simple": "Gravity correction for the first burst's pull.",
+          "technical": "Unique row 2, value 5 = 0.2. It is passed as the second force parameter of the StartCount 3/4 AddPushOutRequest. Physical units are not established in the consumer code.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:458",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:486",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:95",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:113"
+          ]
+        },
+        "6": {
+          "label": "First burst forward offset",
+          "simple": "Forward placement of the first burst's effect and pull point.",
+          "technical": "Unique row 2, value 6 = 50. Used by UniqueAction for StartCount 3/4 and by TickAttack's GetHomingPosition: owner location + facing * (both scaled capsule radii + 50) + up * value 7.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:177",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:187",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:459",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:483"
+          ]
+        },
+        "7": {
+          "label": "First burst height offset",
+          "simple": "Vertical placement of the first burst's effect and pull point.",
+          "technical": "Unique row 2, value 7 = 50. It is the VerticalOffset for SpawnAttackEffect and GetHomingPosition in the StartCount 3/4 branch.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:188",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:460",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:142",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:383"
+          ]
+        },
+        "8": {
+          "label": "Second homing-hit end delay",
+          "simple": "End delay for the later StartCount 7 burst.",
+          "technical": "Unique row 2, value 8 = 0.15. At StartCount 7, TickEndPhases is called with FloatIndex 8 on row 2, so this slot is genuinely read as the second burst's end timer.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:318",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:324",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:441",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:446"
+          ]
+        },
+        "9": {
+          "label": "Second burst pull strength",
+          "simple": "Force applied to the target during the StartCount 6/7 burst.",
+          "technical": "Unique row 2, value 9 = 4500. TickAttack selects it as the Strength argument of AddPushOutRequest when StartCount is 6 or 7.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:465",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:486",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:95",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:113"
+          ]
+        },
+        "10": {
+          "label": "Second burst gravity correction",
+          "simple": "Gravity correction for the later burst's pull.",
+          "technical": "Unique row 2, value 10 = 0.2. It is the second force parameter in the StartCount 6/7 AddPushOutRequest; exact units are not documented by the consumer.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:466",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:486",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:95",
+            "Source/Abrams/Private/GameBattleSystems_B.cpp:113"
+          ]
+        },
+        "11": {
+          "label": "Second burst forward offset",
+          "simple": "Forward placement of the later burst's effect and pull point.",
+          "technical": "Unique row 2, value 11 = 50. UniqueAction selects it for StartCount 6/7, and TickAttack uses the same value in GetHomingPosition for that branch.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:177",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:192",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:467",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:483"
+          ]
+        },
+        "12": {
+          "label": "Second burst height offset",
+          "simple": "Vertical placement of the later burst's effect and pull point.",
+          "technical": "Unique row 2, value 12 = 200. It is the VerticalOffset for SpawnAttackEffect and GetHomingPosition in the StartCount 6/7 branch, lifting that burst's strike point 200 units above the owner instead of the default 50.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:193",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:468",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:142",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:383"
+          ]
+        }
+      },
+      "untraced": [
+        13
+      ],
+      "notes": [
+        {
+          "text": "For StartCount values other than 3, 4, 6, or 7, UniqueAction hardcodes offsets of 50/50 and does not read this row; the two later bursts are selected by action start count, not by cursed-energy level.",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:177",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:181",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:431",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:454"
+          ]
+        },
+        {
+          "text": "Wall traces gate both homing bursts only on the counts that use this row's force values (3, 4, 6, 7); a blocking trace disables homing before the push is queued.",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:454",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:478"
+          ]
+        }
+      ]
+    },
+    "CP_051_ATTACKH_1": {
+      "title": "Beam level 1 range and timing",
+      "overview": "Row 3 configures the level 1 Cursed Energy 2 beam: how far it reaches, how long the held beam phase lasts, and how fast its endpoint advances.",
+      "values": {
+        "0": {
+          "label": "Level 1 beam range",
+          "simple": "Maximum reach of the level 1 beam.",
+          "technical": "Unique row 3, value 0 = 1800. FCP_051_CursedEnergyAttack_2::Reset seeds EffectDistance from it for level 1, and UpdateEffectLocation uses it as Range when tracing the wall/ground line and capping the endpoint at Range - 5. Levels 2 and 3 use row 4 value 0 instead.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:745",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:747",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:763",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:767"
+          ]
+        },
+        "1": {
+          "label": "Level 1 beam hold duration",
+          "simple": "How long the player must hold level 1 before the beam fires.",
+          "technical": "Unique row 3, value 1 = 0.7 seconds. In TickAttack Phase 1, ActionElapsedTime is advanced by the passive-adjusted rate and compared with this duration. Reaching it sets Byte16, ends the phase unbounded, and sets Flag159. Level 2 uses row 4 value 1 and level 3 uses row 5 value 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:532",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:541",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:546"
+          ]
+        },
+        "2": {
+          "label": "Level 1 endpoint speed",
+          "simple": "How quickly the level 1 beam endpoint grows toward its range.",
+          "technical": "Unique row 3, value 2 = 140. UpdateEffectLocation selects it as Speed for level 1; Speed is multiplied by row 0 value 7 when the passive is active, then Step = Speed * DeltaTime advances EffectElapsed and the endpoint blend. Levels 2 and 3 both use row 4 value 2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:768",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:778",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:787"
+          ]
+        },
+        "5": {
+          "label": "Generic Jugon near stun time (conditional)",
+          "simple": "A shared stun-receive reader would use this as a short-distance stun time if Gojo caused that status.",
+          "technical": "Unique row 3, value 5 = 0. The shared FGameCharacterAction_JugonStunReceive::Start reads attacker row 3 value 5 as TimeNear. No CP_051-specific JugonStun attack was found in the traced source, so this is an identified generic read, not a demonstrated CP_051 effect; applicability remains unresolved.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:279"
+          ]
+        },
+        "6": {
+          "label": "Generic Jugon far stun time (conditional)",
+          "simple": "A shared stun-receive reader would use this as a long-distance stun time if Gojo caused that status.",
+          "technical": "Unique row 3, value 6 = 0. The same shared receive action reads attacker row 3 value 6 as TimeFar. It is only relevant if an attacker with this row delivers JugonStun; no such CP_051 move is traced.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:280"
+          ]
+        },
+        "7": {
+          "label": "Generic Jugon far distance (conditional)",
+          "simple": "A shared stun-receive reader would use this as the far-distance cutoff.",
+          "technical": "Unique row 3, value 7 = 0. FGameCharacterAction_JugonStunReceive::Start reads attacker row 3 value 7 as DistanceFar. It is conditional on that shared stun path being triggered by this character, which was not found in CP_051 code.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:281"
+          ]
+        },
+        "8": {
+          "label": "Generic Jugon near distance (conditional)",
+          "simple": "A shared stun-receive reader would use this as the near-distance cutoff.",
+          "technical": "Unique row 3, value 8 = 0. The receive action reads attacker row 3 value 8 as DistanceNear; if far and near are equal it uses TimeNear directly. No CP_051-specific JugonStun attack is traced, so this is not claimed as an active CP_051 setting.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:271",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:282",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:285"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Only level 1 uses this row for range, duration and speed together. Level 2 switches duration to row 4 but keeps row 4 for range/speed; level 3 takes duration from row 5 while still taking range and speed from row 4.",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:532",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:534",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:745",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:753",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:767",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:773"
+          ]
+        },
+        {
+          "text": "The beam's direction comes from the PG_Attack_01 bone up vector, and its height is blended toward a snapped ground point; these are traced effect mechanics but are not floats in this unique row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:785",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:834"
+          ]
+        }
+      ]
+    },
+    "CP_051_ATTACKH_2": {
+      "title": "Beam level 2 range and timing",
+      "overview": "Row 4 supplies the beam range and endpoint speed for both level 2 and level 3, plus the hold duration for level 2 only.",
+      "values": {
+        "0": {
+          "label": "Level 2/3 beam range",
+          "simple": "Maximum reach of the beam at cursed-energy levels 2 and 3.",
+          "technical": "Unique row 4, value 0 = 1800. Reset uses it to seed EffectDistance for both level 2 and level 3, and UpdateEffectLocation uses it as Range for those levels. Level 1 uses row 3 value 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:745",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:751",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:763",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:772"
+          ]
+        },
+        "1": {
+          "label": "Level 2 beam hold duration",
+          "simple": "How long the player must hold level 2 before the beam fires.",
+          "technical": "Unique row 4, value 1 = 0.6 seconds. TickAttack Phase 1 selects it only when GetCursedEnergyLevel() == 2; level 1 uses row 3 value 1 and level 3 uses row 5 value 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:533",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:541"
+          ]
+        },
+        "2": {
+          "label": "Level 2/3 endpoint speed",
+          "simple": "How quickly the beam endpoint grows at levels 2 and 3.",
+          "technical": "Unique row 4, value 2 = 140. UpdateEffectLocation selects it as Speed for both level 2 and level 3. The passive multiplier from row 0 value 7 is applied afterward, and Step = Speed * DeltaTime drives the endpoint movement.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:770",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:773",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:778",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:787"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The level choice is made from the controller's cursed-energy level at Reset, tick, and UniqueAction time; the unique row number is not chosen by a data-table name lookup.",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:745",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:763",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:654"
+          ]
+        }
+      ]
+    },
+    "CP_051_ATTACKH_3": {
+      "title": "Beam level 3 hold duration",
+      "overview": "Row 5 is narrowly used: the traced level 3 beam only takes its hold duration from here. Range and speed still come from row 4.",
+      "values": {
+        "0": {
+          "label": "Stored level 3 beam range",
+          "simple": "The level 3 row stores a range. The traced level 3 beam uses the range from the level 2 row.",
+          "technical": "Both Reset and UpdateEffectLocation put cursed-energy levels 2 and 3 in the case that reads FloatValue[0] of row index 4. This value sits at row index 5. The same row still contributes its own duration through slot 1.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:743-753",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:763-776",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:531-535"
+          ]
+        },
+        "1": {
+          "label": "Level 3 beam hold duration",
+          "simple": "How long the player must hold level 3 before the beam fires.",
+          "technical": "Unique row 5, value 1 = 0.5 seconds. TickAttack Phase 1 selects it only when GetCursedEnergyLevel() == 3. Once ActionElapsedTime, advanced by the passive-scaled rate, reaches it, the attack finishes its hold phase.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:529",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:534",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:541",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:546"
+          ]
+        },
+        "2": {
+          "label": "Stored level 3 beam growth speed",
+          "simple": "The level 3 row stores a growth speed. The traced level 3 beam uses the speed from the level 2 row.",
+          "technical": "UpdateEffectLocation groups levels 2 and 3 together and reads FloatValue[2] of row index 4. It scales that speed by the passive multiplier before advancing the beam. This slot is in row index 5.",
+          "status": "observed",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:763-784"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Row 5 value 0 is not read by the CE2 reset or endpoint code: level 3 seeds EffectDistance and takes Range from row 4 value 0. This is a traced asymmetry, not an assumption from the row's name.",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:745",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:751",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:772"
+          ]
+        }
+      ]
+    },
+    "CP_051_ATTACKH_SHOOT_CAMERA": {
+      "title": "Beam camera framing",
+      "overview": "Row 6 sets the temporary camera used when the Cursed Energy 2 beam starts. Values 0-10 are read by the shared camera-request helper; value 11 is read directly by the CP_051 beam action as a forward gaze lead.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "Side-to-side camera shift in the beam view.",
+          "technical": "Unique row 6, value 0 = -600. MakeUniqueCameraRequest(2, 6) assigns it to FVirtualCameraRequest.CameraOffset.X; the struct documents this offset as camera position in gaze-rotation space from the eye base.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:614"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "Second camera shift axis in the beam view.",
+          "technical": "Unique row 6, value 1 = 200. It is assigned to CameraOffset.Y by the same helper.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "Vertical camera shift in the beam view.",
+          "technical": "Unique row 6, value 2 = 350. It is assigned to CameraOffset.Z by MakeUniqueCameraRequest(2, 6).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "Limit on how far the beam camera may look below the eye.",
+          "technical": "Unique row 6, value 3 = 10. It becomes FVirtualCameraRequest.LimitAngleDown. The consumer struct describes this as the maximum gaze elevation below the eye; it does not spell out a unit in the source.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:32"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "Limit on how far the beam camera may look above the eye.",
+          "technical": "Unique row 6, value 4 = 0. It becomes LimitAngleUp. Zero is still read and written into the request; no fallback substitution occurs in this helper.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:33"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "Beam-camera field-of-view setting; zero leaves the generic request at no new FOV.",
+          "technical": "Unique row 6, value 5 = 0. MakeUniqueCameraRequest assigns it to FieldOfView. The request struct says only values greater than 0 are treated as a new FOV, so this read effectively keeps the no-new-FOV state; the later restore requests explicitly set FOV 90 instead.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:34",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:633",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:715"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "No blend is requested for the beam FOV or when restoring the old camera.",
+          "technical": "Unique row 6, value 6 = 0. The camera helper assigns it to FieldOfViewBlendTime, and CE2 reads it again when restoring the saved camera after UniqueAction(1) or FinishAttackEffects. The request struct says only values greater than 0 create a blend duration; zero means snap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:35",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:633",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:715"
+          ]
+        },
+        "7": {
+          "label": "Field-of-view easing selector",
+          "simple": "Picks linear FOV easing for this camera request.",
+          "technical": "Unique row 6, value 7 = 0. MakeUniqueCameraRequest casts it to int and switches 0->Linear, 1->EaseIn, 2->EaseOut, 3->EaseInOut; any other value leaves the request's default easing. Here it selects Linear.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:956",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:36"
+          ]
+        },
+        "8": {
+          "label": "Camera yaw orbit",
+          "simple": "Yaw orbit applied to the beam camera.",
+          "technical": "Unique row 6, value 8 = 0. It is assigned to FVirtualCameraRequest.OrbitYaw. Zero is read and passed through to the request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29"
+          ]
+        },
+        "9": {
+          "label": "Camera pitch orbit",
+          "simple": "Pitch orbit applied to the beam camera.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30"
+          ],
+          "technical": "The mode-2 request builder assigns FloatValue[9] of row 6 to FVirtualCameraRequest.OrbitPitch. Student Gojo builds that request at the first beam start while switching the active camera to mode 3."
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Roll applied to the beam camera.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31"
+          ],
+          "technical": "The mode-2 request builder assigns FloatValue[10] of row 6 to FVirtualCameraRequest.Roll. The first beam start passes the request into SetCameraMode when entering mode 3."
+        },
+        "11": {
+          "label": "Forward gaze lead",
+          "simple": "Places the camera's look-at point in front of Gojo during the beam shot.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:589",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:614",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:617",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:585"
+          ],
+          "technical": "The first beam start and subsequent ticks in camera mode 3 set Mode3GazeLocation to the owner positional anchor plus the owner facing vector multiplied by row 6 FloatValue[11], in world units. This extra lead controls the gaze point independently of the shared camera request fields."
+        }
+      },
+      "untraced": [
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The camera mode is saved before SetCameraMode(3, true, request) and restored to that saved mode with FOV 90 when the beam's UniqueAction(1) or FinishAttackEffects runs. The beam effect chain itself is separate from these camera values.",
+          "evidence": [
+            "Source/Abrams/Private/CP_051_ActionController.cpp:613",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:614",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:629",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:711"
+          ]
+        },
+        {
+          "text": "MakeUniqueCameraRequest only fills these fields when CameraMode == 2; CP_051 passes 2 as the request-template mode even though the owner is switched to runtime mode 3.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/CP_051_ActionController.cpp:614"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "CharacterDataTable selects UCP_051_ActionController for this character; there is no CP_051 behaviour-controller file in Source. The AI side is FGameCharacterAIThinkNode_CP_051, created by the generic brain factory, and its setup uses hardcoded behaviour weights/ranges rather than these unique floats.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:603",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:168",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeSetup.cpp:3036",
+        "Source/Abrams/Public/CP_051_ActionController.h:7"
+      ]
+    },
+    {
+      "text": "The Limitless loop is the character's main quirk: idle charge fills from row 0 values 4/5, the active window changes hit/combo rules, and the passive itself comes from costume pattern 1 or the ExtraAttack_1 action. The row-0 damage bonuses are gated on that buff.",
+      "evidence": [
+        "Source/Abrams/Private/CP_051_ActionController.cpp:999",
+        "Source/Abrams/Private/CP_051_ActionController.cpp:1146",
+        "Source/Abrams/Private/CP_051_ActionController.cpp:1750",
+        "Source/Abrams/Private/CP_051_ActionController.cpp:883",
+        "Source/Abrams/Private/CP_051_ActionController.cpp:918"
+      ]
+    },
+    {
+      "text": "NormalAttack_2 and NormalAttack_3 both spawn FX_CP_051_00101 and call into the controller's FX_CP_051_00103 homing effect; CursedEnergyAttack_1/Auto use the CP_051_AttackG_01 homing rows, and CE2 uses the passive-only CP_051_ATTACKH_2_* attack sets. These are effect/attack-set behaviours traced around the unique rows, not extra unique floats.",
+      "evidence": [
+        "Source/Abrams/Private/CP_051_ActionController.cpp:142",
+        "Source/Abrams/Private/CP_051_ActionController.cpp:1258",
+        "Source/Abrams/Private/CP_051_ActionController.cpp:1638",
+        "Source/Abrams/Private/CP_051_ActionController.cpp:55",
+        "Tools/verify/CHAR/CP_051_ActionController.md:100",
+        "Tools/verify/CHAR/CP_051_ActionController.md:81"
+      ]
+    },
+    {
+      "text": "The CE2 beam is a moving chain of spawned effects (FX_CP_051_08111/08112/08113_*/08114/08115) stepped by row 3/4 range and speed; AddPushOutRequest in the normal attacks is forwarded through battle system 340 to ApplyExternalForce. No AGameShikigami path is involved: shikigami read ShikigamiUniqueDataTable, a different table.",
+      "evidence": [
+        "Source/Abrams/Private/CP_051_ActionController.cpp:501",
+        "Source/Abrams/Private/CP_051_ActionController.cpp:759",
+        "Source/Abrams/Private/CP_051_ActionController.cpp:424",
+        "Source/Abrams/Private/GameBattleSystems_B.cpp:95",
+        "Source/Abrams/Private/GameShikigami.cpp:874"
+      ]
+    },
+    {
+      "text": "The CP_051 UI widget only displays the Limitless gauge from the status controller; it does not read any CharacterUniqueDataTable float. The verification note records that several CP_051 action bodies are still DIFF/HOLD, so the descriptions here are traced consumer semantics rather than a byte-match certificate.",
+      "evidence": [
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_051.cpp:19",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_051.cpp:27",
+        "Tools/verify/CHAR/CP_051_ActionController.md:5",
+        "Tools/verify/CHAR/CP_051_ActionController.md:65"
+      ]
+    }
+  ]
+}

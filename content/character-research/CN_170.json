@@ -1,0 +1,84 @@
+{
+  "overview": "This Visual Battle Lobby mannequin changes material patterns on certain actions. Its export leaves all unique slots empty.",
+  "technicalOverview": "Mannequin Cursed Spirit (CN_170) is a non-selectable NPC used as the Visual Battle Lobby mannequin, not a playable fighter with unique tuning values. Its authoritative unique-row list is empty: all nine Id_CharacterUnique slots are None, so this page has no row or float settings to adjust. The cooked character row uses CP_010 data for movement, cursed energy, operation and chat, lists no attack sets of its own, and points at the dedicated CN_170 controller types. Those controllers are deliberately tiny: the action controller only switches the owner's material pattern on certain action starts and refuses the revival experience buff, while the behavior controller is an exact CP_010 shell. AI type 29 also has no dedicated think node and falls through to CP_010's. Everything described below is traced from those shared controller/data roles; nothing is attributed to a CN_170 unique float because no such row exists.",
+  "rows": {},
+  "notes": [
+    {
+      "text": "There are no CN_170 unique rows to configure - none of the nine Id_CharacterUnique entries is populated, so no row index 0-8 or float slot 0-13 can be attributed to this character. Setup still reserves one pointer per Id_CharacterUnique entry, but each None id resolves to no row. Even if something tried to read one, the accessor is a raw UniqueRows[RowIndex]->FloatValue[ValueIndex] dereference with no null or bounds check, and neither CN_170 controller contains a GetOwnerUniqueFloat, GetCharacterUniqueFloatValue or MakeUniqueCameraRequest call. Any hypothetical inherited read of a missing row is unresolved, not a tunable value; the nine unique rows that CP_170 and other characters own must not be copied here.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:560",
+        "Source/Abrams/Private/GameCharacter.cpp:561",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Private/GameCharacterAction.cpp:935",
+        "Source/Abrams/Private/CN_170_ActionController.cpp:9",
+        "Source/Abrams/Private/CN_170_BehaviorController.cpp:6"
+      ]
+    },
+    {
+      "text": "The one visible mechanic on the action side is a material swap: when an action starts, the controller first runs the base handler, then sets the owner's material pattern to 1 if the new action reports that a start material pattern should be applied. The base action reports false for that flag, so the swap is opt-in per action rather than happening on every action. No CN_170-specific action setting is traced, so the trigger is left at whatever the incoming action declares; this is a traced slot-280 wrapper, not a value read from unique data.",
+      "evidence": [
+        "Source/Abrams/Private/CN_170_ActionController.cpp:9",
+        "Source/Abrams/Private/CN_170_ActionController.cpp:11",
+        "Source/Abrams/Private/CN_170_ActionController.cpp:12",
+        "Source/Abrams/Private/CN_170_ActionController.cpp:14",
+        "Source/Abrams/Public/GameCharacterAction.h:116",
+        "Source/Abrams/Public/CN_170_ActionController.h:18",
+        "Tools/verify/CHAR/icf-census.py:97"
+      ]
+    },
+    {
+      "text": "CN_170 deliberately cannot receive the revival buff. The base controller grants BUFF_CURSED_ENERGY_EXP_INCREASE_REVIVAL only when CanApplyRevivalBuff() is true; this controller overrides that check to return false, so the buff is never applied on its behalf. Several other support/NPC controllers use the same opt-out, so it is shared plumbing rather than a CN_170-only rule, and it comes from a virtual override rather than a data-table value.",
+      "evidence": [
+        "Source/Abrams/Public/CN_170_ActionController.h:19",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:1512",
+        "Source/Abrams/Private/GameCharacterActionController.cpp:1514",
+        "Source/Abrams/Public/GameCharacterActionController.h:691",
+        "Tools/verify/CHAR/icf-census.py:97"
+      ]
+    },
+    {
+      "text": "Both controllers are footprint shells with no member storage of their own: the action controller is 0x168, exactly the base size, and the behavior controller is 0x50, also exactly the base size with zero reflected properties. The verification sweep records the action controller as verified-empty and the behavior one as a budget-0 shell. 'Empty' refers only to members - the action controller still owns the two overrides described here.",
+      "evidence": [
+        "Source/Abrams/Public/CN_170_ActionController.h:10",
+        "Source/Abrams/Public/CN_170_ActionController.h:13",
+        "Source/Abrams/Public/CN_170_BehaviorController.h:11",
+        "Source/Abrams/Public/CN_170_BehaviorController.h:14",
+        "Tools/verify/CHAR/claims.csv:9",
+        "Tools/verify/CHAR/batches/batch-action.md:52",
+        "Tools/verify/CHAR/batches/batch-behaviour.md:16"
+      ]
+    },
+    {
+      "text": "CP_010 supplies the AI plumbing. GameCharacter creates UCN_170_ActionController for ActionControllerType 43 and CreateBrain creates UCN_170_BehaviorController for AI index 29, but the think-node jump table has no case 29 and falls into the default CP_010 node. The behavior controller's CreateThinkParam is a pure Super-forward, and verification shows CN_170 and CN_071 share CP_010's class constructor and vtable, so slot 87 is simply CP_010's forward. There is no bespoke CN_170 think node or AI action factory - sharing that table does not give CN_170 anyone else's unique rows.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:628",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:1415",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:208",
+        "Source/Abrams/Private/GameCharacterBrain_AI.cpp:211",
+        "Source/Abrams/Private/CN_170_BehaviorController.cpp:6",
+        "Tools/verify/CHAR/BehaviorController_shells.md:73",
+        "Tools/verify/CHAR/ai-factory-table.md:10",
+        "Tools/verify/CHAR/GameCharacterAIThinkNode.md:104"
+      ]
+    },
+    {
+      "text": "Its role explains the sparse setup: the Visual Battle Lobby appends CN_170 as the NPC entry after the session members, and the cooked character row is non-selectable with no attack sets while borrowing CP_010 movement, cursed-energy, operation and chat data. That is why the traced controller has no damage or projectile logic and no unique float reads, and why this wiki entry records no tunable rows.",
+      "evidence": [
+        "Source/Abrams/Private/GamePhase_BattleVisualLobby.cpp:86",
+        "Source/Abrams/Private/GamePhase_BattleVisualLobby.cpp:1419",
+        "Source/Abrams/Private/GameCharacter.cpp:628",
+        "Source/Abrams/Private/CN_170_ActionController.cpp:9"
+      ]
+    },
+    {
+      "text": "Reconstruction caveat for the material-swap effect: the slot-280 OnActionStarted body is byte-equal to retail but was dropped from the linked executable by /OPT:REF with no newer source caller, so the match lane records it as HOLD. The description above comes from the decompiled/traced body rather than an observed live game call.",
+      "evidence": [
+        "Tools/verify/LANES/w23-char-c.md:82",
+        "Source/Abrams/Private/CN_170_ActionController.cpp:12"
+      ]
+    }
+  ]
+}

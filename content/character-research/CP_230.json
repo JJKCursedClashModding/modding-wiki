@@ -1,0 +1,1139 @@
+{
+  "overview": "Choso’s settings tune blood orb recovery, buff bonuses, and the charge stages and camera for his piercing beam.",
+  "technicalOverview": "Choso (CP_230) builds and spends up to five blood orbs. Row 0 sets the orb refill per cursed-energy level and the buffed damage, cursed-energy-gain and guard-hit multipliers; row 2 times the delayed cursed-energy drain while his Cursed Energy Attack 1 buff is active. Rows 3-5 are the level-specific variants for the four-stage charged piercing beam, row 1 shapes that beam and its burst, and row 6 is the lock-on camera preset used during the charge. All reads use zero-based row and float indices directly; the reconstructed code does not look rows up by name.",
+  "rows": {
+    "CP_230": {
+      "title": "Blood orbs and buffed attack scaling",
+      "overview": "The core row sets how many blood orbs Choso refills at each cursed-energy level and how much stronger his buffed follow-up attacks, cursed-energy gain and guard hits become. The three orb counts are read by position; the later multipliers only apply while the Cursed Energy Attack 1 buff is active.",
+      "values": {
+        "0": {
+          "label": "Level 1 orb count",
+          "simple": "Choso refills to 3 blood orbs at cursed-energy level 1.",
+          "technical": "RefillStock indexes GCP_230_StockCountIndices = {0,1,2} with CursedEnergyLevel - 1 and reads this row with that index. The resulting count is passed to SpawnStockEffects and to SetBloodBallStock without clamping in the call. The controller level is synced from the status level clamped to at most 3. A generic ProjectionSorceryReceive fallback also reads owner row 0 value 0 as a restraint-time substitute only when the request has no DamageTableRow; that is a shared receiver path, not a CP_230-created action.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1600",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1612",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1613",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1614",
+            "Source/Abrams/Private/GameCharacterStatusController.cpp:158",
+            "Source/Abrams/Public/GameCharacterActionController.h:604",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:212",
+            "Source/Abrams/Private/GameCharacterAction_ProjectionSorcery.cpp:214"
+          ]
+        },
+        "1": {
+          "label": "Level 2 orb count",
+          "simple": "Choso refills to 4 blood orbs at cursed-energy level 2.",
+          "technical": "The same RefillStock count lookup selects value index 1 only when the controller cursed-energy level is exactly 2. It sets both the number of FX_CP_230_00101 effects around the neck and the status BloodBallStock. Shared AI timed-hold classes also read owner row 0 value 1, but CP_230's behavior controller does not create those hold executors.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1600",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1612",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1613",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1614",
+            "Source/Abrams/Private/CP_230_BehaviorController.cpp:9",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:118",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:119"
+          ]
+        },
+        "2": {
+          "label": "Level 3 orb count",
+          "simple": "Choso refills to 5 blood orbs at cursed-energy level 3.",
+          "technical": "The RefillStock count lookup selects value index 2 only at cursed-energy level 3. This is row 0 value 2, a different slot from row 2 value 0 used by the Cursed Energy Attack 1 buff timer. A generic AI hold executor reads row 0 value 2, but CP_230 does not create that executor.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1600",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1612",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1613",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1614",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1236",
+            "Source/Abrams/Private/CP_230_BehaviorController.cpp:9",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:129",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:130"
+          ]
+        },
+        "3": {
+          "label": "Buffed follow-up damage",
+          "simple": "With the buff on, second normal attacks keep full damage and stock-consuming third attacks hit at 1.1x after spending an orb.",
+          "technical": "Two CP_230 slots read this float. On NormalAttack_2 / NormalAttackAir_2, damage rate is 1.0 when the CP_230_CursedEnergyAttack1 stack is positive but BloodBallStock is <= 0, and this value when the stack is positive with stock available; without the buff it is 0.0. On NormalAttack_3, its auto/air variants and NormalAttack_3_1, damage rate is 1.0 when the buff is up and bStockConsumed is 0, and this value when bStockConsumed is 1; without the buff it is 0.0. bStockConsumed is set only after ConsumeStock actually decrements the stock and removes an effect.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:919",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:925",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:927",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:931",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1044",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1048",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1050",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1054",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1573",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1584",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1069"
+          ]
+        },
+        "4": {
+          "label": "Buffed cursed-energy gain multiplier",
+          "simple": "Spending an orb makes buffed attacks give 1.2x cursed-energy experience.",
+          "technical": "NormalAttack_2 / NormalAttackAir_2 return this value from GetDealtHitCursedEnergyExpMultiplier when BloodBallStock is positive, otherwise 1.0. The stock-attack family, including NormalAttack_3_1, returns it when the CP_230 controller has bStockConsumed == 1, otherwise 1.0. The stock-attack check is IsA-guarded; the NormalAttack_2 slot is not.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:940",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:942",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:944",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1063",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1065",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1067",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1069",
+            "Source/Abrams/Public/CP_230_ActionController.h:77"
+          ]
+        },
+        "5": {
+          "label": "Buffed guard-durability damage",
+          "simple": "Guard hits from buffed normal attacks break 1.5x as much guard durability.",
+          "technical": "GetGuardDurabilityDamageMultiplier returns this float only when the action's controller is UCP_230_ActionController and the owner has a positive CP_230_CursedEnergyAttack1 stack. Every other case returns 1.0, including the same generic attack classes on another character.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:865",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:869",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:873",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:875",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:877",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:880"
+          ]
+        }
+      },
+      "untraced": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The generic AI timed-hold actions read row 0 values 0-2 as base hold duration plus a level-scaled increment, but those executors are created for other characters' behavior controllers. CP_230's behavior controller specialises only AI ordinal 0x13 to the Cursed Energy Attack 2 combo, so those generic reads are not assigned to Choso.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:119",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:123",
+            "Source/Abrams/Private/GameCharacterAINode.cpp:130",
+            "Source/Abrams/Private/CP_230_BehaviorController.cpp:9",
+            "Source/Abrams/Private/GameCharacterBehaviorController.cpp:119"
+          ]
+        }
+      ]
+    },
+    "CP_230_ATTACKF": {
+      "title": "Piercing beam and burst shape",
+      "overview": "This row sizes the thin beam fired from NormalAttack_3_1 and the later burst effect. Index 0 places the beam; index 1 sets its capsule radius, and indices 2-4 shape the multi-capsule burst.",
+      "values": {
+        "0": {
+          "label": "Piercing beam forward offset",
+          "simple": "The thin beam starts 100 units ahead of Choso, tilted by his upper-body roll.",
+          "technical": "StartBeam spawns FX_CP_230_05101 at owner location plus this value multiplied by the facing forward vector rotated about the owner right vector by AnimInstance FullBodyRotation.Roll. There is no separate Y/Z offset and no unit conversion in the call; the number is used directly as a world-space distance. StartBeam runs on the next attack tick after UniqueAction 1 on NormalAttack_3_1 or its air variant.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:641",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:644",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:646",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:648",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:649",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:751",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:761",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:805"
+          ]
+        },
+        "1": {
+          "label": "Piercing beam capsule radius",
+          "simple": "The thin beam's hit capsules are at most 200 units wide.",
+          "technical": "UpdateBeamCollision reads this as Radius when BeamEffect is valid. For each capsule tagged with the default collision tag from either the effect's attack collision or its nullifies-damage keeper, half-height = Min(Scale * ClippedBeamLength, 900) / 2 and requested radius = Min(half-height, this value). Scale is the beam ease current value, so the radius can be smaller early in the ease.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:720",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:722",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:724",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:725",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:728",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:729",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:732",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:736",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:803"
+          ]
+        },
+        "2": {
+          "label": "Burst base reach",
+          "simple": "The follow-up burst starts with 200 units of radial reach before the extra capsules widen it.",
+          "technical": "UpdateBurstCollision reads this as Offset. For each capsule it computes Reach = Widen + Offset and requests radius Min(Reach, HalfHeight), where HalfHeight = (Widen + Length) / 2 and Length = Min(BurstBeamLength, 900). The first capsule has Widen = 0. The same calculation is repeated for the nullifies-damage keeper in the reconstruction.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1673",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1675",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1676",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1681",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1686",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1689",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1691",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1692",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1693",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1705"
+          ]
+        },
+        "3": {
+          "label": "Burst extra capsule height",
+          "simple": "All burst capsules after the first are raised by up to 250 units as the burst opens.",
+          "technical": "For capsule Index > 0, Height = this float * Interp250.GetCurrent(); relative location Z is that Height and index 0 stays at Z = 0. Interp250 is started from 0 to 1 over 0.15 seconds when the burst spawns, and ActionTick calls the collision update while that ease is active. Both collision-keeper passes use the same rule.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1688",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1690",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1702",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1704",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1748",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1889",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1892"
+          ]
+        },
+        "4": {
+          "label": "Burst extra capsule widening",
+          "simple": "All burst capsules after the first widen by up to 100 units as the burst opens.",
+          "technical": "For capsule Index > 0, Widen = this float * Interp250.GetCurrent(). It is added to Reach and to Length in HalfHeight = (Widen + Length) / 2; index 0 has no widening. The same value is used in both collision-keeper loops. Generic trap code also reads row 1 value 4 from a spawner as a timing value, but no CP_230 trap/spawner path was found and no such use is assigned here.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1689",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1691",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1693",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1703",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1705",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1748",
+            "Source/Abrams/Private/GameTrapActionController.cpp:403"
+          ]
+        }
+      },
+      "untraced": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The thin beam and the burst use different effects and different collision passes: the beam's capsules come from FX_CP_230_05101, while the burst is FX_CP_230_05201 spawned by the controller. Both happen to read this row, and the lock-on camera preset is a separate row 6.",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:646",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:724",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:814",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:818",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1730",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1733",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:276"
+          ]
+        }
+      ]
+    },
+    "CP_230_ATTACKG": {
+      "title": "Cursed Energy Attack 1 buff drain",
+      "overview": "When Choso toggles the Cursed Energy Attack 1 buff on, this row starts a countdown and then a delayed cursed-energy drain. It is not the attack-set table with a similar name.",
+      "values": {
+        "0": {
+          "label": "Delay before the drain",
+          "simple": "The buff waits about 1.5 seconds of active time before it starts draining cursed energy.",
+          "technical": "SetCursedEnergyAttack1Buff(true) stores this as Unknown284 and resets Unknown280 to phase 0. ActionTick requires the CP_230 mode flag, the buff to still be present, and the attack layer to be neither CursedEnergyAttack_1 nor CursedEnergyAttackAir_1 before phase 0 advances. In phase 1 it decrements Unknown284 by DeltaTime divided by CustomTimeDilation (1.0 when dilation is <= 0) and advances to phase 2 once the value is <= 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1229",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1235",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1236",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1839",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1843",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1846",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1852",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1853",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1854",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1856"
+          ]
+        },
+        "1": {
+          "label": "Drain rate ease start",
+          "simple": "The delayed drain starts at 60 cursed-energy units per second.",
+          "technical": "This is the From argument of Interp288.Start when the buff is added. In phase 2, GetCursedEnergyDrainRate returns Interp288.GetCurrent() only while the buff is up, the active attack is not CE_1 or Air_1, and Unknown280 is exactly 2; otherwise it returns 0. Interp288 is advanced with DeltaTime divided by the same dilation guard.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1237",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1344",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1346",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1348",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1352",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1355",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1860",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1862",
+            "Source/Abrams/Public/CP_230_ActionController.h:51"
+          ]
+        },
+        "2": {
+          "label": "Drain rate ease end",
+          "simple": "The delayed drain ramps toward the same value, 60, by default.",
+          "technical": "This is the To argument of Interp288.Start. With the supplied data the start and end are equal, so the traced code produces a flat 60 while the ease is active; the source does not apply another multiplier. The same phase-2 guard as value 1 controls whether the current value becomes the controller's drain rate.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1237",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1344",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1352",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1860",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1862",
+            "Source/Abrams/Public/CP_230_ActionController.h:51"
+          ]
+        },
+        "3": {
+          "label": "Drain rate ease duration",
+          "simple": "The drain-rate ramp lasts 1 second of time-dilated game time.",
+          "technical": "This is the Duration argument of Interp288.Start. The ease uses a linear interpolation with exponent 2 and 2 steps, and ActionTick updates it with DeltaTime divided by CustomTimeDilation when dilation is positive, otherwise with DeltaTime. Removing the buff does not restart Interp288 in the traced code.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1237",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1239",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1242",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1860",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1862",
+            "Source/Framework/Public/StudioFloatEaseInterpolator.h:81",
+            "Source/Framework/Public/StudioFloatEaseInterpolator.h:104"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "These ATTACKG values are timing for the CP_230_CursedEnergyAttack1 buff, not the similarly named CP_230_ATTACKG_1_x / CP_230_ATTACKG_2 AttackSet rows. The latter are FNames looked up in AttackSetDataTables by the CE_1 action.",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1197",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1211",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1216",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1220",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1229",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:1237"
+          ]
+        }
+      ]
+    },
+    "CP_230_ATTACKH_1": {
+      "title": "Level 1 charged piercing beam",
+      "overview": "This is the cursed-energy level 1 variant for the four-stage charged piercing attack. Indices 3-6 are the hold thresholds for stages 1-4, and indices 7-10 are the per-frame growth amounts that also cap how long the beam may become.",
+      "values": {
+        "0": {
+          "label": "Unused first charge slot",
+          "simple": "No Choso-specific effect is known for this value (0.3).",
+          "technical": "No read of row 3 value 0 was found in the CP_230 controller, its actions, shared camera helper, trap forwarding or AI code. The closest traced reads of this row are the charge-stage timings at indices 3-6 and beam growth at indices 7-10. A zero default would not by itself prove disuse; this slot is left unresolved rather than named.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:64",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:127"
+          ]
+        },
+        "1": {
+          "label": "Unused second charge slot",
+          "simple": "No Choso-specific effect is known for this value (0.3).",
+          "technical": "No identified CP_230 reader of this slot exists in the searched source. The nearest relevant code reads adjacent charge values from the same row by explicit index; the generic JugonStunReceive uses row 3 values 5-8 on an attacker but not this slot. The row is still read positionally because it is listed in Id_CharacterUnique.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:69",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/GameCharacter.cpp:561",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:279"
+          ]
+        },
+        "2": {
+          "label": "Unused third charge slot",
+          "simple": "No Choso-specific effect is known for this value (0.9).",
+          "technical": "No identified CP_230 reader of this slot exists in the searched source. The nearest traced reads are the charge-stage comparisons and growth values at indices 3-10 of the same row; the generic AI hold and trap accesses use other rows or other game objects.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:64",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:114",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170",
+            "Source/Abrams/Private/GameTrapActionController.cpp:182"
+          ]
+        },
+        "3": {
+          "label": "Stage 1 hold threshold",
+          "simple": "Stage 1 advances after the charge key has been held for 4000.0 of the elapsed-time units used by the action.",
+          "technical": "While the charge key is held in the first CE_2 start, stage 0 compares ActionElapsedTime against this float using a strict less-than test. On success the stage increments, elapsed time resets and the charge effect is refreshed; at equality it does not advance. On release this same float becomes ChargeDuration for stage 0. Row selection is by the action's cursed-energy level: 1 -> row 3, 2 -> row 4, 3 -> row 5; any other level leaves Row = -1 and the unchecked accessor has no fallback. The current row supplies value 3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:40",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:78",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:381",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:411",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:25"
+          ]
+        },
+        "4": {
+          "label": "Stage 2 hold threshold",
+          "simple": "Stage 2 advances after another 4500.0 of the same elapsed-time units.",
+          "technical": "While the charge key is held in the first CE_2 start, stage 1 compares ActionElapsedTime against this float using a strict less-than test. On success the stage increments, elapsed time resets and the charge effect is refreshed; at equality it does not advance. On release this same float becomes ChargeDuration for stage 1. Row selection is by the action's cursed-energy level: 1 -> row 3, 2 -> row 4, 3 -> row 5; any other level leaves Row = -1 and the unchecked accessor has no fallback. The current row supplies value 4.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:40",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:90",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:381",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:411",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:25"
+          ]
+        },
+        "5": {
+          "label": "Stage 3 hold threshold",
+          "simple": "Stage 3 advances after another 5000.0 of the same elapsed-time units.",
+          "technical": "While the charge key is held in the first CE_2 start, stage 2 compares ActionElapsedTime against this float using a strict less-than test. On success the stage increments, elapsed time resets and the charge effect is refreshed; at equality it does not advance. On release this same float becomes ChargeDuration for stage 2. Row selection is by the action's cursed-energy level: 1 -> row 3, 2 -> row 4, 3 -> row 5; any other level leaves Row = -1 and the unchecked accessor has no fallback. The current row supplies value 5.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:40",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:102",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:381",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:411",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:25"
+          ]
+        },
+        "6": {
+          "label": "Stage 4 duration cap",
+          "simple": "Stage 4 has no further advance; 6000 is the charge duration used if the key is released in that stage.",
+          "technical": "On key release in charge stage 3 this float becomes ChargeDuration, which caps accumulated beam length. Stage 3 is the final stage: TickAttack only advances when ChargeStage < 3, so this value is never used as an advance threshold. Row selection is by the action's cursed-energy level: 1 -> row 3, 2 -> row 4, 3 -> row 5; any other value leaves Row = -1 with no unchecked-accessor fallback. A generic attacker-side JugonStunReceive reads row 3 value 6 as a far stun time, but CP_230 damage data does not identify a JugonStun use.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:105",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:114",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:280"
+          ]
+        },
+        "7": {
+          "label": "Stage 1 beam growth",
+          "simple": "In stage 1 the beam grows by 12000 times DeltaTime each tick, up to the stage's charge duration.",
+          "technical": "GetBeamRange returns this float for charge stage 0; outside stages 0-3 it returns the local default 30000. TickChargeBeam adds GetBeamRange() * DeltaTime to ChargeTime and clamps the total to ChargeDuration, then uses that total as BeamLength. This is therefore a growth speed applied every frame, not a one-shot final distance, and the stage duration from value 3 is the cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:134",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:122",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:531",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:544",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:545",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170"
+          ]
+        },
+        "8": {
+          "label": "Stage 2 beam growth",
+          "simple": "In stage 2 the beam grows by 15000 times DeltaTime each tick, up to the stage's charge duration.",
+          "technical": "GetBeamRange returns this float for charge stage 1; outside stages 0-3 it returns the local default 30000. TickChargeBeam adds GetBeamRange() * DeltaTime to ChargeTime and clamps the total to ChargeDuration, then uses that total as BeamLength. This is therefore a growth speed applied every frame, not a one-shot final distance, and the stage duration from value 4 is the cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:146",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:122",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:531",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:544",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:545",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170"
+          ]
+        },
+        "9": {
+          "label": "Stage 3 beam growth",
+          "simple": "In stage 3 the beam grows by 18000 times DeltaTime each tick, up to the stage's charge duration.",
+          "technical": "GetBeamRange returns this float for charge stage 2; outside stages 0-3 it returns the local default 30000. TickChargeBeam adds GetBeamRange() * DeltaTime to ChargeTime and clamps the total to ChargeDuration, then uses that total as BeamLength. This is therefore a growth speed applied every frame, not a one-shot final distance, and the stage duration from value 5 is the cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:158",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:122",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:531",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:544",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:545",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170"
+          ]
+        },
+        "10": {
+          "label": "Stage 4 beam growth",
+          "simple": "In the finisher stage the beam grows by 22000 times DeltaTime each tick, up to the stage's charge duration.",
+          "technical": "GetBeamRange returns this float for charge stage 3; outside stages 0-3 it returns the local default 30000. TickChargeBeam adds GetBeamRange() * DeltaTime to ChargeTime and clamps the total to ChargeDuration, then uses that total as BeamLength. This is therefore a growth speed applied every frame, not a one-shot final distance, and the stage duration from value 6 is the cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:122",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:531",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:544",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:545"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The first stage threshold differs between the level rows (0.9 at level 1, 0.5 at levels 2 and 3); stages 2-4 and all four growth values are identical across the three rows. The auto CE_2 variant ignores the per-stage split and always reads index 4 for duration and index 8 for growth on the same level row. A generic JugonStunReceive also reads attacker row 3 values 5-8 as near/far stun times, but no CP_230 JugonStun damage use was found, so that shared read is not assigned to Choso.",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:65",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:77",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:89",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:101",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:496",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:505",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:508",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:517",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:269",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:282"
+          ]
+        }
+      ]
+    },
+    "CP_230_ATTACKH_2": {
+      "title": "Level 2 charged piercing beam",
+      "overview": "This is the cursed-energy level 2 variant for the four-stage charged piercing attack. Indices 3-6 are the hold thresholds for stages 1-4, and indices 7-10 are the per-frame growth amounts that also cap how long the beam may become.",
+      "values": {
+        "0": {
+          "label": "Unused first charge slot",
+          "simple": "No Choso-specific effect is known for this value (0.3).",
+          "technical": "No read of row 4 value 0 was found in the CP_230 controller, its actions, shared camera helper, trap forwarding or AI code. The closest traced reads of this row are the charge-stage timings at indices 3-6 and beam growth at indices 7-10. A zero default would not by itself prove disuse; this slot is left unresolved rather than named.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:64",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:127"
+          ]
+        },
+        "1": {
+          "label": "Unused second charge slot",
+          "simple": "No Choso-specific effect is known for this value (0.3).",
+          "technical": "No identified CP_230 reader of this slot exists in the searched source. The nearest relevant code reads adjacent charge values from the same row by explicit index; the generic JugonStunReceive uses row 3 values 5-8 on an attacker but not this slot. The row is still read positionally because it is listed in Id_CharacterUnique.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:69",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/GameCharacter.cpp:561",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:279"
+          ]
+        },
+        "2": {
+          "label": "Unused third charge slot",
+          "simple": "No Choso-specific effect is known for this value (0.5).",
+          "technical": "No identified CP_230 reader of this slot exists in the searched source. The nearest traced reads are the charge-stage comparisons and growth values at indices 3-10 of the same row; the generic AI hold and trap accesses use other rows or other game objects.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:64",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:114",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170",
+            "Source/Abrams/Private/GameTrapActionController.cpp:182"
+          ]
+        },
+        "3": {
+          "label": "Stage 1 hold threshold",
+          "simple": "Stage 1 advances after the charge key has been held for 4000.0 of the elapsed-time units used by the action.",
+          "technical": "While the charge key is held in the first CE_2 start, stage 0 compares ActionElapsedTime against this float using a strict less-than test. On success the stage increments, elapsed time resets and the charge effect is refreshed; at equality it does not advance. On release this same float becomes ChargeDuration for stage 0. Row selection is by the action's cursed-energy level: 1 -> row 3, 2 -> row 4, 3 -> row 5; any other level leaves Row = -1 and the unchecked accessor has no fallback. The current row supplies value 3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:40",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:78",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:381",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:411",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:25"
+          ]
+        },
+        "4": {
+          "label": "Stage 2 hold threshold",
+          "simple": "Stage 2 advances after another 4500.0 of the same elapsed-time units.",
+          "technical": "While the charge key is held in the first CE_2 start, stage 1 compares ActionElapsedTime against this float using a strict less-than test. On success the stage increments, elapsed time resets and the charge effect is refreshed; at equality it does not advance. On release this same float becomes ChargeDuration for stage 1. Row selection is by the action's cursed-energy level: 1 -> row 3, 2 -> row 4, 3 -> row 5; any other level leaves Row = -1 and the unchecked accessor has no fallback. The current row supplies value 4.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:40",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:90",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:381",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:411",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:25"
+          ]
+        },
+        "5": {
+          "label": "Stage 3 hold threshold",
+          "simple": "Stage 3 advances after another 5000.0 of the same elapsed-time units.",
+          "technical": "While the charge key is held in the first CE_2 start, stage 2 compares ActionElapsedTime against this float using a strict less-than test. On success the stage increments, elapsed time resets and the charge effect is refreshed; at equality it does not advance. On release this same float becomes ChargeDuration for stage 2. Row selection is by the action's cursed-energy level: 1 -> row 3, 2 -> row 4, 3 -> row 5; any other level leaves Row = -1 and the unchecked accessor has no fallback. The current row supplies value 5.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:40",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:102",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:381",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:411",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:25"
+          ]
+        },
+        "6": {
+          "label": "Stage 4 duration cap",
+          "simple": "Stage 4 has no further advance; 6000 is the charge duration used if the key is released in that stage.",
+          "technical": "On key release in charge stage 3 this float becomes ChargeDuration, which caps accumulated beam length. Stage 3 is the final stage: TickAttack only advances when ChargeStage < 3, so this value is never used as an advance threshold. Row selection is by the action's cursed-energy level: 1 -> row 3, 2 -> row 4, 3 -> row 5; any other value leaves Row = -1 with no unchecked-accessor fallback. A generic attacker-side JugonStunReceive reads row 3 value 6 as a far stun time, but CP_230 damage data does not identify a JugonStun use.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:105",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:114",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:280"
+          ]
+        },
+        "7": {
+          "label": "Stage 1 beam growth",
+          "simple": "In stage 1 the beam grows by 12000 times DeltaTime each tick, up to the stage's charge duration.",
+          "technical": "GetBeamRange returns this float for charge stage 0; outside stages 0-3 it returns the local default 30000. TickChargeBeam adds GetBeamRange() * DeltaTime to ChargeTime and clamps the total to ChargeDuration, then uses that total as BeamLength. This is therefore a growth speed applied every frame, not a one-shot final distance, and the stage duration from value 3 is the cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:134",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:122",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:531",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:544",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:545",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170"
+          ]
+        },
+        "8": {
+          "label": "Stage 2 beam growth",
+          "simple": "In stage 2 the beam grows by 15000 times DeltaTime each tick, up to the stage's charge duration.",
+          "technical": "GetBeamRange returns this float for charge stage 1; outside stages 0-3 it returns the local default 30000. TickChargeBeam adds GetBeamRange() * DeltaTime to ChargeTime and clamps the total to ChargeDuration, then uses that total as BeamLength. This is therefore a growth speed applied every frame, not a one-shot final distance, and the stage duration from value 4 is the cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:146",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:122",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:531",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:544",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:545",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170"
+          ]
+        },
+        "9": {
+          "label": "Stage 3 beam growth",
+          "simple": "In stage 3 the beam grows by 18000 times DeltaTime each tick, up to the stage's charge duration.",
+          "technical": "GetBeamRange returns this float for charge stage 2; outside stages 0-3 it returns the local default 30000. TickChargeBeam adds GetBeamRange() * DeltaTime to ChargeTime and clamps the total to ChargeDuration, then uses that total as BeamLength. This is therefore a growth speed applied every frame, not a one-shot final distance, and the stage duration from value 5 is the cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:158",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:122",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:531",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:544",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:545",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170"
+          ]
+        },
+        "10": {
+          "label": "Stage 4 beam growth",
+          "simple": "In the finisher stage the beam grows by 22000 times DeltaTime each tick, up to the stage's charge duration.",
+          "technical": "GetBeamRange returns this float for charge stage 3; outside stages 0-3 it returns the local default 30000. TickChargeBeam adds GetBeamRange() * DeltaTime to ChargeTime and clamps the total to ChargeDuration, then uses that total as BeamLength. This is therefore a growth speed applied every frame, not a one-shot final distance, and the stage duration from value 6 is the cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:122",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:531",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:544",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:545"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The first stage threshold differs between the level rows (0.9 at level 1, 0.5 at levels 2 and 3); stages 2-4 and all four growth values are identical across the three rows. The auto CE_2 variant ignores the per-stage split and always reads index 4 for duration and index 8 for growth on the same level row. A generic JugonStunReceive also reads attacker row 3 values 5-8 as near/far stun times, but no CP_230 JugonStun damage use was found, so that shared read is not assigned to Choso.",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:65",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:77",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:89",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:101",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:496",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:505",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:508",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:517",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:269",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:282"
+          ]
+        }
+      ]
+    },
+    "CP_230_ATTACKH_3": {
+      "title": "Level 3 charged piercing beam",
+      "overview": "This is the cursed-energy level 3 variant for the four-stage charged piercing attack. Indices 3-6 are the hold thresholds for stages 1-4, and indices 7-10 are the per-frame growth amounts that also cap how long the beam may become.",
+      "values": {
+        "0": {
+          "label": "Unused first charge slot",
+          "simple": "No Choso-specific effect is known for this value (0.3).",
+          "technical": "No read of row 5 value 0 was found in the CP_230 controller, its actions, shared camera helper, trap forwarding or AI code. The closest traced reads of this row are the charge-stage timings at indices 3-6 and beam growth at indices 7-10. A zero default would not by itself prove disuse; this slot is left unresolved rather than named.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:64",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:127"
+          ]
+        },
+        "1": {
+          "label": "Unused second charge slot",
+          "simple": "No Choso-specific effect is known for this value (0.3).",
+          "technical": "No identified CP_230 reader of this slot exists in the searched source. The nearest relevant code reads adjacent charge values from the same row by explicit index; the generic JugonStunReceive uses row 3 values 5-8 on an attacker but not this slot. The row is still read positionally because it is listed in Id_CharacterUnique.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:69",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/GameCharacter.cpp:561",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:279"
+          ]
+        },
+        "2": {
+          "label": "Unused third charge slot",
+          "simple": "No Choso-specific effect is known for this value (0.5).",
+          "technical": "No identified CP_230 reader of this slot exists in the searched source. The nearest traced reads are the charge-stage comparisons and growth values at indices 3-10 of the same row; the generic AI hold and trap accesses use other rows or other game objects.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:64",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:114",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170",
+            "Source/Abrams/Private/GameTrapActionController.cpp:182"
+          ]
+        },
+        "3": {
+          "label": "Stage 1 hold threshold",
+          "simple": "Stage 1 advances after the charge key has been held for 4000.0 of the elapsed-time units used by the action.",
+          "technical": "While the charge key is held in the first CE_2 start, stage 0 compares ActionElapsedTime against this float using a strict less-than test. On success the stage increments, elapsed time resets and the charge effect is refreshed; at equality it does not advance. On release this same float becomes ChargeDuration for stage 0. Row selection is by the action's cursed-energy level: 1 -> row 3, 2 -> row 4, 3 -> row 5; any other level leaves Row = -1 and the unchecked accessor has no fallback. The current row supplies value 3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:40",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:78",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:381",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:411",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:25"
+          ]
+        },
+        "4": {
+          "label": "Stage 2 hold threshold",
+          "simple": "Stage 2 advances after another 4500.0 of the same elapsed-time units.",
+          "technical": "While the charge key is held in the first CE_2 start, stage 1 compares ActionElapsedTime against this float using a strict less-than test. On success the stage increments, elapsed time resets and the charge effect is refreshed; at equality it does not advance. On release this same float becomes ChargeDuration for stage 1. Row selection is by the action's cursed-energy level: 1 -> row 3, 2 -> row 4, 3 -> row 5; any other level leaves Row = -1 and the unchecked accessor has no fallback. The current row supplies value 4.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:40",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:90",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:381",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:411",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:25"
+          ]
+        },
+        "5": {
+          "label": "Stage 3 hold threshold",
+          "simple": "Stage 3 advances after another 5000.0 of the same elapsed-time units.",
+          "technical": "While the charge key is held in the first CE_2 start, stage 2 compares ActionElapsedTime against this float using a strict less-than test. On success the stage increments, elapsed time resets and the charge effect is refreshed; at equality it does not advance. On release this same float becomes ChargeDuration for stage 2. Row selection is by the action's cursed-energy level: 1 -> row 3, 2 -> row 4, 3 -> row 5; any other level leaves Row = -1 and the unchecked accessor has no fallback. The current row supplies value 5.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:40",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:102",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:381",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:411",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:25"
+          ]
+        },
+        "6": {
+          "label": "Stage 4 duration cap",
+          "simple": "Stage 4 has no further advance; 6000 is the charge duration used if the key is released in that stage.",
+          "technical": "On key release in charge stage 3 this float becomes ChargeDuration, which caps accumulated beam length. Stage 3 is the final stage: TickAttack only advances when ChargeStage < 3, so this value is never used as an advance threshold. Row selection is by the action's cursed-energy level: 1 -> row 3, 2 -> row 4, 3 -> row 5; any other value leaves Row = -1 with no unchecked-accessor fallback. A generic attacker-side JugonStunReceive reads row 3 value 6 as a far stun time, but CP_230 damage data does not identify a JugonStun use.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:105",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:114",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:400",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:409",
+            "Source/Abrams/Private/GameCharacterAction_CursedEnergyAttack.cpp:19",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:280"
+          ]
+        },
+        "7": {
+          "label": "Stage 1 beam growth",
+          "simple": "In stage 1 the beam grows by 12000 times DeltaTime each tick, up to the stage's charge duration.",
+          "technical": "GetBeamRange returns this float for charge stage 0; outside stages 0-3 it returns the local default 30000. TickChargeBeam adds GetBeamRange() * DeltaTime to ChargeTime and clamps the total to ChargeDuration, then uses that total as BeamLength. This is therefore a growth speed applied every frame, not a one-shot final distance, and the stage duration from value 3 is the cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:134",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:122",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:531",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:544",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:545",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170"
+          ]
+        },
+        "8": {
+          "label": "Stage 2 beam growth",
+          "simple": "In stage 2 the beam grows by 15000 times DeltaTime each tick, up to the stage's charge duration.",
+          "technical": "GetBeamRange returns this float for charge stage 1; outside stages 0-3 it returns the local default 30000. TickChargeBeam adds GetBeamRange() * DeltaTime to ChargeTime and clamps the total to ChargeDuration, then uses that total as BeamLength. This is therefore a growth speed applied every frame, not a one-shot final distance, and the stage duration from value 4 is the cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:146",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:122",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:531",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:544",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:545",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170"
+          ]
+        },
+        "9": {
+          "label": "Stage 3 beam growth",
+          "simple": "In stage 3 the beam grows by 18000 times DeltaTime each tick, up to the stage's charge duration.",
+          "technical": "GetBeamRange returns this float for charge stage 2; outside stages 0-3 it returns the local default 30000. TickChargeBeam adds GetBeamRange() * DeltaTime to ChargeTime and clamps the total to ChargeDuration, then uses that total as BeamLength. This is therefore a growth speed applied every frame, not a one-shot final distance, and the stage duration from value 5 is the cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:158",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:122",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:531",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:544",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:545",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170"
+          ]
+        },
+        "10": {
+          "label": "Stage 4 beam growth",
+          "simple": "In the finisher stage the beam grows by 22000 times DeltaTime each tick, up to the stage's charge duration.",
+          "technical": "GetBeamRange returns this float for charge stage 3; outside stages 0-3 it returns the local default 30000. TickChargeBeam adds GetBeamRange() * DeltaTime to ChargeTime and clamps the total to ChargeDuration, then uses that total as BeamLength. This is therefore a growth speed applied every frame, not a one-shot final distance, and the stage duration from value 6 is the cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:170",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:122",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:531",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:544",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:545"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The first stage threshold differs between the level rows (0.9 at level 1, 0.5 at levels 2 and 3); stages 2-4 and all four growth values are identical across the three rows. The auto CE_2 variant ignores the per-stage split and always reads index 4 for duration and index 8 for growth on the same level row. A generic JugonStunReceive also reads attacker row 3 values 5-8 as near/far stun times, but no CP_230 JugonStun damage use was found, so that shared read is not assigned to Choso.",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:65",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:77",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:89",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:101",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:496",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:505",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:508",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:517",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:269",
+            "Source/Abrams/Private/GameCharacterAction_Restraint.cpp:282"
+          ]
+        }
+      ]
+    },
+    "CP_230_ATTACKH_SHOOT_CAMERA": {
+      "title": "Charged attack camera preset",
+      "overview": "A lock-on camera preset used only while the charged piercing attack controls the camera. It supplies the camera offset, gaze limits, field of view and orbit angles; the same row's blend-time value is reused when the camera returns to normal.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "The camera sits 150 units behind the gaze frame.",
+          "technical": "MakeUniqueCameraRequest(CameraMode=2, RowIndex=6) reads this as the X component of Request.CameraOffset. Mode 2 rotates that offset into the gaze rotation space and adds it to the eye base before collision correction. The negative value is kept as supplied.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:276",
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:383",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "The camera is offset 65 units to the side.",
+          "technical": "Read as the Y component of the same Request.CameraOffset when the request is built from row 6. No separate clamp is applied in the helper.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:276",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "The camera is offset 15 units upward.",
+          "technical": "Read as the Z component of Request.CameraOffset. The shared helper collects this before constructing the vector, then mode 2 rotates the complete offset by the gaze quaternion.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:276",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:387"
+          ]
+        },
+        "3": {
+          "label": "Downward gaze limit",
+          "simple": "The gaze can look at most 60 degrees below the eye line.",
+          "technical": "Read into Request.LimitAngleDown. UpdateRequestCamera compares the elevation angle of the gaze with this limit when the target is below the eye and rotates the gaze back to the limit; the source uses degrees through AngleBetweenDegrees and RotateAngleAxis.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:380"
+          ]
+        },
+        "4": {
+          "label": "Upward gaze limit",
+          "simple": "The gaze can look at most 30 degrees above the eye line.",
+          "technical": "Read into Request.LimitAngleUp. The same camera update applies it only when the gaze target is above the eye; equality with the elevation does not trigger the clamp.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:375",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:380"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "The charged-attack camera uses an 85 degree field of view.",
+          "technical": "Read into Request.FieldOfView. ChangeCameraMode accepts a new field of view only when it is greater than zero; with this positive value it starts FovInterp when the blend time is also positive.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:574",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578"
+          ]
+        },
+        "6": {
+          "label": "Field-of-view blend time",
+          "simple": "Field-of-view changes take 0.2 seconds.",
+          "technical": "Read into Request.FieldOfViewBlendTime by the shared helper. On return from the charged attack, FinishAttackEffects builds a fresh request with FieldOfView = 90 and copies this same row 6 value as the blend time; a value <= 0 would snap instead of blending, but the supplied 0.2 starts FovInterp.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:304",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:306",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:309",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:310",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:311",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:582"
+          ]
+        },
+        "7": {
+          "label": "Field-of-view easing selector",
+          "simple": "The value 0 selects linear field-of-view blending.",
+          "technical": "The helper casts this float to int32 and maps 0/1/2/3 to EEasingFunc Linear/EaseIn/EaseOut/EaseInOut. Any other integer leaves the request's default FieldOfViewEasing, which is 0 (Linear). Thus the configured 0 is a real easing choice, not a disabled blend; blend onset is still controlled by value 6.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:943",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:955",
+            "Source/Abrams/Private/GameCharacterAction.cpp:956",
+            "Source/Abrams/Private/GameCharacterAction.cpp:967",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:36"
+          ]
+        },
+        "8": {
+          "label": "Orbit yaw",
+          "simple": "The gaze orbits 5 degrees around the camera when looking down the beam.",
+          "technical": "Read into Request.OrbitYaw. Mode 2 builds FRotator(OrbitPitch, OrbitYaw, 0); when the rotator is non-zero it transforms the gaze point through the camera view before the final look rotation is set.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:419",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:426"
+          ]
+        },
+        "9": {
+          "label": "Orbit pitch",
+          "simple": "No extra gaze orbit pitch is applied by default.",
+          "technical": "Read into Request.OrbitPitch, the first component of the orbit rotator in UpdateRequestCamera. With the supplied 0 the orbit is driven only by the yaw value when nonzero; the code still reads the float unconditionally when building the request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:420",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:421"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "No extra camera roll is applied by default.",
+          "technical": "Read into Request.Roll and passed to SetViewTarget87 as the roll argument by the mode-2 camera update. Roll is read even when the orbit is zero; the default 0 leaves the view unrolled.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:429",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:430"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The shared MakeUniqueCameraRequest fills only row indices 0-10 for CameraMode 2 and leaves the struct default for other modes. CP_230 calls it with mode 2 and row index 6 only on the first start of Cursed Energy Attack 2, saving the previous camera mode first.",
+          "evidence": [
+            "Source/Abrams/Private/CP_230_ActionController.cpp:266",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:269",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:272",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:273",
+            "Source/Abrams/Private/CP_230_ActionController.cpp:276",
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:944",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameCharacterAction.cpp:974"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Row indices are positional. Character setup appends one entry per Id_CharacterUnique name, and both AGameCharacter::GetCharacterUniqueFloatValue and FGameCharacterAction::GetOwnerUniqueFloat pass ValueIndex and RowIndex straight through with no bounds check or fallback. Missing rows and out-of-range indices are therefore not defended against in code; the CP_230 charge switches use -1 as an invalid-row sentinel but still call the unchecked accessor.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:561",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacter.cpp:1761",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Private/GameCharacterAction.cpp:935",
+        "Source/Abrams/Public/GameCharacter.h:1012",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:71"
+      ]
+    },
+    {
+      "text": "The CE_1 action toggles BUFF_CP_230_CURSEDENERGYATTACK1 every time it starts: it adds the buff when no stack exists and removes it when one exists. While that buff is up, cursed-energy recovery becomes 0, normal attacks gain the row-0 multipliers, guard-durability damage changes, and the status helper derived from the buff increases homing speed; the controller also drops the buff when cursed energy reaches 0 outside an attack.",
+      "evidence": [
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1172",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1177",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1229",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1233",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1241",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1325",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1328",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1516",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1528",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1867",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1871",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4203",
+        "Source/Abrams/Private/GameCharacterStatusController.cpp:4213"
+      ]
+    },
+    {
+      "text": "The blood orbs are controller state plus effects, not just a UI counter. RefillStock spawns FX_CP_230_00101 at the neck with fixed offsets and sets BloodBallStock; ConsumeStock spends one and finishes the oldest effect; third-normal and CE_2 actions consume them, ExtraAttack_1, battle start and revival refill them, and the CP_230 battle widget shows up to five images.",
+      "evidence": [
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1573",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1584",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1600",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1612",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1633",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1653",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1112",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1118",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1926",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1929",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1452",
+        "Source/Abrams/Private/CP_230_ActionController.cpp:1455",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_230.cpp:25",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_230.cpp:29",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_230.cpp:67",
+        "Source/Abrams/Private/GameBattleCharacterUniqueWidget_CP_230.cpp:69"
+      ]
+    },
+    {
+      "text": "Choso has a specialised behavior controller and think node but no per-character .inl file was found. The behavior controller only replaces AI ordinal 0x13 with the shared Cursed Energy Attack 2 combo executor; the CP_230 think node tick mirrors BloodBallStock into brain key 0. Other AI ordinals are inherited from the shared behavior factory, and the shared AI hold classes that read row 0 values are not part of CP_230's factory.",
+      "evidence": [
+        "Source/Abrams/Private/CP_230_BehaviorController.cpp:9",
+        "Source/Abrams/Private/CP_230_BehaviorController.cpp:13",
+        "Source/Abrams/Private/GameCharacterBehaviorController.cpp:119",
+        "Source/Abrams/Private/GameCharacterBehaviorController.cpp:121",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:701",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:706",
+        "Source/Abrams/Private/GameCharacterAIThinkNodeTick.cpp:707",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:112",
+        "Source/Abrams/Private/GameCharacterAINode.cpp:123",
+        "Source/Abrams/Public/GameCharacterAIThinkNode.h:721"
+      ]
+    },
+    {
+      "text": "Generic trap actions forward their spawner's character unique floats through GetUniqueFloat, and shikigami actions use a separate ShikigamiUniqueDataTable through AGameShikigami. No CP_230 trap or shikigami reader was identified: all traced CP_230 unique reads stay in the action controller/actions or the shared camera helper, and those generic paths are not assigned to Choso here.",
+      "evidence": [
+        "Source/Abrams/Private/GameTrapActionController.cpp:182",
+        "Source/Abrams/Private/GameTrapActionController.cpp:184",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188",
+        "Source/Abrams/Public/GameShikigami.h:350",
+        "Source/Abrams/Private/GameDataTableManager.cpp:220",
+        "Source/Abrams/Private/GameDataTableManager.cpp:242",
+        "Source/Abrams/Private/GameCharacter.cpp:611"
+      ]
+    },
+    {
+      "text": "Verification notes record the CP_230 row-0 reads as proven from disassembly and identify the level-index and stock-offset tables used by the controller. The explanations here are taken from the current reconstructed Source readers; those notes are provenance, not a claim that every body is byte-matched.",
+      "evidence": [
+        "Tools/verify/CHAR/CP_230_ActionController.md:27",
+        "Tools/verify/CHAR/CP_230_ActionController.md:269",
+        "Tools/verify/CHAR/CP_230_ActionController.md:270",
+        "Tools/verify/CHAR/CP_230_ActionController.md:294",
+        "Tools/verify/CHAR/CP_230_ActionController.md:297",
+        "Tools/verify/CHAR/CP_230_ActionController.md:300"
+      ]
+    }
+  ]
+}

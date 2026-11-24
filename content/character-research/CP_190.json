@@ -1,0 +1,1524 @@
+{
+  "overview": "Kamo’s settings tune his low-health passive, steerable blood pool, arrow upgrades, and charged blood attacks.",
+  "technicalOverview": "Noritoshi Kamo's nine unique rows are zero-based slots in CharacterDataTable.Id_CharacterUnique. They feed a blood-manipulation kit: a low-HP passive and shared resource helper, a steerable blood pool, an arrow-upgrading normal attack, a counter stance, a cursed-energy blood shot, and a chargeable blood beam. Each row is a plain FloatValue array read by index with no bounds checks. Everything below is traced from reconstructed source: values are CP_190-specific, and same-named rows for other characters are not assumed to behave the same way.",
+  "rows": {
+    "CP_190": {
+      "title": "Character base and blood-resource tuning",
+      "overview": "The character's own row holds the low-HP passive threshold and the two numbers that decide how blood spending becomes either gauge loss or self-damage. It is read both by the HP-change callback and by the controller's shared spend helper.",
+      "values": {
+        "0": {
+          "label": "Self-damage multiplier",
+          "simple": "Sets how strongly a blood cost damages the owner when the blood gauge is not active.",
+          "technical": "In SpendUnknown2C8, after the supplied Value has been multiplied into Rate, the no-gauge branch requires Rate > 0 and owner GAISlot141 (send-damage rate) > 0. It then calls GetHitPointAfterDamage(row0[0] * Rate), clamps the result to at least 1.0 HP, and writes it back with SetHitPoint. The blood-gauge branch does not read this float; it subtracts Rate from the gauge instead.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:108",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:112",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:118",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:125",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:132",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:139",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:140",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:141",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:144"
+          ]
+        },
+        "1": {
+          "label": "Low-HP passive threshold",
+          "simple": "Turns the CP-190 passive on once HP is at or below this fraction of maximum.",
+          "technical": "OnHitPointChanged computes NewHitPoint / StatusController.HitPointMax and tests row0[1] >= Ratio, so the inclusive boundary is Ratio <= 0.5. On a state change it adds BUFF_CP_190_PASSIVE when low, or removes all CP_190_Passive buff/debuff states when no longer low; unchanged states return early.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:646",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:649",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:651",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:656",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:660",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:666"
+          ]
+        },
+        "2": {
+          "label": "Passive cost rate",
+          "simple": "Makes blood costs cheaper while the CP-190 passive is stacked.",
+          "technical": "In SpendUnknown2C8, GetBuffDebuffStack(CP_190_Passive) > 0 selects row0[2] as Rate instead of the literal 1.0f; the spend Value is then multiplied into Rate. With the default, every later cost is 0.25 * Value while stacked and 1.0 * Value without the stack.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:108",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:112",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:114",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:118",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:125",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:139",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:150"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The spend helper's self-damage branch is also gated by the owner's send-damage rate; if that rate is not positive, no HP write occurs even when the cost is positive.",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:132",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:133",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:134"
+          ]
+        }
+      ]
+    },
+    "CP_190_ATTACKD": {
+      "title": "Blood-pool placement and steering",
+      "overview": "NormalAttack_2_1 and its air variant use this row to pick where the blood pool is placed, how far it can reach a target, how fast it slides with the stick, and how long/large it becomes. The setup is traced in the controller and action classes.",
+      "values": {
+        "0": {
+          "label": "Forward placement reach",
+          "simple": "Chooses how far in front of the character the pool appears when there is no selected target.",
+          "technical": "Counter 1 tick sets Target.X/Y = owner XY + owner 2-D facing * row1[0]. If a valid secondary target exists, that point is replaced by cone/cap logic, so this value governs the no-secondary-target placement.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:930",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:953",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:954",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:955",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:957"
+          ]
+        },
+        "1": {
+          "label": "Steering time limit",
+          "simple": "Caps how long the placed pool can be pushed around.",
+          "technical": "Counter 3 adds DeltaTime to Elapsed every tick. At action start count 1, the action ends when the spot is more than 90 degrees off forward, NormalAttack_2 is no longer held, or row1[1] <= Elapsed. The comparison is inclusive once elapsed reaches 1.5 seconds.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:930",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1076",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1290",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1295",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1301",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1303",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1305"
+          ]
+        },
+        "2": {
+          "label": "Target pull cap",
+          "simple": "Prevents a targeted pool placement from being farther away than this distance.",
+          "technical": "With a secondary target inside the aim cone, the 2-D distance is compared with row1[2]. If larger, placement uses owner + normalized delta * row1[2]; if not, it uses the target's location. Outside the cone the closest point on the cone edge is used and this cap is not applied.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:957",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:965",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:982",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:986",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:989"
+          ]
+        },
+        "3": {
+          "label": "Aim cone width",
+          "simple": "Sets the width of the cone used to decide whether a target can pull the pool directly.",
+          "technical": "AngleBetweenDegrees(owner forward, target direction) > row1[3] * 0.5 selects the outside-cone branch. With the default 90 the half-angle is 45 degrees; outside, the edge direction sign is row1[3] * +0.5 or * -0.5 from the cross-product Z sign before FindClosestPointOnLine.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:965",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:973",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:974"
+          ]
+        },
+        "4": {
+          "label": "Pool steering speed",
+          "simple": "Sets how fast move input slides the pool.",
+          "technical": "Counter 3 computes Goal = PoolLocation + InputMoveDirection * row1[4] * DeltaTime, then resolves ground and wall sweeps. The explicit multiplication by frame delta makes it a distance-per-second rate in world coordinates.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1076",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1077",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1078"
+          ]
+        },
+        "5": {
+          "label": "Pool size",
+          "simple": "Sets the puddle/decal size and the visual scale of pool effects.",
+          "technical": "Passed to AddBloodPool as Radius. It becomes the decal Size.Y and Size.Z, the Niagara 'Radius' parameter, capsule radius/requested capsule size, half of the nine drop-point offsets, FX_CP_190_04311 XY scale as Radius * 0.01, and landed drop effect scale as Radius * 0.002.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:833",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:193",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:194",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:195",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:326",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:327",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:335",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:336",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:348",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:397",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1050",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1051",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1059"
+          ]
+        },
+        "6": {
+          "label": "Placement delay",
+          "simple": "Waits before the placed pool begins forming drops.",
+          "technical": "AddBloodPool stores row1[6] as StartDelay. UpdateBloodPools state 0 subtracts DeltaTime divided by owner CustomTimeDilation (or by 1.0 when that value is not positive) and breaks while StartDelay > 0. At <= 0 it re-grounds the centre, probes water, starts the pool sound and advances to state 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:833",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:218",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:225",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:226",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:232",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:233",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:234"
+          ]
+        },
+        "7": {
+          "label": "Pool formation delay",
+          "simple": "Waits before the pool body and its drops appear.",
+          "technical": "Stored as PoolDelay. State 1 subtracts the same time-dilated delta and breaks while > 0. At <= 0 it spawns FX_CP_190_04111, applies the radius to Niagara/capsules, queues nine surface-dependent drops at 0.2 + index * 0.1 seconds, and advances to state 2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:833",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:318",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:319",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:320",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:326",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:327",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:348",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:379"
+          ]
+        },
+        "8": {
+          "label": "Pool lifetime",
+          "simple": "Controls how long the completed pool remains before cleanup.",
+          "technical": "Stored as Lifetime. State 2 subtracts the time-dilated delta; while > 0 queued drops land. At <= 0 all pool effects finish, the decal fades, the sound stops over 0.5 seconds and the pool entry is removed.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:833",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:390",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:391",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:392",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:397",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:414",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:421",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:428",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:432",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:433",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:435"
+          ]
+        }
+      },
+      "untraced": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Pool timers use the owner's CustomTimeDilation divisor; this is a runtime timing detail and not a separate data slot.",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:218",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:225",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:226"
+          ]
+        },
+        {
+          "text": "Drops use FX_CP_190_04112 for most mapped surfaces and FX_CP_190_04122 for Water; this is effect selection, not another float in the row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:285",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:290",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:295",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:302"
+          ]
+        }
+      ]
+    },
+    "CP_190_ATTACKD_SHOOT_CAMERA": {
+      "title": "Blood-pool aim camera",
+      "overview": "Camera request row used when NormalAttack_2_1 first enters camera mode 2. MakeUniqueCameraRequest reads indices 0 through 10; the same row's index 6 is also used when leaving the aim camera.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "Moves the aim camera along its local X offset.",
+          "technical": "MakeUniqueCameraRequest(2, Row) copies unique float 0 into Request.CameraOffset.X. The virtual camera adds CameraOffset in gaze-rotation space from the eye base.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:896"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "Sets the aim camera's sideways offset.",
+          "technical": "MakeUniqueCameraRequest(2, Row) copies unique float 1 into Request.CameraOffset.Y. Zero means no sideways offset; the value is still read and stored.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:896"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "Sets the aim camera's vertical offset.",
+          "technical": "MakeUniqueCameraRequest(2, Row) copies unique float 2 into Request.CameraOffset.Z; the virtual camera adds it after rotating by the gaze.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:896"
+          ]
+        },
+        "3": {
+          "label": "Down elevation limit",
+          "simple": "Limits how far below the eye the aim camera looks.",
+          "technical": "Copied to Request.LimitAngleDown. The mode-2 camera compares gaze elevation with this limit when the target is below the eye; it is an angle in the rotator/elevation system used by the camera.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:32",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:376",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:896"
+          ]
+        },
+        "4": {
+          "label": "Up elevation limit",
+          "simple": "Limits how far above the eye the aim camera looks.",
+          "technical": "Copied to Request.LimitAngleUp. The mode-2 camera compares gaze elevation with this limit when the target is above the eye; it is an angle in the camera's rotator/elevation system.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:33",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:376",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:896"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "Sets the aim camera's FOV only when positive.",
+          "technical": "Copied to Request.FieldOfView. ChangeCameraMode applies a new FOV only when it is > 0; zero therefore leaves the FOV unchanged on entry, rather than setting FOV to zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:34",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:574",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:582",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:896"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "Controls how quickly FOV changes.",
+          "technical": "Copied to Request.FieldOfViewBlendTime. On camera exit CP_190 explicitly sets FOV 90 and reuses this same row index as the blend time; a positive value starts FovInterp, otherwise the FOV snaps.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:35",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:582",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:896",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1328"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "Chooses the FOV easing curve.",
+          "technical": "Read as an integer switch: 0 = Linear, 1 = EaseIn, 2 = EaseOut, 3 = EaseInOut; other values leave the request's default easing. The entry FOV here is zero, so this mainly matters when a positive exit FOV is blended.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:954",
+            "Source/Abrams/Private/GameCharacterAction.cpp:956",
+            "Source/Abrams/Private/GameCharacterAction.cpp:958",
+            "Source/Abrams/Private/GameCharacterAction.cpp:960",
+            "Source/Abrams/Private/GameCharacterAction.cpp:962",
+            "Source/Abrams/Private/GameCharacterAction.cpp:964",
+            "Source/Abrams/Private/GameCharacterAction.cpp:968",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:896"
+          ]
+        },
+        "8": {
+          "label": "Orbit yaw",
+          "simple": "Orbits the aim camera horizontally.",
+          "technical": "Copied to Request.OrbitYaw and applied by the mode-2 camera as gaze orbit about the camera (rotator yaw).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:896"
+          ]
+        },
+        "9": {
+          "label": "Orbit pitch",
+          "simple": "Orbits the aim camera vertically.",
+          "technical": "Copied to Request.OrbitPitch and applied as rotator pitch in the mode-2 camera request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:896"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Rolls the aim camera.",
+          "technical": "Copied to Request.Roll; the virtual camera consumes Roll in its request update.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:896"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "The camera is restored only when the next action is AttackDefault and the camera is still in mode 2; the exit request forces FOV 90 and takes its blend time from this row's index 6.",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1320",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1321",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1324",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1326",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1328",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1330"
+          ]
+        }
+      ]
+    },
+    "CP_190_ATTACKE": {
+      "title": "Arrow-upgrade normal attack",
+      "overview": "NormalAttack_3 and its air variant use this row to time the one-shot weapon upgrade and pay for it through the CP-190 resource helper. The upgraded attack row is a different table, not a second unique float row.",
+      "values": {
+        "0": {
+          "label": "Upgrade delay",
+          "simple": "Sets how long the normal attack waits before upgrading the arrows.",
+          "technical": "In start count 1, ActionElapsedTime accumulates DeltaTime. When UpgradeCount == 0 and !(row3[0] >= ActionElapsedTime) — that is, after elapsed time is strictly greater than 0.1 — the action increments UpgradeCount, resets elapsed to zero, plays FX_CP_190_00101 at L_weapon, calls UpgradeSpawnedEffects and spends row3[1]. At exactly 0.1 no upgrade occurs.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1481",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1492",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1493",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1494",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1495",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1496",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1503",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1505",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1506"
+          ]
+        },
+        "1": {
+          "label": "Upgrade blood cost",
+          "simple": "Sets the blood cost paid once when the arrows upgrade.",
+          "technical": "Passed as the Value argument to UCP_190_ActionController::SpendUnknown2C8 at the same one-shot upgrade. Its effective gauge or HP cost is scaled by the passive-rate and self-damage rules in row 0.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1505",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1506",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:108",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:118",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:125",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:139"
+          ]
+        }
+      },
+      "untraced": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "After the upgrade, attack index 2 resolves to CP_190_ATTACKE_02_01 instead of the normal set row; that row lookup is separate from this unique row.",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1541",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1542",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1546"
+          ]
+        }
+      ]
+    },
+    "CP_190_ATTACKF": {
+      "title": "Counter stance",
+      "overview": "NormalAttack_3_1 and its air variant use this row for the counter shot's blood cost, the stance's open window, and the hit-slow applied to an attacker who hits the open stance.",
+      "values": {
+        "0": {
+          "label": "Counter-shot blood cost",
+          "simple": "Sets the resource paid when the counter shot fires.",
+          "technical": "On UniqueAction parameter 0, the action plays FX_CP_190_00401_1 or _00501_1 from PG_Attack_01 with the boot rotation and passes row4[0] to SpendUnknown2C8.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1570",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1581",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1582",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1584",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1586"
+          ]
+        },
+        "1": {
+          "label": "Stance open duration",
+          "simple": "Sets how long the character holds the counter stance.",
+          "technical": "Phase 1 adds DeltaTime to ActionElapsedTime and returns while row4[1] > ActionElapsedTime. At elapsed >= 0.6 it plays the end animation and clears bStanceOpen, so the boundary is inclusive when the timer reaches the value.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1675",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1680",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1681",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1682",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1685",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1686"
+          ]
+        },
+        "2": {
+          "label": "Counter hit-slow rate",
+          "simple": "Sets the hit-slow rate applied to the attacker on a counter.",
+          "technical": "BuildHitResponse sets AttackerHitSlowRate = row4[2] whenever the open stance takes the hit and sets bAttackerHitSlow true.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1609",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1612",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1613",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1614"
+          ]
+        },
+        "3": {
+          "label": "Counter hit-slow time",
+          "simple": "Sets how long the attacker is hit-slowed.",
+          "technical": "BuildHitResponse sets AttackerHitSlowTime = row4[3] in the same response. It also sets the instigator as secondary target and locks collision key 9.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1615",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1616",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1617",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1619",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1621"
+          ]
+        }
+      },
+      "untraced": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Hits whose damage row has bIgnoreHyperArmor are not intercepted by the stance, regardless of these values.",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1627",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1629",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1630",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1632"
+          ]
+        }
+      ]
+    },
+    "CP_190_ATTACKG": {
+      "title": "Cursed-energy shot cost",
+      "overview": "CursedEnergyAttack_1 chooses one of the first three floats by cursed-energy level and pays that amount through the CP-190 resource helper when the blood shot starts.",
+      "values": {
+        "0": {
+          "label": "Level 1 blood cost",
+          "simple": "Blood cost of the level 1 cursed-energy shot.",
+          "technical": "On UniqueAction parameter 0 at start count 0, GetCursedEnergyLevel() 1 selects LevelIndex 0. The shot variant is FX_CP_190_00401 when the gauge/pool is live, else FX_CP_190_00501. row5[0] is passed to SpendUnknown2C8.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1770",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1776",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1777",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1778",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1784",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1786",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1787",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1789",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1790",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1801"
+          ]
+        },
+        "1": {
+          "label": "Level 2 blood cost",
+          "simple": "Blood cost of the level 2 cursed-energy shot.",
+          "technical": "GetCursedEnergyLevel() 2 selects LevelIndex 1; row5[1] is passed to SpendUnknown2C8 at the same one-shot start.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1787",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1792",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1793",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1794",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1801"
+          ]
+        },
+        "2": {
+          "label": "Level 3 blood cost",
+          "simple": "Blood cost of the level 3 cursed-energy shot.",
+          "technical": "GetCursedEnergyLevel() 3 selects LevelIndex 2; row5[2] is passed to SpendUnknown2C8 at the same one-shot start.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1787",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1795",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1796",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1797",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1801"
+          ]
+        }
+      },
+      "untraced": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Any level outside 1 through 3 leaves LevelIndex at its default 0 in the traced switch, so it uses the level 1 float rather than an out-of-bounds row read.",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1786",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1787",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1789",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1790",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1792",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1793",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1794",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1795",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1796",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1797",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1798",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1799",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1801"
+          ]
+        }
+      ]
+    },
+    "CP_190_ATTACKG_SHOOT_CAMERA": {
+      "title": "Cursed-energy shot camera",
+      "overview": "Camera request row used when CursedEnergyAttack_1 enters camera mode 2. Indices 0 through 10 are read by MakeUniqueCameraRequest; index 6 is read again on exit.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "Moves the aim camera along its local X offset.",
+          "technical": "MakeUniqueCameraRequest(2, Row) copies unique float 0 into Request.CameraOffset.X. The virtual camera adds CameraOffset in gaze-rotation space from the eye base.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1837"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "Sets the aim camera's sideways offset.",
+          "technical": "MakeUniqueCameraRequest(2, Row) copies unique float 1 into Request.CameraOffset.Y. Zero means no sideways offset; the value is still read and stored.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1837"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "Sets the aim camera's vertical offset.",
+          "technical": "MakeUniqueCameraRequest(2, Row) copies unique float 2 into Request.CameraOffset.Z; the virtual camera adds it after rotating by the gaze.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1837"
+          ]
+        },
+        "3": {
+          "label": "Down elevation limit",
+          "simple": "Limits how far below the eye the aim camera looks.",
+          "technical": "Copied to Request.LimitAngleDown. The mode-2 camera compares gaze elevation with this limit when the target is below the eye; it is an angle in the rotator/elevation system used by the camera.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:32",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:376",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1837"
+          ]
+        },
+        "4": {
+          "label": "Up elevation limit",
+          "simple": "Limits how far above the eye the aim camera looks.",
+          "technical": "Copied to Request.LimitAngleUp. The mode-2 camera compares gaze elevation with this limit when the target is above the eye; it is an angle in the camera's rotator/elevation system.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:33",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:376",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1837"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "Sets the aim camera's FOV only when positive.",
+          "technical": "Copied to Request.FieldOfView. ChangeCameraMode applies a new FOV only when it is > 0; zero therefore leaves the FOV unchanged on entry, rather than setting FOV to zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:34",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:574",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:582",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1837"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "Controls how quickly FOV changes.",
+          "technical": "Copied to Request.FieldOfViewBlendTime. On camera exit CP_190 explicitly sets FOV 90 and reuses this same row index as the blend time; a positive value starts FovInterp, otherwise the FOV snaps.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:35",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:582",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1837",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1891"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "Chooses the FOV easing curve.",
+          "technical": "Read as an integer switch: 0 = Linear, 1 = EaseIn, 2 = EaseOut, 3 = EaseInOut; other values leave the request's default easing. The entry FOV here is zero, so this mainly matters when a positive exit FOV is blended.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:954",
+            "Source/Abrams/Private/GameCharacterAction.cpp:956",
+            "Source/Abrams/Private/GameCharacterAction.cpp:958",
+            "Source/Abrams/Private/GameCharacterAction.cpp:960",
+            "Source/Abrams/Private/GameCharacterAction.cpp:962",
+            "Source/Abrams/Private/GameCharacterAction.cpp:964",
+            "Source/Abrams/Private/GameCharacterAction.cpp:968",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1837"
+          ]
+        },
+        "8": {
+          "label": "Orbit yaw",
+          "simple": "Orbits the aim camera horizontally.",
+          "technical": "Copied to Request.OrbitYaw and applied by the mode-2 camera as gaze orbit about the camera (rotator yaw).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1837"
+          ]
+        },
+        "9": {
+          "label": "Orbit pitch",
+          "simple": "Orbits the aim camera vertically.",
+          "technical": "Copied to Request.OrbitPitch and applied as rotator pitch in the mode-2 camera request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1837"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Rolls the aim camera.",
+          "technical": "Copied to Request.Roll; the virtual camera consumes Roll in its request update.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1837"
+          ]
+        }
+      },
+      "untraced": [
+        11,
+        12,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Camera mode 2 is entered only if the owner was not already in mode 2; the previous mode is saved and restored only when the next action is not the same type.",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1833",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1834",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1835",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1837",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1882",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1884",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1889",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1891"
+          ]
+        }
+      ]
+    },
+    "CP_190_ATTACKH": {
+      "title": "Blood-beam charge and growth",
+      "overview": "This row drives the charged beam: opening cost, four charge-stage thresholds and maximum lengths, four growth speeds, and one fixed growth speed used by the auto variants. The beam is clipped by traces after growth.",
+      "values": {
+        "0": {
+          "label": "Beam opening blood cost",
+          "simple": "Resource paid when the blood beam shot starts.",
+          "technical": "On UniqueAction parameter 0, CP_190 plays FX_CP_190_00401 or _00501 from PG_Attack_01, attaches it KeepWorld, and passes row7[0] to SpendUnknown2C8.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1938",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1973",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1975",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1977",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981"
+          ]
+        },
+        "1": {
+          "label": "Stage 0 max beam length",
+          "simple": "Maximum beam length for charge stage 0.",
+          "technical": "UpdateMaxBeamLength stores row7[1] in MaxBeamLength at ChargeStage 0; TickBeam caps BeamLength with FMath::Min(Grown, MaxBeamLength). The visible direct caller is the early-release branch when ShouldKeepCharging is false.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2032",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2037",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2181",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2182",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2183",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2186",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2316",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2317"
+          ]
+        },
+        "2": {
+          "label": "Stage 0 charge time",
+          "simple": "Time needed before stage 0 advances.",
+          "technical": "In start count 1 ChargeStage 0 advances when row7[2] < ActionElapsedTime, resets elapsed and calls StepChargeStage. The strict `<` means no advance at exact equality; 4500 is seconds of accumulated action time.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2040",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2041",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2043",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2044",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2045",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2047"
+          ]
+        },
+        "3": {
+          "label": "Stage 1 max beam length",
+          "simple": "Maximum beam length for charge stage 1.",
+          "technical": "UpdateMaxBeamLength assigns row7[3] when ChargeStage == 1; the same cap is applied in TickBeam.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2181",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2188",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2189",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2316",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2317"
+          ]
+        },
+        "4": {
+          "label": "Stage 1 charge time",
+          "simple": "Time needed before stage 1 advances, with a level gate.",
+          "technical": "ChargeStage 1 advances only when row7[4] < ActionElapsedTime and GetCursedEnergyLevel() > 1. Equality does not advance; the level gate is strictly greater than level 1.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2049",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2050",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2051",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2052",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2053",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2055"
+          ]
+        },
+        "5": {
+          "label": "Stage 2 max beam length",
+          "simple": "Maximum beam length for charge stage 2.",
+          "technical": "UpdateMaxBeamLength assigns row7[5] when ChargeStage == 2. The auto beam variant overrides the whole function and always uses row7[5] as its maximum.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2181",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2191",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2192",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2442",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2444",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2316",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2317"
+          ]
+        },
+        "6": {
+          "label": "Stage 2 charge time",
+          "simple": "Time needed before stage 2 advances, with a level gate.",
+          "technical": "ChargeStage 2 advances only when row7[6] < ActionElapsedTime and GetCursedEnergyLevel() > 2. Equality does not advance; the level gate is strictly greater than level 2.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2058",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2059",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2060",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2061",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2063"
+          ]
+        },
+        "7": {
+          "label": "Stage 3 max beam length",
+          "simple": "Maximum beam length for the last charge stage.",
+          "technical": "UpdateMaxBeamLength assigns row7[7] when ChargeStage == 3. The main tick has no further stage advancement beyond 3.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2181",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2194",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2195",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2068",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2069"
+          ]
+        },
+        "8": {
+          "label": "Stage 0 beam growth speed",
+          "simple": "How fast the beam grows at charge stage 0.",
+          "technical": "GetBeamGrowSpeed returns row7[8] for ChargeStage 0. TickBeam computes Grown = speed * DeltaTime + BeamLength and then caps it at MaxBeamLength.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2155",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2157",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2158",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2159",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2160",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2316",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2317"
+          ]
+        },
+        "9": {
+          "label": "Stage 1 beam growth speed",
+          "simple": "How fast the beam grows at charge stage 1.",
+          "technical": "GetBeamGrowSpeed returns row7[9] for ChargeStage 1, with the same per-frame growth and cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2155",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2161",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2162",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2316",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2317"
+          ]
+        },
+        "10": {
+          "label": "Stage 2 beam growth speed",
+          "simple": "How fast the beam grows at charge stage 2.",
+          "technical": "GetBeamGrowSpeed returns row7[10] for ChargeStage 2, with the same per-frame growth and cap.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2155",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2163",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2164",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2316",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2317"
+          ]
+        },
+        "11": {
+          "label": "Stage 3 beam growth speed",
+          "simple": "How fast the beam grows at the final charge stage.",
+          "technical": "GetBeamGrowSpeed returns row7[11] for ChargeStage 3. Any other stage falls back to the literal 30000.0f rather than to this row.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2155",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2165",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2166",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2168",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2316",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2317"
+          ]
+        },
+        "12": {
+          "label": "Auto beam growth speed",
+          "simple": "Fixed growth speed used by the auto beam variants.",
+          "technical": "TCP_190_CursedEnergyAttack_2_Auto overrides GetBeamGrowSpeed and always returns row7[12], ignoring ChargeStage. The ordinary 74/78 variants keep using the per-stage speeds in indices 8 through 11.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Public/CP_190_Actions.h:289",
+            "Source/Abrams/Public/CP_190_Actions.h:296",
+            "Source/Abrams/Public/CP_190_Actions.h:298",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2428",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2429",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2430",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2160",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2162",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2164",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2166"
+          ]
+        }
+      },
+      "untraced": [
+        13
+      ],
+      "notes": [
+        {
+          "text": "Beam length growth is separate from visual effect choice: GetBeamEffectId indexes GCP_190_BeamEffectIds by cursed-energy level and stage, not by these float values.",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1919",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1920",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1921",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1922",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1923",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1924",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1925",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1926",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2171",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2172"
+          ]
+        },
+        {
+          "text": "The ordinary variants keep charging while within 0.05 s of the notify start or while CursedEnergyAttack_2 is held; the auto variants only keep charging within the first 0.05 s.",
+          "evidence": [
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2139",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2140",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2142",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2144",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2421",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2422"
+          ]
+        }
+      ]
+    },
+    "CP_190_ATTACKH_SHOOT_CAMERA": {
+      "title": "Blood-beam aim camera",
+      "overview": "Camera request row used when CursedEnergyAttack_2 enters camera mode 2. Indices 0 through 10 are read by MakeUniqueCameraRequest; index 6 is read again on exit. Indices 11 through 13 have only a generic trap forwarding read, not a CP_190 action read.",
+      "values": {
+        "0": {
+          "label": "Camera offset X",
+          "simple": "Moves the aim camera along its local X offset.",
+          "technical": "MakeUniqueCameraRequest(2, Row) copies unique float 0 into Request.CameraOffset.X. The virtual camera adds CameraOffset in gaze-rotation space from the eye base.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981"
+          ]
+        },
+        "1": {
+          "label": "Camera offset Y",
+          "simple": "Sets the aim camera's sideways offset.",
+          "technical": "MakeUniqueCameraRequest(2, Row) copies unique float 1 into Request.CameraOffset.Y. Zero means no sideways offset; the value is still read and stored.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:947",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981"
+          ]
+        },
+        "2": {
+          "label": "Camera offset Z",
+          "simple": "Sets the aim camera's vertical offset.",
+          "technical": "MakeUniqueCameraRequest(2, Row) copies unique float 2 into Request.CameraOffset.Z; the virtual camera adds it after rotating by the gaze.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:946",
+            "Source/Abrams/Private/GameCharacterAction.cpp:948",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:28",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981"
+          ]
+        },
+        "3": {
+          "label": "Down elevation limit",
+          "simple": "Limits how far below the eye the aim camera looks.",
+          "technical": "Copied to Request.LimitAngleDown. The mode-2 camera compares gaze elevation with this limit when the target is below the eye; it is an angle in the rotator/elevation system used by the camera.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:949",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:32",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:376",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981"
+          ]
+        },
+        "4": {
+          "label": "Up elevation limit",
+          "simple": "Limits how far above the eye the aim camera looks.",
+          "technical": "Copied to Request.LimitAngleUp. The mode-2 camera compares gaze elevation with this limit when the target is above the eye; it is an angle in the camera's rotator/elevation system.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:950",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:33",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:370",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:376",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:378",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981"
+          ]
+        },
+        "5": {
+          "label": "Field of view",
+          "simple": "Sets the aim camera's FOV only when positive.",
+          "technical": "Copied to Request.FieldOfView. ChangeCameraMode applies a new FOV only when it is > 0; zero therefore leaves the FOV unchanged on entry, rather than setting FOV to zero.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:951",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:34",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:573",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:574",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:582",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981"
+          ]
+        },
+        "6": {
+          "label": "FOV blend time",
+          "simple": "Controls how quickly FOV changes.",
+          "technical": "Copied to Request.FieldOfViewBlendTime. On camera exit CP_190 explicitly sets FOV 90 and reuses this same row index as the blend time; a positive value starts FovInterp, otherwise the FOV snaps.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:952",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:35",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:576",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:578",
+            "Source/Abrams/Private/GameCharacterVirtualCamera.cpp:582",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:2115"
+          ]
+        },
+        "7": {
+          "label": "FOV easing selector",
+          "simple": "Chooses the FOV easing curve.",
+          "technical": "Read as an integer switch: 0 = Linear, 1 = EaseIn, 2 = EaseOut, 3 = EaseInOut; other values leave the request's default easing. The entry FOV here is zero, so this mainly matters when a positive exit FOV is blended.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:953",
+            "Source/Abrams/Private/GameCharacterAction.cpp:954",
+            "Source/Abrams/Private/GameCharacterAction.cpp:956",
+            "Source/Abrams/Private/GameCharacterAction.cpp:958",
+            "Source/Abrams/Private/GameCharacterAction.cpp:960",
+            "Source/Abrams/Private/GameCharacterAction.cpp:962",
+            "Source/Abrams/Private/GameCharacterAction.cpp:964",
+            "Source/Abrams/Private/GameCharacterAction.cpp:968",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981"
+          ]
+        },
+        "8": {
+          "label": "Orbit yaw",
+          "simple": "Orbits the aim camera horizontally.",
+          "technical": "Copied to Request.OrbitYaw and applied by the mode-2 camera as gaze orbit about the camera (rotator yaw).",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:29",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981"
+          ]
+        },
+        "9": {
+          "label": "Orbit pitch",
+          "simple": "Orbits the aim camera vertically.",
+          "technical": "Copied to Request.OrbitPitch and applied as rotator pitch in the mode-2 camera request.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:30",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981"
+          ]
+        },
+        "10": {
+          "label": "Camera roll",
+          "simple": "Rolls the aim camera.",
+          "technical": "Copied to Request.Roll; the virtual camera consumes Roll in its request update.",
+          "status": "verified",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:25",
+            "Source/Abrams/Public/GameCharacterVirtualCamera.h:31",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981"
+          ]
+        },
+        "11": {
+          "label": "Shared trap-only row 8 slot 11",
+          "simple": "Zero in CP_190's beam camera row; no CP_190-specific effect is traced here.",
+          "technical": "MakeUniqueCameraRequest reads only unique indices 0 through 10, so this CP_190 action never consumes it. Uzumaki trap uses it as a minimum-distance clamp for the source actor. That is a different actor/controller path and is not assigned to CP_190; no CP_190-specific effect is established.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1435",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1740",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1741"
+          ]
+        },
+        "12": {
+          "label": "Shared trap-only row 8 slot 12",
+          "simple": "Zero in CP_190's beam camera row; no CP_190-specific effect is traced here.",
+          "technical": "MakeUniqueCameraRequest reads only unique indices 0 through 10, so this CP_190 action never consumes it. Uzumaki trap uses it as a minimum speed for the source actor. That is a different actor/controller path and is not assigned to CP_190; no CP_190-specific effect is established.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1432",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1873"
+          ]
+        },
+        "13": {
+          "label": "Shared trap-only row 8 slot 13",
+          "simple": "Zero in CP_190's beam camera row; no CP_190-specific effect is traced here.",
+          "technical": "MakeUniqueCameraRequest reads only unique indices 0 through 10, so this CP_190 action never consumes it. Uzumaki trap uses it as the upper play-rate end for distance-based animation. That is a different actor/controller path and is not assigned to CP_190; no CP_190-specific effect is established.",
+          "status": "unresolved",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1445",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1745"
+          ]
+        }
+      },
+      "untraced": [],
+      "notes": [
+        {
+          "text": "Indices 11 through 13 are not read by MakeUniqueCameraRequest, which stops at index 10. A generic Uzumaki trap reads source-interface row8 floats 11/12/13, but no CP_190 action path here reaches that trap reader.",
+          "evidence": [
+            "Source/Abrams/Private/GameCharacterAction.cpp:941",
+            "Source/Abrams/Private/GameCharacterAction.cpp:970",
+            "Source/Abrams/Private/GameCharacterAction.cpp:971",
+            "Source/Abrams/Private/GameCharacterAction.cpp:972",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1430",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1432",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1435",
+            "Source/Abrams/Private/GameTrapActionController.cpp:1445",
+            "Source/Abrams/Private/CP_190_ActionController.cpp:1981"
+          ]
+        }
+      ]
+    }
+  },
+  "notes": [
+    {
+      "text": "Row indices are positional: CharacterDataTable lists Id_CharacterUnique in order, AGameCharacter loads one optional unique row per name, and the accessor reads UniqueRows[RowIndex]->FloatValue[ValueIndex] with no bounds checks.",
+      "evidence": [
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUnique.h:7",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUnique.h:11",
+        "Source/AbramsDataTable/Public/GameDataTableRow_CharacterUnique.h:15",
+        "Source/Abrams/Private/GameCharacter.cpp:559",
+        "Source/Abrams/Private/GameCharacter.cpp:560",
+        "Source/Abrams/Private/GameCharacter.cpp:561",
+        "Source/Abrams/Private/GameCharacter.cpp:563",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacter.cpp:1761"
+      ]
+    },
+    {
+      "text": "The two GUF helpers are thin forwarders: FGameCharacterAction::GetOwnerUniqueFloat calls AGameCharacter::GetCharacterUniqueFloatValue, and MakeUniqueCameraRequest is the shared reader for camera rows, filling only indices 0 through 10 when CameraMode is 2.",
+      "evidence": [
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Private/GameCharacterAction.cpp:935",
+        "Source/Abrams/Private/GameCharacterAction.cpp:941",
+        "Source/Abrams/Private/GameCharacterAction.cpp:946",
+        "Source/Abrams/Private/GameCharacterAction.cpp:947",
+        "Source/Abrams/Private/GameCharacterAction.cpp:948",
+        "Source/Abrams/Private/GameCharacterAction.cpp:949",
+        "Source/Abrams/Private/GameCharacterAction.cpp:950",
+        "Source/Abrams/Private/GameCharacterAction.cpp:951",
+        "Source/Abrams/Private/GameCharacterAction.cpp:952",
+        "Source/Abrams/Private/GameCharacterAction.cpp:953",
+        "Source/Abrams/Private/GameCharacterAction.cpp:970",
+        "Source/Abrams/Private/GameCharacterAction.cpp:971",
+        "Source/Abrams/Private/GameCharacterAction.cpp:972",
+        "Source/Abrams/Private/GameCharacter.cpp:1759",
+        "Source/Abrams/Private/GameCharacter.cpp:1761"
+      ]
+    },
+    {
+      "text": "All blood costs run through UCP_190_ActionController::SpendUnknown2C8. With CP_190_Passive stacked the rate starts at row 0 index 2 (0.25), otherwise at literal 1.0; if the blood gauge is live the scaled value is subtracted from it, while otherwise a positive send-damage rate allows HP to be reduced with a floor of 1.",
+      "evidence": [
+        "Source/Abrams/Private/CP_190_ActionController.cpp:108",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:112",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:114",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:118",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:121",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:125",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:132",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:139",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:140",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:141",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:144",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:150"
+      ]
+    },
+    {
+      "text": "Ground and air action variants share these same unique rows and generally reuse the ground attack-set row on slot 141; there are no separate air-specific unique rows in CP_190's nine-row list.",
+      "evidence": [
+        "Source/Abrams/Public/CP_190_Actions.h:40",
+        "Source/Abrams/Public/CP_190_Actions.h:46",
+        "Source/Abrams/Public/CP_190_Actions.h:57",
+        "Source/Abrams/Public/CP_190_Actions.h:70",
+        "Source/Abrams/Public/CP_190_Actions.h:110",
+        "Source/Abrams/Public/CP_190_Actions.h:115",
+        "Source/Abrams/Public/CP_190_Actions.h:128",
+        "Source/Abrams/Public/CP_190_Actions.h:152",
+        "Source/Abrams/Public/CP_190_Actions.h:167",
+        "Source/Abrams/Public/CP_190_Actions.h:189",
+        "Source/Abrams/Public/CP_190_Actions.h:202",
+        "Source/Abrams/Public/CP_190_Actions.h:221",
+        "Source/Abrams/Public/CP_190_Actions.h:236",
+        "Source/Abrams/Public/CP_190_Actions.h:280",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:751",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:794",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:1344",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:1552",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:1728",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:1902",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:2400"
+      ]
+    },
+    {
+      "text": "The blood pools live on the controller, are stepped last-to-first with owner CustomTimeDilation, and water ground changes the drop effect to FX_CP_190_04122 while other mapped surfaces use FX_CP_190_04112.",
+      "evidence": [
+        "Source/Abrams/Private/CP_190_ActionController.cpp:218",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:225",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:226",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:227",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:285",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:290",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:295",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:302",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:457",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:459"
+      ]
+    },
+    {
+      "text": "Auto CursedEnergyAttack_2 variants (types 75/79) are not just shorter holds: they disable target aim, keep charging only within the first 0.05 s, use a fixed beam effect, take growth speed from row 7 index 12, and take max length from row 7 index 5.",
+      "evidence": [
+        "Source/Abrams/Public/CP_190_Actions.h:289",
+        "Source/Abrams/Public/CP_190_Actions.h:296",
+        "Source/Abrams/Public/CP_190_Actions.h:298",
+        "Source/Abrams/Public/CP_190_Actions.h:299",
+        "Source/Abrams/Public/CP_190_Actions.h:300",
+        "Source/Abrams/Public/CP_190_Actions.h:301",
+        "Source/Abrams/Public/CP_190_Actions.h:302",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:2421",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:2422",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:2424",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:2428",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:2429",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:2430",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:2436",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:2437",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:2442",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:2444"
+      ]
+    },
+    {
+      "text": "No character-specific .inl is included by CP_190; its controller includes ordinary headers, and the shared GameCharacterActionInline.h fast GUF path is used by CP_270 rather than by CP_190, so the CP_190 reads are the traced out-of-line calls shown above.",
+      "evidence": [
+        "Source/Abrams/Private/CP_190_ActionController.cpp:1",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:2",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:3",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:4",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:5",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:6",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:7",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:8",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:9",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:10",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:11",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:12",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:13",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:14",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:15",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:16",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:17",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:18",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:19",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:20",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:21",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:22",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:23",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:24",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:25",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:26",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:27",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:28",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:29",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:30",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:31",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:32",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:33",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:34",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:35",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:36",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:37",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:38",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:39",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:40",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:41",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:42",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:43",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:44",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:45",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:46",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:47",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:48",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:49",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:50",
+        "Source/Abrams/Private/GameCharacterAction.cpp:933",
+        "Source/Abrams/Private/GameCharacterAction.cpp:935"
+      ]
+    },
+    {
+      "text": "The CP_190 verification record is byte-compare work on reconstructed actions; it documents several matched slot bodies but also recorded drift and parked/decoded bodies, so these wiki explanations should be read as source-traced behavior rather than a claim that every retail function is byte-identical.",
+      "evidence": [
+        "Tools/verify/CHAR/CP_190_ActionController.md:1",
+        "Tools/verify/CHAR/CP_190_ActionController.md:63",
+        "Tools/verify/CHAR/CP_190_ActionController.md:64",
+        "Tools/verify/CHAR/CP_190_ActionController.md:65",
+        "Tools/verify/CHAR/CP_190_ActionController.md:66",
+        "Tools/verify/CHAR/CP_190_ActionController.md:67",
+        "Tools/verify/CHAR/CP_190_ActionController.md:68",
+        "Tools/verify/CHAR/CP_190_ActionController.md:69",
+        "Tools/verify/CHAR/CP_190_ActionController.md:70",
+        "Tools/verify/CHAR/CP_190_ActionController.md:71",
+        "Tools/verify/CHAR/CP_190_ActionController.md:72",
+        "Tools/verify/CHAR/CP_190_ActionController.md:73",
+        "Tools/verify/CHAR/CP_190_ActionController.md:74",
+        "Tools/verify/CHAR/CP_190_ActionController.md:75",
+        "Tools/verify/CHAR/CP_190_ActionController.md:76"
+      ]
+    },
+    {
+      "text": "Weapon visuals are a separate quirk: UniqueAction 100/101/102 attach FX_CP_190_00211 to arrow_A1/B1/C1 and 200 attaches FX_CP_190_09101 to arrow_A1; arrow material sections are hidden at setup and hidden/shown with battle sequences. These calls do not read the unique float rows.",
+      "evidence": [
+        "Source/Abrams/Private/CP_190_ActionController.cpp:543",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:545",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:550",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:557",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:560",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:591",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:609",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:617",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:623",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:640"
+      ]
+    },
+    {
+      "text": "The generic trap controller reads source-interface row 7 and row 8 floats for its own Uzumaki behavior. Those reads are not CP_190 readers: CP_190's traced row 7/8 consumers are the blood-beam actions and MakeUniqueCameraRequest, so the trap-only tail of row 8 is marked unresolved rather than assigned.",
+      "evidence": [
+        "Source/Abrams/Private/GameTrapActionController.cpp:184",
+        "Source/Abrams/Private/GameTrapActionController.cpp:188",
+        "Source/Abrams/Private/GameTrapActionController.cpp:1430",
+        "Source/Abrams/Private/GameTrapActionController.cpp:1432",
+        "Source/Abrams/Private/GameTrapActionController.cpp:1435",
+        "Source/Abrams/Private/GameTrapActionController.cpp:1445",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:1938",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:1975",
+        "Source/Abrams/Private/CP_190_ActionController.cpp:1981"
+      ]
+    }
+  ]
+}
